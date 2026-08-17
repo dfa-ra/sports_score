@@ -111,7 +111,9 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Файловое хранилище
 
-Аватары игроков и логотипы команд хранятся в S3-совместимом storage. В БД — `avatarUrl` / `logoUrl` (или object key). `StorageService` абстрагирует провайдер (MinIO локально, AWS S3 в production).
+По умолчанию аватары и логотипы сохраняются **на диск сервера** (`LOCAL_STORAGE_DIR`, обычно `/app/data/uploads` в Docker) и отдаются по URL `/media/...`.
+
+Опционально можно включить S3/MinIO (`S3_ENABLED=true`) — тогда используется `S3StorageService`.
 
 ## Уведомления
 
