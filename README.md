@@ -57,16 +57,22 @@ git push origin v0.1.0
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres redis minio minio-init
-cd backend && ./mvnw spring-boot:run
+# API без хранилища файлов (достаточно для старта)
+docker compose up -d --build postgres redis backend
 cd web && npm install && npm run dev
 ```
 
-Полный стек (API + зависимости, включая MinIO):
+С MinIO (аватары/логотипы):
 
 ```bash
-cp .env.example .env
-docker compose up --build
+# в .env: S3_ENABLED=true
+docker compose --profile storage up -d --build
+```
+
+Полный стек:
+
+```bash
+docker compose --profile full up -d --build
 ```
 
 API: `http://localhost:8080`  
