@@ -42,4 +42,29 @@ class PublicSurfaceSecurityTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/api/v1/tournaments",
+            "/api/v1/matches",
+            "/api/v1/teams",
+            "/api/v1/players",
+            "/api/v1/sports",
+            "/api/v1/statistics/players",
+            "/api/v1/statistics/teams"
+    })
+    void catalogIsPublicWithoutRegistration(String path) throws Exception {
+        mockMvc.perform(get(path)).andExpect(status().isOk());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/api/v1/players/me",
+            "/api/v1/auth/me",
+            "/api/v1/admin/users",
+            "/api/v1/referee/matches"
+    })
+    void privateSurfacesStillNeedALogin(String path) throws Exception {
+        mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
+    }
 }

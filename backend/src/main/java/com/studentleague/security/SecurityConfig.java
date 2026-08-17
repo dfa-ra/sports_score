@@ -78,6 +78,20 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/media/**"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/players/me").authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/tournaments",
+                                "/api/v1/tournaments/**",
+                                "/api/v1/matches",
+                                "/api/v1/matches/**",
+                                "/api/v1/teams",
+                                "/api/v1/teams/**",
+                                "/api/v1/players",
+                                "/api/v1/players/**",
+                                "/api/v1/statistics/**",
+                                "/api/v1/sports",
+                                "/api/v1/sports/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

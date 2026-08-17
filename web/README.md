@@ -38,7 +38,7 @@ npm run preview
 
 ## Основные разделы
 
-Пользователю доступен только этот фронтенд. Swagger, OpenAPI и Actuator на backend закрыты.
+Каталог открыт без регистрации. Создание команд, турниров, матчей и смена ролей — в интерфейсе (профиль, карточки, админ-панель). Swagger закрыт.
 
 - Публичные: Home, турниры, матчи (live), команды, игроки, статистика, login/register
 - Admin: дашборд со вкладками users / tournaments / matches / teams / players / referees / statistics

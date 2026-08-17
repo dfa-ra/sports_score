@@ -36,7 +36,7 @@ const visible = computed(() => {
   <section class="stack">
     <div class="page-title">
       <h1>Матчи</h1>
-      <p>Live и расписание. Карточка открывает ленту событий.</p>
+      <p>Live и расписание. Смотреть можно без регистрации.</p>
     </div>
     <div class="filters">
       <button class="btn secondary" :class="{ on: filter === 'ALL' }" @click="filter = 'ALL'">Все</button>

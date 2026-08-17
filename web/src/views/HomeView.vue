@@ -14,10 +14,6 @@ const loaded = ref(false)
 const teams = useTeamDirectory()
 
 onMounted(async () => {
-  if (!auth.isAuthenticated) {
-    loaded.value = true
-    return
-  }
   try {
     await teams.load()
     const { data } = await api.get('/matches', { params: { size: 12, sort: 'scheduledAt,desc' } })
@@ -25,7 +21,7 @@ onMounted(async () => {
     liveMatches.value = items.filter((m: any) => m.status === 'LIVE' || m.status === 'PAUSED')
     upcoming.value = items.filter((m: any) => m.status === 'SCHEDULED').slice(0, 4)
   } catch {
-    // guest / offline
+    // offline
   } finally {
     loaded.value = true
   }
@@ -39,13 +35,13 @@ onMounted(async () => {
         <p class="eyebrow">Студенческая спортивная лига</p>
         <h1>Счёт живой. Трибуна тоже.</h1>
         <p class="lede">
-          Live-счёт, турниры и статистика без лишнего шума —
-          плюс кабинеты капитана, судьи и администратора.
+          Смотрите матчи, таблицы и статистику без регистрации.
+          Аккаунт нужен только капитанам, судьям и тем, кто хочет выйти на поле.
         </p>
         <div class="cta">
           <RouterLink class="btn" to="/matches">Смотреть матчи</RouterLink>
           <RouterLink class="btn secondary" to="/tournaments">Турниры</RouterLink>
-          <RouterLink v-if="!auth.isAuthenticated" class="btn success" to="/register">Создать аккаунт</RouterLink>
+          <RouterLink v-if="!auth.isAuthenticated" class="btn success" to="/register">Стать игроком</RouterLink>
         </div>
       </div>
       <div class="hero-side">
@@ -58,13 +54,13 @@ onMounted(async () => {
           <strong>{{ upcoming.length }}</strong>
         </div>
         <div class="stat accent">
-          <span class="stat-label">Ваша роль</span>
-          <strong>{{ labelOf(roleLabel, auth.role, 'Гость') }}</strong>
+          <span class="stat-label">Вы</span>
+          <strong>{{ auth.isAuthenticated ? labelOf(roleLabel, auth.role) : 'Зритель' }}</strong>
         </div>
       </div>
     </div>
 
-    <div v-if="auth.isAuthenticated" class="grid cards">
+    <div class="grid cards">
       <RouterLink class="panel feature" to="/matches">
         <h2>Матчи</h2>
         <p>Расписание, live-счёт и лента событий. Без бесконечного обновления страницы.</p>
@@ -78,7 +74,7 @@ onMounted(async () => {
         <p>Голы, пасы и таблица — из реальных событий, не из легенд раздевалки.</p>
       </RouterLink>
       <RouterLink
-        v-if="auth.role === 'REFEREE' || auth.role === 'ADMIN'"
+        v-if="auth.canOfficiate"
         class="panel feature"
         to="/referee"
       >
@@ -87,7 +83,7 @@ onMounted(async () => {
       </RouterLink>
     </div>
 
-    <div v-if="loaded && auth.isAuthenticated && liveMatches.length" class="stack">
+    <div v-if="loaded && liveMatches.length" class="stack">
       <div class="page-title">
         <h2>Идут сейчас</h2>
         <p>Пока свисток не прозвучал — можно дышать вместе со счётом.</p>
@@ -107,7 +103,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="loaded && auth.isAuthenticated && upcoming.length" class="stack">
+    <div v-if="loaded && upcoming.length" class="stack">
       <div class="page-title">
         <h2>На подходе</h2>
       </div>

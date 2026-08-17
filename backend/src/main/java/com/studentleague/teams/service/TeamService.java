@@ -54,23 +54,25 @@ public class TeamService {
 
     @Transactional
     public TeamResponse createTeam(UserPrincipal principal, CreateTeamRequest request) {
-        PlayerProfile creatorProfile = requireProfileForUser(principal.getId());
-
         Team team = new Team();
         team.setName(request.name().trim());
         team.setShortName(request.shortName());
         team.setLogoUrl(request.logoUrl());
+
+        if (principal.getRole() == Role.ADMIN) {
+            playerProfileRepository.findByUserId(principal.getId()).ifPresentOrElse(profile -> {
+                team.setCaptainId(profile.getId());
+                teamRepository.save(team);
+                ensureActiveMembership(team.getId(), profile.getId());
+            }, () -> teamRepository.save(team));
+            return toTeamResponse(team);
+        }
+
+        PlayerProfile creatorProfile = requireProfileForUser(principal.getId());
         team.setCaptainId(creatorProfile.getId());
         teamRepository.save(team);
-
-        TeamMember membership = new TeamMember();
-        membership.setTeamId(team.getId());
-        membership.setPlayerId(creatorProfile.getId());
-        membership.setStatus(TeamMemberStatus.ACTIVE);
-        teamMemberRepository.save(membership);
-
+        ensureActiveMembership(team.getId(), creatorProfile.getId());
         promoteToCaptain(creatorProfile.getUserId());
-
         return toTeamResponse(team);
     }
 
@@ -200,6 +202,14 @@ public class TeamService {
             user.setRole(Role.CAPTAIN);
             userRepository.save(user);
         }
+    }
+
+    private void ensureActiveMembership(UUID teamId, UUID playerId) {
+        TeamMember membership = teamMemberRepository.findByTeamIdAndPlayerId(teamId, playerId).orElseGet(TeamMember::new);
+        membership.setTeamId(teamId);
+        membership.setPlayerId(playerId);
+        membership.setStatus(TeamMemberStatus.ACTIVE);
+        teamMemberRepository.save(membership);
     }
 
     private PlayerProfile requireProfileForUser(UUID userId) {

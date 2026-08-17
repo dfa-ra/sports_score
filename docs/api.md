@@ -130,9 +130,9 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/players` | Авторизованный |
-| GET | `/players/{id}` | Авторизованный |
-| GET | `/players/{id}/card` | Авторизованный — публичная карточка |
+| GET | `/players` | Публичный |
+| GET | `/players/{id}` | Публичный |
+| GET | `/players/{id}/card` | Публичный |
 | PUT | `/players/me` | Свой профиль (создаёт/обновляет) |
 
 Публичная карточка: имя, фото, команда, номер, позиция, статистика, история матчей.
@@ -143,7 +143,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET/POST | `/teams` | Чтение: auth; создание: с профилем игрока (становится капитаном) |
+| GET/POST | `/teams` | Чтение: публичное; создание: игрок (становится капитаном) или ADMIN |
 | GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN |
 | GET | `/teams/{id}/members` | Auth |
 | POST | `/teams/{id}/members` | Капитан команды |
@@ -156,7 +156,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/sports` | Auth |
+| GET | `/sports` | Публичный |
 
 ---
 
@@ -164,7 +164,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET/POST | `/tournaments` | POST: ADMIN |
+| GET/POST | `/tournaments` | GET: публичный; POST: ADMIN |
 | GET/PUT | `/tournaments/{id}` | PUT: ADMIN |
 | POST | `/tournaments/{id}/teams` | CAPTAIN — заявка своей команды |
 | POST | `/tournaments/{id}/teams/{teamId}/approve` | ADMIN |
@@ -178,8 +178,8 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/matches` | Auth — фильтры |
-| GET | `/matches/{id}` | Auth |
+| GET | `/matches` | Публичный — фильтры |
+| GET | `/matches/{id}` | Публичный |
 | POST | `/matches` | ADMIN |
 | POST | `/matches/{id}/referees` | ADMIN |
 | GET | `/matches/{id}/events` | Auth |
@@ -207,8 +207,8 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/statistics/players` | Auth — фильтры |
-| GET | `/statistics/teams` | Auth — фильтры |
+| GET | `/statistics/players` | Публичный — фильтры |
+| GET | `/statistics/teams` | Публичный — фильтры |
 
 Считается из не-voided записей `MatchEvent`.
 
@@ -260,9 +260,11 @@ Auth: `Authorization: Bearer <access_token>`
 
 ## Матрица авторизации (кратко)
 
-| Возможность | FAN | PLAYER | CAPTAIN | REFEREE | ADMIN |
-|---|---|---|---|---|---|
-| Просмотр публичных данных | ✓ | ✓ | ✓ | ✓ | ✓ |
+Чтение каталога (турниры, матчи, команды, игроки, статистика, виды спорта) **публичное**: регистрация не нужна.
+
+| Возможность | Без входа | FAN | PLAYER | CAPTAIN | REFEREE | ADMIN |
+|---|---|---|---|---|---|---|
+| Просмотр публичных данных | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Свой профиль | | ✓ | ✓ | | ✓ |
 | Состав своей команды | | | ✓* | | ✓ |
 | Заявка команды на турнир | | | ✓* | | ✓ |

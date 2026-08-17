@@ -54,8 +54,9 @@ async function logout() {
           <RouterLink to="/teams">Команды</RouterLink>
           <RouterLink to="/players">Игроки</RouterLink>
           <RouterLink to="/statistics">Статистика</RouterLink>
-          <RouterLink v-if="auth.role === 'ADMIN'" to="/admin">Админ</RouterLink>
-          <RouterLink v-if="auth.role === 'REFEREE' || auth.role === 'ADMIN'" to="/referee">Судья</RouterLink>
+          <RouterLink v-if="auth.canManageLeague" to="/admin">Админ</RouterLink>
+          <RouterLink v-if="auth.canOfficiate" to="/referee">Судья</RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/profile">Профиль</RouterLink>
         </nav>
 
         <div class="auth">
@@ -78,7 +79,7 @@ async function logout() {
     </main>
     <footer class="foot">
       <div class="container">
-        Поле открыто. Свисток — у судьи, а не у Swagger.
+        Смотреть можно без билета. Играть — после регистрации.
       </div>
     </footer>
   </div>

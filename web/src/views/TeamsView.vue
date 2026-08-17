@@ -2,27 +2,40 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
+import { useAuthStore } from '../stores/auth'
 import { initials } from '../lib/format'
+import CreateTeamForm from '../components/CreateTeamForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 
+const auth = useAuthStore()
 const items = ref<any[]>([])
 const loading = ref(true)
+const showForm = ref(false)
 
-onMounted(async () => {
+async function load() {
   try {
     const { data } = await api.get('/teams', { params: { size: 50 } })
     items.value = data.content
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
 </script>
 
 <template>
   <section class="stack">
     <div class="page-title">
       <h1>Команды</h1>
-      <p>Составы и капитаны студенческой лиги.</p>
+      <p>Составы и капитаны студенческой лиги. Смотреть можно всем.</p>
+    </div>
+    <div v-if="auth.isAuthenticated" class="toolbar">
+      <button class="btn" @click="showForm = !showForm">{{ showForm ? 'Скрыть форму' : 'Создать команду' }}</button>
+      <RouterLink v-if="auth.role === 'FAN'" class="btn secondary" to="/profile">Сначала профиль игрока</RouterLink>
+    </div>
+    <div v-if="showForm" class="panel">
+      <CreateTeamForm @created="load" />
     </div>
     <div v-if="loading" class="grid cards">
       <div v-for="n in 4" :key="n" class="skeleton" />
@@ -39,6 +52,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .card-link { display: grid; gap: 0.35rem; justify-items: start; }
 .crest {
   width: 42px;

@@ -72,5 +72,32 @@ export const useAuthStore = defineStore('auth', () => {
     persist()
   }
 
-  return { accessToken, refreshToken, user, isAuthenticated, role, register, login, refresh, logout, logoutLocal }
+  async function refreshMe() {
+    if (!accessToken.value) return null
+    const { data } = await api.get('/auth/me')
+    user.value = data
+    persist()
+    return data
+  }
+
+  const canManageLeague = computed(() => role.value === 'ADMIN')
+  const canManageTeam = computed(() => role.value === 'CAPTAIN' || role.value === 'ADMIN')
+  const canOfficiate = computed(() => role.value === 'REFEREE' || role.value === 'ADMIN')
+
+  return {
+    accessToken,
+    refreshToken,
+    user,
+    isAuthenticated,
+    role,
+    canManageLeague,
+    canManageTeam,
+    canOfficiate,
+    register,
+    login,
+    refresh,
+    refreshMe,
+    logout,
+    logoutLocal,
+  }
 })

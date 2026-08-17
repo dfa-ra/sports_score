@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, labelOf } from '../lib/format'
+import { apiError } from '../lib/errors'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import CopyChip from '../components/CopyChip.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -14,7 +15,13 @@ const route = useRoute()
 const auth = useAuthStore()
 const match = ref<any>(null)
 const events = ref<any[]>([])
+const referees = ref<any[]>([])
+const users = ref<any[]>([])
+const refereeId = ref('')
 const connected = ref(false)
+const error = ref('')
+const ok = ref('')
+const pending = ref(false)
 const teams = useTeamDirectory()
 let client: Client | null = null
 
@@ -23,9 +30,34 @@ const timeline = computed(() => [...events.value].reverse())
 async function load() {
   const id = route.params.id
   await teams.load()
-  const [m, e] = await Promise.all([api.get(`/matches/${id}`), api.get(`/matches/${id}/events`)])
+  const [m, e, r] = await Promise.all([
+    api.get(`/matches/${id}`),
+    api.get(`/matches/${id}/events`),
+    api.get(`/matches/${id}/referees`),
+  ])
   match.value = m.data
   events.value = e.data
+  referees.value = r.data
+  if (auth.canManageLeague) {
+    const { data } = await api.get('/admin/users', { params: { size: 100 } })
+    users.value = (data.content ?? []).filter((u: any) => u.role === 'REFEREE')
+    if (!refereeId.value && users.value[0]) refereeId.value = users.value[0].id
+  }
+}
+
+async function assignReferee() {
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.post(`/matches/${match.value.id}/referees`, { refereeId: refereeId.value })
+    ok.value = 'Судья назначен. Пульт уже ждёт.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
 }
 
 onMounted(async () => {
@@ -76,6 +108,23 @@ onUnmounted(() => client?.deactivate())
       <p class="muted">
         Период {{ match.period ?? '—' }} · {{ formatClock(match.gameTimeSeconds) }} игрового времени
       </p>
+    </div>
+
+    <div v-if="auth.canManageLeague" class="panel stack">
+      <h2>Судьи</h2>
+      <p v-for="r in referees" :key="r.id" class="muted">{{ r.refereeEmail || r.refereeId }}</p>
+      <form class="stack" @submit.prevent="assignReferee">
+        <label class="field">Назначить судью
+          <select v-model="refereeId" required>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
+          </select>
+        </label>
+        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
+      </form>
+      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
+      <p v-if="error" class="form-error">{{ error }}</p>
+      <p v-if="ok" class="form-ok">{{ ok }}</p>
+      <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
     </div>
 
     <div class="panel">

@@ -3,6 +3,11 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import { labelOf, roleLabel } from '../../lib/format'
+import { apiError } from '../../lib/errors'
+import { useTeamDirectory } from '../../lib/useTeamDirectory'
+import CreateMatchForm from '../../components/CreateMatchForm.vue'
+import CreateTeamForm from '../../components/CreateTeamForm.vue'
+import CreateTournamentForm from '../../components/CreateTournamentForm.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 
 const users = ref<any[]>([])
@@ -14,6 +19,10 @@ const sports = ref<any[]>([])
 const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics'>('users')
 const teamStats = ref<any[]>([])
 const playerStats = ref<any[]>([])
+const error = ref('')
+const ok = ref('')
+const pending = ref(false)
+const names = useTeamDirectory()
 
 const tabs = [
   { id: 'users', label: 'Пользователи' },
@@ -25,9 +34,9 @@ const tabs = [
   { id: 'statistics', label: 'Статистика' },
 ] as const
 
-onMounted(async () => {
+async function load() {
   const [u, t, m, tm, p, s, ts, ps] = await Promise.all([
-    api.get('/admin/users', { params: { size: 50 } }),
+    api.get('/admin/users', { params: { size: 100 } }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
     api.get('/teams', { params: { size: 50 } }),
@@ -44,7 +53,25 @@ onMounted(async () => {
   sports.value = s.data
   teamStats.value = ts.data
   playerStats.value = ps.data
-})
+  await names.load()
+}
+
+onMounted(load)
+
+async function updateUser(user: any) {
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.patch(`/admin/users/${user.id}`, { role: user.role, enabled: user.enabled })
+    ok.value = `${user.email} обновлён.`
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
 </script>
 
 <template>
@@ -52,7 +79,7 @@ onMounted(async () => {
     <div class="page-title">
       <p class="eyebrow">Служебный вход</p>
       <h1>Админ-панель</h1>
-      <p>Пользователи, турниры, матчи и статистика. Без Swagger — всё, что нужно, уже здесь.</p>
+      <p>Всё управление лигой — здесь. Без curl, без Swagger, только кнопки.</p>
     </div>
     <div class="tabs">
       <button
@@ -63,41 +90,80 @@ onMounted(async () => {
         @click="tab = t.id"
       >{{ t.label }}</button>
     </div>
+    <p v-if="error" class="form-error">{{ error }}</p>
+    <p v-if="ok" class="form-ok">{{ ok }}</p>
 
     <div v-if="tab === 'users'" class="panel">
       <h2>Пользователи</h2>
+      <p class="muted">Админа через форму не назначают — он из .env. Остальным роли ставятся здесь.</p>
       <table class="table">
-        <thead><tr><th>Email</th><th>Роль</th><th>Активен</th></tr></thead>
+        <thead><tr><th>Email</th><th>Роль</th><th>Активен</th><th></th></tr></thead>
         <tbody>
           <tr v-for="u in users" :key="u.id">
             <td>{{ u.email }}</td>
-            <td>{{ labelOf(roleLabel, u.role) }}</td>
-            <td>{{ u.enabled ? 'да' : 'нет' }}</td>
+            <td>
+              <select v-if="u.role !== 'ADMIN'" v-model="u.role">
+                <option value="FAN">Зритель</option>
+                <option value="PLAYER">Игрок</option>
+                <option value="CAPTAIN">Капитан</option>
+                <option value="REFEREE">Судья</option>
+              </select>
+              <span v-else>{{ labelOf(roleLabel, u.role) }}</span>
+            </td>
+            <td>
+              <label class="check">
+                <input v-model="u.enabled" type="checkbox" :disabled="u.role === 'ADMIN'" />
+                {{ u.enabled ? 'да' : 'нет' }}
+              </label>
+            </td>
+            <td>
+              <button v-if="u.role !== 'ADMIN'" class="btn" :disabled="pending" @click="updateUser(u)">Сохранить</button>
+            </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <div v-else-if="tab === 'tournaments'" class="panel">
-      <h2>Турниры</h2>
-      <div v-for="t in tournaments" :key="t.id" class="row">
-        <RouterLink :to="`/tournaments/${t.id}`">{{ t.name }}</RouterLink>
-        <StatusBadge :status="t.status" />
+    <div v-else-if="tab === 'tournaments'" class="grid two">
+      <div class="panel stack">
+        <h2>Новый турнир</h2>
+        <CreateTournamentForm @created="load" />
+      </div>
+      <div class="panel">
+        <h2>Уже идут</h2>
+        <div v-for="t in tournaments" :key="t.id" class="row">
+          <RouterLink :to="`/tournaments/${t.id}`">{{ t.name }}</RouterLink>
+          <StatusBadge :status="t.status" />
+        </div>
       </div>
     </div>
 
-    <div v-else-if="tab === 'matches'" class="panel">
-      <h2>Матчи</h2>
-      <div v-for="m in matches" :key="m.id" class="row">
-        <RouterLink :to="`/matches/${m.id}`">{{ m.homeScore }}:{{ m.awayScore }}</RouterLink>
-        <StatusBadge :status="m.status" />
+    <div v-else-if="tab === 'matches'" class="grid two">
+      <div class="panel stack">
+        <h2>Назначить матч</h2>
+        <CreateMatchForm @created="load" />
+      </div>
+      <div class="panel">
+        <h2>Сетка</h2>
+        <div v-for="m in matches" :key="m.id" class="row">
+          <RouterLink :to="`/matches/${m.id}`">
+            {{ names.name(m.homeTeamId) }} {{ m.homeScore }}:{{ m.awayScore }} {{ names.name(m.awayTeamId) }}
+          </RouterLink>
+          <StatusBadge :status="m.status" />
+        </div>
       </div>
     </div>
 
-    <div v-else-if="tab === 'teams'" class="panel">
-      <h2>Команды</h2>
-      <div v-for="t in teams" :key="t.id" class="row">
-        <RouterLink :to="`/teams/${t.id}`">{{ t.name }}</RouterLink>
+    <div v-else-if="tab === 'teams'" class="grid two">
+      <div class="panel stack">
+        <h2>Новая команда</h2>
+        <CreateTeamForm @created="load" />
+      </div>
+      <div class="panel">
+        <h2>Клубы</h2>
+        <div v-for="t in teams" :key="t.id" class="row">
+          <RouterLink :to="`/teams/${t.id}`">{{ t.name }}</RouterLink>
+        </div>
       </div>
     </div>
 
@@ -108,8 +174,9 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-else-if="tab === 'referees'" class="panel">
+    <div v-else-if="tab === 'referees'" class="panel stack">
       <h2>Судьи</h2>
+      <p class="muted">Роль ставится во вкладке «Пользователи». Потом судью назначают в карточке матча.</p>
       <div v-for="u in users.filter(x => x.role === 'REFEREE')" :key="u.id" class="row">{{ u.email }}</div>
       <p class="muted">Виды спорта: {{ sports.map(s => s.code).join(', ') || 'пока не заданы' }}</p>
     </div>
@@ -138,5 +205,10 @@ h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
   gap: 1rem;
   padding: 0.65rem 0;
   border-bottom: 1px solid var(--line);
+}
+.grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.check { display: inline-flex; align-items: center; gap: 0.4rem; }
+@media (max-width: 860px) {
+  .grid.two { grid-template-columns: 1fr; }
 }
 </style>
