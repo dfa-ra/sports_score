@@ -4,6 +4,8 @@ import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.notifications.NotificationEventType;
+import com.studentleague.notifications.NotificationService;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.repository.SportRepository;
@@ -43,6 +45,7 @@ public class TournamentService {
     private final TeamRepository teamRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final MatchRepository matchRepository;
+    private final NotificationService notificationService;
 
     public TournamentService(
             TournamentRepository tournamentRepository,
@@ -50,7 +53,8 @@ public class TournamentService {
             SportRepository sportRepository,
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
-            MatchRepository matchRepository
+            MatchRepository matchRepository,
+            NotificationService notificationService
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
@@ -58,6 +62,7 @@ public class TournamentService {
         this.teamRepository = teamRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.matchRepository = matchRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -149,6 +154,16 @@ public class TournamentService {
         entry.setTeamId(team.getId());
         entry.setStatus(TournamentTeamStatus.PENDING);
         tournamentTeamRepository.save(entry);
+        notificationService.publishToUser(
+                principal.getId(),
+                NotificationEventType.TOURNAMENT_REGISTRATION,
+                "Tournament registration submitted",
+                team.getName() + " registered for " + tournament.getName(),
+                Map.of(
+                        "tournamentId", tournamentId.toString(),
+                        "teamId", team.getId().toString()
+                )
+        );
         return toTeamResponse(entry, team.getName());
     }
 

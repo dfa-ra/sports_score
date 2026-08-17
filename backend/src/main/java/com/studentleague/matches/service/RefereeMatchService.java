@@ -90,6 +90,13 @@ public class RefereeMatchService {
         match.setPeriod(1);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_STARTED");
+        notificationService.publishToUser(
+                principal.getId(),
+                com.studentleague.notifications.NotificationEventType.MATCH_STARTING,
+                "Match started",
+                "Your assigned match is now live",
+                java.util.Map.of("matchId", matchId.toString())
+        );
         return response;
     }
 
@@ -128,6 +135,13 @@ public class RefereeMatchService {
         match.setFinishedAt(Instant.now());
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_FINISHED");
+        notificationService.publishToUser(
+                principal.getId(),
+                com.studentleague.notifications.NotificationEventType.MATCH_FINISHED,
+                "Match finished",
+                "Final score " + response.homeScore() + ":" + response.awayScore(),
+                java.util.Map.of("matchId", matchId.toString())
+        );
         return response;
     }
 
@@ -156,13 +170,13 @@ public class RefereeMatchService {
         MatchEventResponse eventResponse = toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT");
         if (request.eventType() == com.studentleague.matches.domain.MatchEventType.GOAL) {
-            notificationService.publish(new com.studentleague.notifications.NotificationPayload(
-                    com.studentleague.notifications.NotificationEventType.GOAL,
+            notificationService.publishToUser(
                     principal.getId(),
+                    com.studentleague.notifications.NotificationEventType.GOAL,
                     "Goal!",
                     "A goal was scored",
                     java.util.Map.of("matchId", matchId.toString())
-            ));
+            );
         }
         return eventResponse;
     }

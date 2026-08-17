@@ -216,6 +216,28 @@ Message example:
 
 ---
 
+## Notifications / Push
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/notifications/device-tokens` | Bearer | Register ANDROID/IOS/WEB device token |
+| DELETE | `/notifications/device-tokens?token=` | Bearer | Unregister token |
+
+Push delivery goes through `NotificationService` → `PushNotificationProvider` (no-op by default; optional FCM/APNs stubs).
+
+Domain triggers: match starting/finished, goal, tournament registration, team invitation, schedule update.
+
+---
+
+## Uploads
+
+| Method | Path | Auth |
+|---|---|---|
+| POST | `/uploads/players/me/avatar` | Authenticated (multipart `file`) |
+| POST | `/uploads/teams/{teamId}/logo` | Captain of team or ADMIN |
+
+---
+
 ## Authorization matrix (summary)
 
 | Capability | FAN | PLAYER | CAPTAIN | REFEREE | ADMIN |

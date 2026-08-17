@@ -3,6 +3,8 @@ package com.studentleague.teams.service;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.notifications.NotificationEventType;
+import com.studentleague.notifications.NotificationService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.dto.AddTeamMemberRequest;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -33,17 +36,20 @@ public class TeamService {
     private final TeamMemberRepository teamMemberRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     public TeamService(
             TeamRepository teamRepository,
             TeamMemberRepository teamMemberRepository,
             PlayerProfileRepository playerProfileRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            NotificationService notificationService
     ) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -131,6 +137,14 @@ public class TeamService {
             user.setRole(Role.PLAYER);
             userRepository.save(user);
         }
+
+        notificationService.publishToUser(
+                player.getUserId(),
+                NotificationEventType.TEAM_INVITATION,
+                "Added to team",
+                "You were added to " + team.getName(),
+                Map.of("teamId", teamId.toString(), "playerId", player.getId().toString())
+        );
 
         return toMemberResponse(member);
     }
