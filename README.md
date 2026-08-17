@@ -85,14 +85,24 @@ Copy `.env.example` to `.env`. Never commit secrets.
 
 1. Architecture + database + authentication ✅
 2. Users + players + teams ✅
-3. Tournaments + matches ← **current**
-4. Referee mode + match events
-5. WebSocket + live score
-6. Statistics
-7. Vue web
-8. Flutter mobile
-9. Push notifications
-10. Testing + Docker + production hardening
+3. Tournaments + matches ✅
+4. Referee mode + match events ✅
+5. WebSocket + live score ✅
+6. Statistics ✅
+7. Vue web ✅
+8. Flutter mobile ✅ (skeleton + referee large-button UI)
+9. Push notifications ✅ (provider abstraction + no-op)
+10. Testing + Docker + production hardening ✅ (baseline)
+
+## Web
+
+```bash
+cd web && npm install && npm run dev
+```
+
+## Mobile
+
+See [mobile/README.md](mobile/README.md).
 
 ## License
 

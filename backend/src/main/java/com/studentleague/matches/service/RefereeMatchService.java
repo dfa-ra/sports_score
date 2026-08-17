@@ -13,6 +13,7 @@ import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.matches.scoring.ScorePolicyRegistry;
 import com.studentleague.matches.scoring.ScoreSnapshot;
+import com.studentleague.notifications.NotificationService;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.entity.Sport;
@@ -43,6 +44,7 @@ public class RefereeMatchService {
     private final ScorePolicyRegistry scorePolicyRegistry;
     private final MatchService matchService;
     private final LiveMatchPublisher liveMatchPublisher;
+    private final NotificationService notificationService;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -53,7 +55,8 @@ public class RefereeMatchService {
             PlayerProfileRepository playerProfileRepository,
             ScorePolicyRegistry scorePolicyRegistry,
             MatchService matchService,
-            LiveMatchPublisher liveMatchPublisher
+            LiveMatchPublisher liveMatchPublisher,
+            NotificationService notificationService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -64,6 +67,7 @@ public class RefereeMatchService {
         this.scorePolicyRegistry = scorePolicyRegistry;
         this.matchService = matchService;
         this.liveMatchPublisher = liveMatchPublisher;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -151,6 +155,15 @@ public class RefereeMatchService {
         MatchResponse matchResponse = toResponse(matchRepository.save(match));
         MatchEventResponse eventResponse = toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT");
+        if (request.eventType() == com.studentleague.matches.domain.MatchEventType.GOAL) {
+            notificationService.publish(new com.studentleague.notifications.NotificationPayload(
+                    com.studentleague.notifications.NotificationEventType.GOAL,
+                    principal.getId(),
+                    "Goal!",
+                    "A goal was scored",
+                    java.util.Map.of("matchId", matchId.toString())
+            ));
+        }
         return eventResponse;
     }
 
