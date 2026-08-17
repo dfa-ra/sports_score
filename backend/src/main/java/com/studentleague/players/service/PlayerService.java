@@ -6,6 +6,8 @@ import com.studentleague.players.dto.PlayerProfileRequest;
 import com.studentleague.players.dto.PlayerProfileResponse;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.statistics.dto.PlayerStatisticsResponse;
+import com.studentleague.statistics.service.StatisticsService;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.entity.TeamMember;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -30,17 +33,20 @@ public class PlayerService {
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
+    private final StatisticsService statisticsService;
 
     public PlayerService(
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             TeamMemberRepository teamMemberRepository,
-            TeamRepository teamRepository
+            TeamRepository teamRepository,
+            StatisticsService statisticsService
     ) {
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamRepository = teamRepository;
+        this.statisticsService = statisticsService;
     }
 
     @Transactional
@@ -100,6 +106,17 @@ public class PlayerService {
                         team.getId(), team.getName(), team.getShortName(), team.getLogoUrl());
             }
         }
+        Map<String, Object> statistics = new HashMap<>();
+        List<PlayerStatisticsResponse> stats = statisticsService.playerStatistics(null, null, null, playerId);
+        if (!stats.isEmpty()) {
+            PlayerStatisticsResponse s = stats.getFirst();
+            statistics.put("goals", s.goals());
+            statistics.put("assists", s.assists());
+            statistics.put("yellowCards", s.yellowCards());
+            statistics.put("redCards", s.redCards());
+            statistics.put("appearances", s.appearances());
+        }
+
         return new PlayerCardResponse(
                 profile.getId(),
                 profile.getFirstName(),
@@ -109,7 +126,7 @@ public class PlayerService {
                 profile.getJerseyNumber(),
                 profile.getPosition(),
                 teamSummary,
-                Map.of(),
+                statistics,
                 List.of()
         );
     }

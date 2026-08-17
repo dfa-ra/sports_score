@@ -7,6 +7,7 @@ import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
@@ -41,6 +42,7 @@ public class RefereeMatchService {
     private final PlayerProfileRepository playerProfileRepository;
     private final ScorePolicyRegistry scorePolicyRegistry;
     private final MatchService matchService;
+    private final LiveMatchPublisher liveMatchPublisher;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -50,7 +52,8 @@ public class RefereeMatchService {
             TeamMemberRepository teamMemberRepository,
             PlayerProfileRepository playerProfileRepository,
             ScorePolicyRegistry scorePolicyRegistry,
-            MatchService matchService
+            MatchService matchService,
+            LiveMatchPublisher liveMatchPublisher
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -60,6 +63,7 @@ public class RefereeMatchService {
         this.playerProfileRepository = playerProfileRepository;
         this.scorePolicyRegistry = scorePolicyRegistry;
         this.matchService = matchService;
+        this.liveMatchPublisher = liveMatchPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -80,7 +84,9 @@ public class RefereeMatchService {
         match.setStartedAt(Instant.now());
         match.setGameTimeSeconds(0);
         match.setPeriod(1);
-        return toResponse(matchRepository.save(match));
+        MatchResponse response = toResponse(matchRepository.save(match));
+        liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_STARTED");
+        return response;
     }
 
     @Transactional
@@ -90,7 +96,9 @@ public class RefereeMatchService {
             throw ApiException.badRequest("Only LIVE matches can be paused");
         }
         match.setStatus(MatchStatus.PAUSED);
-        return toResponse(matchRepository.save(match));
+        MatchResponse response = toResponse(matchRepository.save(match));
+        liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_PAUSED");
+        return response;
     }
 
     @Transactional
@@ -100,7 +108,9 @@ public class RefereeMatchService {
             throw ApiException.badRequest("Only PAUSED matches can be resumed");
         }
         match.setStatus(MatchStatus.LIVE);
-        return toResponse(matchRepository.save(match));
+        MatchResponse response = toResponse(matchRepository.save(match));
+        liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_RESUMED");
+        return response;
     }
 
     @Transactional
@@ -112,7 +122,9 @@ public class RefereeMatchService {
         recalculateScore(match);
         match.setStatus(MatchStatus.FINISHED);
         match.setFinishedAt(Instant.now());
-        return toResponse(matchRepository.save(match));
+        MatchResponse response = toResponse(matchRepository.save(match));
+        liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_FINISHED");
+        return response;
     }
 
     @Transactional
@@ -136,8 +148,10 @@ public class RefereeMatchService {
         matchEventRepository.save(event);
 
         recalculateScore(match);
-        matchRepository.save(match);
-        return toEventResponse(event);
+        MatchResponse matchResponse = toResponse(matchRepository.save(match));
+        MatchEventResponse eventResponse = toEventResponse(event);
+        liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT");
+        return eventResponse;
     }
 
     @Transactional
@@ -159,11 +173,10 @@ public class RefereeMatchService {
         matchEventRepository.save(event);
 
         recalculateScore(match);
-        if (match.getStatus() == MatchStatus.FINISHED) {
-            // keep finished; score still recalculated
-        }
-        matchRepository.save(match);
-        return toEventResponse(event);
+        MatchResponse matchResponse = toResponse(matchRepository.save(match));
+        MatchEventResponse eventResponse = toEventResponse(event);
+        liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT_VOIDED");
+        return eventResponse;
     }
 
     @Transactional(readOnly = true)
