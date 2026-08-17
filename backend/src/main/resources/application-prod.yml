@@ -1,0 +1,41 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    com.studentleague: INFO
+    org.springframework.security: WARN
+
+app:
+  redis:
+    enabled: ${APP_REDIS_ENABLED:false}
+  s3:
+    enabled: ${S3_ENABLED:true}
+  jwt:
+    # Must be overridden via JWT_SECRET env in production (min 32 chars).
+    secret: ${JWT_SECRET}

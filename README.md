@@ -41,19 +41,32 @@ Hierarchy: `FAN` < `PLAYER` < `CAPTAIN`. Authorization is always enforced on the
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres redis
+docker compose up -d postgres redis minio minio-init
 cd backend && ./mvnw spring-boot:run
+cd web && npm install && npm run dev
+```
+
+Full stack (API + dependencies, including MinIO):
+
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
 API: `http://localhost:8080`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
-Health: `http://localhost:8080/api/v1/health`
+Health: `http://localhost:8080/api/v1/health`  
+MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
 
-Full stack (when wired):
+## Production checklist
 
-```bash
-docker compose up --build
-```
+- Set a strong unique `JWT_SECRET` (≥ 32 chars; never the example value)
+- Override `DATABASE_PASSWORD` (prod profile rejects the default)
+- Use `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway on)
+- Configure real `S3_*` credentials (or keep `S3_ENABLED=false` with no-op storage)
+- Restrict `CORS_ORIGINS` to real front-end origins
+- Enable FCM/APNs providers only with real credentials (`app.push.fcm.enabled` / `app.push.apns.enabled`)
+- Prefer Redis (`APP_REDIS_ENABLED=true`) for multi-instance rate limiting / live fan-out
 
 ## Environment variables
 
@@ -64,11 +77,15 @@ Copy `.env.example` to `.env`. Never commit secrets.
 | `DATABASE_URL` | JDBC URL |
 | `DATABASE_USERNAME` / `DATABASE_PASSWORD` | DB credentials |
 | `REDIS_URL` | Redis connection |
+| `APP_REDIS_ENABLED` | Enable Redis auto-config / cluster features |
 | `JWT_SECRET` | HMAC secret for access tokens |
 | `JWT_ACCESS_EXPIRATION` | Access token TTL (ms) |
 | `JWT_REFRESH_EXPIRATION` | Refresh token TTL (ms) |
+| `S3_ENABLED` | Use S3-compatible storage instead of no-op |
 | `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage |
+| `S3_PUBLIC_BASE_URL` | Public URL prefix for stored objects |
 | `CORS_ORIGINS` | Allowed browser origins |
+| `SPRING_PROFILES_ACTIVE` | `dev` / `prod` |
 
 ## Project layout
 

@@ -21,7 +21,8 @@ class JwtServiceTest {
                 new AppProperties.Cors(List.of("http://localhost:5173")),
                 new AppProperties.Jwt("test-secret-key-that-is-long-enough-for-hs256-algorithms-123456", 60_000, 3_600_000),
                 new AppProperties.RateLimit(30),
-                new AppProperties.S3("", "", "", "")
+                new AppProperties.S3(false, "", "", "", "", ""),
+                new AppProperties.Redis(false)
         );
         jwtService = new JwtService(properties);
     }
