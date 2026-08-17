@@ -1,15 +1,15 @@
-# Student League Mobile
+# Student League — Mobile
 
-Flutter feature-based client for Android and iOS.
+Flutter-клиент (одна codebase для Android и iOS) с feature-based архитектурой.
 
 ```
 lib/
-  core/       # networking, theme, app shell
+  core/       # сеть, тема, оболочка приложения
   features/   # auth, home, tournaments, matches, teams, players, statistics, profile, referee
-  shared/     # shared widgets/models
+  shared/     # общие виджеты/модели
 ```
 
-## Local
+## Локально
 
 ```bash
 flutter pub get
@@ -18,11 +18,11 @@ flutter test
 flutter run
 ```
 
-Referee mode uses large action buttons for live event entry.
+Режим судьи использует крупные кнопки для быстрого ввода событий во время матча.
 
-## CI builds
+## CI-сборки
 
-GitHub Actions builds:
+GitHub Actions собирает:
 
-- debug APK on every CI run
-- release APK + AAB (and optional unsigned iOS payload) on version tags — see [docs/ci.md](../docs/ci.md)
+- debug APK на каждом CI-прогоне
+- release APK + AAB (и опциональный unsigned iOS payload) по version tags — см. [docs/ci.md](../docs/ci.md)

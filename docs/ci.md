@@ -1,53 +1,53 @@
 # CI / CD
 
-GitHub Actions workflows live under `.github/workflows/`.
+Workflows GitHub Actions лежат в `.github/workflows/`.
 
-## Continuous Integration (`ci.yml`)
+## Непрерывная интеграция (`ci.yml`)
 
-Runs on pushes and pull requests:
+Запускается на push и pull request:
 
-| Job | What it does |
+| Job | Что делает |
 |---|---|
-| **Backend** | Java 21 + `./mvnw test` and `package` |
-| **Web** | Node 22 + `npm ci` + `npm run build` (uploads `web/dist`) |
-| **Mobile** | Flutter stable: `analyze`, `test`, debug APK smoke build |
+| **Backend** | Java 21 + `./mvnw test` и `package` |
+| **Web** | Node 22 + `npm ci` + `npm run build` (артефакт `web/dist`) |
+| **Mobile** | Flutter stable: `analyze`, `test`, smoke debug APK |
 
-## Releases (`release.yml`)
+## Релизы (`release.yml`)
 
-Triggered by:
+Триггеры:
 
-- pushing a version tag: `git tag v0.2.0 && git push origin v0.2.0`
-- or **Actions → Release → Run workflow** (manual version input)
+- push тега версии: `git tag v0.2.0 && git push origin v0.2.0`
+- или **Actions → Release → Run workflow** (ручной ввод версии)
 
-Produces a GitHub Release with:
+Создаёт GitHub Release с артефактами:
 
-| Artifact | Notes |
+| Артефакт | Примечание |
 |---|---|
 | Backend JAR | Spring Boot fat JAR |
-| Web `student-league-web-<ver>.tar.gz` | Vite production `dist/` |
-| Android APK + AAB | Flutter `--release` (default debug keystore until you add signing secrets) |
-| iOS unsigned zip | `Runner.app` from `macos-latest` (`--no-codesign`); optional / non-blocking |
+| Web `student-league-web-<ver>.tar.gz` | Production `dist/` Vite |
+| Android APK + AAB | Flutter `--release` (пока default keystore, пока не добавлены secrets подписи) |
+| iOS unsigned zip | `Runner.app` с `macos-latest` (`--no-codesign`); опционально / не блокирует релиз |
 
-### Android signing (Store-ready)
+### Подпись Android (готово к Store)
 
-Add repository secrets and extend `android-release` when ready:
+Добавьте secrets репозитория и расширьте job `android-release`:
 
 - `ANDROID_KEYSTORE_BASE64`
 - `ANDROID_KEYSTORE_PASSWORD`
 - `ANDROID_KEY_ALIAS`
 - `ANDROID_KEY_PASSWORD`
 
-Then decode the keystore in CI and pass `-P` / `key.properties` to Gradle before `flutter build appbundle --release`.
+В CI нужно декодировать keystore и передать `key.properties` / Gradle properties перед `flutter build appbundle --release`.
 
-### iOS signing (App Store)
+### Подпись iOS (App Store)
 
-Requires Apple certificates, provisioning profiles, and preferably [Fastlane Match](https://docs.fastlane.tools/actions/match/). The current job only validates that the iOS target compiles without codesign.
+Нужны сертификаты Apple, provisioning profiles и желательно [Fastlane Match](https://docs.fastlane.tools/actions/match/). Текущий job только проверяет, что iOS-таргет собирается без codesign.
 
-## Example release flow
+## Пример релизного потока
 
 ```bash
-# ensure CI is green on main
+# убедиться, что CI на main зелёный
 git tag v0.1.0
 git push origin v0.1.0
-# GitHub Actions → Release workflow uploads assets to the GitHub Release
+# GitHub Actions → Release загружает ассеты в GitHub Release
 ```

@@ -1,14 +1,14 @@
-# Database
+# База данных
 
-## Policy
+## Политика
 
-- **PostgreSQL** is the source of truth.
-- All schema changes go through **Flyway** (`backend/src/main/resources/db/migration`).
-- JPA `ddl-auto` is `validate` (or `none`) — never `create` / `update` in shared environments.
-- Prefer UUIDs for primary keys.
-- Avoid bidirectional serialization graphs; expose data via DTOs/projections.
+- **PostgreSQL** — источник истины.
+- Все изменения схемы — только через **Flyway** (`backend/src/main/resources/db/migration`).
+- JPA `ddl-auto` = `validate` (или `none`) — никогда `create` / `update` в общих окружениях.
+- Предпочтительны UUID как PK.
+- Избегать bidirectional serialization graphs; отдавать данные через DTO/projections.
 
-## Entity-relationship overview
+## Обзор связей
 
 ```
 User 1──1 PlayerProfile
@@ -21,12 +21,13 @@ Team (home/away) → Match
 Match *──* User(REFEREE) via MatchReferee
 Match 1──* MatchEvent
 User 1──* RefreshToken
+User 1──* DeviceToken
 ```
 
-## Tables
+## Таблицы
 
 ### users
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | email | VARCHAR UNIQUE NOT NULL | |
@@ -36,7 +37,7 @@ User 1──* RefreshToken
 | created_at / updated_at | TIMESTAMPTZ | |
 
 ### player_profiles
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | user_id | UUID UNIQUE FK → users | |
@@ -44,11 +45,11 @@ User 1──* RefreshToken
 | date_of_birth | DATE | nullable |
 | avatar_url | VARCHAR | S3 URL/key |
 | jersey_number | INT | nullable |
-| position | VARCHAR | sport-agnostic label |
+| position | VARCHAR | спорт-агностичная метка |
 | bio | TEXT | |
 
 ### teams
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | name | VARCHAR NOT NULL | |
@@ -58,102 +59,111 @@ User 1──* RefreshToken
 | created_at / updated_at | TIMESTAMPTZ | |
 
 ### team_members
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
-| team_id | UUID FK | indexed |
-| player_id | UUID FK | indexed |
+| team_id | UUID FK | индекс |
+| player_id | UUID FK | индекс |
 | joined_at | TIMESTAMPTZ | |
 | status | VARCHAR | ACTIVE, INVITED, REMOVED |
 
 ### sports
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | name | VARCHAR | |
 | code | VARCHAR UNIQUE | FOOTBALL, BASKETBALL, VOLLEYBALL, HOCKEY |
 
 ### tournaments
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | name | VARCHAR | |
 | description | TEXT | |
 | sport_id | UUID FK | |
-| season_year | INT | stats filter |
+| season_year | INT | фильтр статистики |
 | start_date / end_date | DATE | |
 | status | VARCHAR | DRAFT, REGISTRATION, ACTIVE, FINISHED, CANCELLED |
-| format | VARCHAR | e.g. ROUND_ROBIN, KNOCKOUT |
+| format | VARCHAR | напр. ROUND_ROBIN, KNOCKOUT |
 | created_at / updated_at | TIMESTAMPTZ | |
 
 ### tournament_teams
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
-| tournament_id | UUID FK | indexed |
+| tournament_id | UUID FK | индекс |
 | team_id | UUID FK | |
 | status | VARCHAR | PENDING, APPROVED, REJECTED, WITHDRAWN |
 | registered_at / approved_at | TIMESTAMPTZ | |
 | UNIQUE(tournament_id, team_id) | | |
 
 ### matches
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
-| tournament_id | UUID FK | indexed |
+| tournament_id | UUID FK | индекс |
 | sport_id | UUID FK | |
 | home_team_id / away_team_id | UUID FK | |
-| scheduled_at | TIMESTAMPTZ | indexed |
+| scheduled_at | TIMESTAMPTZ | индекс |
 | started_at / finished_at | TIMESTAMPTZ | |
-| status | VARCHAR | SCHEDULED, LIVE, PAUSED, FINISHED, CANCELLED — indexed |
-| home_score / away_score | INT | derived from events |
+| status | VARCHAR | SCHEDULED, LIVE, PAUSED, FINISHED, CANCELLED — индекс |
+| home_score / away_score | INT | выводится из событий |
 | game_time_seconds | INT | nullable |
 | period | INT | nullable |
 
 ### match_referees
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | match_id | UUID FK | |
-| referee_id | UUID FK → users | must be REFEREE |
+| referee_id | UUID FK → users | должен быть REFEREE |
 | assigned_at | TIMESTAMPTZ | |
 | UNIQUE(match_id, referee_id) | | |
 
 ### match_events
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
-| match_id | UUID FK | indexed |
+| match_id | UUID FK | индекс |
 | event_type | VARCHAR | GOAL, ASSIST, YELLOW_CARD, … |
 | timestamp | TIMESTAMPTZ | wall clock |
-| game_time | INT | seconds or sport-specific unit |
+| game_time | INT | секунды или единица спорта |
 | team_id | UUID | nullable |
-| player_id | UUID | indexed; nullable |
-| secondary_player_id | UUID | assist / sub partner |
-| metadata | JSONB | sport-specific payload |
-| voided | BOOLEAN | soft cancel |
+| player_id | UUID | индекс; nullable |
+| secondary_player_id | UUID | ассист / партнёр замены |
+| metadata | JSONB | спорт-специфичный payload |
+| voided | BOOLEAN | soft-отмена |
 | voided_at | TIMESTAMPTZ | |
 | created_at | TIMESTAMPTZ | |
 
 ### refresh_tokens
-| Column | Type | Notes |
+| Колонка | Тип | Примечание |
 |---|---|---|
 | id | UUID PK | |
 | user_id | UUID FK | |
-| token_hash | VARCHAR UNIQUE | SHA-256 of opaque token |
+| token_hash | VARCHAR UNIQUE | SHA-256 opaque-токена |
 | expires_at | TIMESTAMPTZ | |
 | revoked_at | TIMESTAMPTZ | |
-| replaced_by_token_id | UUID | rotation chain |
+| replaced_by_token_id | UUID | цепочка ротации |
 | created_at | TIMESTAMPTZ | |
 
-## Indexes (required)
+### device_tokens
+| Колонка | Тип | Примечание |
+|---|---|---|
+| id | UUID PK | |
+| user_id | UUID FK | |
+| platform | VARCHAR | ANDROID, IOS, WEB |
+| token | VARCHAR UNIQUE | |
+| created_at / updated_at | TIMESTAMPTZ | |
+
+## Индексы (обязательные)
 
 - `matches(tournament_id)`, `matches(scheduled_at)`, `matches(status)`
 - `match_events(match_id)`, `match_events(player_id)`
 - `team_members(team_id)`, `team_members(player_id)`
 - `tournament_teams(tournament_id)`
 
-## Enumerations (stored as VARCHAR)
+## Перечисления (хранятся как VARCHAR)
 
 **Role:** FAN, PLAYER, CAPTAIN, REFEREE, ADMIN  
 
@@ -167,26 +177,26 @@ User 1──* RefreshToken
 
 **MatchEventType:** GOAL, ASSIST, YELLOW_CARD, RED_CARD, FOUL, SUBSTITUTION, POINT, PERIOD_START, PERIOD_END, OTHER
 
-## JSONB metadata examples
+## Примеры JSONB metadata
 
-Football goal:
+Гол в футболе:
 
 ```json
 { "period": 1, "ownGoal": false }
 ```
 
-Substitution:
+Замена:
 
 ```json
 { "playerInId": "...", "playerOutId": "..." }
 ```
 
-Basketball point:
+Очко в баскетболе:
 
 ```json
 { "points": 3, "period": 2 }
 ```
 
-## Statistics
+## Статистика
 
-Computed from non-voided `match_events` and finished `matches`. Optional materialized/cache tables may be added later but must be rebuildable from events.
+Считается из не-voided `match_events` и завершённых `matches`. Materialized/cache таблицы допустимы позже, но должны полностью восстанавливаться из событий.

@@ -15,7 +15,7 @@ public class OpenApiConfig {
         return new OpenAPI()
                 .info(new Info()
                         .title("Student League API")
-                        .description("REST API for the Student League sports platform")
+                        .description("REST API платформы студенческой спортивной лиги Student League")
                         .version("v1"))
                 .components(new Components().addSecuritySchemes(
                         "bearerAuth",

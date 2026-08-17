@@ -1,36 +1,36 @@
-# Notifications
+# Уведомления
 
-Push notifications are delivered through `NotificationService` → `PushNotificationProvider`.
+Push-уведомления доставляются через цепочку `NotificationService` → `PushNotificationProvider`.
 
-Default provider: `NoOpPushNotificationProvider` (logs only).
+Провайдер по умолчанию: `NoOpPushNotificationProvider` (только логирует).
 
-Optional stubs (enable via config):
+Опциональные stubs (включаются конфигом):
 
 - `app.push.fcm.enabled=true` → `FcmPushNotificationProvider`
 - `app.push.apns.enabled=true` → `ApnsPushNotificationProvider`
 
-## Client registration
+## Регистрация клиента
 
-Authenticated clients register device tokens:
+Авторизованные клиенты регистрируют device tokens:
 
 ```http
 POST /api/v1/notifications/device-tokens
 { "platform": "ANDROID", "token": "..." }
 ```
 
-Platforms: `ANDROID`, `IOS`, `WEB`. Tokens are stored in `device_tokens` (Flyway `V3`).
+Платформы: `ANDROID`, `IOS`, `WEB`. Токены хранятся в `device_tokens` (миграция Flyway `V3`).
 
-## Domain events (wired)
+## Доменные события (подключены)
 
-| Event | Trigger |
+| Событие | Триггер |
 |---|---|
-| `MATCH_STARTING` | Referee starts match |
-| `MATCH_FINISHED` | Referee finishes match |
-| `GOAL` | Referee records GOAL event |
-| `TOURNAMENT_REGISTRATION` | Captain registers team |
-| `TEAM_INVITATION` | Captain/admin adds player to roster |
-| `SCHEDULE_UPDATE` | Match scheduled / referee assigned |
+| `MATCH_STARTING` | Судья стартует матч |
+| `MATCH_FINISHED` | Судья завершает матч |
+| `GOAL` | Судья фиксирует событие GOAL |
+| `TOURNAMENT_REGISTRATION` | Капитан подаёт заявку команды |
+| `TEAM_INVITATION` | Капитан/admin добавляет игрока в состав |
+| `SCHEDULE_UPDATE` | Матч запланирован / судья назначен |
 
-Publishing is `@Async` so domain requests are not blocked by providers.
+Публикация идёт через `@Async`, чтобы доменные запросы не блокировались провайдерами.
 
-Enable a real provider by implementing `PushNotificationProvider` and configuring credentials via environment variables (never commit secrets).
+Реальный провайдер подключается реализацией `PushNotificationProvider` и credentials из переменных окружения (секреты в git не коммитить).

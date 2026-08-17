@@ -1,57 +1,57 @@
 # Student League
 
-Production-oriented platform for a student sports league: live scores, schedules, statistics, and management of teams, players, referees, and tournaments.
+Production-ориентированная платформа студенческой спортивной лиги: live-счёт, расписания, статистика и управление командами, игроками, судьями и турнирами.
 
-Inspired by FlashScore for match viewing, with additional operational capabilities for captains, referees, and administrators.
+По просмотру матчей близка к FlashScore, плюс операционные возможности для капитанов, судей и администраторов.
 
-## Stack
+## Стек
 
-| Layer | Technology |
+| Слой | Технологии |
 |---|---|
 | Backend | Java 21, Spring Boot 3, Spring Security, JPA/Hibernate, Flyway |
-| Database | PostgreSQL (source of truth) |
-| Cache / Pub-Sub | Redis |
+| БД | PostgreSQL (источник истины) |
+| Кэш / Pub-Sub | Redis |
 | API | REST `/api/v1`, OpenAPI/Swagger, WebSocket (STOMP) |
 | Web | Vue 3, TypeScript, Vite, Pinia, Vue Router, Axios |
 | Mobile | Flutter (Android + iOS) |
-| Storage | S3-compatible object storage (avatars, logos) |
-| Infra | Docker Compose |
+| Хранилище | S3-совместимое object storage (аватары, логотипы) |
+| Инфраструктура | Docker Compose |
 
-## Architecture
+## Архитектура
 
-Modular monolith — one Spring Boot application with feature packages:
+Модульный монолит — одно Spring Boot-приложение с пакетами по доменам:
 
 `auth` · `users` · `players` · `teams` · `sports` · `tournaments` · `matches` · `referees` · `statistics` · `notifications` · `admin`
 
-See [docs/architecture.md](docs/architecture.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), and [docs/ci.md](docs/ci.md).
+См. [docs/architecture.md](docs/architecture.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md) и [docs/ci.md](docs/ci.md).
 
-## CI / Releases
+## CI / Релизы
 
 GitHub Actions:
 
-- **CI** (`.github/workflows/ci.yml`) — backend tests, Vue production build, Flutter analyze/test + debug APK
-- **Release** (`.github/workflows/release.yml`) — on `v*` tags (or manual dispatch): backend JAR, web tarball, Android APK/AAB, optional unsigned iOS zip → GitHub Release assets
+- **CI** (`.github/workflows/ci.yml`) — тесты backend, production-сборка Vue, Flutter analyze/test + debug APK
+- **Release** (`.github/workflows/release.yml`) — по тегам `v*` (или ручной запуск): JAR backend, tarball web, Android APK/AAB, опциональный unsigned iOS zip → артефакты GitHub Release
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Details and signing notes: [docs/ci.md](docs/ci.md).
+Подробности и подпись билдов: [docs/ci.md](docs/ci.md).
 
-## Roles
+## Роли
 
-| Role | Notes |
+| Роль | Описание |
 |---|---|
-| `FAN` | Default registration role |
-| `PLAYER` | Has a player profile |
-| `CAPTAIN` | Manages own team roster |
-| `REFEREE` | Controls assigned matches (orthogonal) |
-| `ADMIN` | Tournaments, approvals, referee assignment (orthogonal) |
+| `FAN` | Роль по умолчанию при регистрации |
+| `PLAYER` | Есть профиль игрока |
+| `CAPTAIN` | Управляет составом своей команды |
+| `REFEREE` | Контролирует назначенные матчи (отдельная роль) |
+| `ADMIN` | Турниры, подтверждения, назначение судей (отдельная роль) |
 
-Hierarchy: `FAN` < `PLAYER` < `CAPTAIN`. Authorization is always enforced on the backend.
+Иерархия: `FAN` < `PLAYER` < `CAPTAIN`. Авторизация всегда проверяется на backend.
 
-## Quick start (development)
+## Быстрый старт (разработка)
 
 ```bash
 cp .env.example .env
@@ -60,7 +60,7 @@ cd backend && ./mvnw spring-boot:run
 cd web && npm install && npm run dev
 ```
 
-Full stack (API + dependencies, including MinIO):
+Полный стек (API + зависимости, включая MinIO):
 
 ```bash
 cp .env.example .env
@@ -70,60 +70,61 @@ docker compose up --build
 API: `http://localhost:8080`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
 Health: `http://localhost:8080/api/v1/health`  
-MinIO console: `http://localhost:9001` (minioadmin / minioadmin)
+Консоль MinIO: `http://localhost:9001` (minioadmin / minioadmin)
 
-## Production checklist
+## Чеклист для production
 
-- Set a strong unique `JWT_SECRET` (≥ 32 chars; never the example value)
-- Override `DATABASE_PASSWORD` (prod profile rejects the default)
-- Use `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway on)
-- Configure real `S3_*` credentials (or keep `S3_ENABLED=false` with no-op storage)
-- Restrict `CORS_ORIGINS` to real front-end origins
-- Enable FCM/APNs providers only with real credentials (`app.push.fcm.enabled` / `app.push.apns.enabled`)
-- Prefer Redis (`APP_REDIS_ENABLED=true`) for multi-instance rate limiting / live fan-out
+- Задать уникальный сильный `JWT_SECRET` (≥ 32 символов; не значение из примера)
+- Переопределить `DATABASE_PASSWORD` (prod-профиль отклоняет дефолт)
+- Использовать `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway включён)
+- Настроить реальные `S3_*` (или оставить `S3_ENABLED=false` с no-op хранилищем)
+- Ограничить `CORS_ORIGINS` реальными origin фронтенда
+- Включать FCM/APNs только с реальными credentials (`app.push.fcm.enabled` / `app.push.apns.enabled`)
+- Для нескольких инстансов предпочтителен Redis (`APP_REDIS_ENABLED=true`)
 
-## Environment variables
+## Переменные окружения
 
-Copy `.env.example` to `.env`. Never commit secrets.
+Скопируйте `.env.example` в `.env`. Секреты в git не коммитить.
 
-| Variable | Purpose |
+| Переменная | Назначение |
 |---|---|
 | `DATABASE_URL` | JDBC URL |
-| `DATABASE_USERNAME` / `DATABASE_PASSWORD` | DB credentials |
-| `REDIS_URL` | Redis connection |
-| `APP_REDIS_ENABLED` | Enable Redis auto-config / cluster features |
-| `JWT_SECRET` | HMAC secret for access tokens |
-| `JWT_ACCESS_EXPIRATION` | Access token TTL (ms) |
-| `JWT_REFRESH_EXPIRATION` | Refresh token TTL (ms) |
-| `S3_ENABLED` | Use S3-compatible storage instead of no-op |
+| `DATABASE_USERNAME` / `DATABASE_PASSWORD` | Учётные данные БД |
+| `REDIS_URL` | Подключение к Redis |
+| `APP_REDIS_ENABLED` | Включить Redis auto-config / кластерные фичи |
+| `JWT_SECRET` | HMAC-секрет access-токенов |
+| `JWT_ACCESS_EXPIRATION` | TTL access-токена (мс) |
+| `JWT_REFRESH_EXPIRATION` | TTL refresh-токена (мс) |
+| `S3_ENABLED` | Использовать S3 вместо no-op |
 | `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage |
-| `S3_PUBLIC_BASE_URL` | Public URL prefix for stored objects |
-| `CORS_ORIGINS` | Allowed browser origins |
+| `S3_PUBLIC_BASE_URL` | Публичный префикс URL объектов |
+| `CORS_ORIGINS` | Разрешённые browser origins |
 | `SPRING_PROFILES_ACTIVE` | `dev` / `prod` |
 
-## Project layout
+## Структура репозитория
 
 ```
 ├── backend/          Spring Boot API
-├── web/              Vue 3 application (Phase 7)
-├── mobile/           Flutter application (Phase 8)
-├── docs/             Architecture, database, API
+├── web/              Vue 3 приложение
+├── mobile/           Flutter приложение
+├── docs/             Архитектура, БД, API, CI
+├── .github/workflows CI и релизы
 ├── docker-compose.yml
 └── .env.example
 ```
 
-## Development phases
+## Фазы разработки
 
-1. Architecture + database + authentication ✅
-2. Users + players + teams ✅
-3. Tournaments + matches ✅
-4. Referee mode + match events ✅
-5. WebSocket + live score ✅
-6. Statistics ✅
+1. Архитектура + БД + аутентификация ✅
+2. Пользователи + игроки + команды ✅
+3. Турниры + матчи ✅
+4. Режим судьи + события матча ✅
+5. WebSocket + live-счёт ✅
+6. Статистика ✅
 7. Vue web ✅
-8. Flutter mobile ✅ (skeleton + referee large-button UI)
-9. Push notifications ✅ (provider abstraction + no-op)
-10. Testing + Docker + production hardening ✅ (baseline)
+8. Flutter mobile ✅ (скелет + UI судьи с крупными кнопками)
+9. Push-уведомления ✅ (абстракция провайдера + no-op)
+10. Тесты + Docker + production hardening ✅
 
 ## Web
 
@@ -133,8 +134,8 @@ cd web && npm install && npm run dev
 
 ## Mobile
 
-See [mobile/README.md](mobile/README.md).
+См. [mobile/README.md](mobile/README.md).
 
-## License
+## Лицензия
 
-Proprietary — student league project.
+Proprietary — проект студенческой лиги.

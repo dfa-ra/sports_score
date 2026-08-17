@@ -1,5 +1,39 @@
-# Vue 3 + TypeScript + Vite
+# Student League — Web
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Клиентское Vue 3 + TypeScript + Vite приложение студенческой спортивной лиги.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Стек
+
+- Vue 3 (`<script setup>`)
+- TypeScript
+- Vite
+- Pinia (auth store)
+- Vue Router
+- Axios (+ refresh interceptor)
+- STOMP / SockJS для live-счёта
+
+## Локальный запуск
+
+Требуется запущенный backend на `http://localhost:8080` (или proxy Vite).
+
+```bash
+npm install
+npm run dev
+```
+
+Production-сборка:
+
+```bash
+npm run build
+npm run preview
+```
+
+## Основные разделы
+
+- Публичные: Home, турниры, матчи (live), команды, игроки, статистика, login/register
+- Admin: дашборд со вкладками users / tournaments / matches / teams / players / referees / statistics
+- Referee: список назначенных матчей и Live Match Control с крупными кнопками
+
+## CI
+
+Сборка web входит в GitHub Actions CI и в релизный tarball — см. [docs/ci.md](../docs/ci.md).

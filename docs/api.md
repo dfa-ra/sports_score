@@ -1,20 +1,20 @@
 # API
 
-Base URL: `/api/v1`  
+Базовый URL: `/api/v1`  
 Content-Type: `application/json`  
 Auth: `Authorization: Bearer <access_token>`
 
-Interactive docs: `/swagger-ui.html` (OpenAPI at `/v3/api-docs`).
+Интерактивная документация: `/swagger-ui.html` (OpenAPI: `/v3/api-docs`).
 
-## Conventions
+## Соглашения
 
-### Pagination
+### Пагинация
 
-List endpoints accept:
+Списочные endpoints принимают:
 
-- `page` (0-based), `size`, `sort` (e.g. `scheduledAt,desc`)
+- `page` (с нуля), `size`, `sort` (напр. `scheduledAt,desc`)
 
-Response envelope:
+Обёртка ответа:
 
 ```json
 {
@@ -26,51 +26,51 @@ Response envelope:
 }
 ```
 
-### Errors
+### Ошибки
 
 ```json
 {
   "code": "VALIDATION_ERROR",
-  "message": "Human-readable summary",
+  "message": "Краткое человекочитаемое описание",
   "details": [{ "field": "email", "message": "must be a well-formed email address" }],
   "timestamp": "2026-08-17T12:00:00Z",
   "path": "/api/v1/auth/register"
 }
 ```
 
-Common codes: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `BUSINESS_RULE_VIOLATION`.
+Частые коды: `VALIDATION_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `BUSINESS_RULE_VIOLATION`.
 
-### Filtering
+### Фильтрация
 
-Where applicable: query params such as `tournamentId`, `status`, `teamId`, `playerId`, `seasonYear`, `sportCode`, `from`, `to`.
+Где применимо: query-параметры `tournamentId`, `status`, `teamId`, `playerId`, `seasonYear`, `sportCode`, `from`, `to`.
 
 ---
 
-## Authentication
+## Аутентификация
 
-| Method | Path | Auth | Description |
+| Метод | Путь | Auth | Описание |
 |---|---|---|---|
-| POST | `/auth/register` | Public | Create FAN account |
-| POST | `/auth/login` | Public | Access + refresh tokens |
-| POST | `/auth/refresh` | Public (refresh body) | Rotate refresh, new access |
-| POST | `/auth/logout` | Bearer or refresh | Revoke refresh token |
-| GET | `/auth/me` | Bearer | Current user profile |
+| POST | `/auth/register` | Публичный | Создать аккаунт FAN |
+| POST | `/auth/login` | Публичный | Access + refresh токены |
+| POST | `/auth/refresh` | Публичный (refresh в body) | Ротация refresh, новый access |
+| POST | `/auth/logout` | Bearer или refresh | Отозвать refresh |
+| GET | `/auth/me` | Bearer | Текущий пользователь |
 
-### Register
+### Регистрация
 
-Request:
+Запрос:
 
 ```json
 { "email": "fan@example.com", "password": "Str0ngPass!" }
 ```
 
-Response `201`: user summary (id, email, role) — **no password**.
+Ответ `201`: краткая карточка пользователя (id, email, role) — **без пароля**.
 
 ### Login
 
-Request: `{ "email", "password" }`  
+Запрос: `{ "email", "password" }`  
 
-Response `200`:
+Ответ `200`:
 
 ```json
 {
@@ -84,123 +84,124 @@ Response `200`:
 
 ### Refresh
 
-Request: `{ "refreshToken": "..." }` → new access + refresh (old refresh revoked).
+Запрос: `{ "refreshToken": "..." }` → новый access + refresh (старый refresh отозван).
 
-Rate limiting applies to register/login/refresh.
+На register/login/refresh действует rate limiting.
 
 ---
 
 ## Health
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| GET | `/health` | Public |
+| GET | `/health` | Публичный |
 
 ---
 
-## Users (Phase 2+)
+## Пользователи (admin)
 
-| Method | Path | Roles |
+| Метод | Путь | Роли |
 |---|---|---|
 | GET | `/admin/users` | ADMIN |
-| PATCH | `/admin/users/{id}` | ADMIN — enable/role |
+| PATCH | `/admin/users/{id}` | ADMIN — enabled/role |
 
 ---
 
-## Players (Phase 2+)
+## Игроки
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| GET | `/players` | Authenticated |
-| GET | `/players/{id}` | Authenticated |
-| GET | `/players/{id}/card` | Authenticated/public — public card |
-| POST/PUT | `/players/me` | PLAYER+ — own profile |
+| GET | `/players` | Авторизованный |
+| GET | `/players/{id}` | Авторизованный |
+| GET | `/players/{id}/card` | Авторизованный — публичная карточка |
+| PUT | `/players/me` | Свой профиль (создаёт/обновляет) |
 
-Public card: name, photo, team, number, position, statistics, match history.
+Публичная карточка: имя, фото, команда, номер, позиция, статистика, история матчей.
 
 ---
 
-## Teams (Phase 2+)
+## Команды
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| GET/POST | `/teams` | Read: auth; Create: CAPTAIN/ADMIN |
-| GET/PATCH | `/teams/{id}` | Patch: captain of team or ADMIN |
+| GET/POST | `/teams` | Чтение: auth; создание: с профилем игрока (становится капитаном) |
+| GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN |
 | GET | `/teams/{id}/members` | Auth |
-| POST | `/teams/{id}/members` | Captain of team |
-| DELETE | `/teams/{id}/members/{playerId}` | Captain of team |
-| PUT | `/teams/{id}/captain` | Captain or ADMIN |
+| POST | `/teams/{id}/members` | Капитан команды |
+| DELETE | `/teams/{id}/members/{playerId}` | Капитан команды |
+| PUT | `/teams/{id}/captain` | Капитан или ADMIN |
 
 ---
 
-## Sports (Phase 2+)
+## Виды спорта
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
 | GET | `/sports` | Auth |
 
 ---
 
-## Tournaments (Phase 3+)
+## Турниры
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
 | GET/POST | `/tournaments` | POST: ADMIN |
-| GET/PATCH | `/tournaments/{id}` | PATCH: ADMIN |
-| POST | `/tournaments/{id}/teams` | CAPTAIN — register own team |
+| GET/PUT | `/tournaments/{id}` | PUT: ADMIN |
+| POST | `/tournaments/{id}/teams` | CAPTAIN — заявка своей команды |
 | POST | `/tournaments/{id}/teams/{teamId}/approve` | ADMIN |
-| DELETE | `/tournaments/{id}/teams/{teamId}` | ADMIN — exclude |
+| DELETE | `/tournaments/{id}/teams/{teamId}` | ADMIN — исключение |
 | GET | `/tournaments/{id}/standings` | Auth |
 | GET | `/tournaments/{id}/matches` | Auth |
 
 ---
 
-## Matches (Phase 3+)
+## Матчи
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| GET | `/matches` | Auth — filters |
+| GET | `/matches` | Auth — фильтры |
 | GET | `/matches/{id}` | Auth |
 | POST | `/matches` | ADMIN |
 | POST | `/matches/{id}/referees` | ADMIN |
+| GET | `/matches/{id}/events` | Auth |
+| GET | `/matches/{id}/referees` | Auth |
 
 ---
 
-## Referee / Match events (Phase 4+)
+## Судья / события матча
 
-All referee actions require `currentUser` assigned on the match.
+Все действия судьи требуют, чтобы `currentUser` был назначен на матч.
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
 | GET | `/referee/matches` | REFEREE |
-| POST | `/referee/matches/{id}/start` | Assigned referee |
-| POST | `/referee/matches/{id}/pause` | Assigned referee |
-| POST | `/referee/matches/{id}/resume` | Assigned referee |
-| POST | `/referee/matches/{id}/finish` | Assigned referee |
-| GET | `/matches/{id}/events` | Auth |
-| POST | `/referee/matches/{id}/events` | Assigned referee |
-| POST | `/referee/matches/{id}/events/{eventId}/void` | Assigned referee |
+| POST | `/referee/matches/{id}/start` | Назначенный судья |
+| POST | `/referee/matches/{id}/pause` | Назначенный судья |
+| POST | `/referee/matches/{id}/resume` | Назначенный судья |
+| POST | `/referee/matches/{id}/finish` | Назначенный судья |
+| POST | `/referee/matches/{id}/events` | Назначенный судья |
+| POST | `/referee/matches/{id}/events/{eventId}/void` | Назначенный судья |
 
 ---
 
-## Statistics (Phase 6+)
+## Статистика
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| GET | `/statistics/players` | Auth — filters |
-| GET | `/statistics/teams` | Auth — filters |
+| GET | `/statistics/players` | Auth — фильтры |
+| GET | `/statistics/teams` | Auth — фильтры |
 
-Derived from non-voided `MatchEvent` records.
+Считается из не-voided записей `MatchEvent`.
 
 ---
 
-## WebSocket (Phase 5+)
+## WebSocket
 
 - Connect: `ws://host/ws` (STOMP).
 - Subscribe: `/topic/matches/{matchId}`.
-- Auth: JWT on CONNECT.
+- Auth: JWT на CONNECT.
 
-Message example:
+Пример сообщения:
 
 ```json
 {
@@ -216,38 +217,38 @@ Message example:
 
 ---
 
-## Notifications / Push
+## Уведомления / Push
 
-| Method | Path | Auth | Description |
+| Метод | Путь | Auth | Описание |
 |---|---|---|---|
-| POST | `/notifications/device-tokens` | Bearer | Register ANDROID/IOS/WEB device token |
-| DELETE | `/notifications/device-tokens?token=` | Bearer | Unregister token |
+| POST | `/notifications/device-tokens` | Bearer | Зарегистрировать ANDROID/IOS/WEB token |
+| DELETE | `/notifications/device-tokens?token=` | Bearer | Удалить token |
 
-Push delivery goes through `NotificationService` → `PushNotificationProvider` (no-op by default; optional FCM/APNs stubs).
+Доставка: `NotificationService` → `PushNotificationProvider` (по умолчанию no-op; опциональные stubs FCM/APNs).
 
-Domain triggers: match starting/finished, goal, tournament registration, team invitation, schedule update.
+Доменные триггеры: старт/финиш матча, гол, заявка на турнир, приглашение в команду, обновление расписания.
 
 ---
 
-## Uploads
+## Загрузки файлов
 
-| Method | Path | Auth |
+| Метод | Путь | Auth |
 |---|---|---|
-| POST | `/uploads/players/me/avatar` | Authenticated (multipart `file`) |
-| POST | `/uploads/teams/{teamId}/logo` | Captain of team or ADMIN |
+| POST | `/uploads/players/me/avatar` | Авторизованный (multipart `file`) |
+| POST | `/uploads/teams/{teamId}/logo` | Капитан команды или ADMIN |
 
 ---
 
-## Authorization matrix (summary)
+## Матрица авторизации (кратко)
 
-| Capability | FAN | PLAYER | CAPTAIN | REFEREE | ADMIN |
+| Возможность | FAN | PLAYER | CAPTAIN | REFEREE | ADMIN |
 |---|---|---|---|---|---|
-| Browse public data | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Manage own profile | | ✓ | ✓ | | ✓ |
-| Manage own team roster | | | ✓* | | ✓ |
-| Register team to tournament | | | ✓* | | ✓ |
-| Create/edit tournaments | | | | | ✓ |
-| Control assigned match | | | | ✓* | |
-| Assign referees | | | | | ✓ |
+| Просмотр публичных данных | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Свой профиль | | ✓ | ✓ | | ✓ |
+| Состав своей команды | | | ✓* | | ✓ |
+| Заявка команды на турнир | | | ✓* | | ✓ |
+| Создание/редактирование турниров | | | | | ✓ |
+| Контроль назначенного матча | | | | ✓* | |
+| Назначение судей | | | | | ✓ |
 
-\* Ownership checks required (captain of that team / assigned referee).
+\* Обязательны проверки ownership (капитан именно этой команды / назначенный судья).

@@ -1,16 +1,16 @@
-# Architecture
+# Архитектура
 
-## Overview
+## Обзор
 
-Student League is a **modular monolith**: a single Spring Boot 3 application partitioned into feature packages. Domain logic stays extractable for future service splits without rewriting business rules.
+Student League — **модульный монолит**: одно приложение Spring Boot 3, разделённое на feature-пакеты. Доменную логику можно позже выделить в сервисы без переписывания бизнес-правил.
 
-Clients:
+Клиенты:
 
-- **Web** — Vue 3 SPA
-- **Mobile** — Flutter (shared Android/iOS codebase)
-- **Integrations** — OpenAPI consumers
+- **Web** — SPA на Vue 3
+- **Mobile** — Flutter (одна codebase для Android/iOS)
+- **Интеграции** — потребители OpenAPI
 
-## High-level diagram
+## Схема верхнего уровня
 
 ```
 ┌─────────────┐  ┌─────────────┐
@@ -26,103 +26,103 @@ Clients:
 └───────┬──────────┬──────────┬────┘
         │          │          │
         ▼          ▼          ▼
-   PostgreSQL    Redis    S3-compatible
-   (truth)     (cache/    (media)
+   PostgreSQL    Redis    S3-совместимое
+   (истина)    (кэш/      (медиа)
                pubsub/
                rate limit)
 ```
 
-## Module boundaries
+## Границы модулей
 
-| Module | Responsibility |
+| Модуль | Ответственность |
 |---|---|
-| `common` | Errors, pagination, shared types |
+| `common` | Ошибки, пагинация, общие типы |
 | `config` | Security, Redis, OpenAPI, WebSocket, CORS, Jackson |
-| `security` | JWT, principals, filters, permission helpers |
-| `auth` | Register, login, logout, refresh |
-| `users` | User account administration |
-| `players` | Player profiles and public cards |
-| `teams` | Teams, membership, captaincy |
-| `sports` | Sport catalog (FOOTBALL, …) |
-| `tournaments` | Tournaments, team registration |
-| `matches` | Matches, events, live control, score policies |
-| `referees` | Referee assignment views |
-| `statistics` | Aggregation from `MatchEvent` |
-| `notifications` | Push abstraction (FCM/APNs) |
-| `storage` | Object storage abstraction |
-| `admin` | Cross-cutting admin APIs |
+| `security` | JWT, principals, фильтры, helpers прав |
+| `auth` | Регистрация, login, logout, refresh |
+| `users` | Администрирование аккаунтов |
+| `players` | Профили игроков и публичные карточки |
+| `teams` | Команды, состав, капитанство |
+| `sports` | Каталог видов спорта (FOOTBALL, …) |
+| `tournaments` | Турниры, заявки команд |
+| `matches` | Матчи, события, live-контроль, score policies |
+| `referees` | Представления назначений судей |
+| `statistics` | Агрегация из `MatchEvent` |
+| `notifications` | Абстракция push (FCM/APNs) |
+| `storage` | Абстракция object storage |
+| `admin` | Сквозные admin API |
 
-Each feature package uses layers: `controller` → `service` → `repository`, with `entity`, `dto`, `mapper`.
+Каждый feature-пакет использует слои: `controller` → `service` → `repository`, плюс `entity`, `dto`, `mapper`.
 
-## Layering rules
+## Правила слоёв
 
-1. Controllers accept/return DTOs only — never JPA entities.
-2. Business rules live in services (transactions, ownership checks).
-3. Repositories are Spring Data interfaces; avoid huge entity graphs.
-4. Cross-module calls go through services (or small shared ports), not repositories of other features when avoidable.
+1. Controllers принимают/возвращают только DTO — никогда JPA entities.
+2. Бизнес-правила живут в services (транзакции, проверки ownership).
+3. Repositories — Spring Data интерфейсы; избегать огромных entity graphs.
+4. Межмодульные вызовы — через services (или небольшие ports), а не через чужие repositories, когда это возможно.
 
-## Authentication & authorization
+## Аутентификация и авторизация
 
-- **Access token:** JWT (short-lived), Bearer header.
-- **Refresh token:** opaque random value; only SHA-256 hash stored; **rotated** on each refresh.
-- **Passwords:** BCrypt; `passwordHash` never appears in API responses.
-- **Roles:** `FAN` < `PLAYER` < `CAPTAIN` via Spring `RoleHierarchy`. `REFEREE` and `ADMIN` are orthogonal.
-- **Ownership:** captain checks use `Team.captainId` vs current user's `PlayerProfile`; referee checks use `MatchReferee` assignment. Client-supplied role/ids are never trusted for authz.
+- **Access token:** JWT (короткоживущий), заголовок Bearer.
+- **Refresh token:** непрозрачное случайное значение; в БД хранится только SHA-256; при каждом refresh выполняется **ротация**.
+- **Пароли:** BCrypt; `passwordHash` никогда не отдаётся в API.
+- **Роли:** `FAN` < `PLAYER` < `CAPTAIN` через Spring `RoleHierarchy`. `REFEREE` и `ADMIN` — ортогональные роли.
+- **Ownership:** капитан проверяется по `Team.captainId` vs `PlayerProfile` текущего пользователя; судья — по назначению `MatchReferee`. Role/ids с клиента для авторизации не доверяются.
 
-## Match events & live score
+## События матча и live-счёт
 
-`MatchEvent` is the **source of truth** for scoring and statistics.
+`MatchEvent` — **источник истины** для счёта и статистики.
 
-Flow after a referee action:
+После действия судьи:
 
-1. Validate referee assignment + match state machine + sport rules.
-2. Persist `MatchEvent` (PostgreSQL).
-3. Recalculate match score/status via sport-specific `ScorePolicy`.
-4. Publish to Redis Pub/Sub channel `match:{matchId}`.
-5. WebSocket bridge fans out to STOMP topic `/topic/matches/{matchId}`.
+1. Проверка назначения судьи + state machine матча + правила вида спорта.
+2. Сохранение `MatchEvent` в PostgreSQL.
+3. Пересчёт счёта/статуса через sport-specific `ScorePolicy`.
+4. Публикация в Redis Pub/Sub (`studentleague:match-live` при включённом Redis).
+5. Fan-out через WebSocket на STOMP-топик `/topic/matches/{matchId}`.
 
-Clients subscribe once; polling is not required for live updates.
+Клиенты подписываются один раз; polling для live не нужен.
 
 ## WebSocket
 
-- Endpoint: `/ws` (STOMP over SockJS/WebSocket).
+- Endpoint: `/ws` (STOMP поверх SockJS/WebSocket).
 - Subscribe: `/topic/matches/{matchId}`.
-- Connect auth: JWT (query param or header interceptor).
-- Payloads: score changes, new/voided events, status, game time, match finished.
+- Auth на CONNECT: JWT (query или header interceptor).
+- Payload: изменение счёта, новые/отменённые события, статус, игровое время, завершение матча.
 
-## Redis usage
+## Использование Redis
 
-| Use | Notes |
+| Назначение | Примечание |
 |---|---|
-| Cache | Read-heavy stats/lists with TTL (optional later) |
-| Pub/Sub | Live match event propagation when `APP_REDIS_ENABLED=true` |
-| Rate limiting | Auth endpoints (in-memory by default; Redis-ready) |
-| Temporary data | Short-lived locks / ephemeral state |
+| Кэш | Тяжёлые на чтение списки/статы с TTL (опционально позже) |
+| Pub/Sub | Live-распространение событий при `APP_REDIS_ENABLED=true` |
+| Rate limiting | Auth endpoints (по умолчанию in-memory; готовность к Redis) |
+| Временные данные | Короткоживущие locks / ephemeral state |
 
-Enable Redis live fan-out with `APP_REDIS_ENABLED=true`. Flow:
+Включение live fan-out: `APP_REDIS_ENABLED=true`.
 
-1. Persist `MatchEvent` / match state in PostgreSQL
-2. `LiveMatchPublisher` publishes JSON to Redis channel `studentleague:match-live`
-3. Each backend instance listens and fans out to local STOMP `/topic/matches/{matchId}`
+1. Persist события/состояния в PostgreSQL  
+2. `LiveMatchPublisher` публикует JSON в канал Redis `studentleague:match-live`  
+3. Каждый инстанс backend слушает канал и рассылает в локальный STOMP `/topic/matches/{matchId}`
 
-When Redis is disabled, updates are published directly to the local STOMP broker (single-instance).
+Если Redis выключен, обновления публикуются напрямую в локальный STOMP broker (один инстанс).
 
-PostgreSQL remains the only durable source of truth.
+PostgreSQL остаётся единственным durable source of truth.
 
-## File storage
+## Файловое хранилище
 
-Player avatars and team logos are stored in S3-compatible storage. The database keeps `avatarUrl` / `logoUrl` (or object keys). `StorageService` abstracts the provider (MinIO locally, AWS S3 in production).
+Аватары игроков и логотипы команд хранятся в S3-совместимом storage. В БД — `avatarUrl` / `logoUrl` (или object key). `StorageService` абстрагирует провайдер (MinIO локально, AWS S3 в production).
 
-## Notifications
+## Уведомления
 
-`NotificationPublisher` / `PushNotificationProvider` interfaces allow swapping FCM, APNs, or a no-op provider. Domain services emit notification intents; providers deliver them asynchronously.
+Интерфейсы `NotificationService` / `PushNotificationProvider` позволяют менять FCM, APNs или no-op. Доменные сервисы эмитят intents; провайдеры доставляют асинхронно.
 
-## Deployment
+## Деплой
 
-Local/dev: Docker Compose (`backend`, `postgres`, `redis`, later `minio`).
+Local/dev: Docker Compose (`backend`, `postgres`, `redis`, `minio`).
 
-Production: same containers behind a reverse proxy; secrets via environment; Flyway on startup; `ddl-auto=validate` (never `create`).
+Production: те же контейнеры за reverse proxy; секреты через env; Flyway при старте; `ddl-auto=validate` (никогда `create`).
 
-## Future extraction
+## Будущее выделение сервисов
 
-Feature packages map 1:1 to candidate services. Shared kernel (`common`, auth contracts) would become libraries; Redis/WS already assume multi-instance fan-out.
+Feature-пакеты соответствуют кандидатам в сервисы 1:1. Общий kernel (`common`, auth-контракты) станет библиотеками; Redis/WS уже рассчитаны на multi-instance fan-out.
