@@ -37,6 +37,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+Важно: обычный push в ветку запускает только **CI**, не Release. Релизные APK/AAB/JAR появляются после тега `v*` или ручного Run workflow в Actions.
+
 Подробности и подпись билдов: [docs/ci.md](docs/ci.md).
 
 ## Роли
