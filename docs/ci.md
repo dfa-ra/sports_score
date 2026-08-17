@@ -43,10 +43,31 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 
 Нужны сертификаты Apple, provisioning profiles и желательно [Fastlane Match](https://docs.fastlane.tools/actions/match/). Текущий job только проверяет, что iOS-таргет собирается без codesign.
 
+## Как получить релиз прямо сейчас
+
+Релизный workflow **не** запускается на обычный push в ветку. Нужен тег:
+
+```bash
+# 1) дождаться зелёного CI на ветке/PR
+# 2) создать и запушить тег (из ветки с готовым кодом или после merge в main)
+git checkout cursor/bc-a9909673-7bed-451d-be9b-396d953591e8-52db   # или main после merge
+git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Либо вручную: GitHub → **Actions** → **Release** → **Run workflow** → указать версию (например `0.1.0`).
+
+Для первого релиза **никакие secrets не обязательны**:
+- Android APK/AAB соберутся на default keystore
+- iOS — unsigned zip (без Apple-сертификатов), job не блокирует релиз если упадёт
+
+Secrets (`ANDROID_KEYSTORE_*`, Apple certs) нужны только для публикации в Google Play / App Store.
+
 ## Пример релизного потока
 
 ```bash
-# убедиться, что CI на main зелёный
+# убедиться, что CI на ветке/main зелёный
 git tag v0.1.0
 git push origin v0.1.0
 # GitHub Actions → Release загружает ассеты в GitHub Release
