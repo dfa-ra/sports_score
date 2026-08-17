@@ -61,8 +61,27 @@ Auth: `Authorization: Bearer <access_token>`
 Запрос:
 
 ```json
-{ "email": "fan@example.com", "password": "Str0ngPass!" }
+{
+  "email": "fan@example.com",
+  "password": "Str0ngPass!",
+  "accountType": "FAN"
+}
 ```
+
+Или игрок:
+
+```json
+{
+  "email": "player@example.com",
+  "password": "Str0ngPass!",
+  "accountType": "PLAYER",
+  "firstName": "Иван",
+  "lastName": "Иванов"
+}
+```
+
+`accountType`: только `FAN` (зритель) или `PLAYER` (игрок).  
+Админ **не** регистрируется через API — задаётся в `.env` (`ADMIN_EMAIL` / `ADMIN_PASSWORD`).
 
 Ответ `201`: краткая карточка пользователя (id, email, role) — **без пароля**.
 

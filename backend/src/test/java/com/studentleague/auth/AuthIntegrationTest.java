@@ -24,7 +24,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"Str0ngPass!"}
+                                {"email":"%s","password":"Str0ngPass!","accountType":"FAN"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value(email))
@@ -106,7 +106,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"Str0ngPass!"}
+                                {"email":"%s","password":"Str0ngPass!","accountType":"FAN"}
                                 """.formatted(email)))
                 .andExpect(status().isCreated());
 
@@ -122,7 +122,7 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     void duplicateRegistrationConflicts() throws Exception {
         String email = "dup-" + System.nanoTime() + "@example.com";
         String body = """
-                {"email":"%s","password":"Str0ngPass!"}
+                {"email":"%s","password":"Str0ngPass!","accountType":"FAN"}
                 """.formatted(email);
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

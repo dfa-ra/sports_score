@@ -2,9 +2,12 @@ package com.studentleague.auth.service;
 
 import com.studentleague.auth.entity.RefreshToken;
 import com.studentleague.auth.repository.RefreshTokenRepository;
+import com.studentleague.auth.dto.RegisterRequest;
 import com.studentleague.auth.dto.UserResponse;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.config.AppProperties;
+import com.studentleague.players.entity.PlayerProfile;
+import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.JwtService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.users.domain.Role;
@@ -28,6 +31,7 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PlayerProfileRepository playerProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AppProperties appProperties;
@@ -36,29 +40,54 @@ public class AuthService {
     public AuthService(
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
+            PlayerProfileRepository playerProfileRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             AppProperties appProperties
     ) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.playerProfileRepository = playerProfileRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.appProperties = appProperties;
     }
 
     @Transactional
-    public UserResponse register(String email, String rawPassword) {
-        String normalizedEmail = email.trim().toLowerCase();
+    public UserResponse register(RegisterRequest request) {
+        String normalizedEmail = request.email().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw ApiException.conflict("Email already registered");
         }
+
+        Role role = "PLAYER".equals(request.accountType()) ? Role.PLAYER : Role.FAN;
+        if (role != Role.FAN && role != Role.PLAYER) {
+            throw ApiException.badRequest("Можно зарегистрироваться только как FAN или PLAYER");
+        }
+
+        // Email из ADMIN_EMAIL нельзя зарегистрировать публично
+        AppProperties.Admin admin = appProperties.admin();
+        if (admin != null && admin.email() != null
+                && normalizedEmail.equalsIgnoreCase(admin.email().trim())) {
+            throw ApiException.forbidden("Этот email зарезервирован для администратора");
+        }
+
         User user = new User();
         user.setEmail(normalizedEmail);
-        user.setPasswordHash(passwordEncoder.encode(rawPassword));
-        user.setRole(Role.FAN);
+        user.setPasswordHash(passwordEncoder.encode(request.password()));
+        user.setRole(role);
         user.setEnabled(true);
         userRepository.save(user);
+
+        if (role == Role.PLAYER) {
+            PlayerProfile profile = new PlayerProfile();
+            profile.setUserId(user.getId());
+            profile.setFirstName(request.firstName().trim());
+            profile.setLastName(request.lastName().trim());
+            profile.setDisplayName(request.firstName().trim() + " " + request.lastName().trim());
+            playerProfileRepository.save(profile);
+        }
+
         return toUserResponse(user);
     }
 
