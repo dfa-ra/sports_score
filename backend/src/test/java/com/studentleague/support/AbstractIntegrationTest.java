@@ -54,7 +54,7 @@ public abstract class AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"%s"}
+                                {"email":"%s","password":"%s","accountType":"FAN"}
                                 """.formatted(email, password)))
                 .andExpect(status().isCreated());
 

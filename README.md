@@ -71,6 +71,7 @@ Health: `http://localhost:8080/api/v1/health`
 ## Чеклист для production
 
 - Задать уникальный сильный `JWT_SECRET` (≥ 32 символов; не значение из примера)
+- Задать `ADMIN_EMAIL` / `ADMIN_PASSWORD` (единственный админ)
 - Переопределить `DATABASE_PASSWORD` (prod-профиль отклоняет дефолт)
 - Использовать `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway включён)
 - Убедиться, что volume/папка `LOCAL_STORAGE_DIR` доступна на запись
@@ -89,6 +90,7 @@ Health: `http://localhost:8080/api/v1/health`
 | `REDIS_URL` | Подключение к Redis |
 | `APP_REDIS_ENABLED` | Включить Redis auto-config / кластерные фичи |
 | `JWT_SECRET` | HMAC-секрет access-токенов |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Единственный админ (создаётся при старте) |
 | `JWT_ACCESS_EXPIRATION` | TTL access-токена (мс) |
 | `JWT_REFRESH_EXPIRATION` | TTL refresh-токена (мс) |
 | `LOCAL_STORAGE_DIR` | Папка для аватаров/логотипов на диске |

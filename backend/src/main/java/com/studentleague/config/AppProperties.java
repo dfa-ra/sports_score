@@ -10,7 +10,8 @@ public record AppProperties(
         Jwt jwt,
         RateLimit rateLimit,
         Redis redis,
-        LocalStorage localStorage
+        LocalStorage localStorage,
+        Admin admin
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -24,10 +25,16 @@ public record AppProperties(
     public record Redis(boolean enabled) {
     }
 
-    /** Локальное хранение файлов на диске сервера. */
     public record LocalStorage(
             String rootDir,
             String publicBaseUrl
+    ) {
+    }
+
+    /** Единственный админ, создаётся при старте из .env */
+    public record Admin(
+            String email,
+            String password
     ) {
     }
 }

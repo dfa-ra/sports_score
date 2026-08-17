@@ -44,6 +44,9 @@ app:
   local-storage:
     root-dir: ${LOCAL_STORAGE_DIR:./data/uploads}
     public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:/media}
+  admin:
+    email: ${ADMIN_EMAIL:}
+    password: ${ADMIN_PASSWORD:}
 
 springdoc:
   api-docs:

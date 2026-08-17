@@ -39,6 +39,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       LOCAL_STORAGE_DIR: /app/data/uploads
       LOCAL_STORAGE_PUBLIC_BASE_URL: /media
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@studentleague.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMeAdmin123!}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-at-least-256-bits-long!!}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
     ports:

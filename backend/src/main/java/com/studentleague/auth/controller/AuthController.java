@@ -37,13 +37,13 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Register a new FAN account")
+    @Operation(summary = "Регистрация зрителя (FAN) или игрока (PLAYER)")
     public ResponseEntity<UserResponse> register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest
     ) {
         authRateLimiter.check(httpRequest);
-        UserResponse user = authService.register(request.email(), request.password());
+        UserResponse user = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 

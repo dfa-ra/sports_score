@@ -28,9 +28,15 @@ export const useAuthStore = defineStore('auth', () => {
     else localStorage.removeItem('sl_user')
   }
 
-  async function register(email: string, password: string) {
-    await api.post('/auth/register', { email, password })
-    return login(email, password)
+  async function register(payload: {
+    email: string
+    password: string
+    accountType: 'FAN' | 'PLAYER'
+    firstName?: string
+    lastName?: string
+  }) {
+    await api.post('/auth/register', payload)
+    return login(payload.email, payload.password)
   }
 
   async function login(email: string, password: string) {
