@@ -4,9 +4,11 @@ import com.studentleague.common.dto.PageResponse;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
+import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.service.MatchService;
+import com.studentleague.matches.service.RefereeMatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -35,9 +37,11 @@ import java.util.UUID;
 public class MatchController {
 
     private final MatchService matchService;
+    private final RefereeMatchService refereeMatchService;
 
-    public MatchController(MatchService matchService) {
+    public MatchController(MatchService matchService, RefereeMatchService refereeMatchService) {
         this.matchService = matchService;
+        this.refereeMatchService = refereeMatchService;
     }
 
     @GetMapping
@@ -79,5 +83,11 @@ public class MatchController {
     @Operation(summary = "List referees assigned to match")
     public List<MatchRefereeResponse> listReferees(@PathVariable UUID id) {
         return matchService.listReferees(id);
+    }
+
+    @GetMapping("/{id}/events")
+    @Operation(summary = "List match events")
+    public List<MatchEventResponse> listEvents(@PathVariable UUID id) {
+        return refereeMatchService.listEvents(id);
     }
 }
