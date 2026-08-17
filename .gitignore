@@ -1,0 +1,67 @@
+# Secrets
+.env
+.env.local
+*.pem
+*.p12
+*.jks
+
+# Java / Maven
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# Node / Vue
+web/node_modules/
+web/dist/
+web/.vite/
+*.local
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Flutter
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/.pub-cache/
+mobile/.pub/
+mobile/**/*.iml
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/debug/
+mobile/android/app/profile/
+mobile/android/app/release/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*~
+.cursor/
+
+# Logs / temp
+*.log
+tmp/
+temp/
+coverage/
+.nyc_output/
+
+# Testcontainers
+.testcontainers/
