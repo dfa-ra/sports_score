@@ -83,9 +83,9 @@ Copy `.env.example` to `.env`. Never commit secrets.
 
 ## Development phases
 
-1. Architecture + database + authentication ← **current**
-2. Users + players + teams
-3. Tournaments + matches
+1. Architecture + database + authentication ✅
+2. Users + players + teams ✅
+3. Tournaments + matches ← **current**
 4. Referee mode + match events
 5. WebSocket + live score
 6. Statistics
