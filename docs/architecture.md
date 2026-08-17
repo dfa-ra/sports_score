@@ -26,7 +26,7 @@ Student League — **модульный монолит**: одно прилож�
 └───────┬──────────┬──────────┬────┘
         │          │          │
         ▼          ▼          ▼
-   PostgreSQL    Redis    S3-совместимое
+   PostgreSQL    Redis    Диск /media
    (истина)    (кэш/      (медиа)
                pubsub/
                rate limit)
@@ -49,7 +49,7 @@ Student League — **модульный монолит**: одно прилож�
 | `referees` | Представления назначений судей |
 | `statistics` | Агрегация из `MatchEvent` |
 | `notifications` | Абстракция push (FCM/APNs) |
-| `storage` | Абстракция object storage |
+| `storage` | Локальные файлы на диске (`/media`) |
 | `admin` | Сквозные admin API |
 
 Каждый feature-пакет использует слои: `controller` → `service` → `repository`, плюс `entity`, `dto`, `mapper`.
@@ -111,9 +111,7 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Файловое хранилище
 
-По умолчанию аватары и логотипы сохраняются **на диск сервера** (`LOCAL_STORAGE_DIR`, обычно `/app/data/uploads` в Docker) и отдаются по URL `/media/...`.
-
-Опционально можно включить S3/MinIO (`S3_ENABLED=true`) — тогда используется `S3StorageService`.
+Аватары и логотипы сохраняются **на диск сервера** (`LOCAL_STORAGE_DIR`, в Docker — `/app/data/uploads`) и отдаются по URL `/media/...`.
 
 ## Уведомления
 
@@ -121,7 +119,7 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Деплой
 
-Local/dev: Docker Compose (`backend`, `postgres`, `redis`, `minio`).
+Local/dev: Docker Compose (`backend`, `postgres`, `redis`).
 
 Production: те же контейнеры за reverse proxy; секреты через env; Flyway при старте; `ddl-auto=validate` (никогда `create`).
 

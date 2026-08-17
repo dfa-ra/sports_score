@@ -43,7 +43,7 @@ User 1──* DeviceToken
 | user_id | UUID UNIQUE FK → users | |
 | first_name, last_name, display_name | VARCHAR | |
 | date_of_birth | DATE | nullable |
-| avatar_url | VARCHAR | S3 URL/key |
+| avatar_url | VARCHAR | URL файла на диске (`/media/...`) |
 | jersey_number | INT | nullable |
 | position | VARCHAR | спорт-агностичная метка |
 | bio | TEXT | |

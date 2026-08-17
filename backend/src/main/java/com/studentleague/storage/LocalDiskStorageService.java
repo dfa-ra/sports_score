@@ -2,7 +2,6 @@ package com.studentleague.storage;
 
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.config.AppProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,7 +15,6 @@ import java.util.UUID;
  * Сохраняет файлы в локальную папку на диске сервера и отдаёт публичный URL /media/...
  */
 @Service
-@ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
 public class LocalDiskStorageService implements StorageService {
 
     private final Path rootDir;
