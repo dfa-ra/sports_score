@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../features/home/home_page.dart';
+import '../features/matches/matches_page.dart';
 import '../features/referee/referee_control_page.dart';
+import 'theme.dart';
 
 class StudentLeagueApp extends StatelessWidget {
   const StudentLeagueApp({super.key});
@@ -9,15 +11,11 @@ class StudentLeagueApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Student League',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2FD67B),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(),
       home: const HomePage(),
       routes: {
+        '/matches': (_) => const MatchesPage(),
         '/referee': (_) => const RefereeControlPage(),
       },
     );

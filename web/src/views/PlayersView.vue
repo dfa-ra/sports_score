@@ -10,12 +10,21 @@ onMounted(async () => {
 </script>
 <template>
   <section class="stack">
-    <h1>Players</h1>
+    <div class="page-title">
+      <h1>Игроки</h1>
+      <p>Публичные карточки и статистика.</p>
+    </div>
+    <div v-if="!items.length" class="empty">Игроков пока нет</div>
     <div class="grid cards">
-      <RouterLink v-for="p in items" :key="p.id" class="panel" :to="`/players/${p.id}`">
+      <RouterLink v-for="p in items" :key="p.id" class="panel card-link" :to="`/players/${p.id}`">
         <h2>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</h2>
-        <p>{{ p.position || 'Player' }} · #{{ p.jerseyNumber ?? '-' }}</p>
+        <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
       </RouterLink>
     </div>
   </section>
 </template>
+<style scoped>
+.card-link { text-decoration: none; color: inherit; }
+.card-link:hover { text-decoration: none; border-color: rgba(88,166,255,.45); }
+h2 { font-size: 1.15rem; margin-bottom: 0.25rem; }
+</style>

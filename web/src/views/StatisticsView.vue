@@ -11,11 +11,15 @@ onMounted(async () => {
 </script>
 <template>
   <section class="stack">
-    <h1>Statistics</h1>
+    <div class="page-title">
+      <h1>Статистика</h1>
+      <p>Агрегация из событий матчей (не voided).</p>
+    </div>
     <div class="panel">
-      <h2>Players</h2>
-      <table class="table">
-        <thead><tr><th>Player</th><th>G</th><th>A</th><th>YC</th><th>RC</th><th>Apps</th></tr></thead>
+      <h2>Игроки</h2>
+      <div v-if="!players.length" class="empty" style="margin-top:0.75rem">Пока нет данных</div>
+      <table v-else class="table">
+        <thead><tr><th>Игрок</th><th>G</th><th>A</th><th>ЖК</th><th>КК</th><th>Игры</th></tr></thead>
         <tbody>
           <tr v-for="p in players" :key="p.playerId">
             <td>{{ p.displayName }}</td><td>{{ p.goals }}</td><td>{{ p.assists }}</td>
@@ -25,9 +29,10 @@ onMounted(async () => {
       </table>
     </div>
     <div class="panel">
-      <h2>Teams</h2>
-      <table class="table">
-        <thead><tr><th>Team</th><th>W</th><th>D</th><th>L</th><th>Pts</th></tr></thead>
+      <h2>Команды</h2>
+      <div v-if="!teams.length" class="empty" style="margin-top:0.75rem">Пока нет данных</div>
+      <table v-else class="table">
+        <thead><tr><th>Команда</th><th>W</th><th>D</th><th>L</th><th>Очки</th></tr></thead>
         <tbody>
           <tr v-for="t in teams" :key="t.teamId">
             <td>{{ t.teamName }}</td><td>{{ t.wins }}</td><td>{{ t.draws }}</td><td>{{ t.losses }}</td><td>{{ t.points }}</td>
@@ -37,3 +42,6 @@ onMounted(async () => {
     </div>
   </section>
 </template>
+<style scoped>
+h2 { font-size: 1.1rem; margin-bottom: 0.35rem; }
+</style>
