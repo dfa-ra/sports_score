@@ -23,7 +23,21 @@ Modular monolith — one Spring Boot application with feature packages:
 
 `auth` · `users` · `players` · `teams` · `sports` · `tournaments` · `matches` · `referees` · `statistics` · `notifications` · `admin`
 
-See [docs/architecture.md](docs/architecture.md), [docs/database.md](docs/database.md), and [docs/api.md](docs/api.md).
+See [docs/architecture.md](docs/architecture.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md), and [docs/ci.md](docs/ci.md).
+
+## CI / Releases
+
+GitHub Actions:
+
+- **CI** (`.github/workflows/ci.yml`) — backend tests, Vue production build, Flutter analyze/test + debug APK
+- **Release** (`.github/workflows/release.yml`) — on `v*` tags (or manual dispatch): backend JAR, web tarball, Android APK/AAB, optional unsigned iOS zip → GitHub Release assets
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Details and signing notes: [docs/ci.md](docs/ci.md).
 
 ## Roles
 
