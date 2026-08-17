@@ -11,4 +11,5 @@ public interface TournamentTeamRepository extends JpaRepository<TournamentTeam, 
     List<TournamentTeam> findByTournamentId(UUID tournamentId);
     Optional<TournamentTeam> findByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);
     boolean existsByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);
+    List<TournamentTeam> findByTeamId(UUID teamId);
 }

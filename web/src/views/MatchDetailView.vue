@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, labelOf } from '../lib/format'
 import { apiError } from '../lib/errors'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
@@ -95,7 +96,6 @@ onUnmounted(() => client?.deactivate())
     <div class="page-title">
       <h1>{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
       <p>{{ connected ? 'Live-канал дышит' : 'Подключаемся к трансляции…' }} · {{ formatWhen(match.scheduledAt) }}</p>
-      <CopyChip :value="String(match.id)" label="Скопировать id матча" />
     </div>
 
     <div class="panel scoreboard" :class="{ 'live-pulse': match.status === 'LIVE' }">
@@ -110,20 +110,10 @@ onUnmounted(() => client?.deactivate())
       </p>
     </div>
 
-    <div v-if="auth.canManageLeague" class="panel stack">
+    <div v-if="referees.length || auth.canOfficiate" class="panel stack">
       <h2>Судьи</h2>
       <p v-for="r in referees" :key="r.id" class="muted">{{ r.refereeEmail || r.refereeId }}</p>
-      <form class="stack" @submit.prevent="assignReferee">
-        <label class="field">Назначить судью
-          <select v-model="refereeId" required>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
-          </select>
-        </label>
-        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
-      </form>
-      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
-      <p v-if="error" class="form-error">{{ error }}</p>
-      <p v-if="ok" class="form-ok">{{ ok }}</p>
+      <p v-if="!referees.length" class="muted">Судья ещё не назначен.</p>
       <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
     </div>
 
@@ -138,6 +128,21 @@ onUnmounted(() => client?.deactivate())
         </li>
       </ul>
     </div>
+
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <CopyChip :value="String(match.id)" label="Скопировать id матча" />
+      <form class="stack" @submit.prevent="assignReferee">
+        <label class="field">Назначить судью
+          <select v-model="refereeId" required>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
+          </select>
+        </label>
+        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
+      </form>
+      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
+      <p v-if="error" class="form-error">{{ error }}</p>
+      <p v-if="ok" class="form-ok">{{ ok }}</p>
+    </AdminOnly>
   </section>
 </template>
 

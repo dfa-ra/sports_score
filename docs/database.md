@@ -56,6 +56,7 @@ User 1──* DeviceToken
 | short_name | VARCHAR | |
 | logo_url | VARCHAR | |
 | captain_id | UUID FK → player_profiles | nullable |
+| disbanded | BOOLEAN NOT NULL DEFAULT FALSE | расформирована админом |
 | created_at / updated_at | TIMESTAMPTZ | |
 
 ### team_members

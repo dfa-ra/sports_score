@@ -143,11 +143,12 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET/POST | `/teams` | Чтение: публичное; создание: игрок (становится капитаном) или ADMIN |
-| GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN |
-| GET | `/teams/{id}/members` | Auth |
-| POST | `/teams/{id}/members` | Капитан команды |
-| DELETE | `/teams/{id}/members/{playerId}` | Капитан команды |
+| GET/POST | `/teams` | Чтение: публичное (без расформированных; `includeDisbanded=true` — все). Создание: игрок/капитан (становится капитаном). ADMIN создавать не может |
+| GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN. Расформированную править нельзя |
+| DELETE | `/teams/{id}` | ADMIN — расформировать (состав снимается, заявки на турниры — WITHDRAWN) |
+| GET | `/teams/{id}/members` | Публичный |
+| POST | `/teams/{id}/members` | Капитан команды или ADMIN |
+| DELETE | `/teams/{id}/members/{playerId}` | Капитан команды или ADMIN |
 | PUT | `/teams/{id}/captain` | Капитан или ADMIN |
 
 ---

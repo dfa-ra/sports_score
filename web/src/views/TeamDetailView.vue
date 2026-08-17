@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { initials } from '../lib/format'
 import { apiError } from '../lib/errors'
+import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
 
@@ -22,7 +23,7 @@ const ok = ref('')
 const pending = ref(false)
 
 const isCaptain = computed(() => me.value && team.value && me.value.id === team.value.captainId)
-const canManage = computed(() => auth.canManageLeague || isCaptain.value)
+const canManage = computed(() => !team.value?.disbanded && (auth.canManageLeague || isCaptain.value))
 
 onMounted(load)
 
@@ -40,7 +41,7 @@ async function load() {
     } catch {
       me.value = null
     }
-    if (auth.canManageLeague || isCaptain.value) {
+    if (canManage.value) {
       const { data } = await api.get('/players', { params: { size: 100 } })
       players.value = data.content ?? []
       if (!playerId.value && players.value[0]) playerId.value = players.value[0].id
@@ -104,6 +105,21 @@ async function makeCaptain(id: string) {
     pending.value = false
   }
 }
+
+async function disbandTeam() {
+  if (!confirm(`Расформировать «${team.value.name}»? Состав снимут, заявки на турниры снимут.`)) return
+  error.value = ''
+  pending.value = true
+  try {
+    await api.delete(`/teams/${team.value.id}`)
+    ok.value = 'Команда расформирована.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
 </script>
 
 <template>
@@ -111,11 +127,11 @@ async function makeCaptain(id: string) {
     <div class="page-title">
       <span class="crest">{{ initials(team.shortName || team.name) }}</span>
       <h1>{{ team.name }}</h1>
-      <p>{{ team.shortName || 'Команда без аббревиатуры, но с характером.' }}</p>
-      <CopyChip :value="String(team.id)" label="Скопировать id команды" />
+      <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
+      <p v-else>{{ team.shortName || 'Команда без аббревиатуры, но с характером.' }}</p>
     </div>
 
-    <div v-if="canManage" class="panel stack">
+    <div v-if="canManage && isCaptain" class="panel stack">
       <h2>Редактировать</h2>
       <form class="stack" @submit.prevent="saveTeam">
         <label class="field">Название<input v-model="name" required /></label>
@@ -132,12 +148,12 @@ async function makeCaptain(id: string) {
           <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>
         </RouterLink>
         <span class="muted">№{{ m.jerseyNumber ?? '—' }}</span>
-        <div v-if="canManage" class="actions">
+        <div v-if="canManage && isCaptain" class="actions">
           <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="makeCaptain(m.playerId)">Капитан</button>
           <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="removeMember(m.playerId)">Убрать</button>
         </div>
       </div>
-      <form v-if="canManage" class="stack" @submit.prevent="addMember">
+      <form v-if="canManage && isCaptain" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
           <select v-model="playerId" required>
             <option v-for="p in players" :key="p.id" :value="p.id">
@@ -147,9 +163,42 @@ async function makeCaptain(id: string) {
         </label>
         <button class="btn" type="submit" :disabled="pending">Добавить в состав</button>
       </form>
+      <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
+      <p v-if="ok && !auth.canManageLeague" class="form-ok">{{ ok }}</p>
+    </div>
+
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <p class="muted">Служебные действия. На публичной карточке их нет.</p>
+      <CopyChip :value="String(team.id)" label="Скопировать id команды" />
+      <form v-if="!team.disbanded" class="stack" @submit.prevent="saveTeam">
+        <label class="field">Название<input v-model="name" required /></label>
+        <label class="field">Короткое имя<input v-model="shortName" /></label>
+        <button class="btn secondary" type="submit" :disabled="pending">Сохранить карточку</button>
+      </form>
+      <form v-if="!team.disbanded" class="stack" @submit.prevent="addMember">
+        <label class="field">Добавить игрока
+          <select v-model="playerId" required>
+            <option v-for="p in players" :key="p.id" :value="p.id">
+              {{ p.displayName || `${p.firstName} ${p.lastName}` }}
+            </option>
+          </select>
+        </label>
+        <button class="btn" type="submit" :disabled="pending">Добавить в состав</button>
+      </form>
+      <div v-if="!team.disbanded && members.length" class="stack">
+        <div v-for="m in members" :key="`admin-${m.id}`" class="member">
+          <span>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</span>
+          <div class="actions">
+            <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="makeCaptain(m.playerId)">Капитан</button>
+            <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="removeMember(m.playerId)">Убрать</button>
+          </div>
+        </div>
+      </div>
+      <button v-if="!team.disbanded" class="btn danger" :disabled="pending" @click="disbandTeam">Расформировать команду</button>
+      <p v-else class="muted">Уже расформирована — править состав нельзя.</p>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
-    </div>
+    </AdminOnly>
   </section>
 </template>
 

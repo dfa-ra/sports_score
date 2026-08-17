@@ -114,6 +114,70 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void adminCannotCreateTeamButCanDisband() throws Exception {
+        String adminToken = createAdminAndLogin("admin-team-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String captainEmail = "captain-disband-" + System.nanoTime() + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Cap","lastName":"Tain","jerseyNumber":1,"position":"PG"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Admin United","shortName":"AU"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Campus United","shortName":"CU"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.disbanded").value(false))
+                .andReturn();
+        String teamId = objectMapper.readTree(teamResult.getResponse().getContentAsString()).get("id").asText();
+        captainToken = loginOnly(captainEmail, "Str0ngPass!");
+
+        mockMvc.perform(delete("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(captainToken)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/teams/" + teamId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disbanded").value(true));
+
+        mockMvc.perform(get("/api/v1/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isEmpty());
+
+        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')].disbanded").value(org.hamcrest.Matchers.hasItem(true)));
+
+        mockMvc.perform(put("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Still Alive"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void adminCanListAndUpdateUsers() throws Exception {
         String adminToken = createAdminAndLogin("admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String fanEmail = "fan-admin-" + System.nanoTime() + "@example.com";

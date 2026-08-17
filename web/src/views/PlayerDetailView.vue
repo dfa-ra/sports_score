@@ -3,8 +3,12 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { initials, labelOf, statusLabel } from '../lib/format'
+import { useAuthStore } from '../stores/auth'
+import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
+
+const auth = useAuthStore()
 
 const route = useRoute()
 const card = ref<any>(null)
@@ -31,7 +35,6 @@ onMounted(async () => {
         Команда:
         <RouterLink :to="`/teams/${card.team.id}`">{{ card.team.name }}</RouterLink>
       </p>
-      <CopyChip :value="String(card.id)" label="Скопировать id игрока" />
     </div>
 
     <div class="panel">
@@ -59,6 +62,10 @@ onMounted(async () => {
         <span class="muted">{{ labelOf(statusLabel, m.status) }}</span>
       </RouterLink>
     </div>
+
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <CopyChip :value="String(card.id)" label="Скопировать id игрока" />
+    </AdminOnly>
   </section>
 </template>
 

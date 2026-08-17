@@ -29,6 +29,9 @@ public class Team {
     @Column(name = "captain_id")
     private UUID captainId;
 
+    @Column(nullable = false)
+    private boolean disbanded = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -88,6 +91,14 @@ public class Team {
 
     public void setCaptainId(UUID captainId) {
         this.captainId = captainId;
+    }
+
+    public boolean isDisbanded() {
+        return disbanded;
+    }
+
+    public void setDisbanded(boolean disbanded) {
+        this.disbanded = disbanded;
     }
 
     public Instant getCreatedAt() {

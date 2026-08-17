@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,9 +49,10 @@ public class TeamController {
     @Operation(summary = "List teams")
     public PageResponse<TeamResponse> list(
             @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean includeDisbanded,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return PageResponse.from(teamService.listTeams(q, pageable));
+        return PageResponse.from(teamService.listTeams(q, includeDisbanded, pageable));
     }
 
     @PostMapping
@@ -77,6 +79,17 @@ public class TeamController {
             @Valid @RequestBody UpdateTeamRequest request
     ) {
         return teamService.updateTeam(principal, id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Disband a team (admin only)")
+    public void disband(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id
+    ) {
+        teamService.disbandTeam(principal, id);
     }
 
     @GetMapping("/{id}/members")

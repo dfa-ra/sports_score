@@ -136,6 +136,9 @@ public class TournamentService {
         }
         Team team = teamRepository.findById(request.teamId())
                 .orElseThrow(() -> ApiException.notFound("Team not found"));
+        if (team.isDisbanded()) {
+            throw ApiException.badRequest("Нельзя заявить расформированную команду");
+        }
 
         if (principal.getRole() != Role.ADMIN) {
             var profile = playerProfileRepository.findByUserId(principal.getId())

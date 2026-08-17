@@ -15,7 +15,7 @@ export function useTeamDirectory() {
   async function load(force = false) {
     if (loaded.value && !force) return
     try {
-      const { data } = await api.get('/teams', { params: { size: 200 } })
+      const { data } = await api.get('/teams', { params: { size: 200, includeDisbanded: true } })
       const next: Record<string, TeamBrief> = {}
       for (const team of data.content ?? []) {
         next[team.id] = team
