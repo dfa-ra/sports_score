@@ -9,8 +9,8 @@ public record AppProperties(
         Cors cors,
         Jwt jwt,
         RateLimit rateLimit,
-        S3 s3,
-        Redis redis
+        Redis redis,
+        LocalStorage localStorage
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -21,16 +21,13 @@ public record AppProperties(
     public record RateLimit(int authRequestsPerMinute) {
     }
 
-    public record S3(
-            boolean enabled,
-            String endpoint,
-            String accessKey,
-            String secretKey,
-            String bucket,
-            String publicBaseUrl
-    ) {
+    public record Redis(boolean enabled) {
     }
 
-    public record Redis(boolean enabled) {
+    /** Локальное хранение файлов на диске сервера. */
+    public record LocalStorage(
+            String rootDir,
+            String publicBaseUrl
+    ) {
     }
 }

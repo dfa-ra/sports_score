@@ -14,7 +14,7 @@ Production-ориентированная платформа студенчес�
 | API | REST `/api/v1`, OpenAPI/Swagger, WebSocket (STOMP) |
 | Web | Vue 3, TypeScript, Vite, Pinia, Vue Router, Axios |
 | Mobile | Flutter (Android + iOS) |
-| Хранилище | S3-совместимое object storage (аватары, логотипы) |
+| Хранилище | Локальный диск (`/media/...`, аватары и логотипы) |
 | Инфраструктура | Docker Compose |
 
 ## Архитектура
@@ -57,29 +57,23 @@ git push origin v0.1.0
 
 ```bash
 cp .env.example .env
-docker compose up -d postgres redis minio minio-init
-cd backend && ./mvnw spring-boot:run
+docker compose up -d --build
 cd web && npm install && npm run dev
 ```
 
-Полный стек (API + зависимости, включая MinIO):
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
+Сервисы: `postgres`, `redis`, `backend`.  
+Файлы (аватары/логотипы) пишутся на диск в volume `uploads_data` и отдаются как `/media/...`.
 
 API: `http://localhost:8080`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`  
-Health: `http://localhost:8080/api/v1/health`  
-Консоль MinIO: `http://localhost:9001` (minioadmin / minioadmin)
+Health: `http://localhost:8080/api/v1/health`
 
 ## Чеклист для production
 
 - Задать уникальный сильный `JWT_SECRET` (≥ 32 символов; не значение из примера)
 - Переопределить `DATABASE_PASSWORD` (prod-профиль отклоняет дефолт)
 - Использовать `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway включён)
-- Настроить реальные `S3_*` (или оставить `S3_ENABLED=false` с no-op хранилищем)
+- Убедиться, что volume/папка `LOCAL_STORAGE_DIR` доступна на запись
 - Ограничить `CORS_ORIGINS` реальными origin фронтенда
 - Включать FCM/APNs только с реальными credentials (`app.push.fcm.enabled` / `app.push.apns.enabled`)
 - Для нескольких инстансов предпочтителен Redis (`APP_REDIS_ENABLED=true`)
@@ -97,9 +91,8 @@ Health: `http://localhost:8080/api/v1/health`
 | `JWT_SECRET` | HMAC-секрет access-токенов |
 | `JWT_ACCESS_EXPIRATION` | TTL access-токена (мс) |
 | `JWT_REFRESH_EXPIRATION` | TTL refresh-токена (мс) |
-| `S3_ENABLED` | Использовать S3 вместо no-op |
-| `S3_ENDPOINT` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` / `S3_BUCKET` | Object storage |
-| `S3_PUBLIC_BASE_URL` | Публичный префикс URL объектов |
+| `LOCAL_STORAGE_DIR` | Папка для аватаров/логотипов на диске |
+| `LOCAL_STORAGE_PUBLIC_BASE_URL` | Публичный префикс URL (обычно `/media`) |
 | `CORS_ORIGINS` | Разрешённые browser origins |
 | `SPRING_PROFILES_ACTIVE` | `dev` / `prod` |
 

@@ -26,7 +26,7 @@ Student League — **модульный монолит**: одно прилож�
 └───────┬──────────┬──────────┬────┘
         │          │          │
         ▼          ▼          ▼
-   PostgreSQL    Redis    S3-совместимое
+   PostgreSQL    Redis    Диск /media
    (истина)    (кэш/      (медиа)
                pubsub/
                rate limit)
@@ -49,7 +49,7 @@ Student League — **модульный монолит**: одно прилож�
 | `referees` | Представления назначений судей |
 | `statistics` | Агрегация из `MatchEvent` |
 | `notifications` | Абстракция push (FCM/APNs) |
-| `storage` | Абстракция object storage |
+| `storage` | Локальные файлы на диске (`/media`) |
 | `admin` | Сквозные admin API |
 
 Каждый feature-пакет использует слои: `controller` → `service` → `repository`, плюс `entity`, `dto`, `mapper`.
@@ -111,7 +111,7 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Файловое хранилище
 
-Аватары игроков и логотипы команд хранятся в S3-совместимом storage. В БД — `avatarUrl` / `logoUrl` (или object key). `StorageService` абстрагирует провайдер (MinIO локально, AWS S3 в production).
+Аватары и логотипы сохраняются **на диск сервера** (`LOCAL_STORAGE_DIR`, в Docker — `/app/data/uploads`) и отдаются по URL `/media/...`.
 
 ## Уведомления
 
@@ -119,7 +119,7 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Деплой
 
-Local/dev: Docker Compose (`backend`, `postgres`, `redis`, `minio`).
+Local/dev: Docker Compose (`backend`, `postgres`, `redis`).
 
 Production: те же контейнеры за reverse proxy; секреты через env; Flyway при старте; `ddl-auto=validate` (никогда `create`).
 

@@ -81,3 +81,7 @@ mobile/ios/Flutter/Flutter.podspec
 *.jks
 *.keystore
 key.properties
+
+# Local uploads
+data/
+backend/data/

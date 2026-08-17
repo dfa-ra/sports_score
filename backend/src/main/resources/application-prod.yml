@@ -34,8 +34,9 @@ logging:
 app:
   redis:
     enabled: ${APP_REDIS_ENABLED:false}
-  s3:
-    enabled: ${S3_ENABLED:true}
+  local-storage:
+    root-dir: ${LOCAL_STORAGE_DIR:/app/data/uploads}
+    public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:/media}
   jwt:
     # Must be overridden via JWT_SECRET env in production (min 32 chars).
     secret: ${JWT_SECRET}
