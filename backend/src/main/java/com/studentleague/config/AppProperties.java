@@ -10,7 +10,8 @@ public record AppProperties(
         Jwt jwt,
         RateLimit rateLimit,
         S3 s3,
-        Redis redis
+        Redis redis,
+        LocalStorage localStorage
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -32,5 +33,14 @@ public record AppProperties(
     }
 
     public record Redis(boolean enabled) {
+    }
+
+    /**
+     * Локальное хранение файлов на диске (по умолчанию вместо MinIO).
+     */
+    public record LocalStorage(
+            String rootDir,
+            String publicBaseUrl
+    ) {
     }
 }

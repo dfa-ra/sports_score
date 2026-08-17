@@ -57,23 +57,14 @@ git push origin v0.1.0
 
 ```bash
 cp .env.example .env
-# API без хранилища файлов (достаточно для старта)
-docker compose up -d --build postgres redis backend
+docker compose up -d --build
 cd web && npm install && npm run dev
 ```
 
-С MinIO (аватары/логотипы):
+Сервисы: `postgres`, `redis`, `backend`.  
+Файлы (аватары/логотипы) пишутся на диск в volume `uploads_data` и отдаются как `/media/...`.
 
-```bash
-# в .env: S3_ENABLED=true
-docker compose --profile storage up -d --build
-```
-
-Полный стек:
-
-```bash
-docker compose --profile full up -d --build
-```
+MinIO больше не нужен для обычного деплоя.
 
 API: `http://localhost:8080`  
 Swagger UI: `http://localhost:8080/swagger-ui.html`  

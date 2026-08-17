@@ -41,6 +41,9 @@ app:
     auth-requests-per-minute: ${AUTH_RATE_LIMIT:30}
   redis:
     enabled: ${APP_REDIS_ENABLED:false}
+  local-storage:
+    root-dir: ${LOCAL_STORAGE_DIR:./data/uploads}
+    public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:/media}
   s3:
     enabled: ${S3_ENABLED:false}
     endpoint: ${S3_ENDPOINT:}

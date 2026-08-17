@@ -22,7 +22,8 @@ class JwtServiceTest {
                 new AppProperties.Jwt("test-secret-key-that-is-long-enough-for-hs256-algorithms-123456", 60_000, 3_600_000),
                 new AppProperties.RateLimit(30),
                 new AppProperties.S3(false, "", "", "", "", ""),
-                new AppProperties.Redis(false)
+                new AppProperties.Redis(false),
+                new AppProperties.LocalStorage("./data/uploads-test", "/media")
         );
         jwtService = new JwtService(properties);
     }
