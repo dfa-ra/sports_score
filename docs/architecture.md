@@ -8,7 +8,7 @@ Student League — **модульный монолит**: одно прилож�
 
 - **Web** — SPA на Vue 3
 - **Mobile** — Flutter (одна codebase для Android/iOS)
-- **Интеграции** — потребители OpenAPI
+- **Интеграции** — REST `/api/v1` (Swagger/OpenAPI UI в runtime не публикуется)
 
 ## Схема верхнего уровня
 
@@ -37,7 +37,7 @@ Student League — **модульный монолит**: одно прилож�
 | Модуль | Ответственность |
 |---|---|
 | `common` | Ошибки, пагинация, общие типы |
-| `config` | Security, Redis, OpenAPI, WebSocket, CORS, Jackson |
+| `config` | Security, Redis, WebSocket, CORS, Jackson |
 | `security` | JWT, principals, фильтры, helpers прав |
 | `auth` | Регистрация, login, logout, refresh |
 | `users` | Администрирование аккаунтов |

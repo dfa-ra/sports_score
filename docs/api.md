@@ -4,7 +4,7 @@
 Content-Type: `application/json`  
 Auth: `Authorization: Bearer <access_token>`
 
-Интерактивная документация: `/swagger-ui.html` (OpenAPI: `/v3/api-docs`).
+Интерактивный Swagger/OpenAPI **закрыт** для пользователей (`/swagger-ui.html`, `/v3/api-docs`, `/actuator/**`). Публичная поверхность — Vue-приложение; этот файл — внутренняя спецификация для разработки.
 
 ## Соглашения
 

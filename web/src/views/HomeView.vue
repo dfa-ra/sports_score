@@ -3,11 +3,15 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
+import { formatWhen, labelOf, roleLabel } from '../lib/format'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
+import StatusBadge from '../components/StatusBadge.vue'
 
 const auth = useAuthStore()
 const liveMatches = ref<any[]>([])
 const upcoming = ref<any[]>([])
 const loaded = ref(false)
+const teams = useTeamDirectory()
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
@@ -15,6 +19,7 @@ onMounted(async () => {
     return
   }
   try {
+    await teams.load()
     const { data } = await api.get('/matches', { params: { size: 12, sort: 'scheduledAt,desc' } })
     const items = data.content ?? []
     liveMatches.value = items.filter((m: any) => m.status === 'LIVE' || m.status === 'PAUSED')
@@ -32,10 +37,10 @@ onMounted(async () => {
     <div class="hero panel rise">
       <div class="hero-copy">
         <p class="eyebrow">Студенческая спортивная лига</p>
-        <h1>Student League</h1>
+        <h1>Счёт живой. Трибуна тоже.</h1>
         <p class="lede">
-          Live-счёт, турниры и статистика по нескольким видам спорта —
-          плюс кабинет капитана, судьи и администратора.
+          Live-счёт, турниры и статистика без лишнего шума —
+          плюс кабинеты капитана, судьи и администратора.
         </p>
         <div class="cta">
           <RouterLink class="btn" to="/matches">Смотреть матчи</RouterLink>
@@ -48,13 +53,13 @@ onMounted(async () => {
           <span class="stat-label">Live сейчас</span>
           <strong>{{ liveMatches.length }}</strong>
         </div>
-        <div class="stat">
+        <div class="stat tilt">
           <span class="stat-label">Скоро</span>
           <strong>{{ upcoming.length }}</strong>
         </div>
         <div class="stat accent">
-          <span class="stat-label">Режим</span>
-          <strong>{{ auth.role ?? 'FAN' }}</strong>
+          <span class="stat-label">Ваша роль</span>
+          <strong>{{ labelOf(roleLabel, auth.role, 'Гость') }}</strong>
         </div>
       </div>
     </div>
@@ -62,15 +67,15 @@ onMounted(async () => {
     <div v-if="auth.isAuthenticated" class="grid cards">
       <RouterLink class="panel feature" to="/matches">
         <h2>Матчи</h2>
-        <p>Расписание, live-счёт и лента событий без polling.</p>
+        <p>Расписание, live-счёт и лента событий. Без бесконечного обновления страницы.</p>
       </RouterLink>
       <RouterLink class="panel feature" to="/teams">
         <h2>Команды</h2>
-        <p>Составы, капитаны и заявки на турниры.</p>
+        <p>Составы, капитаны и заявки. Как заявка в общагу, только спортивнее.</p>
       </RouterLink>
       <RouterLink class="panel feature" to="/statistics">
         <h2>Статистика</h2>
-        <p>Голы, ассисты и таблица — из MatchEvent.</p>
+        <p>Голы, пасы и таблица — из реальных событий, не из легенд раздевалки.</p>
       </RouterLink>
       <RouterLink
         v-if="auth.role === 'REFEREE' || auth.role === 'ADMIN'"
@@ -78,13 +83,14 @@ onMounted(async () => {
         to="/referee"
       >
         <h2>Кабинет судьи</h2>
-        <p>Крупные кнопки для быстрого ввода событий.</p>
+        <p>Крупные кнопки. Пальцы не промахнутся даже в дождь.</p>
       </RouterLink>
     </div>
 
-    <div v-if="loaded && auth.isAuthenticated && liveMatches.length" class="stack" style="margin-top:1rem">
+    <div v-if="loaded && auth.isAuthenticated && liveMatches.length" class="stack">
       <div class="page-title">
         <h2>Идут сейчас</h2>
+        <p>Пока свисток не прозвучал — можно дышать вместе со счётом.</p>
       </div>
       <div class="grid cards">
         <RouterLink
@@ -93,9 +99,23 @@ onMounted(async () => {
           class="panel live-pulse"
           :to="`/matches/${m.id}`"
         >
-          <span class="badge live">{{ m.status }}</span>
+          <StatusBadge :status="m.status" />
+          <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
           <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
-          <p class="muted">Открыть live-трансляцию событий</p>
+          <p class="muted">Открыть live-ленту</p>
+        </RouterLink>
+      </div>
+    </div>
+
+    <div v-if="loaded && auth.isAuthenticated && upcoming.length" class="stack">
+      <div class="page-title">
+        <h2>На подходе</h2>
+      </div>
+      <div class="grid cards">
+        <RouterLink v-for="m in upcoming" :key="m.id" class="panel" :to="`/matches/${m.id}`">
+          <StatusBadge :status="m.status" />
+          <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
+          <p class="muted">{{ formatWhen(m.scheduledAt) }}</p>
         </RouterLink>
       </div>
     </div>
@@ -103,45 +123,31 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.home { display: grid; gap: 1.25rem; }
+.home { display: grid; gap: 1.35rem; }
 .hero {
   display: grid;
-  grid-template-columns: 1.6fr 0.9fr;
+  grid-template-columns: 1.55fr 0.9fr;
   gap: 1.5rem;
-  padding: 1.75rem;
-  background:
-    linear-gradient(135deg, rgba(88, 166, 255, 0.08), transparent 42%),
-    var(--surface);
+  padding: 1.9rem;
+  border-radius: 28px 20px 26px 18px;
 }
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.72rem;
-  color: var(--accent);
-  margin: 0 0 0.6rem;
-  font-weight: 700;
-}
-h1 {
-  font-size: clamp(2.2rem, 5vw, 3.2rem);
-  line-height: 1.05;
-  max-width: 12ch;
-}
-.lede { max-width: 36rem; margin-top: 0.75rem; font-size: 1.02rem; }
-.cta { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.2rem; }
+.lede { max-width: 36rem; margin-top: 0.75rem; font-size: 1.05rem; }
+.cta { display: flex; gap: 0.65rem; flex-wrap: wrap; margin-top: 1.25rem; }
 .hero-side { display: grid; gap: 0.75rem; align-content: center; }
 .stat {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0.9rem 1rem;
-  background: var(--bg);
+  border-radius: 16px 13px 15px 12px;
+  padding: 0.95rem 1rem;
+  background: rgba(10, 13, 8, 0.35);
 }
-.stat.accent { border-color: rgba(88, 166, 255, 0.35); background: var(--accent-soft); }
-.stat-label { display: block; color: var(--muted); font-size: 0.78rem; margin-bottom: 0.2rem; }
-.stat strong { font-size: 1.35rem; color: var(--text-strong); }
-.feature { text-decoration: none; color: inherit; transition: transform 0.15s ease; }
-.feature:hover { transform: translateY(-2px); text-decoration: none; border-color: rgba(88, 166, 255, 0.4); }
-.feature h2 { font-size: 1.15rem; margin-bottom: 0.35rem; }
+.stat.tilt { transform: rotate(-0.6deg); }
+.stat.accent { border-color: rgba(226, 179, 106, 0.35); background: var(--accent-soft); }
+.stat-label { display: block; color: var(--muted); font-size: 0.76rem; margin-bottom: 0.2rem; }
+.stat strong { font-size: 1.4rem; color: var(--text-strong); font-family: var(--font-display); }
+.feature h2 { font-size: 1.25rem; margin-bottom: 0.35rem; }
+.versus { font-weight: 750; color: var(--text-strong); margin-top: 0.45rem; }
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; }
+  .stat.tilt { transform: none; }
 }
 </style>
