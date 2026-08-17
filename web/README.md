@@ -12,16 +12,24 @@
 - Axios (+ refresh interceptor)
 - STOMP / SockJS для live-счёта
 
-## Локальный запуск
+## Запуск
 
-Требуется запущенный backend на `http://localhost:8080` (или proxy Vite).
+В Docker вместе с backend (рекомендуется на сервере):
+
+```bash
+docker compose up -d --build web
+```
+
+Сайт: `http://localhost` (или `WEB_PORT` из `.env`). Контейнер сам отдаёт статику и проксирует `/api`, `/ws`, `/media`.
+
+Локальная разработка с hot reload — нужен backend на `http://localhost:8080`:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Production-сборка:
+Production-сборка без Docker:
 
 ```bash
 npm run build

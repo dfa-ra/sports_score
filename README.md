@@ -58,15 +58,22 @@ git push origin v0.1.0
 ```bash
 cp .env.example .env
 docker compose up -d --build
-cd web && npm install && npm run dev
 ```
 
-Сервисы: `postgres`, `redis`, `backend`.  
+Сервисы: `postgres`, `redis`, `backend`, `web`.  
 Файлы (аватары/логотипы) пишутся на диск в volume `uploads_data` и отдаются как `/media/...`.
 
-Web: `http://localhost:5173`  
-API: `http://localhost:8080/api/v1` (только для клиентов, не для браузера)  
-Health: `http://localhost:8080/api/v1/health`  
+Web: `http://localhost` (контейнер `web`, порт `WEB_PORT`, по умолчанию 80)  
+API и live идут через тот же origin: `/api/v1`, `/ws`, `/media`  
+Health: `http://localhost/api/v1/health`  
+
+Хостовый nginx не нужен: статика и прокси уже внутри контейнера `web`. Если порт 80 занят старым nginx — остановите его (`sudo systemctl disable --now nginx`) или задайте `WEB_PORT=3000`.
+
+Для разработки фронта без пересборки образа:
+
+```bash
+cd web && npm install && npm run dev
+```
 
 Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — пользователю доступен только фронтенд.
 
@@ -77,7 +84,8 @@ Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — польз
 - Переопределить `DATABASE_PASSWORD` (prod-профиль отклоняет дефолт)
 - Использовать `SPRING_PROFILES_ACTIVE=prod` (`ddl-auto=validate`, Flyway включён)
 - Убедиться, что volume/папка `LOCAL_STORAGE_DIR` доступна на запись
-- Ограничить `CORS_ORIGINS` реальными origin фронтенда
+- Ограничить `CORS_ORIGINS` реальными origin фронтенда (если ходите на backend:8080 напрямую; через контейнер `web` это same-origin)
+- На сервере остановить хостовый nginx, если он занимает порт 80: `sudo systemctl disable --now nginx`
 - Включать FCM/APNs только с реальными credentials (`app.push.fcm.enabled` / `app.push.apns.enabled`)
 - Для нескольких инстансов предпочтителен Redis (`APP_REDIS_ENABLED=true`)
 
@@ -97,7 +105,8 @@ Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — польз
 | `JWT_REFRESH_EXPIRATION` | TTL refresh-токена (мс) |
 | `LOCAL_STORAGE_DIR` | Папка для аватаров/логотипов на диске |
 | `LOCAL_STORAGE_PUBLIC_BASE_URL` | Публичный префикс URL (обычно `/media`) |
-| `CORS_ORIGINS` | Разрешённые browser origins |
+| `CORS_ORIGINS` | Разрешённые browser origins (для прямого захода на :8080; через контейнер `web` запросы same-origin) |
+| `WEB_PORT` | Публичный порт фронта (по умолчанию `80`) |
 | `SPRING_PROFILES_ACTIVE` | `dev` / `prod` |
 
 ## Структура репозитория

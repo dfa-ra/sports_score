@@ -119,9 +119,11 @@ PostgreSQL остаётся единственным durable source of truth.
 
 ## Деплой
 
-Local/dev: Docker Compose (`backend`, `postgres`, `redis`).
+Local/dev и prod: Docker Compose (`web`, `backend`, `postgres`, `redis`).
 
-Production: те же контейнеры за reverse proxy; секреты через env; Flyway при старте; `ddl-auto=validate` (никогда `create`).
+Контейнер `web` отдаёт Vue-статику и проксирует `/api`, `/ws`, `/media` на backend. Хостовый nginx не обязателен.
+
+Production: те же контейнеры; секреты через env; Flyway при старте; `ddl-auto=validate` (никогда `create`).
 
 ## Будущее выделение сервисов
 
