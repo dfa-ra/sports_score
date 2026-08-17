@@ -30,6 +30,8 @@ npm run preview
 
 ## Основные разделы
 
+Пользователю доступен только этот фронтенд. Swagger, OpenAPI и Actuator на backend закрыты.
+
 - Публичные: Home, турниры, матчи (live), команды, игроки, статистика, login/register
 - Admin: дашборд со вкладками users / tournaments / matches / teams / players / referees / statistics
 - Referee: список назначенных матчей и Live Match Control с крупными кнопками

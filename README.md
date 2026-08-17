@@ -11,7 +11,7 @@ Production-ориентированная платформа студенчес�
 | Backend | Java 21, Spring Boot 3, Spring Security, JPA/Hibernate, Flyway |
 | БД | PostgreSQL (источник истины) |
 | Кэш / Pub-Sub | Redis |
-| API | REST `/api/v1`, OpenAPI/Swagger, WebSocket (STOMP) |
+| API | REST `/api/v1`, WebSocket (STOMP). Swagger/OpenAPI закрыты для пользователей |
 | Web | Vue 3, TypeScript, Vite, Pinia, Vue Router, Axios |
 | Mobile | Flutter (Android + iOS) |
 | Хранилище | Локальный диск (`/media/...`, аватары и логотипы) |
@@ -64,9 +64,11 @@ cd web && npm install && npm run dev
 Сервисы: `postgres`, `redis`, `backend`.  
 Файлы (аватары/логотипы) пишутся на диск в volume `uploads_data` и отдаются как `/media/...`.
 
-API: `http://localhost:8080`  
-Swagger UI: `http://localhost:8080/swagger-ui.html`  
-Health: `http://localhost:8080/api/v1/health`
+Web: `http://localhost:5173`  
+API: `http://localhost:8080/api/v1` (только для клиентов, не для браузера)  
+Health: `http://localhost:8080/api/v1/health`  
+
+Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — пользователю доступен только фронтенд.
 
 ## Чеклист для production
 

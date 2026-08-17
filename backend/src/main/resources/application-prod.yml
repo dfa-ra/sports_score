@@ -16,14 +16,23 @@ server:
     include-binding-errors: never
     include-stacktrace: never
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health
   endpoint:
     health:
       show-details: never
+  info:
+    env:
+      enabled: false
 
 logging:
   level:

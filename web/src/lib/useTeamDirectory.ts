@@ -1,0 +1,41 @@
+import { ref } from 'vue'
+import api from '../api/client'
+
+export interface TeamBrief {
+  id: string
+  name: string
+  shortName?: string
+  logoUrl?: string
+}
+
+const cache = ref<Record<string, TeamBrief>>({})
+const loaded = ref(false)
+
+export function useTeamDirectory() {
+  async function load() {
+    if (loaded.value) return
+    try {
+      const { data } = await api.get('/teams', { params: { size: 200 } })
+      const next: Record<string, TeamBrief> = {}
+      for (const team of data.content ?? []) {
+        next[team.id] = team
+      }
+      cache.value = next
+      loaded.value = true
+    } catch {
+      loaded.value = false
+    }
+  }
+
+  function name(id?: string | null, fallback = 'Команда') {
+    if (!id) return fallback
+    return cache.value[id]?.shortName || cache.value[id]?.name || fallback
+  }
+
+  function fullName(id?: string | null, fallback = 'Команда') {
+    if (!id) return fallback
+    return cache.value[id]?.name || fallback
+  }
+
+  return { teams: cache, load, name, fullName }
+}

@@ -1,19 +1,54 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { labelOf, roleLabel } from './lib/format'
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
+const menuOpen = ref(false)
+
+const mood = computed(() => {
+  if (route.path.startsWith('/login') || route.path.startsWith('/register')) return 'mood-auth'
+  if (route.path.startsWith('/referee')) return 'mood-ref'
+  if (route.path.startsWith('/admin')) return 'mood-admin'
+  if (route.path.startsWith('/matches')) return 'mood-pitch'
+  return 'mood-home'
+})
+
+watch(mood, (value) => {
+  document.body.classList.remove('mood-auth', 'mood-pitch', 'mood-ref', 'mood-admin', 'mood-home')
+  document.body.classList.add(value)
+}, { immediate: true })
+
+watch(() => route.fullPath, () => {
+  menuOpen.value = false
+})
+
+async function logout() {
+  await auth.logout()
+  router.push('/')
+}
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :data-mood="mood">
     <header class="topbar">
       <div class="container topbar-inner">
         <RouterLink class="brand" to="/">
-          <span class="brand-mark">SL</span>
-          <span class="brand-text">Student League</span>
+          <span class="brand-mark" aria-hidden="true">SL</span>
+          <span class="brand-text">
+            Student League
+            <small>живая студенческая лига</small>
+          </span>
         </RouterLink>
-        <nav>
+
+        <button class="btn icon menu-btn secondary" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
+          <span>{{ menuOpen ? '✕' : '☰' }}</span>
+        </button>
+
+        <nav :class="{ open: menuOpen }">
           <RouterLink to="/tournaments">Турниры</RouterLink>
           <RouterLink to="/matches">Матчи</RouterLink>
           <RouterLink to="/teams">Команды</RouterLink>
@@ -22,10 +57,14 @@ const auth = useAuthStore()
           <RouterLink v-if="auth.role === 'ADMIN'" to="/admin">Админ</RouterLink>
           <RouterLink v-if="auth.role === 'REFEREE' || auth.role === 'ADMIN'" to="/referee">Судья</RouterLink>
         </nav>
+
         <div class="auth">
           <template v-if="auth.isAuthenticated">
-            <span class="user-chip">{{ auth.user?.email }}</span>
-            <button class="btn secondary" @click="auth.logout()">Выйти</button>
+            <span class="user-chip">
+              <em>{{ labelOf(roleLabel, auth.role) }}</em>
+              {{ auth.user?.email }}
+            </span>
+            <button class="btn secondary" @click="logout">Выйти</button>
           </template>
           <template v-else>
             <RouterLink class="btn secondary" to="/login">Войти</RouterLink>
@@ -37,17 +76,22 @@ const auth = useAuthStore()
     <main class="container main rise">
       <RouterView />
     </main>
+    <footer class="foot">
+      <div class="container">
+        Поле открыто. Свисток — у судьи, а не у Swagger.
+      </div>
+    </footer>
   </div>
 </template>
 
 <style scoped>
-.shell { min-height: 100vh; }
+.shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
-  backdrop-filter: blur(16px);
-  background: rgba(13, 17, 23, 0.86);
+  backdrop-filter: blur(18px);
+  background: rgba(18, 22, 15, 0.78);
   border-bottom: 1px solid var(--line);
 }
 .topbar-inner {
@@ -55,56 +99,93 @@ const auth = useAuthStore()
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 64px;
+  min-height: 72px;
 }
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.7rem;
   color: var(--text-strong);
   text-decoration: none;
-  font-weight: 700;
 }
-.brand:hover { text-decoration: none; }
+.brand:hover { text-decoration: none; color: var(--text-strong); }
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px 10px 14px 9px;
   display: grid;
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid rgba(88, 166, 255, 0.35);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  border: 1px solid rgba(226, 179, 106, 0.35);
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+  transform: rotate(-4deg);
+  transition: transform 220ms var(--spring);
 }
-.brand-text { font-size: 1rem; }
-nav { display: flex; gap: 0.15rem; flex-wrap: wrap; }
-nav a {
+.brand:hover .brand-mark { transform: rotate(3deg) scale(1.06); }
+.brand-text {
+  display: grid;
+  font-weight: 800;
+  line-height: 1.05;
+}
+.brand-text small {
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.92rem;
-  padding: 0.4rem 0.7rem;
-  border-radius: 8px;
-  text-decoration: none;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
 }
-nav a:hover { color: var(--text-strong); background: rgba(110, 118, 129, 0.12); text-decoration: none; }
+nav { display: flex; gap: 0.12rem; flex-wrap: wrap; }
+nav a {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  text-decoration: none;
+  transition: transform 180ms var(--spring), background-color 180ms var(--ease), color 180ms var(--ease);
+}
+nav a:hover { color: var(--text-strong); background: rgba(255, 255, 255, 0.05); transform: translateY(-1px); }
 nav a.router-link-active {
-  color: var(--text-strong);
-  background: var(--accent-soft);
+  color: #22180b;
+  background: var(--accent);
 }
 .auth { display: flex; gap: 0.55rem; align-items: center; }
 .user-chip {
-  max-width: 180px;
+  max-width: 210px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.82rem;
 }
-.main { padding: 1.5rem 0 3rem; }
-@media (max-width: 900px) {
-  .topbar-inner { flex-wrap: wrap; padding: 0.75rem 0; }
+.user-chip em {
+  display: block;
+  font-style: normal;
+  color: var(--accent);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+.menu-btn { display: none; }
+.main { padding: 1.6rem 0 2.4rem; }
+.foot {
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 0 0 1.4rem;
+  opacity: 0.8;
+}
+@media (max-width: 980px) {
+  .menu-btn { display: inline-flex; }
+  nav {
+    display: none;
+    width: 100%;
+    order: 4;
+    padding-bottom: 0.6rem;
+  }
+  nav.open { display: flex; }
+  .topbar-inner { flex-wrap: wrap; padding: 0.7rem 0; }
   .user-chip { display: none; }
 }
 </style>

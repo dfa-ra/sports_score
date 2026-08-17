@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { passwordHint } from '../lib/format'
 
 const email = ref('')
 const password = ref('')
@@ -9,13 +10,17 @@ const accountType = ref<'FAN' | 'PLAYER'>('FAN')
 const firstName = ref('')
 const lastName = ref('')
 const error = ref('')
+const pending = ref(false)
+const showPassword = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
 
 const isPlayer = computed(() => accountType.value === 'PLAYER')
+const hint = computed(() => passwordHint(password.value))
 
 async function submit() {
   error.value = ''
+  pending.value = true
   try {
     await auth.register({
       email: email.value,
@@ -26,24 +31,39 @@ async function submit() {
     })
     router.push('/')
   } catch (e: any) {
-    error.value = e.response?.data?.message || 'Не удалось зарегистрироваться'
+    error.value = e.response?.data?.message || 'Регистрация споткнулась. Попробуем ещё раз без фальстарта.'
+  } finally {
+    pending.value = false
   }
 }
 </script>
 
 <template>
   <section class="auth-wrap rise">
-    <div class="panel stack">
+    <div class="panel stack card">
       <div class="page-title">
-        <h1>Регистрация</h1>
-        <p>Выберите: зритель или игрок. Админ создаётся только через .env.</p>
+        <p class="eyebrow">Регистрация</p>
+        <h1>Выберите трибуну</h1>
+        <p>Зритель смотрит. Игрок выходит на поле. Админа через форму не назначают — так честнее.</p>
       </div>
       <form class="stack" @submit.prevent="submit">
         <label class="field">Email
-          <input v-model="email" type="email" required autocomplete="username" />
+          <input v-model="email" type="email" required autocomplete="username" placeholder="you@league.local" />
         </label>
         <label class="field">Пароль
-          <input v-model="password" type="password" required minlength="8" autocomplete="new-password" />
+          <span class="pass-row">
+            <input
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            />
+            <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
+              {{ showPassword ? 'Скрыть' : 'Показать' }}
+            </button>
+          </span>
+          <span class="field-hint">{{ hint }}</span>
         </label>
 
         <div class="role-pick">
@@ -54,7 +74,7 @@ async function submit() {
             @click="accountType = 'FAN'"
           >
             <strong>Зритель</strong>
-            <span>Смотреть матчи, турниры и статистику</span>
+            <span>Матчи, турниры и статистика. Можно болеть громко.</span>
           </button>
           <button
             type="button"
@@ -63,21 +83,23 @@ async function submit() {
             @click="accountType = 'PLAYER'"
           >
             <strong>Игрок</strong>
-            <span>Профиль, команды, заявки на турниры</span>
+            <span>Профиль, команда и заявка на турнир. Бутсы прилагаются мысленно.</span>
           </button>
         </div>
 
-        <template v-if="isPlayer">
+        <div v-if="isPlayer" class="player-fields">
           <label class="field">Имя
             <input v-model="firstName" required maxlength="100" />
           </label>
           <label class="field">Фамилия
             <input v-model="lastName" required maxlength="100" />
           </label>
-        </template>
+        </div>
 
-        <p v-if="error" style="color:var(--danger)">{{ error }}</p>
-        <button class="btn success" type="submit">Создать аккаунт</button>
+        <p v-if="error" class="form-error">{{ error }}</p>
+        <button class="btn success" type="submit" :disabled="pending">
+          {{ pending ? 'Печатаем бейдж…' : 'Создать аккаунт' }}
+        </button>
       </form>
       <p class="muted">Уже есть аккаунт? <RouterLink to="/login">Войти</RouterLink></p>
     </div>
@@ -85,24 +107,34 @@ async function submit() {
 </template>
 
 <style scoped>
-.auth-wrap { display: grid; place-items: center; min-height: calc(100vh - 140px); }
-.panel { width: min(460px, 100%); }
-.role-pick { display: grid; gap: 0.65rem; }
+.auth-wrap { display: grid; place-items: center; min-height: calc(100vh - 170px); }
+.card { width: min(480px, 100%); border-radius: 28px 18px 24px 16px; }
+.pass-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }
+.peek { min-width: 92px; }
+.role-pick { display: grid; gap: 0.7rem; }
 .role-card {
   text-align: left;
   display: grid;
-  gap: 0.25rem;
-  padding: 0.85rem 1rem;
-  border-radius: 10px;
+  gap: 0.28rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px 13px 15px 12px;
   border: 1px solid var(--line);
-  background: var(--bg);
+  background: rgba(10, 13, 8, 0.35);
   color: var(--text);
   cursor: pointer;
+  transition: transform 180ms var(--spring), border-color 180ms var(--ease), background-color 180ms var(--ease);
 }
-.role-card strong { color: var(--text-strong); }
+.role-card:hover { transform: translateY(-2px); }
+.role-card:active { transform: scale(0.98); }
+.role-card strong { color: var(--text-strong); font-family: var(--font-display); font-size: 1.15rem; }
 .role-card span { color: var(--muted); font-size: 0.88rem; }
 .role-card.active {
-  border-color: rgba(88, 166, 255, 0.55);
+  border-color: rgba(226, 179, 106, 0.55);
   background: var(--accent-soft);
+}
+.player-fields {
+  display: grid;
+  gap: 0.85rem;
+  animation: fadeLift 280ms var(--ease) both;
 }
 </style>
