@@ -1,0 +1,8 @@
+# Integration tests use Testcontainers; Redis auto-config is excluded via DynamicPropertySource.
+spring:
+  main:
+    allow-bean-definition-overriding: true
+logging:
+  level:
+    org.springframework.security: WARN
+    org.testcontainers: INFO
