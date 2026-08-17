@@ -5,6 +5,7 @@ void main() {
   testWidgets('renders Student League home', (WidgetTester tester) async {
     await tester.pumpWidget(const StudentLeagueApp());
     expect(find.text('Student League'), findsOneWidget);
-    expect(find.text('Open Referee Mode'), findsOneWidget);
+    expect(find.text('Матчи'), findsWidgets);
+    expect(find.text('Режим судьи'), findsOneWidget);
   });
 }
