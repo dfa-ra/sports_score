@@ -23,11 +23,14 @@ export const roleLabel: Record<string, string> = {
 
 export const eventLabel: Record<string, string> = {
   GOAL: 'Гол',
-  ASSIST: 'Пас',
+  ASSIST: 'Голевая',
   YELLOW_CARD: 'Жёлтая',
   RED_CARD: 'Красная',
   SUBSTITUTION: 'Замена',
   POINT: 'Очко',
+  FOUL: 'Фол',
+  PERIOD_START: 'Начало тайма',
+  PERIOD_END: 'Конец тайма',
   OTHER: 'Событие',
 }
 
@@ -53,6 +56,41 @@ export function formatClock(totalSeconds?: number | null) {
   const minutes = Math.floor(safe / 60)
   const seconds = safe % 60
   return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+export function periodNoun(sportCode?: string | null) {
+  if (sportCode === 'BASKETBALL') return 'четверть'
+  if (sportCode === 'VOLLEYBALL') return 'партия'
+  return 'тайм'
+}
+
+export function periodLabel(period?: number | null, sportCode?: string | null, periodCount?: number | null) {
+  if (!period) return 'Ещё не свистнули'
+  if (periodCount && period > periodCount) return 'Доп. время'
+  const noun = periodNoun(sportCode)
+  if (noun === 'четверть') return `${period}-я четверть`
+  if (noun === 'партия') return `${period}-я партия`
+  return `${period}-й тайм`
+}
+
+export function playerTag(name?: string | null, jersey?: number | null) {
+  if (!name && jersey == null) return ''
+  if (jersey == null) return name || ''
+  return `#${jersey} ${name || ''}`.trim()
+}
+
+export function eventDetail(ev: {
+  eventType?: string
+  playerName?: string | null
+  playerJersey?: number | null
+  secondaryPlayerName?: string | null
+  secondaryPlayerJersey?: number | null
+}) {
+  const main = playerTag(ev.playerName, ev.playerJersey)
+  const second = playerTag(ev.secondaryPlayerName, ev.secondaryPlayerJersey)
+  if (ev.eventType === 'GOAL' && second) return `${main} · пас ${second}`
+  if (ev.eventType === 'SUBSTITUTION' && second) return `${main} → ${second}`
+  return main
 }
 
 export function initials(name?: string | null) {

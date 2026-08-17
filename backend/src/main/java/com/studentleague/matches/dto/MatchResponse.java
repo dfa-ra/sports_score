@@ -18,6 +18,10 @@ public record MatchResponse(
         int homeScore,
         int awayScore,
         Integer gameTimeSeconds,
-        Integer period
+        Integer period,
+        int periodCount,
+        int periodLengthSeconds,
+        Instant clockRunningSince,
+        String sportCode
 ) {
 }

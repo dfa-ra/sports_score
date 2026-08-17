@@ -56,6 +56,15 @@ public class Match {
     @Column
     private Integer period;
 
+    @Column(name = "period_count", nullable = false)
+    private int periodCount = 2;
+
+    @Column(name = "period_length_seconds", nullable = false)
+    private int periodLengthSeconds = 1200;
+
+    @Column(name = "clock_running_since")
+    private Instant clockRunningSince;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -165,5 +174,29 @@ public class Match {
 
     public void setPeriod(Integer period) {
         this.period = period;
+    }
+
+    public int getPeriodCount() {
+        return periodCount;
+    }
+
+    public void setPeriodCount(int periodCount) {
+        this.periodCount = periodCount;
+    }
+
+    public int getPeriodLengthSeconds() {
+        return periodLengthSeconds;
+    }
+
+    public void setPeriodLengthSeconds(int periodLengthSeconds) {
+        this.periodLengthSeconds = periodLengthSeconds;
+    }
+
+    public Instant getClockRunningSince() {
+        return clockRunningSince;
+    }
+
+    public void setClockRunningSince(Instant clockRunningSince) {
+        this.clockRunningSince = clockRunningSince;
     }
 }

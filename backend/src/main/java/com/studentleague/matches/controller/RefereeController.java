@@ -66,6 +66,12 @@ public class RefereeController {
         return refereeMatchService.finish(principal, id);
     }
 
+    @PostMapping("/matches/{id}/next-period")
+    @Operation(summary = "Start the next period")
+    public MatchResponse nextPeriod(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return refereeMatchService.nextPeriod(principal, id);
+    }
+
     @PostMapping("/matches/{id}/events")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Add match event")

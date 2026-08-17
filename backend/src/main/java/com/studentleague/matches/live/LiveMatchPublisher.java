@@ -35,6 +35,10 @@ public class LiveMatchPublisher {
                 match.awayScore(),
                 match.gameTimeSeconds(),
                 match.period(),
+                match.periodCount(),
+                match.periodLengthSeconds(),
+                match.clockRunningSince(),
+                match.sportCode(),
                 lastEvent
         );
 

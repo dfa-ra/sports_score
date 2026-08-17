@@ -109,8 +109,11 @@ User 1──* DeviceToken
 | started_at / finished_at | TIMESTAMPTZ | |
 | status | VARCHAR | SCHEDULED, LIVE, PAUSED, FINISHED, CANCELLED — индекс |
 | home_score / away_score | INT | выводится из событий |
-| game_time_seconds | INT | nullable |
-| period | INT | nullable |
+| game_time_seconds | INT | накопленное время текущего тайма (на паузе) |
+| period | INT | текущий тайм |
+| period_count | INT | по умолчанию 2 |
+| period_length_seconds | INT | по умолчанию 1200 (20 мин) |
+| clock_running_since | TIMESTAMPTZ | когда снова пошли часы |
 
 ### match_referees
 | Колонка | Тип | Примечание |
@@ -129,9 +132,17 @@ User 1──* DeviceToken
 | event_type | VARCHAR | GOAL, ASSIST, YELLOW_CARD, … |
 | timestamp | TIMESTAMPTZ | wall clock |
 | game_time | INT | секунды или единица спорта |
+| period | INT | какой тайм |
 | team_id | UUID | nullable |
 | player_id | UUID | индекс; nullable |
 | secondary_player_id | UUID | ассист / партнёр замены |
+
+### match_lineup_players
+| Колонка | Тип | Примечание |
+|---|---|---|
+| match_id / team_id / player_id | UUID | UNIQUE(match_id, player_id) |
+| starter | BOOLEAN | основа или скамейка |
+| sort_order | INT | |
 | metadata | JSONB | спорт-специфичный payload |
 | voided | BOOLEAN | soft-отмена |
 | voided_at | TIMESTAMPTZ | |

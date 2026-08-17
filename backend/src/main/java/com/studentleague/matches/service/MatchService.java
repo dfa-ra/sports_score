@@ -1,6 +1,7 @@
 package com.studentleague.matches.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
@@ -37,6 +38,7 @@ public class MatchService {
     private final TournamentTeamRepository tournamentTeamRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final MatchMapper matchMapper;
 
     public MatchService(
             MatchRepository matchRepository,
@@ -44,7 +46,8 @@ public class MatchService {
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             UserRepository userRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            MatchMapper matchMapper
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -52,6 +55,7 @@ public class MatchService {
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.matchMapper = matchMapper;
     }
 
     @Transactional
@@ -74,6 +78,9 @@ public class MatchService {
         match.setStatus(MatchStatus.SCHEDULED);
         match.setHomeScore(0);
         match.setAwayScore(0);
+        match.setPeriodCount(request.periodCount() == null ? MatchClock.DEFAULT_PERIOD_COUNT : request.periodCount());
+        int minutes = request.periodLengthMinutes() == null ? 20 : request.periodLengthMinutes();
+        match.setPeriodLengthSeconds(minutes * 60);
         Match saved = matchRepository.save(match);
         notificationService.publishToUser(
                 null,
@@ -156,20 +163,6 @@ public class MatchService {
     }
 
     private MatchResponse toResponse(Match match) {
-        return new MatchResponse(
-                match.getId(),
-                match.getTournamentId(),
-                match.getSportId(),
-                match.getHomeTeamId(),
-                match.getAwayTeamId(),
-                match.getScheduledAt(),
-                match.getStartedAt(),
-                match.getFinishedAt(),
-                match.getStatus(),
-                match.getHomeScore(),
-                match.getAwayScore(),
-                match.getGameTimeSeconds(),
-                match.getPeriod()
-        );
+        return matchMapper.toResponse(match);
     }
 }

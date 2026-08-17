@@ -38,7 +38,19 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
                         .header("Authorization", auth(fx.refereeToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("LIVE"));
+                .andExpect(jsonPath("$.status").value("LIVE"))
+                .andExpect(jsonPath("$.period").value(1))
+                .andExpect(jsonPath("$.periodCount").value(2))
+                .andExpect(jsonPath("$.periodLengthSeconds").value(1200))
+                .andExpect(jsonPath("$.clockRunningSince").isNotEmpty());
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s"}
+                                """.formatted(fx.homeTeamId)))
+                .andExpect(status().isBadRequest());
 
         MvcResult goal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
                         .header("Authorization", auth(fx.refereeToken))
@@ -48,6 +60,8 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(fx.homeTeamId, fx.homePlayerId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.eventType").value("GOAL"))
+                .andExpect(jsonPath("$.playerName").value("Home Player"))
+                .andExpect(jsonPath("$.period").value(1))
                 .andReturn();
         String eventId = objectMapper.readTree(goal.getResponse().getContentAsString()).get("id").asText();
 
@@ -75,11 +89,27 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(fx.homeTeamId, fx.homePlayerId)))
                 .andExpect(status().isCreated());
 
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s","starterPlayerIds":["%s"]}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.confirmed").value(true))
+                .andExpect(jsonPath("$.home.starters[0].playerId").value(fx.homePlayerId));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/next-period")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.period").value(2));
+
         mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
                         .header("Authorization", auth(fx.refereeToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("FINISHED"))
-                .andExpect(jsonPath("$.homeScore").value(1));
+                .andExpect(jsonPath("$.homeScore").value(1))
+                .andExpect(jsonPath("$.clockRunningSince").value(org.hamcrest.Matchers.nullValue()));
     }
 
     private Fixture setupMatch(String adminToken) throws Exception {

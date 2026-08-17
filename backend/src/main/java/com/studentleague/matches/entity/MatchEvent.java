@@ -35,6 +35,9 @@ public class MatchEvent {
     @Column(name = "game_time")
     private Integer gameTime;
 
+    @Column
+    private Integer period;
+
     @Column(name = "team_id")
     private UUID teamId;
 
@@ -108,6 +111,14 @@ public class MatchEvent {
 
     public void setGameTime(Integer gameTime) {
         this.gameTime = gameTime;
+    }
+
+    public Integer getPeriod() {
+        return period;
+    }
+
+    public void setPeriod(Integer period) {
+        this.period = period;
     }
 
     public UUID getTeamId() {

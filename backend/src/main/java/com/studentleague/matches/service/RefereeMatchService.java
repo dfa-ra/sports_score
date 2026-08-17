@@ -1,6 +1,8 @@
 package com.studentleague.matches.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.clock.MatchClock;
+import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.CreateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
@@ -45,6 +47,7 @@ public class RefereeMatchService {
     private final MatchService matchService;
     private final LiveMatchPublisher liveMatchPublisher;
     private final NotificationService notificationService;
+    private final MatchMapper matchMapper;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -56,7 +59,8 @@ public class RefereeMatchService {
             ScorePolicyRegistry scorePolicyRegistry,
             MatchService matchService,
             LiveMatchPublisher liveMatchPublisher,
-            NotificationService notificationService
+            NotificationService notificationService,
+            MatchMapper matchMapper
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -68,6 +72,7 @@ public class RefereeMatchService {
         this.matchService = matchService;
         this.liveMatchPublisher = liveMatchPublisher;
         this.notificationService = notificationService;
+        this.matchMapper = matchMapper;
     }
 
     @Transactional(readOnly = true)
@@ -84,10 +89,13 @@ public class RefereeMatchService {
         if (match.getStatus() != MatchStatus.SCHEDULED) {
             throw ApiException.badRequest("Only SCHEDULED matches can be started");
         }
+        Instant now = Instant.now();
         match.setStatus(MatchStatus.LIVE);
-        match.setStartedAt(Instant.now());
+        match.setStartedAt(now);
         match.setGameTimeSeconds(0);
         match.setPeriod(1);
+        MatchClock.startRunning(match, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_STARTED");
         notificationService.publishToUser(
@@ -106,6 +114,7 @@ public class RefereeMatchService {
         if (match.getStatus() != MatchStatus.LIVE) {
             throw ApiException.badRequest("Only LIVE matches can be paused");
         }
+        MatchClock.freeze(match, Instant.now());
         match.setStatus(MatchStatus.PAUSED);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_PAUSED");
@@ -119,6 +128,7 @@ public class RefereeMatchService {
             throw ApiException.badRequest("Only PAUSED matches can be resumed");
         }
         match.setStatus(MatchStatus.LIVE);
+        MatchClock.startRunning(match, Instant.now());
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_RESUMED");
         return response;
@@ -130,9 +140,11 @@ public class RefereeMatchService {
         if (match.getStatus() != MatchStatus.LIVE && match.getStatus() != MatchStatus.PAUSED) {
             throw ApiException.badRequest("Only LIVE or PAUSED matches can be finished");
         }
+        Instant now = Instant.now();
+        MatchClock.freeze(match, now);
         recalculateScore(match);
         match.setStatus(MatchStatus.FINISHED);
-        match.setFinishedAt(Instant.now());
+        match.setFinishedAt(now);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_FINISHED");
         notificationService.publishToUser(
@@ -146,6 +158,30 @@ public class RefereeMatchService {
     }
 
     @Transactional
+    public MatchResponse nextPeriod(UserPrincipal principal, UUID matchId) {
+        Match match = requireAssignedMatch(principal, matchId);
+        if (match.getStatus() != MatchStatus.LIVE && match.getStatus() != MatchStatus.PAUSED) {
+            throw ApiException.badRequest("Тайм можно сменить только в живом матче");
+        }
+        int current = match.getPeriod() == null ? 1 : match.getPeriod();
+        if (current >= match.getPeriodCount()) {
+            throw ApiException.badRequest("Это последний тайм — можно заканчивать матч");
+        }
+        Instant now = Instant.now();
+        MatchClock.freeze(match, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_END, now);
+        match.setPeriod(current + 1);
+        match.setGameTimeSeconds(0);
+        if (match.getStatus() == MatchStatus.LIVE) {
+            MatchClock.startRunning(match, now);
+        }
+        recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
+        MatchResponse response = toResponse(matchRepository.save(match));
+        liveMatchPublisher.publishMatchUpdate(response, null, "PERIOD_CHANGED");
+        return response;
+    }
+
+    @Transactional
     public MatchEventResponse addEvent(UserPrincipal principal, UUID matchId, CreateMatchEventRequest request) {
         Match match = requireAssignedMatch(principal, matchId);
         if (!EVENT_ALLOWED.contains(match.getStatus())) {
@@ -153,11 +189,14 @@ public class RefereeMatchService {
         }
         validateEventPayload(match, request);
 
+        Instant now = Instant.now();
+        int elapsed = MatchClock.elapsedSeconds(match, now);
         MatchEvent event = new MatchEvent();
         event.setMatchId(matchId);
         event.setEventType(request.eventType());
-        event.setTimestamp(Instant.now());
-        event.setGameTime(request.gameTime() != null ? request.gameTime() : match.getGameTimeSeconds());
+        event.setTimestamp(now);
+        event.setGameTime(request.gameTime() != null ? request.gameTime() : elapsed);
+        event.setPeriod(match.getPeriod());
         event.setTeamId(request.teamId());
         event.setPlayerId(request.playerId());
         event.setSecondaryPlayerId(request.secondaryPlayerId());
@@ -230,19 +269,51 @@ public class RefereeMatchService {
                 && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("teamId must be home or away team of the match");
         }
+        boolean needsPlayer = request.eventType() == MatchEventType.GOAL
+                || request.eventType() == MatchEventType.ASSIST
+                || request.eventType() == MatchEventType.YELLOW_CARD
+                || request.eventType() == MatchEventType.RED_CARD
+                || request.eventType() == MatchEventType.FOUL
+                || request.eventType() == MatchEventType.SUBSTITUTION
+                || request.eventType() == MatchEventType.POINT;
+        if (needsPlayer && request.playerId() == null) {
+            throw ApiException.badRequest("Выберите игрока для этого события");
+        }
+        if (request.eventType() == MatchEventType.SUBSTITUTION && request.secondaryPlayerId() == null) {
+            throw ApiException.badRequest("Для замены нужен игрок, который выходит");
+        }
         if (request.playerId() != null) {
             playerProfileRepository.findById(request.playerId())
                     .orElseThrow(() -> ApiException.notFound("Player not found"));
             if (request.teamId() != null
                     && !teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                     request.teamId(), request.playerId(), TeamMemberStatus.ACTIVE)) {
-                throw ApiException.badRequest("Player is not an active member of the selected team");
+                throw ApiException.badRequest("Игрок не в заявке этой команды");
             }
         }
         if (request.secondaryPlayerId() != null) {
             playerProfileRepository.findById(request.secondaryPlayerId())
                     .orElseThrow(() -> ApiException.notFound("Secondary player not found"));
+            if (request.teamId() != null
+                    && !teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
+                    request.teamId(), request.secondaryPlayerId(), TeamMemberStatus.ACTIVE)) {
+                throw ApiException.badRequest("Второй игрок не в заявке этой команды");
+            }
+            if (request.playerId() != null && request.playerId().equals(request.secondaryPlayerId())) {
+                throw ApiException.badRequest("Это должен быть другой человек");
+            }
         }
+    }
+
+    private void recordPeriodEvent(Match match, MatchEventType type, Instant now) {
+        MatchEvent event = new MatchEvent();
+        event.setMatchId(match.getId());
+        event.setEventType(type);
+        event.setTimestamp(now);
+        event.setGameTime(match.getGameTimeSeconds());
+        event.setPeriod(match.getPeriod());
+        event.setVoided(false);
+        matchEventRepository.save(event);
     }
 
     private Match requireAssignedMatch(UserPrincipal principal, UUID matchId) {
@@ -263,37 +334,10 @@ public class RefereeMatchService {
     }
 
     private MatchResponse toResponse(Match match) {
-        return new MatchResponse(
-                match.getId(),
-                match.getTournamentId(),
-                match.getSportId(),
-                match.getHomeTeamId(),
-                match.getAwayTeamId(),
-                match.getScheduledAt(),
-                match.getStartedAt(),
-                match.getFinishedAt(),
-                match.getStatus(),
-                match.getHomeScore(),
-                match.getAwayScore(),
-                match.getGameTimeSeconds(),
-                match.getPeriod()
-        );
+        return matchMapper.toResponse(match);
     }
 
     private MatchEventResponse toEventResponse(MatchEvent event) {
-        return new MatchEventResponse(
-                event.getId(),
-                event.getMatchId(),
-                event.getEventType(),
-                event.getTimestamp(),
-                event.getGameTime(),
-                event.getTeamId(),
-                event.getPlayerId(),
-                event.getSecondaryPlayerId(),
-                event.getMetadata(),
-                event.isVoided(),
-                event.getVoidedAt(),
-                event.getCreatedAt()
-        );
+        return matchMapper.toEventResponse(event);
     }
 }

@@ -180,11 +180,13 @@ Auth: `Authorization: Bearer <access_token>`
 | Метод | Путь | Auth |
 |---|---|---|
 | GET | `/matches` | Публичный — фильтры |
-| GET | `/matches/{id}` | Публичный |
-| POST | `/matches` | ADMIN |
+| GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode` |
+| POST | `/matches` | ADMIN. Опционально `periodCount` (1–8) и `periodLengthMinutes` (1–90), иначе 2×20 |
 | POST | `/matches/{id}/referees` | ADMIN |
-| GET | `/matches/{id}/events` | Auth |
-| GET | `/matches/{id}/referees` | Auth |
+| GET | `/matches/{id}/events` | Публичный. Имена игроков, `period`, `secondaryPlayer*` = пас / кто вышел |
+| GET | `/matches/{id}/referees` | Публичный |
+| GET | `/matches/{id}/lineups` | Публичный — основа и скамейка; если капитан не записал, вся заявка как скамейка |
+| PUT | `/matches/{id}/lineups` | Капитан этой команды, назначенный судья или ADMIN |
 
 ---
 
@@ -199,7 +201,8 @@ Auth: `Authorization: Bearer <access_token>`
 | POST | `/referee/matches/{id}/pause` | Назначенный судья |
 | POST | `/referee/matches/{id}/resume` | Назначенный судья |
 | POST | `/referee/matches/{id}/finish` | Назначенный судья |
-| POST | `/referee/matches/{id}/events` | Назначенный судья |
+| POST | `/referee/matches/{id}/next-period` | Назначенный судья — следующий тайм, часы с нуля |
+| POST | `/referee/matches/{id}/events` | Назначенный судья. Для гола/карточки/замены нужен `playerId`; голевая — `secondaryPlayerId` |
 | POST | `/referee/matches/{id}/events/{eventId}/void` | Назначенный судья |
 
 ---
@@ -231,7 +234,12 @@ Auth: `Authorization: Bearer <access_token>`
   "homeScore": 1,
   "awayScore": 0,
   "gameTimeSeconds": 320,
-  "lastEvent": { "eventType": "GOAL", "playerId": "...", "teamId": "..." }
+  "period": 1,
+  "periodCount": 2,
+  "periodLengthSeconds": 1200,
+  "clockRunningSince": "2026-08-17T16:00:00Z",
+  "sportCode": "FOOTBALL",
+  "lastEvent": { "eventType": "GOAL", "playerId": "...", "playerName": "Иванов", "teamId": "..." }
 }
 ```
 
