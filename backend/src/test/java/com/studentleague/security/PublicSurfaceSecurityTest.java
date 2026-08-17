@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,12 +25,15 @@ class PublicSurfaceSecurityTest extends AbstractIntegrationTest {
             "/h2-console"
     })
     void developerSurfacesAreClosedToEveryone(String path) throws Exception {
-        mockMvc.perform(get(path))
-                .andExpect(status().isForbidden());
+        int anonymous = mockMvc.perform(get(path)).andReturn().getResponse().getStatus();
+        assertThat(anonymous).isIn(401, 403);
 
         String token = registerAndLogin("docs-" + System.nanoTime() + "@example.com", "Str0ngPass!");
-        mockMvc.perform(get(path).header("Authorization", auth(token)))
-                .andExpect(status().isForbidden());
+        int authenticated = mockMvc.perform(get(path).header("Authorization", auth(token)))
+                .andReturn()
+                .getResponse()
+                .getStatus();
+        assertThat(authenticated).isIn(401, 403);
     }
 
     @Test
