@@ -1,6 +1,11 @@
 package com.studentleague.players.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.players.dto.PlayerCardResponse;
 import com.studentleague.players.dto.PlayerProfileRequest;
 import com.studentleague.players.dto.PlayerProfileResponse;
@@ -21,9 +26,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -34,19 +42,25 @@ public class PlayerService {
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
     private final StatisticsService statisticsService;
+    private final MatchEventRepository matchEventRepository;
+    private final MatchRepository matchRepository;
 
     public PlayerService(
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             TeamMemberRepository teamMemberRepository,
             TeamRepository teamRepository,
-            StatisticsService statisticsService
+            StatisticsService statisticsService,
+            MatchEventRepository matchEventRepository,
+            MatchRepository matchRepository
     ) {
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamRepository = teamRepository;
         this.statisticsService = statisticsService;
+        this.matchEventRepository = matchEventRepository;
+        this.matchRepository = matchRepository;
     }
 
     @Transactional
@@ -117,6 +131,8 @@ public class PlayerService {
             statistics.put("appearances", s.appearances());
         }
 
+        List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(playerId);
+
         return new PlayerCardResponse(
                 profile.getId(),
                 profile.getFirstName(),
@@ -127,8 +143,37 @@ public class PlayerService {
                 profile.getPosition(),
                 teamSummary,
                 statistics,
-                List.of()
+                history
         );
+    }
+
+    private List<PlayerCardResponse.MatchHistoryItem> buildMatchHistory(UUID playerId) {
+        List<MatchEvent> events = matchEventRepository.findByPlayerIdAndVoidedFalseOrderByTimestampDesc(playerId);
+        Set<UUID> seen = new LinkedHashSet<>();
+        for (MatchEvent event : events) {
+            seen.add(event.getMatchId());
+            if (seen.size() >= 20) {
+                break;
+            }
+        }
+        List<PlayerCardResponse.MatchHistoryItem> history = new ArrayList<>();
+        for (UUID matchId : seen) {
+            Match match = matchRepository.findById(matchId).orElse(null);
+            if (match == null || match.getStatus() != MatchStatus.FINISHED) {
+                continue;
+            }
+            Team home = teamRepository.findById(match.getHomeTeamId()).orElse(null);
+            Team away = teamRepository.findById(match.getAwayTeamId()).orElse(null);
+            String opponentName = (home == null ? "?" : home.getName()) + " vs " + (away == null ? "?" : away.getName());
+            history.add(new PlayerCardResponse.MatchHistoryItem(
+                    match.getId(),
+                    opponentName,
+                    match.getHomeScore(),
+                    match.getAwayScore(),
+                    match.getStatus().name()
+            ));
+        }
+        return history;
     }
 
     private PlayerProfile requireProfile(UUID id) {

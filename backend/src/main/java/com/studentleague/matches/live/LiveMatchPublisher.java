@@ -2,6 +2,7 @@ package com.studentleague.matches.live;
 
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -13,13 +14,16 @@ public class LiveMatchPublisher {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final ObjectProvider<RedisLiveMatchBridge> redisBridge;
 
     public LiveMatchPublisher(
             SimpMessagingTemplate messagingTemplate,
-            ApplicationEventPublisher applicationEventPublisher
+            ApplicationEventPublisher applicationEventPublisher,
+            ObjectProvider<RedisLiveMatchBridge> redisBridge
     ) {
         this.messagingTemplate = messagingTemplate;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.redisBridge = redisBridge;
     }
 
     public void publishMatchUpdate(MatchResponse match, MatchEventResponse lastEvent, String type) {
@@ -33,7 +37,15 @@ public class LiveMatchPublisher {
                 match.period(),
                 lastEvent
         );
-        messagingTemplate.convertAndSend(TOPIC_PREFIX + match.id(), update);
+
+        RedisLiveMatchBridge bridge = redisBridge.getIfAvailable();
+        if (bridge != null) {
+            // Multi-instance: publish to Redis; each node fans out to local STOMP clients.
+            bridge.publish(update);
+        } else {
+            // Single-instance: publish directly to local broker.
+            messagingTemplate.convertAndSend(TOPIC_PREFIX + match.id(), update);
+        }
         applicationEventPublisher.publishEvent(update);
     }
 }

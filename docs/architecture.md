@@ -94,10 +94,18 @@ Clients subscribe once; polling is not required for live updates.
 
 | Use | Notes |
 |---|---|
-| Cache | Read-heavy stats/lists with TTL |
-| Pub/Sub | Live match event propagation |
-| Rate limiting | Auth endpoints |
+| Cache | Read-heavy stats/lists with TTL (optional later) |
+| Pub/Sub | Live match event propagation when `APP_REDIS_ENABLED=true` |
+| Rate limiting | Auth endpoints (in-memory by default; Redis-ready) |
 | Temporary data | Short-lived locks / ephemeral state |
+
+Enable Redis live fan-out with `APP_REDIS_ENABLED=true`. Flow:
+
+1. Persist `MatchEvent` / match state in PostgreSQL
+2. `LiveMatchPublisher` publishes JSON to Redis channel `studentleague:match-live`
+3. Each backend instance listens and fans out to local STOMP `/topic/matches/{matchId}`
+
+When Redis is disabled, updates are published directly to the local STOMP broker (single-instance).
 
 PostgreSQL remains the only durable source of truth.
 
