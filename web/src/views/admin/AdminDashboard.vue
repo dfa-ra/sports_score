@@ -210,7 +210,7 @@ async function disbandTeam(team: any) {
 
 <style scoped>
 .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.btn.on { background: var(--accent); color: #22180b; border-color: transparent; }
+.btn.on { background: var(--accent); color: var(--navy); border-color: transparent; }
 h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
 .row {
   display: flex;

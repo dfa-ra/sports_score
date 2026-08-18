@@ -87,7 +87,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
   border: 1px solid var(--line);
   border-radius: 14px 11px 13px 10px;
   padding: 0.75rem 0.85rem;
-  background: rgba(10, 13, 8, 0.3);
+  background: color-mix(in srgb, var(--navy) 55%, transparent);
 }
 .stat span { display: block; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .stat strong { font-family: var(--font-display); font-size: 1.3rem; }

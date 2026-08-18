@@ -299,7 +299,7 @@ onUnmounted(() => client?.deactivate())
 .sides strong { font-family: var(--font-display); font-size: 1.05rem; }
 .scorers { display: grid; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); }
 .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.btn.on { background: var(--accent); color: #22180b; border-color: transparent; }
+.btn.on { background: var(--accent); color: var(--navy); border-color: transparent; }
 .lineups { grid-template-columns: 1fr 1fr; gap: 1rem; }
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
@@ -311,7 +311,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 13px 11px 14px 10px;
-  background: rgba(10, 13, 8, 0.35);
+  background: color-mix(in srgb, var(--navy) 55%, transparent);
 }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 860px) {

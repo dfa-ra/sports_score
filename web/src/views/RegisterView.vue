@@ -119,7 +119,7 @@ async function submit() {
   padding: 0.95rem 1rem;
   border-radius: 16px 13px 15px 12px;
   border: 1px solid var(--line);
-  background: rgba(10, 13, 8, 0.35);
+  background: color-mix(in srgb, var(--navy) 55%, transparent);
   color: var(--text);
   cursor: pointer;
   transition: transform 180ms var(--spring), border-color 180ms var(--ease), background-color 180ms var(--ease);
@@ -129,7 +129,7 @@ async function submit() {
 .role-card strong { color: var(--text-strong); font-family: var(--font-display); font-size: 1.15rem; }
 .role-card span { color: var(--muted); font-size: 0.88rem; }
 .role-card.active {
-  border-color: rgba(226, 179, 106, 0.55);
+  border-color: rgba(98, 181, 229, 0.55);
   background: var(--accent-soft);
 }
 .player-fields {

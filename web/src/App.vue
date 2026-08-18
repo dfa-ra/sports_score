@@ -92,7 +92,7 @@ async function logout() {
   top: 0;
   z-index: 20;
   backdrop-filter: blur(18px);
-  background: rgba(18, 22, 15, 0.78);
+  background: color-mix(in srgb, var(--navy) 82%, transparent);
   border-bottom: 1px solid var(--line);
 }
 .topbar-inner {
@@ -118,7 +118,7 @@ async function logout() {
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid rgba(226, 179, 106, 0.35);
+  border: 1px solid rgba(98, 181, 229, 0.4);
   font-family: var(--font-display);
   font-size: 0.92rem;
   transform: rotate(-4deg);
@@ -127,8 +127,11 @@ async function logout() {
 .brand:hover .brand-mark { transform: rotate(3deg) scale(1.06); }
 .brand-text {
   display: grid;
+  font-family: var(--font-display);
   font-weight: 800;
   line-height: 1.05;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .brand-text small {
   color: var(--muted);
@@ -148,7 +151,7 @@ nav a {
 }
 nav a:hover { color: var(--text-strong); background: rgba(255, 255, 255, 0.05); transform: translateY(-1px); }
 nav a.router-link-active {
-  color: #22180b;
+  color: var(--navy);
   background: var(--accent);
 }
 .auth { display: flex; gap: 0.55rem; align-items: center; }

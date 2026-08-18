@@ -134,10 +134,10 @@ onMounted(async () => {
   border: 1px solid var(--line);
   border-radius: 16px 13px 15px 12px;
   padding: 0.95rem 1rem;
-  background: rgba(10, 13, 8, 0.35);
+  background: color-mix(in srgb, var(--navy) 55%, transparent);
 }
 .stat.tilt { transform: rotate(-0.6deg); }
-.stat.accent { border-color: rgba(226, 179, 106, 0.35); background: var(--accent-soft); }
+.stat.accent { border-color: rgba(98, 181, 229, 0.4); background: var(--accent-soft); }
 .stat-label { display: block; color: var(--muted); font-size: 0.76rem; margin-bottom: 0.2rem; }
 .stat strong { font-size: 1.4rem; color: var(--text-strong); font-family: var(--font-display); }
 .feature h2 { font-size: 1.25rem; margin-bottom: 0.35rem; }
