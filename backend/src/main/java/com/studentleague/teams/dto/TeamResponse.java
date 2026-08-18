@@ -9,6 +9,7 @@ public record TeamResponse(
         String shortName,
         String logoUrl,
         UUID captainId,
+        boolean disbanded,
         Instant createdAt,
         Instant updatedAt
 ) {

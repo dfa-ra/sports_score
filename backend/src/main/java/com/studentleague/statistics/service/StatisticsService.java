@@ -62,27 +62,41 @@ public class StatisticsService {
             List<MatchEvent> events = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(matchId);
             Set<UUID> appeared = new HashSet<>();
             for (MatchEvent event : events) {
-                if (event.getPlayerId() == null) {
-                    continue;
-                }
-                if (playerId != null && !playerId.equals(event.getPlayerId())) {
+                if (event.getPlayerId() == null && event.getSecondaryPlayerId() == null) {
                     continue;
                 }
                 if (teamId != null && event.getTeamId() != null && !teamId.equals(event.getTeamId())) {
                     continue;
                 }
-                PlayerAccumulator acc = stats.computeIfAbsent(event.getPlayerId(), PlayerAccumulator::new);
-                appeared.add(event.getPlayerId());
-                switch (event.getEventType()) {
-                    case GOAL -> acc.goals++;
-                    case ASSIST -> acc.assists++;
-                    case YELLOW_CARD -> acc.yellowCards++;
-                    case RED_CARD -> acc.redCards++;
-                    default -> {
+                if (playerId != null
+                        && !playerId.equals(event.getPlayerId())
+                        && !playerId.equals(event.getSecondaryPlayerId())) {
+                    continue;
+                }
+                if (event.getPlayerId() != null && (playerId == null || playerId.equals(event.getPlayerId()))) {
+                    PlayerAccumulator acc = stats.computeIfAbsent(event.getPlayerId(), PlayerAccumulator::new);
+                    appeared.add(event.getPlayerId());
+                    switch (event.getEventType()) {
+                        case GOAL -> acc.goals++;
+                        case ASSIST -> acc.assists++;
+                        case YELLOW_CARD -> acc.yellowCards++;
+                        case RED_CARD -> acc.redCards++;
+                        default -> {
+                        }
+                    }
+                    if (event.getTeamId() != null) {
+                        acc.teamId = event.getTeamId();
                     }
                 }
-                if (event.getTeamId() != null) {
-                    acc.teamId = event.getTeamId();
+                if (event.getEventType() == com.studentleague.matches.domain.MatchEventType.GOAL
+                        && event.getSecondaryPlayerId() != null
+                        && (playerId == null || playerId.equals(event.getSecondaryPlayerId()))) {
+                    PlayerAccumulator assist = stats.computeIfAbsent(event.getSecondaryPlayerId(), PlayerAccumulator::new);
+                    assist.assists++;
+                    appeared.add(event.getSecondaryPlayerId());
+                    if (event.getTeamId() != null) {
+                        assist.teamId = event.getTeamId();
+                    }
                 }
             }
             for (UUID appearedPlayerId : appeared) {

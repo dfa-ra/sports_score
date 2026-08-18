@@ -11,21 +11,43 @@ export interface User {
   enabled: boolean
 }
 
+const ACCESS_KEY = 'sl_access'
+const REFRESH_KEY = 'sl_refresh'
+const USER_KEY = 'sl_user'
+
+function forgetSharedCredentials() {
+  localStorage.removeItem(ACCESS_KEY)
+  localStorage.removeItem(REFRESH_KEY)
+  localStorage.removeItem(USER_KEY)
+}
+
+function readSessionUser(): User | null {
+  const raw = sessionStorage.getItem(USER_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as User
+  } catch {
+    return null
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const accessToken = ref<string | null>(localStorage.getItem('sl_access'))
-  const refreshToken = ref<string | null>(localStorage.getItem('sl_refresh'))
-  const user = ref<User | null>(localStorage.getItem('sl_user') ? JSON.parse(localStorage.getItem('sl_user')!) : null)
+  forgetSharedCredentials()
+
+  const accessToken = ref<string | null>(sessionStorage.getItem(ACCESS_KEY))
+  const refreshToken = ref<string | null>(sessionStorage.getItem(REFRESH_KEY))
+  const user = ref<User | null>(readSessionUser())
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const role = computed(() => user.value?.role ?? null)
 
   function persist() {
-    if (accessToken.value) localStorage.setItem('sl_access', accessToken.value)
-    else localStorage.removeItem('sl_access')
-    if (refreshToken.value) localStorage.setItem('sl_refresh', refreshToken.value)
-    else localStorage.removeItem('sl_refresh')
-    if (user.value) localStorage.setItem('sl_user', JSON.stringify(user.value))
-    else localStorage.removeItem('sl_user')
+    if (accessToken.value) sessionStorage.setItem(ACCESS_KEY, accessToken.value)
+    else sessionStorage.removeItem(ACCESS_KEY)
+    if (refreshToken.value) sessionStorage.setItem(REFRESH_KEY, refreshToken.value)
+    else sessionStorage.removeItem(REFRESH_KEY)
+    if (user.value) sessionStorage.setItem(USER_KEY, JSON.stringify(user.value))
+    else sessionStorage.removeItem(USER_KEY)
   }
 
   async function register(payload: {

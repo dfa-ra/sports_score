@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
+import AdminOnly from '../components/AdminOnly.vue'
 import CreateTournamentForm from '../components/CreateTournamentForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -33,12 +34,6 @@ onMounted(load)
       <h1>Турниры</h1>
       <p>Сезоны, статусы и таблицы. Смотреть можно без аккаунта.</p>
     </div>
-    <button v-if="auth.canManageLeague" class="btn" @click="showForm = !showForm">
-      {{ showForm ? 'Скрыть форму' : 'Создать турнир' }}
-    </button>
-    <div v-if="showForm" class="panel">
-      <CreateTournamentForm @created="load" />
-    </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="grid cards">
       <div v-for="n in 3" :key="n" class="skeleton" />
@@ -51,6 +46,12 @@ onMounted(load)
         <p>{{ t.format }} · сезон {{ t.seasonYear }}</p>
       </RouterLink>
     </div>
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <button class="btn" @click="showForm = !showForm">
+        {{ showForm ? 'Скрыть форму' : 'Создать турнир' }}
+      </button>
+      <CreateTournamentForm v-if="showForm" @created="load" />
+    </AdminOnly>
   </section>
 </template>
 

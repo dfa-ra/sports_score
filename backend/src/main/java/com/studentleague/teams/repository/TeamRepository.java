@@ -9,4 +9,6 @@ import java.util.UUID;
 
 public interface TeamRepository extends JpaRepository<Team, UUID> {
     Page<Team> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    Page<Team> findByDisbandedFalse(Pageable pageable);
+    Page<Team> findByDisbandedFalseAndNameContainingIgnoreCase(String name, Pageable pageable);
 }

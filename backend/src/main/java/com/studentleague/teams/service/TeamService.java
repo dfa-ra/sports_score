@@ -17,6 +17,9 @@ import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.entity.TeamMember;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.domain.TournamentTeamStatus;
+import com.studentleague.tournaments.entity.TournamentTeam;
+import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
@@ -34,6 +37,7 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final TournamentTeamRepository tournamentTeamRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
@@ -41,12 +45,14 @@ public class TeamService {
     public TeamService(
             TeamRepository teamRepository,
             TeamMemberRepository teamMemberRepository,
+            TournamentTeamRepository tournamentTeamRepository,
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             NotificationService notificationService
     ) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.tournamentTeamRepository = tournamentTeamRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
@@ -54,21 +60,15 @@ public class TeamService {
 
     @Transactional
     public TeamResponse createTeam(UserPrincipal principal, CreateTeamRequest request) {
+        if (principal.getRole() == Role.ADMIN) {
+            throw ApiException.forbidden("Админ не создаёт команды — только редактирует и расформировывает");
+        }
+
+        PlayerProfile creatorProfile = requireProfileForUser(principal.getId());
         Team team = new Team();
         team.setName(request.name().trim());
         team.setShortName(request.shortName());
         team.setLogoUrl(request.logoUrl());
-
-        if (principal.getRole() == Role.ADMIN) {
-            playerProfileRepository.findByUserId(principal.getId()).ifPresentOrElse(profile -> {
-                team.setCaptainId(profile.getId());
-                teamRepository.save(team);
-                ensureActiveMembership(team.getId(), profile.getId());
-            }, () -> teamRepository.save(team));
-            return toTeamResponse(team);
-        }
-
-        PlayerProfile creatorProfile = requireProfileForUser(principal.getId());
         team.setCaptainId(creatorProfile.getId());
         teamRepository.save(team);
         ensureActiveMembership(team.getId(), creatorProfile.getId());
@@ -82,16 +82,24 @@ public class TeamService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TeamResponse> listTeams(String query, Pageable pageable) {
-        Page<Team> page = (query == null || query.isBlank())
-                ? teamRepository.findAll(pageable)
-                : teamRepository.findByNameContainingIgnoreCase(query.trim(), pageable);
+    public Page<TeamResponse> listTeams(String query, boolean includeDisbanded, Pageable pageable) {
+        boolean hasQuery = query != null && !query.isBlank();
+        Page<Team> page;
+        if (includeDisbanded) {
+            page = hasQuery
+                    ? teamRepository.findByNameContainingIgnoreCase(query.trim(), pageable)
+                    : teamRepository.findAll(pageable);
+        } else {
+            page = hasQuery
+                    ? teamRepository.findByDisbandedFalseAndNameContainingIgnoreCase(query.trim(), pageable)
+                    : teamRepository.findByDisbandedFalse(pageable);
+        }
         return page.map(this::toTeamResponse);
     }
 
     @Transactional
     public TeamResponse updateTeam(UserPrincipal principal, UUID teamId, UpdateTeamRequest request) {
-        Team team = requireTeam(teamId);
+        Team team = requireActiveTeam(teamId);
         assertCanManageTeam(principal, team);
 
         if (request.name() != null && !request.name().isBlank()) {
@@ -116,7 +124,7 @@ public class TeamService {
 
     @Transactional
     public TeamMemberResponse addMember(UserPrincipal principal, UUID teamId, AddTeamMemberRequest request) {
-        Team team = requireTeam(teamId);
+        Team team = requireActiveTeam(teamId);
         assertCanManageTeam(principal, team);
 
         PlayerProfile player = playerProfileRepository.findById(request.playerId())
@@ -153,7 +161,7 @@ public class TeamService {
 
     @Transactional
     public void removeMember(UserPrincipal principal, UUID teamId, UUID playerId) {
-        Team team = requireTeam(teamId);
+        Team team = requireActiveTeam(teamId);
         assertCanManageTeam(principal, team);
 
         if (playerId.equals(team.getCaptainId())) {
@@ -168,7 +176,7 @@ public class TeamService {
 
     @Transactional
     public TeamResponse assignCaptain(UserPrincipal principal, UUID teamId, AssignCaptainRequest request) {
-        Team team = requireTeam(teamId);
+        Team team = requireActiveTeam(teamId);
         assertCanManageTeam(principal, team);
 
         if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(teamId, request.playerId(), TeamMemberStatus.ACTIVE)) {
@@ -182,6 +190,26 @@ public class TeamService {
         teamRepository.save(team);
         promoteToCaptain(newCaptain.getUserId());
         return toTeamResponse(team);
+    }
+
+    @Transactional
+    public void disbandTeam(UserPrincipal principal, UUID teamId) {
+        if (principal.getRole() != Role.ADMIN) {
+            throw ApiException.forbidden("Расформировать команду может только админ");
+        }
+        Team team = requireActiveTeam(teamId);
+        team.setDisbanded(true);
+        teamRepository.save(team);
+        for (TeamMember member : teamMemberRepository.findByTeamId(teamId)) {
+            member.setStatus(TeamMemberStatus.REMOVED);
+            teamMemberRepository.save(member);
+        }
+        for (TournamentTeam entry : tournamentTeamRepository.findByTeamId(teamId)) {
+            if (entry.getStatus() != TournamentTeamStatus.WITHDRAWN) {
+                entry.setStatus(TournamentTeamStatus.WITHDRAWN);
+                tournamentTeamRepository.save(entry);
+            }
+        }
     }
 
     private void assertCanManageTeam(UserPrincipal principal, Team team) {
@@ -222,6 +250,14 @@ public class TeamService {
                 .orElseThrow(() -> ApiException.notFound("Team not found"));
     }
 
+    private Team requireActiveTeam(UUID teamId) {
+        Team team = requireTeam(teamId);
+        if (team.isDisbanded()) {
+            throw ApiException.badRequest("Команда уже расформирована");
+        }
+        return team;
+    }
+
     private TeamResponse toTeamResponse(Team team) {
         return new TeamResponse(
                 team.getId(),
@@ -229,6 +265,7 @@ public class TeamService {
                 team.getShortName(),
                 team.getLogoUrl(),
                 team.getCaptainId(),
+                team.isDisbanded(),
                 team.getCreatedAt(),
                 team.getUpdatedAt()
         );

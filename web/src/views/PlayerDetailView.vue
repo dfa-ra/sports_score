@@ -3,8 +3,12 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { initials, labelOf, statusLabel } from '../lib/format'
+import { useAuthStore } from '../stores/auth'
+import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
+
+const auth = useAuthStore()
 
 const route = useRoute()
 const card = ref<any>(null)
@@ -31,7 +35,6 @@ onMounted(async () => {
         Команда:
         <RouterLink :to="`/teams/${card.team.id}`">{{ card.team.name }}</RouterLink>
       </p>
-      <CopyChip :value="String(card.id)" label="Скопировать id игрока" />
     </div>
 
     <div class="panel">
@@ -59,6 +62,10 @@ onMounted(async () => {
         <span class="muted">{{ labelOf(statusLabel, m.status) }}</span>
       </RouterLink>
     </div>
+
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <CopyChip :value="String(card.id)" label="Скопировать id игрока" />
+    </AdminOnly>
   </section>
 </template>
 
@@ -80,7 +87,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
   border: 1px solid var(--line);
   border-radius: 14px 11px 13px 10px;
   padding: 0.75rem 0.85rem;
-  background: rgba(10, 13, 8, 0.3);
+  background: color-mix(in srgb, var(--navy) 55%, transparent);
 }
 .stat span { display: block; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
 .stat strong { font-family: var(--font-display); font-size: 1.3rem; }
