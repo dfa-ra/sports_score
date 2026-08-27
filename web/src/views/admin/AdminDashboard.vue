@@ -6,6 +6,7 @@ import { labelOf, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import CreateMatchForm from '../../components/CreateMatchForm.vue'
+import CreateTeamForm from '../../components/CreateTeamForm.vue'
 import CreateTournamentForm from '../../components/CreateTournamentForm.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 
@@ -15,7 +16,11 @@ const matches = ref<any[]>([])
 const teams = ref<any[]>([])
 const players = ref<any[]>([])
 const sports = ref<any[]>([])
-const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics'>('users')
+const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics' | 'gallery'>('users')
+const roleRequests = ref<any[]>([])
+const gallery = ref<any>({ photos: [], vkAlbumUrl: '' })
+const photoUrl = ref('')
+const vkAlbumUrl = ref('')
 const teamStats = ref<any[]>([])
 const playerStats = ref<any[]>([])
 const error = ref('')
@@ -31,10 +36,11 @@ const tabs = [
   { id: 'players', label: 'Игроки' },
   { id: 'referees', label: 'Судьи' },
   { id: 'statistics', label: 'Статистика' },
+  { id: 'gallery', label: 'Фото' },
 ] as const
 
 async function load() {
-  const [u, t, m, tm, p, s, ts, ps] = await Promise.all([
+  const [u, t, m, tm, p, s, ts, ps, rr, g] = await Promise.all([
     api.get('/admin/users', { params: { size: 100 } }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
@@ -43,6 +49,8 @@ async function load() {
     api.get('/sports'),
     api.get('/statistics/teams'),
     api.get('/statistics/players'),
+    api.get('/admin/role-requests'),
+    api.get('/gallery'),
   ])
   users.value = u.data.content
   tournaments.value = t.data.content
@@ -52,6 +60,9 @@ async function load() {
   sports.value = s.data
   teamStats.value = ts.data
   playerStats.value = ps.data
+  roleRequests.value = rr.data
+  gallery.value = g.data
+  vkAlbumUrl.value = g.data.vkAlbumUrl || ''
   await names.load()
 }
 
@@ -64,6 +75,45 @@ async function updateUser(user: any) {
   try {
     await api.patch(`/admin/users/${user.id}`, { role: user.role, enabled: user.enabled })
     ok.value = `${user.email} обновлён.`
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function approveRole(req: any) {
+  pending.value = true
+  try {
+    await api.post(`/admin/users/${req.userId}/roles/${req.role}/approve`)
+    ok.value = 'Роль подтверждена.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function addPhoto() {
+  pending.value = true
+  try {
+    await api.post('/admin/gallery', { url: photoUrl.value, source: 'URL' })
+    photoUrl.value = ''
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function saveVkAlbum() {
+  pending.value = true
+  try {
+    await api.put('/admin/gallery/vk-album', { url: vkAlbumUrl.value })
+    ok.value = 'Ссылка на альбом ВК сохранена.'
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -109,7 +159,15 @@ async function disbandTeam(team: any) {
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
 
-    <div v-if="tab === 'users'" class="panel">
+    <div v-if="tab === 'users'" class="stack">
+      <div class="panel" v-if="roleRequests.length">
+        <h2>Заявки на роли</h2>
+        <div v-for="req in roleRequests" :key="req.id" class="row">
+          <span>{{ req.role }} · {{ req.userId }}</span>
+          <button class="btn" :disabled="pending" @click="approveRole(req)">Подтвердить</button>
+        </div>
+      </div>
+      <div class="panel">
       <h2>Пользователи</h2>
       <p class="muted">Админа через форму не назначают — он из .env. Остальным роли ставятся здесь.</p>
       <table class="table">
@@ -138,6 +196,7 @@ async function disbandTeam(team: any) {
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <div v-else-if="tab === 'tournaments'" class="grid two">
@@ -170,13 +229,19 @@ async function disbandTeam(team: any) {
       </div>
     </div>
 
-    <div v-else-if="tab === 'teams'" class="panel stack">
+    <div v-else-if="tab === 'teams'" class="grid two">
+      <div class="panel stack">
+        <h2>Новая команда</h2>
+        <CreateTeamForm @created="load" />
+      </div>
+      <div class="panel stack">
       <h2>Клубы</h2>
-      <p class="muted">Админ команды не создаёт — только правит карточку и может расформировать.</p>
+      <p class="muted">Название, лого, капитан и дата основания. Расформирование — только отсюда.</p>
       <div v-for="t in teams" :key="t.id" class="row">
         <RouterLink :to="`/teams/${t.id}`">{{ t.name }}</RouterLink>
         <span v-if="t.disbanded" class="muted">расформирована</span>
         <button v-else class="btn danger" :disabled="pending" @click="disbandTeam(t)">Расформировать</button>
+      </div>
       </div>
     </div>
 
@@ -192,6 +257,21 @@ async function disbandTeam(team: any) {
       <p class="muted">Роль ставится во вкладке «Пользователи». Потом судью назначают в карточке матча.</p>
       <div v-for="u in users.filter(x => x.role === 'REFEREE')" :key="u.id" class="row">{{ u.email }}</div>
       <p class="muted">Виды спорта: {{ sports.map(s => s.code).join(', ') || 'пока не заданы' }}</p>
+    </div>
+
+    <div v-else-if="tab === 'gallery'" class="panel stack">
+      <h2>Фото с матчей</h2>
+      <label class="field">Альбом ВК
+        <input v-model="vkAlbumUrl" placeholder="https://vk.com/album-..." />
+      </label>
+      <button class="btn secondary" :disabled="pending" @click="saveVkAlbum">Сохранить ссылку</button>
+      <label class="field">Добавить фото по URL
+        <input v-model="photoUrl" placeholder="https://..." />
+      </label>
+      <button class="btn" :disabled="pending || !photoUrl" @click="addPhoto">Добавить</button>
+      <div v-for="photo in gallery.photos" :key="photo.id" class="row">
+        <a :href="photo.url" target="_blank">{{ photo.caption || photo.url }}</a>
+      </div>
     </div>
 
     <div v-else class="panel stack">

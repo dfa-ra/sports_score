@@ -1,6 +1,5 @@
 package com.studentleague.teams;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.studentleague.support.AbstractIntegrationTest;
 import com.studentleague.users.domain.Role;
 import org.junit.jupiter.api.Test;
@@ -18,14 +17,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
 
     @Test
-    void captainCanManageRosterButOtherUserCannot() throws Exception {
+    void adminCreatesTeamAndCaptainManagesRoster() throws Exception {
+        String adminToken = createAdminAndLogin("admin-own-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String captainEmail = "captain-" + System.nanoTime() + "@example.com";
         String otherEmail = "other-" + System.nanoTime() + "@example.com";
         String playerEmail = "player-" + System.nanoTime() + "@example.com";
 
-        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!", "CAPTAIN", "https://example.com/cap.jpg");
         String otherToken = registerAndLogin(otherEmail, "Str0ngPass!");
-        String playerToken = registerAndLogin(playerEmail, "Str0ngPass!");
+        String playerToken = registerAndLogin(playerEmail, "Str0ngPass!", "PLAYER", "https://example.com/p.jpg");
 
         mockMvc.perform(put("/api/v1/players/me")
                         .header("Authorization", auth(captainToken))
@@ -52,23 +52,37 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         String playerId = objectMapper.readTree(playerProfile.getResponse().getContentAsString()).get("id").asText();
+        String captainPlayerId = objectMapper.readTree(
+                mockMvc.perform(get("/api/v1/players/me").header("Authorization", auth(captainToken)))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        ).get("id").asText();
 
-        // Re-login captain to get CAPTAIN role after team creation (role changes on create)
-        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
+        mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(captainToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Campus United","shortName":"CU"}
                                 """))
+                .andExpect(status().isForbidden());
+
+        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s","foundedOn":"2020-09-01"}
+                                """.formatted(captainPlayerId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Campus United"))
+                .andExpect(jsonPath("$.foundedOn").value("2020-09-01"))
                 .andReturn();
         String teamId = objectMapper.readTree(teamResult.getResponse().getContentAsString()).get("id").asText();
 
         assertThat(userRepository.findByEmailIgnoreCase(captainEmail).orElseThrow().getRole())
                 .isEqualTo(Role.CAPTAIN);
 
-        // Fresh token after role promotion
         captainToken = loginOnly(captainEmail, "Str0ngPass!");
 
         mockMvc.perform(post("/api/v1/teams/" + teamId + "/members")
@@ -114,10 +128,10 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void adminCannotCreateTeamButCanDisband() throws Exception {
+    void adminCanCreateAndDisbandTeam() throws Exception {
         String adminToken = createAdminAndLogin("admin-team-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String captainEmail = "captain-disband-" + System.nanoTime() + "@example.com";
-        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!", "CAPTAIN", "https://example.com/c.jpg");
 
         mockMvc.perform(put("/api/v1/players/me")
                         .header("Authorization", auth(captainToken))
@@ -126,21 +140,17 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                                 {"firstName":"Cap","lastName":"Tain","jerseyNumber":1,"position":"PG"}
                                 """))
                 .andExpect(status().isOk());
+        String captainPlayerId = objectMapper.readTree(
+                mockMvc.perform(get("/api/v1/players/me").header("Authorization", auth(captainToken)))
+                        .andReturn().getResponse().getContentAsString()
+        ).get("id").asText();
 
-        mockMvc.perform(post("/api/v1/teams")
+        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Admin United","shortName":"AU"}
-                                """))
-                .andExpect(status().isForbidden());
-
-        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
-                        .header("Authorization", auth(captainToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"Campus United","shortName":"CU"}
-                                """))
+                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s"}
+                                """.formatted(captainPlayerId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.disbanded").value(false))
                 .andReturn();
@@ -212,17 +222,5 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.code=='FOOTBALL')]").exists())
                 .andExpect(jsonPath("$[?(@.code=='BASKETBALL')]").exists());
-    }
-
-    private String loginOnly(String email, String password) throws Exception {
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"%s","password":"%s"}
-                                """.formatted(email, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-        JsonNode body = objectMapper.readTree(login.getResponse().getContentAsString());
-        return body.get("accessToken").asText();
     }
 }

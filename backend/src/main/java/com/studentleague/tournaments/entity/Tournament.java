@@ -46,6 +46,12 @@ public class Tournament {
     @Column(nullable = false, length = 64)
     private String format;
 
+    @Column(columnDefinition = "TEXT")
+    private String regulations;
+
+    @Column(name = "max_squad_size")
+    private Integer maxSquadSize;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -137,6 +143,22 @@ public class Tournament {
 
     public void setFormat(String format) {
         this.format = format;
+    }
+
+    public String getRegulations() {
+        return regulations;
+    }
+
+    public void setRegulations(String regulations) {
+        this.regulations = regulations;
+    }
+
+    public Integer getMaxSquadSize() {
+        return maxSquadSize;
+    }
+
+    public void setMaxSquadSize(Integer maxSquadSize) {
+        this.maxSquadSize = maxSquadSize;
     }
 
     public Instant getCreatedAt() {

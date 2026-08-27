@@ -1,17 +1,32 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 
-const players = ref<any[]>([])
-const teams = ref<any[]>([])
+const scorers = ref<any[]>([])
+const assists = ref<any[]>([])
+const keepers = ref<any[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const [p, t] = await Promise.all([api.get('/statistics/players'), api.get('/statistics/teams')])
-    players.value = p.data
-    teams.value = t.data
+    let tournamentId
+    try {
+      const current = await api.get('/tournaments/current')
+      tournamentId = current.data?.id
+    } catch {
+      tournamentId = undefined
+    }
+    const params = { tournamentId, limit: 30 }
+    const [g, a, k] = await Promise.all([
+      api.get('/statistics/scorers', { params }),
+      api.get('/statistics/assists', { params }),
+      api.get('/statistics/goalkeepers', { params }),
+    ])
+    scorers.value = g.data
+    assists.value = a.data
+    keepers.value = k.data
   } finally {
     loading.value = false
   }
@@ -22,7 +37,7 @@ onMounted(async () => {
   <section class="stack">
     <div class="page-title">
       <h1>Статистика</h1>
-      <p>Считаем только живые события. Отменённые голы в легенды не попадают.</p>
+      <p>Бомбардиры, ассистенты и вратари по сухим матчам текущего турнира.</p>
     </div>
     <div v-if="loading" class="grid cards">
       <div class="skeleton" />
@@ -30,34 +45,43 @@ onMounted(async () => {
     </div>
     <template v-else>
       <div class="panel">
-        <h2>Игроки</h2>
-        <EmptyState v-if="!players.length" title="Цифр ещё нет" text="Как только судья запишет первое событие — таблица оживёт." />
+        <h2>Бомбардиры</h2>
+        <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
         <table v-else class="table">
-          <thead><tr><th>Игрок</th><th>G</th><th>A</th><th>ЖК</th><th>КК</th><th>Игры</th></tr></thead>
+          <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
           <tbody>
-            <tr v-for="p in players" :key="p.playerId">
-              <td>{{ p.displayName }}</td>
+            <tr v-for="p in scorers" :key="p.playerId">
+              <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
               <td>{{ p.goals }}</td>
-              <td>{{ p.assists }}</td>
-              <td>{{ p.yellowCards }}</td>
-              <td>{{ p.redCards }}</td>
               <td>{{ p.appearances }}</td>
             </tr>
           </tbody>
         </table>
       </div>
       <div class="panel">
-        <h2>Команды</h2>
-        <EmptyState v-if="!teams.length" title="Таблица ждёт первый матч" />
+        <h2>Ассистенты</h2>
+        <EmptyState v-if="!assists.length" title="Передач ещё нет" />
         <table v-else class="table">
-          <thead><tr><th>Команда</th><th>В</th><th>Н</th><th>П</th><th>Очки</th></tr></thead>
+          <thead><tr><th>Игрок</th><th>Пасы</th><th>Игры</th></tr></thead>
           <tbody>
-            <tr v-for="t in teams" :key="t.teamId">
-              <td>{{ t.teamName }}</td>
-              <td>{{ t.wins }}</td>
-              <td>{{ t.draws }}</td>
-              <td>{{ t.losses }}</td>
-              <td><strong>{{ t.points }}</strong></td>
+            <tr v-for="p in assists" :key="p.playerId">
+              <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+              <td>{{ p.assists }}</td>
+              <td>{{ p.appearances }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>Вратари</h2>
+        <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" text="Считаем по позиции вратаря и нулю пропущенных." />
+        <table v-else class="table">
+          <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
+          <tbody>
+            <tr v-for="p in keepers" :key="p.playerId">
+              <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+              <td>{{ p.cleanSheets }}</td>
+              <td>{{ p.appearances }}</td>
             </tr>
           </tbody>
         </table>
@@ -65,7 +89,3 @@ onMounted(async () => {
     </template>
   </section>
 </template>
-
-<style scoped>
-h2 { font-size: 1.2rem; margin-bottom: 0.4rem; }
-</style>

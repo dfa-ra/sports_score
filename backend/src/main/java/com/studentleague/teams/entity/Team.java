@@ -8,6 +8,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -28,6 +29,9 @@ public class Team {
 
     @Column(name = "captain_id")
     private UUID captainId;
+
+    @Column(name = "founded_on")
+    private LocalDate foundedOn;
 
     @Column(nullable = false)
     private boolean disbanded = false;
@@ -91,6 +95,14 @@ public class Team {
 
     public void setCaptainId(UUID captainId) {
         this.captainId = captainId;
+    }
+
+    public LocalDate getFoundedOn() {
+        return foundedOn;
+    }
+
+    public void setFoundedOn(LocalDate foundedOn) {
+        this.foundedOn = foundedOn;
     }
 
     public boolean isDisbanded() {

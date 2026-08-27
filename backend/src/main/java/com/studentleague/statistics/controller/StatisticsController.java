@@ -46,4 +46,31 @@ public class StatisticsController {
     ) {
         return statisticsService.teamStatistics(tournamentId, seasonYear, teamId);
     }
+
+    @GetMapping("/scorers")
+    @Operation(summary = "Top scorers")
+    public List<PlayerStatisticsResponse> scorers(
+            @RequestParam(required = false) UUID tournamentId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return statisticsService.scorers(tournamentId, limit);
+    }
+
+    @GetMapping("/assists")
+    @Operation(summary = "Top assists")
+    public List<PlayerStatisticsResponse> assists(
+            @RequestParam(required = false) UUID tournamentId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return statisticsService.assists(tournamentId, limit);
+    }
+
+    @GetMapping("/goalkeepers")
+    @Operation(summary = "Goalkeepers by clean sheets")
+    public List<PlayerStatisticsResponse> goalkeepers(
+            @RequestParam(required = false) UUID tournamentId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return statisticsService.goalkeepers(tournamentId, limit);
+    }
 }

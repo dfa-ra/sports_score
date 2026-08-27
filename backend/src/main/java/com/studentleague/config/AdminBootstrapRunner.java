@@ -3,6 +3,7 @@ package com.studentleague.config;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -22,15 +23,18 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     private final AppProperties appProperties;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     public AdminBootstrapRunner(
             AppProperties appProperties,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            RoleService roleService
     ) {
         this.appProperties = appProperties;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.roleService = roleService;
     }
 
     @Override
@@ -51,15 +55,21 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         user.setPasswordHash(passwordEncoder.encode(admin.password()));
         user.setRole(Role.ADMIN);
         user.setEnabled(true);
+        if (user.getFirstName() == null || user.getFirstName().isBlank()) {
+            user.setFirstName("Админ");
+        }
+        if (user.getLastName() == null || user.getLastName().isBlank()) {
+            user.setLastName("Лиги");
+        }
         userRepository.save(user);
+        roleService.grantApproved(user, Role.ADMIN, null);
+        roleService.grantApproved(user, Role.FAN, null);
 
-        // Снять ADMIN с остальных пользователей (один админ)
         userRepository.findAll().stream()
                 .filter(u -> u.getRole() == Role.ADMIN)
                 .filter(u -> !u.getEmail().equalsIgnoreCase(email))
                 .forEach(u -> {
-                    u.setRole(Role.FAN);
-                    userRepository.save(u);
+                    roleService.reject(u.getId(), Role.ADMIN, "Единственный админ задаётся через .env");
                     log.info("Роль ADMIN снята с {}", u.getEmail());
                 });
 

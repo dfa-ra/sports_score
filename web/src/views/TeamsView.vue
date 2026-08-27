@@ -30,11 +30,10 @@ onMounted(load)
       <h1>Команды</h1>
       <p>Составы и капитаны студенческой лиги. Смотреть можно всем.</p>
     </div>
-    <div v-if="auth.isAuthenticated && !auth.canManageLeague" class="toolbar">
+    <div v-if="auth.canManageLeague" class="toolbar">
       <button class="btn" @click="showForm = !showForm">{{ showForm ? 'Скрыть форму' : 'Создать команду' }}</button>
-      <RouterLink v-if="auth.role === 'FAN'" class="btn secondary" to="/profile">Сначала профиль игрока</RouterLink>
     </div>
-    <div v-if="showForm" class="panel">
+    <div v-if="showForm && auth.canManageLeague" class="panel">
       <CreateTeamForm @created="load" />
     </div>
     <div v-if="loading" class="grid cards">

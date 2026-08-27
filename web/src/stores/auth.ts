@@ -4,11 +4,21 @@ import api from '../api/client'
 
 export type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE' | 'ADMIN'
 
+export interface RoleAssignment {
+  role: Role
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  photoUrl?: string | null
+}
+
 export interface User {
   id: string
   email: string
   role: Role
   enabled: boolean
+  firstName?: string | null
+  lastName?: string | null
+  photoUrl?: string | null
+  roles?: RoleAssignment[]
 }
 
 const ACCESS_KEY = 'sl_access'
@@ -40,6 +50,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const role = computed(() => user.value?.role ?? null)
+  const approvedRoles = computed<Role[]>(() => {
+    const fromAssignments = (user.value?.roles ?? [])
+      .filter((item) => item.status === 'APPROVED')
+      .map((item) => item.role)
+    if (fromAssignments.length) return fromAssignments
+    return user.value?.role ? [user.value.role] : []
+  })
+
+  function hasRole(candidate: Role) {
+    return approvedRoles.value.includes(candidate) || role.value === candidate
+  }
 
   function persist() {
     if (accessToken.value) sessionStorage.setItem(ACCESS_KEY, accessToken.value)
@@ -53,9 +74,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function register(payload: {
     email: string
     password: string
-    accountType: 'FAN' | 'PLAYER'
-    firstName?: string
-    lastName?: string
+    firstName: string
+    lastName: string
+    role: Role
+    photoUrl?: string
   }) {
     await api.post('/auth/register', payload)
     return login(payload.email, payload.password)
@@ -102,9 +124,13 @@ export const useAuthStore = defineStore('auth', () => {
     return data
   }
 
-  const canManageLeague = computed(() => role.value === 'ADMIN')
-  const canManageTeam = computed(() => role.value === 'CAPTAIN' || role.value === 'ADMIN')
-  const canOfficiate = computed(() => role.value === 'REFEREE' || role.value === 'ADMIN')
+  const canManageLeague = computed(() => hasRole('ADMIN'))
+  const canManageTeam = computed(() => hasRole('CAPTAIN') || hasRole('ADMIN'))
+  const canOfficiate = computed(() => hasRole('REFEREE') || hasRole('ADMIN'))
+  const canAccessMyTeam = computed(() =>
+    isAuthenticated.value
+    && (hasRole('PLAYER') || hasRole('CAPTAIN') || hasRole('ADMIN') || hasRole('REFEREE'))
+  )
 
   return {
     accessToken,
@@ -112,9 +138,12 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     isAuthenticated,
     role,
+    approvedRoles,
+    hasRole,
     canManageLeague,
     canManageTeam,
     canOfficiate,
+    canAccessMyTeam,
     register,
     login,
     refresh,

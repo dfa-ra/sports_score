@@ -11,11 +11,13 @@ import java.util.UUID;
 public record CreateTournamentRequest(
         @NotBlank @Size(max = 200) String name,
         String description,
+        String regulations,
         @NotNull UUID sportId,
         @NotNull Integer seasonYear,
         LocalDate startDate,
         LocalDate endDate,
         TournamentStatus status,
-        @NotBlank @Size(max = 64) String format
+        @NotBlank @Size(max = 64) String format,
+        Integer maxSquadSize
 ) {
 }

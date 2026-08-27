@@ -11,7 +11,8 @@ public record AppProperties(
         RateLimit rateLimit,
         Redis redis,
         LocalStorage localStorage,
-        Admin admin
+        Admin admin,
+        Auth auth
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -36,5 +37,8 @@ public record AppProperties(
             String email,
             String password
     ) {
+    }
+
+    public record Auth(boolean autoApproveRoles) {
     }
 }

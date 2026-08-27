@@ -6,15 +6,27 @@ import { initials } from '../lib/format'
 import EmptyState from '../components/EmptyState.vue'
 
 const items = ref<any[]>([])
+const teams = ref<any[]>([])
+const query = ref('')
+const teamId = ref('')
 const loading = ref(true)
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
   try {
-    const { data } = await api.get('/players', { params: { size: 50 } })
-    items.value = data.content
+    const { data } = await api.get('/players', {
+      params: { size: 100, q: query.value || undefined, teamId: teamId.value || undefined },
+    })
+    items.value = data.content ?? []
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  const { data } = await api.get('/teams', { params: { size: 100 } })
+  teams.value = data.content ?? []
+  await load()
 })
 </script>
 
@@ -22,12 +34,24 @@ onMounted(async () => {
   <section class="stack">
     <div class="page-title">
       <h1>Игроки</h1>
-      <p>Публичные карточки и статистика. Номера — не для красоты.</p>
+      <p>Поиск по ФИО или команде. Карточка — статистика выступлений.</p>
     </div>
+    <form class="filters" @submit.prevent="load">
+      <label class="field">ФИО
+        <input v-model="query" placeholder="Иванов" />
+      </label>
+      <label class="field">Команда
+        <select v-model="teamId">
+          <option value="">Все команды</option>
+          <option v-for="t in teams" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
+      </label>
+      <button class="btn" type="submit">Найти</button>
+    </form>
     <div v-if="loading" class="grid cards">
       <div v-for="n in 4" :key="n" class="skeleton" />
     </div>
-    <EmptyState v-else-if="!items.length" title="Состав ещё собирается" text="Как только кто-то зарегистрируется игроком — появится здесь." />
+    <EmptyState v-else-if="!items.length" title="Никого не нашли" />
     <div v-else class="grid cards">
       <RouterLink v-for="p in items" :key="p.id" class="panel card-link" :to="`/players/${p.id}`">
         <span class="avatar">{{ initials(p.displayName || `${p.firstName} ${p.lastName}`) }}</span>
@@ -39,6 +63,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.filters { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.7rem; align-items: end; }
 .card-link { display: grid; gap: 0.3rem; justify-items: start; }
 .avatar {
   width: 42px;
@@ -51,4 +76,5 @@ onMounted(async () => {
   font-weight: 800;
 }
 h2 { font-size: 1.2rem; }
+@media (max-width: 760px) { .filters { grid-template-columns: 1fr; } }
 </style>

@@ -184,7 +184,11 @@ public class RefereeMatchService {
     @Transactional
     public MatchEventResponse addEvent(UserPrincipal principal, UUID matchId, CreateMatchEventRequest request) {
         Match match = requireAssignedMatch(principal, matchId);
-        if (!EVENT_ALLOWED.contains(match.getStatus())) {
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            if (!principal.hasRole(Role.ADMIN)) {
+                throw ApiException.forbidden("После финального свистка протокол правит только админ");
+            }
+        } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
         }
         validateEventPayload(match, request);
@@ -223,7 +227,11 @@ public class RefereeMatchService {
     @Transactional
     public MatchEventResponse voidEvent(UserPrincipal principal, UUID matchId, UUID eventId) {
         Match match = requireAssignedMatch(principal, matchId);
-        if (!EVENT_ALLOWED.contains(match.getStatus()) && match.getStatus() != MatchStatus.FINISHED) {
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            if (!principal.hasRole(Role.ADMIN)) {
+                throw ApiException.forbidden("После финального свистка протокол правит только админ");
+            }
+        } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Cannot void events for this match status");
         }
         MatchEvent event = matchEventRepository.findById(eventId)
@@ -321,14 +329,14 @@ public class RefereeMatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> ApiException.notFound("Match not found"));
         boolean assigned = matchRefereeRepository.existsByMatchIdAndRefereeId(matchId, principal.getId());
-        if (!assigned && principal.getRole() != Role.ADMIN) {
+        if (!assigned && !principal.hasRole(Role.ADMIN)) {
             throw ApiException.forbidden("Referee is not assigned to this match");
         }
         return match;
     }
 
     private void assertReferee(UserPrincipal principal) {
-        if (principal.getRole() != Role.REFEREE && principal.getRole() != Role.ADMIN) {
+        if (!principal.hasAnyRole(Role.REFEREE, Role.ADMIN)) {
             throw ApiException.forbidden("Referee role required");
         }
     }

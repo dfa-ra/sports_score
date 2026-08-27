@@ -15,12 +15,16 @@ const startDate = ref('')
 const endDate = ref('')
 const status = ref('REGISTRATION')
 const format = ref('ROUND_ROBIN')
+const regulations = ref('')
+const maxSquadSize = ref(18)
+const formats = ref<any[]>([])
 const pending = ref(false)
 const error = ref('')
 
 onMounted(async () => {
-  const { data } = await api.get('/sports')
+  const [{ data }, formatsRes] = await Promise.all([api.get('/sports'), api.get('/tournaments/formats')])
   sports.value = data
+  formats.value = formatsRes.data
   if (!sportId.value && data[0]) sportId.value = data[0].id
 })
 
@@ -37,6 +41,8 @@ async function submit() {
       endDate: endDate.value || undefined,
       status: status.value,
       format: format.value,
+      regulations: regulations.value || undefined,
+      maxSquadSize: Number(maxSquadSize.value) || undefined,
     })
     emit('created', data)
     router.push(`/tournaments/${data.id}`)
@@ -81,10 +87,14 @@ async function submit() {
     </label>
     <label class="field">Формат
       <select v-model="format">
-        <option value="ROUND_ROBIN">Круговой</option>
-        <option value="KNOCKOUT">Плей-офф</option>
-        <option value="GROUPS">Группы</option>
+        <option v-for="f in formats" :key="f.code" :value="f.code">{{ f.title }}</option>
       </select>
+    </label>
+    <label class="field">Регламент
+      <textarea v-model="regulations" rows="4" placeholder="Лимит заявки, таймы, дисквалификации…" />
+    </label>
+    <label class="field">Максимум в заявке на турнир
+      <input v-model.number="maxSquadSize" type="number" min="1" max="40" />
     </label>
     <p v-if="error" class="form-error">{{ error }}</p>
     <button class="btn" type="submit" :disabled="pending">{{ pending ? 'Печатаем сетку…' : 'Создать турнир' }}</button>

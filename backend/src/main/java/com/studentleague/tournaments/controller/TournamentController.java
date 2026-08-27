@@ -5,12 +5,15 @@ import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.tournaments.domain.TournamentStatus;
+import com.studentleague.tournaments.dto.CalendarImportResponse;
 import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
 import com.studentleague.tournaments.dto.StandingRow;
+import com.studentleague.tournaments.dto.TournamentFormatResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
+import com.studentleague.tournaments.service.CalendarImportService;
 import com.studentleague.tournaments.service.TournamentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -20,6 +23,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,8 +35,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,10 +51,16 @@ public class TournamentController {
 
     private final TournamentService tournamentService;
     private final MatchService matchService;
+    private final CalendarImportService calendarImportService;
 
-    public TournamentController(TournamentService tournamentService, MatchService matchService) {
+    public TournamentController(
+            TournamentService tournamentService,
+            MatchService matchService,
+            CalendarImportService calendarImportService
+    ) {
         this.tournamentService = tournamentService;
         this.matchService = matchService;
+        this.calendarImportService = calendarImportService;
     }
 
     @GetMapping
@@ -66,6 +79,19 @@ public class TournamentController {
     @Operation(summary = "Create tournament (ADMIN)")
     public TournamentResponse create(@Valid @RequestBody CreateTournamentRequest request) {
         return tournamentService.create(request);
+    }
+
+    @GetMapping("/current")
+    @Operation(summary = "Current (active or latest) tournament")
+    public ResponseEntity<TournamentResponse> current() {
+        TournamentResponse current = tournamentService.current();
+        return current == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(current);
+    }
+
+    @GetMapping("/formats")
+    @Operation(summary = "Supported tournament formats")
+    public List<TournamentFormatResponse> formats() {
+        return tournamentService.formats();
     }
 
     @GetMapping("/{id}")
@@ -126,5 +152,15 @@ public class TournamentController {
             @PageableDefault(size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         return PageResponse.from(matchService.list(id, null, pageable));
+    }
+
+    @PostMapping(value = "/{id}/calendar/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Import calendar from CSV or Excel (ADMIN). Columns: date, time, home, away")
+    public CalendarImportResponse importCalendar(
+            @PathVariable UUID id,
+            @RequestPart("file") MultipartFile file
+    ) {
+        return calendarImportService.importCalendar(id, file);
     }
 }

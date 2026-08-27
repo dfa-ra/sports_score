@@ -21,7 +21,10 @@ const name = ref('')
 const description = ref('')
 const status = ref('REGISTRATION')
 const format = ref('ROUND_ROBIN')
+const regulations = ref('')
 const seasonYear = ref(2026)
+const tab = ref<'table' | 'rules'>('table')
+const calendarFile = ref<File | null>(null)
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
@@ -47,6 +50,7 @@ async function load() {
   description.value = t.data.description || ''
   status.value = t.data.status
   format.value = t.data.format
+  regulations.value = t.data.regulations || ''
   seasonYear.value = t.data.seasonYear
   if (auth.isAuthenticated) {
     const { data } = await api.get('/teams', { params: { size: 100 } })
@@ -73,6 +77,7 @@ async function save() {
       description: description.value || undefined,
       status: status.value,
       format: format.value,
+      regulations: regulations.value || undefined,
       seasonYear: Number(seasonYear.value),
     })
     ok.value = 'Турнир обновлён.'
@@ -102,6 +107,23 @@ async function approve(id: string) {
   pending.value = true
   try {
     await api.post(`/tournaments/${tournament.value.id}/teams/${id}/approve`)
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function importCalendar() {
+  if (!calendarFile.value) return
+  error.value = ''
+  pending.value = true
+  try {
+    const form = new FormData()
+    form.append('file', calendarFile.value)
+    const { data } = await api.post(`/tournaments/${tournament.value.id}/calendar/import`, form)
+    ok.value = `Календарь: создано ${data.created}, пропущено ${data.skipped}.`
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -143,7 +165,15 @@ async function exclude(id: string) {
       </form>
     </div>
 
-    <div class="panel">
+    <div class="filters">
+      <button class="btn secondary" :class="{ on: tab === 'table' }" @click="tab = 'table'">Таблица</button>
+      <button class="btn secondary" :class="{ on: tab === 'rules' }" @click="tab = 'rules'">Регламент</button>
+    </div>
+    <div v-if="tab === 'rules'" class="panel">
+      <h2>Регламент</h2>
+      <p style="white-space: pre-wrap">{{ tournament.regulations || 'Регламент ещё не опубликован.' }}</p>
+    </div>
+    <div v-if="tab === 'table'" class="panel">
       <h2>Таблица</h2>
       <EmptyState v-if="!standings.length" title="Ещё рано считать" text="Очки появятся после первых свистков." />
       <table v-else class="table">
@@ -211,10 +241,15 @@ async function exclude(id: string) {
         </label>
         <label class="field">Формат
           <select v-model="format">
-            <option value="ROUND_ROBIN">Круговой</option>
-            <option value="KNOCKOUT">Плей-офф</option>
-            <option value="GROUPS">Группы</option>
+            <option value="ROUND_ROBIN">Круговой турнир</option>
+            <option value="CUP">Кубок / плей-офф</option>
+            <option value="GROUPS_PLAYOFF">Группы + плей-офф</option>
+            <option value="SWISS">Швейцарская система</option>
+            <option value="DOUBLE_ELIMINATION">Double elimination</option>
           </select>
+        </label>
+        <label class="field">Регламент
+          <textarea v-model="regulations" rows="5" />
         </label>
         <button class="btn secondary" type="submit" :disabled="pending">Сохранить</button>
       </form>
@@ -228,6 +263,13 @@ async function exclude(id: string) {
           <button class="btn secondary" :disabled="pending" @click="exclude(team.teamId)">Убрать</button>
         </div>
       </div>
+
+      <h2>Календарь из Excel / CSV</h2>
+      <p class="muted">Колонки: date, time, home, away. Команды подхватываются по названию и сразу попадают в турнир.</p>
+      <form class="stack" @submit.prevent="importCalendar">
+        <input type="file" accept=".csv,.xlsx,.xls" @change="calendarFile = ($event.target as HTMLInputElement).files?.[0] || null" />
+        <button class="btn secondary" type="submit" :disabled="pending || !calendarFile">Загрузить календарь</button>
+      </form>
 
       <div class="head">
         <h2>Назначить матч</h2>

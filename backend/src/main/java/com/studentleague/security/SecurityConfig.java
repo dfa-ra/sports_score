@@ -74,11 +74,12 @@ public class SecurityConfig {
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
+                                "/api/v1/auth/photo",
                                 "/ws",
                                 "/ws/**",
                                 "/media/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/players/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/tournaments",
                                 "/api/v1/tournaments/**",
@@ -90,7 +91,10 @@ public class SecurityConfig {
                                 "/api/v1/players/**",
                                 "/api/v1/statistics/**",
                                 "/api/v1/sports",
-                                "/api/v1/sports/**"
+                                "/api/v1/sports/**",
+                                "/api/v1/home",
+                                "/api/v1/gallery",
+                                "/api/v1/gallery/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated())

@@ -20,6 +20,8 @@ const match = ref<any>(null)
 const events = ref<any[]>([])
 const referees = ref<any[]>([])
 const lineups = ref<any>(null)
+const homeForm = ref<any[]>([])
+const awayForm = ref<any[]>([])
 const tournament = ref<any>(null)
 const me = ref<any>(null)
 const users = ref<any[]>([])
@@ -57,6 +59,17 @@ async function load() {
   events.value = e.data
   referees.value = r.data
   lineups.value = l.data
+  try {
+    const [hf, af] = await Promise.all([
+      api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
+      api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
+    ])
+    homeForm.value = hf.data
+    awayForm.value = af.data
+  } catch {
+    homeForm.value = []
+    awayForm.value = []
+  }
   try {
     const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
     tournament.value = data
@@ -205,6 +218,18 @@ onUnmounted(() => client?.deactivate())
             </div>
           </li>
         </ul>
+      </div>
+      <div class="grid two">
+        <div class="panel">
+          <h2>Форма хозяев</h2>
+          <p v-for="f in homeForm" :key="f.id" class="muted">{{ f.homeScore }}:{{ f.awayScore }} · {{ formatWhen(f.scheduledAt) }}</p>
+          <p v-if="!homeForm.length" class="muted">Ещё нет пяти матчей.</p>
+        </div>
+        <div class="panel">
+          <h2>Форма гостей</h2>
+          <p v-for="f in awayForm" :key="f.id" class="muted">{{ f.homeScore }}:{{ f.awayScore }} · {{ formatWhen(f.scheduledAt) }}</p>
+          <p v-if="!awayForm.length" class="muted">Ещё нет пяти матчей.</p>
+        </div>
       </div>
       <div v-if="referees.length || auth.canOfficiate" class="panel stack">
         <h2>Бригада</h2>
