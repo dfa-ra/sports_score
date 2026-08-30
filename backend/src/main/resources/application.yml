@@ -49,6 +49,8 @@ app:
     password: ${ADMIN_PASSWORD:}
   auth:
     auto-approve-roles: ${AUTH_AUTO_APPROVE_ROLES:false}
+  demo-data:
+    enabled: ${APP_DEMO_DATA:true}
 
 springdoc:
   api-docs:

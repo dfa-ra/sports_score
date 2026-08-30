@@ -12,7 +12,8 @@ public record AppProperties(
         Redis redis,
         LocalStorage localStorage,
         Admin admin,
-        Auth auth
+        Auth auth,
+        DemoData demoData
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -40,5 +41,9 @@ public record AppProperties(
     }
 
     public record Auth(boolean autoApproveRoles) {
+    }
+
+    /** One-shot campus league when the database has no teams yet. */
+    public record DemoData(boolean enabled) {
     }
 }

@@ -50,6 +50,7 @@ public abstract class AbstractIntegrationTest {
         registry.add("app.rate-limit.auth-requests-per-minute", () -> "1000");
         registry.add("app.cors.allowed-origins", () -> "http://localhost:5173");
         registry.add("app.auth.auto-approve-roles", () -> "true");
+        registry.add("app.demo-data.enabled", () -> "false");
         registry.add("spring.autoconfigure.exclude", () ->
                 "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
                         + "org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration");
