@@ -47,7 +47,8 @@ onMounted(async () => {
       <div class="panel">
         <h2>Бомбардиры</h2>
         <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
-        <table v-else class="table">
+        <div v-else class="table-wrap">
+        <table class="table">
           <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
           <tbody>
             <tr v-for="p in scorers" :key="p.playerId">
@@ -57,6 +58,7 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
       <div class="panel">
         <h2>Ассистенты</h2>

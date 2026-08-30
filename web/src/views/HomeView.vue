@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
+import MatchRow from '../components/MatchRow.vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Slide = {
   id: string
@@ -14,19 +16,32 @@ type Slide = {
 }
 
 const feed = ref<any>(null)
+const matches = ref<any[]>([])
 const loaded = ref(false)
 const slide = ref(0)
 const storyRail = ref<HTMLElement | null>(null)
+const teams = useTeamDirectory()
 let timer: number | undefined
 
 const heroes = computed<Slide[]>(() => feed.value?.heroes ?? [])
 const stories = computed<Slide[]>(() => feed.value?.stories ?? [])
 const current = computed(() => heroes.value[slide.value] || null)
+const tape = computed(() =>
+  matches.value
+    .slice()
+    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+    .slice(0, 8)
+)
 
 onMounted(async () => {
   try {
-    const { data } = await api.get('/home')
+    await teams.load()
+    const [{ data }, games] = await Promise.all([
+      api.get('/home'),
+      api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
+    ])
     feed.value = data
+    matches.value = games.data.content ?? []
     start()
   } catch {
     feed.value = null
@@ -127,6 +142,23 @@ function nudgeStories(dir: number) {
     </div>
 
     <div class="container blocks">
+      <div v-if="tape.length" class="sheet">
+        <div class="league-head">
+          <div>
+            {{ feed?.tournament?.name || 'Матчи' }}
+            <small>Последние и ближайшие</small>
+          </div>
+          <RouterLink class="more" to="/calendar">Все игры</RouterLink>
+        </div>
+        <MatchRow
+          v-for="m in tape"
+          :key="m.id"
+          :match="m"
+          :home-name="teams.name(m.homeTeamId)"
+          :away-name="teams.name(m.awayTeamId)"
+        />
+      </div>
+
       <div class="hero-grid">
         <div class="panel table-block">
           <div class="page-title">
@@ -291,6 +323,14 @@ function nudgeStories(dir: number) {
 }
 .dots button.on { width: 46px; background: #fff; }
 .blocks { display: grid; gap: 1.2rem; padding-top: 1.4rem; }
+.sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.league-head { justify-content: space-between; }
+.more { color: var(--navy); font-size: 0.75rem; font-weight: 800; }
 .hero-grid { display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 1rem; align-items: start; }
 .table-block { padding: 1.4rem 1.5rem; }
 .headlines {
@@ -344,5 +384,8 @@ function nudgeStories(dir: number) {
   .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
   .stories-wrap { grid-template-columns: 1fr; }
   .nudge { display: none; }
+  .hero img { height: 180px; }
+  .blocks { padding-top: 0.9rem; gap: 0.8rem; }
+  .table-block { padding: 1rem; }
 }
 </style>

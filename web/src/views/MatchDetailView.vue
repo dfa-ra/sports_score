@@ -336,11 +336,14 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: 13px 11px 14px 10px;
-  background: color-mix(in srgb, var(--navy) 55%, transparent);
+  background: #f6f9fc;
 }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 860px) {
-  .sides { grid-template-columns: 1fr; }
+  .sides { grid-template-columns: 1fr auto 1fr; gap: 0.45rem; }
+  .sides strong { font-size: 0.82rem; }
   .lineups { grid-template-columns: 1fr; }
+  .scoreboard { border-radius: 14px; padding: 0.9rem; }
+  .clock { font-size: 1.6rem; }
 }
 </style>
