@@ -1,24 +1,26 @@
 package com.studentleague.players.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.entity.MatchLineupPlayer;
 import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.players.dto.PlayerCardResponse;
 import com.studentleague.players.dto.PlayerProfileRequest;
 import com.studentleague.players.dto.PlayerProfileResponse;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
-import com.studentleague.statistics.dto.PlayerStatisticsResponse;
-import com.studentleague.statistics.service.StatisticsService;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.entity.TeamMember;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
-import com.studentleague.users.domain.Role;
+import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import org.springframework.data.domain.Page;
@@ -27,12 +29,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class PlayerService {
@@ -41,26 +46,29 @@ public class PlayerService {
     private final UserRepository userRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamRepository teamRepository;
-    private final StatisticsService statisticsService;
     private final MatchEventRepository matchEventRepository;
     private final MatchRepository matchRepository;
+    private final MatchLineupPlayerRepository lineupPlayerRepository;
+    private final TournamentRepository tournamentRepository;
 
     public PlayerService(
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             TeamMemberRepository teamMemberRepository,
             TeamRepository teamRepository,
-            StatisticsService statisticsService,
             MatchEventRepository matchEventRepository,
-            MatchRepository matchRepository
+            MatchRepository matchRepository,
+            MatchLineupPlayerRepository lineupPlayerRepository,
+            TournamentRepository tournamentRepository
     ) {
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamRepository = teamRepository;
-        this.statisticsService = statisticsService;
         this.matchEventRepository = matchEventRepository;
         this.matchRepository = matchRepository;
+        this.lineupPlayerRepository = lineupPlayerRepository;
+        this.tournamentRepository = tournamentRepository;
     }
 
     @Transactional
@@ -135,18 +143,8 @@ public class PlayerService {
                         team.getId(), team.getName(), team.getShortName(), team.getLogoUrl());
             }
         }
-        Map<String, Object> statistics = new HashMap<>();
-        List<PlayerStatisticsResponse> stats = statisticsService.playerStatistics(null, null, null, playerId);
-        if (!stats.isEmpty()) {
-            PlayerStatisticsResponse s = stats.getFirst();
-            statistics.put("goals", s.goals());
-            statistics.put("assists", s.assists());
-            statistics.put("yellowCards", s.yellowCards());
-            statistics.put("redCards", s.redCards());
-            statistics.put("appearances", s.appearances());
-        }
-
-        List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(playerId);
+        List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(playerId, memberships);
+        Map<String, Object> statistics = seasonTotals(history, profile.getPosition());
 
         return new PlayerCardResponse(
                 profile.getId(),
@@ -162,33 +160,193 @@ public class PlayerService {
         );
     }
 
-    private List<PlayerCardResponse.MatchHistoryItem> buildMatchHistory(UUID playerId) {
-        List<MatchEvent> events = matchEventRepository.findByPlayerIdAndVoidedFalseOrderByTimestampDesc(playerId);
-        Set<UUID> seen = new LinkedHashSet<>();
-        for (MatchEvent event : events) {
-            seen.add(event.getMatchId());
-            if (seen.size() >= 20) {
-                break;
-            }
+    private Map<String, Object> seasonTotals(List<PlayerCardResponse.MatchHistoryItem> history, String position) {
+        Map<String, Object> statistics = new LinkedHashMap<>();
+        List<PlayerCardResponse.MatchHistoryItem> finished = history.stream()
+                .filter(item -> MatchStatus.FINISHED.name().equals(item.status()))
+                .toList();
+        statistics.put("appearances", finished.size());
+        statistics.put("goals", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::goals).sum());
+        statistics.put("assists", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::assists).sum());
+        statistics.put("yellowCards", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::yellowCards).sum());
+        statistics.put("redCards", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::redCards).sum());
+        if (looksLikeGoalkeeper(position)) {
+            long cleanSheets = finished.stream().filter(PlayerService::isCleanSheet).count();
+            statistics.put("cleanSheets", cleanSheets);
         }
+        return statistics;
+    }
+
+    private static boolean isCleanSheet(PlayerCardResponse.MatchHistoryItem item) {
+        int conceded = item.home() ? nz(item.awayScore()) : nz(item.homeScore());
+        return conceded == 0;
+    }
+
+    private static int nz(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private List<PlayerCardResponse.MatchHistoryItem> buildMatchHistory(UUID playerId, List<TeamMember> memberships) {
+        List<MatchLineupPlayer> lineups = lineupPlayerRepository.findByPlayerId(playerId);
+        List<MatchEvent> involvement = matchEventRepository.findActiveInvolvingPlayer(playerId);
+
+        Map<UUID, MatchLineupPlayer> lineupByMatch = new HashMap<>();
+        for (MatchLineupPlayer row : lineups) {
+            lineupByMatch.putIfAbsent(row.getMatchId(), row);
+        }
+        Map<UUID, List<MatchEvent>> eventsByMatch = involvement.stream()
+                .collect(Collectors.groupingBy(MatchEvent::getMatchId));
+
+        Set<UUID> matchIds = new HashSet<>();
+        matchIds.addAll(lineupByMatch.keySet());
+        matchIds.addAll(eventsByMatch.keySet());
+        if (matchIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Match> matches = matchRepository.findAllById(matchIds).stream()
+                .filter(match -> match.getStatus() == MatchStatus.FINISHED || match.getStatus() == MatchStatus.LIVE)
+                .sorted(Comparator.comparing(Match::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(50)
+                .toList();
+
+        Set<UUID> teamIds = new HashSet<>();
+        Set<UUID> tournamentIds = new HashSet<>();
+        for (Match match : matches) {
+            teamIds.add(match.getHomeTeamId());
+            teamIds.add(match.getAwayTeamId());
+            tournamentIds.add(match.getTournamentId());
+        }
+        Map<UUID, Team> teams = teamRepository.findAllById(teamIds).stream()
+                .collect(Collectors.toMap(Team::getId, team -> team));
+        Map<UUID, Tournament> tournaments = tournamentRepository.findAllById(tournamentIds).stream()
+                .collect(Collectors.toMap(Tournament::getId, tournament -> tournament));
+
+        Set<UUID> memberTeamIds = memberships.stream()
+                .map(TeamMember::getTeamId)
+                .collect(Collectors.toSet());
+
         List<PlayerCardResponse.MatchHistoryItem> history = new ArrayList<>();
-        for (UUID matchId : seen) {
-            Match match = matchRepository.findById(matchId).orElse(null);
-            if (match == null || match.getStatus() != MatchStatus.FINISHED) {
-                continue;
+        for (Match match : matches) {
+            List<MatchEvent> events = eventsByMatch.getOrDefault(match.getId(), List.of());
+            MatchLineupPlayer lineup = lineupByMatch.get(match.getId());
+            UUID teamId = resolvePlayerTeamId(match, lineup, events, playerId, memberTeamIds);
+            boolean home = teamId != null && teamId.equals(match.getHomeTeamId());
+
+            Team homeTeam = teams.get(match.getHomeTeamId());
+            Team awayTeam = teams.get(match.getAwayTeamId());
+            String homeName = homeTeam == null ? "?" : homeTeam.getName();
+            String awayName = awayTeam == null ? "?" : awayTeam.getName();
+            String opponentName = home ? awayName : homeName;
+            Tournament tournament = tournaments.get(match.getTournamentId());
+
+            int goals = 0;
+            int assists = 0;
+            int yellowCards = 0;
+            int redCards = 0;
+            Integer lastMinute = null;
+            for (MatchEvent event : events) {
+                if (event.getGameTime() != null) {
+                    lastMinute = event.getGameTime();
+                }
+                if (playerId.equals(event.getPlayerId())) {
+                    switch (event.getEventType()) {
+                        case GOAL -> goals++;
+                        case ASSIST -> assists++;
+                        case YELLOW_CARD -> yellowCards++;
+                        case RED_CARD -> redCards++;
+                        default -> {
+                        }
+                    }
+                }
+                if (event.getEventType() == MatchEventType.GOAL
+                        && playerId.equals(event.getSecondaryPlayerId())) {
+                    assists++;
+                }
             }
-            Team home = teamRepository.findById(match.getHomeTeamId()).orElse(null);
-            Team away = teamRepository.findById(match.getAwayTeamId()).orElse(null);
-            String opponentName = (home == null ? "?" : home.getName()) + " vs " + (away == null ? "?" : away.getName());
+
             history.add(new PlayerCardResponse.MatchHistoryItem(
                     match.getId(),
+                    match.getScheduledAt(),
+                    tournament == null ? null : tournament.getName(),
+                    homeName,
+                    awayName,
                     opponentName,
+                    home,
                     match.getHomeScore(),
                     match.getAwayScore(),
-                    match.getStatus().name()
+                    match.getStatus().name(),
+                    outcomeOf(match, home),
+                    goals,
+                    assists,
+                    yellowCards,
+                    redCards,
+                    minutesPlayed(match, lineup, lastMinute)
             ));
         }
         return history;
+    }
+
+    private static UUID resolvePlayerTeamId(
+            Match match,
+            MatchLineupPlayer lineup,
+            List<MatchEvent> events,
+            UUID playerId,
+            Set<UUID> memberTeamIds
+    ) {
+        if (lineup != null) {
+            return lineup.getTeamId();
+        }
+        for (MatchEvent event : events) {
+            if (event.getTeamId() != null && (playerId.equals(event.getPlayerId())
+                    || playerId.equals(event.getSecondaryPlayerId()))) {
+                return event.getTeamId();
+            }
+        }
+        if (memberTeamIds.contains(match.getHomeTeamId())) {
+            return match.getHomeTeamId();
+        }
+        if (memberTeamIds.contains(match.getAwayTeamId())) {
+            return match.getAwayTeamId();
+        }
+        return null;
+    }
+
+    private static String outcomeOf(Match match, boolean home) {
+        if (match.getStatus() != MatchStatus.FINISHED) {
+            return null;
+        }
+        int scored = home ? match.getHomeScore() : match.getAwayScore();
+        int conceded = home ? match.getAwayScore() : match.getHomeScore();
+        if (scored > conceded) {
+            return "WIN";
+        }
+        if (scored < conceded) {
+            return "LOSS";
+        }
+        return "DRAW";
+    }
+
+    private static Integer minutesPlayed(Match match, MatchLineupPlayer lineup, Integer lastEventMinute) {
+        if (lineup != null && lineup.isStarter() && match.getGameTimeSeconds() != null) {
+            return Math.max(1, match.getGameTimeSeconds() / 60);
+        }
+        if (lineup != null && lineup.isStarter()) {
+            return 40;
+        }
+        return lastEventMinute;
+    }
+
+    private static boolean looksLikeGoalkeeper(String position) {
+        if (position == null || position.isBlank()) {
+            return false;
+        }
+        String value = position.toLowerCase();
+        return value.contains("gk")
+                || value.contains("goal")
+                || value.contains("вратар")
+                || value.matches(".*\\bвр\\b.*")
+                || value.contains("keeper");
     }
 
     private PlayerProfile requireProfile(UUID id) {
