@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
@@ -128,22 +129,25 @@ class _Standings extends StatelessWidget {
                 ),
               ),
               for (var i = 0; i < store.standings.length; i++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Row(
-                    children: [
-                      _Rank(index: i),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(store.standings[i].teamName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ),
-                      SizedBox(width: 28, child: Text('${store.standings[i].played}', textAlign: TextAlign.center)),
-                      SizedBox(width: 48, child: Text('${store.standings[i].goalsFor}:${store.standings[i].goalsAgainst}', textAlign: TextAlign.center)),
-                      SizedBox(
-                        width: 28,
-                        child: Text('${store.standings[i].points}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
-                      ),
-                    ],
+                InkWell(
+                  onTap: () => context.push('/teams/${store.standings[i].teamId}'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Row(
+                      children: [
+                        _Rank(index: i),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(store.standings[i].teamName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ),
+                        SizedBox(width: 28, child: Text('${store.standings[i].played}', textAlign: TextAlign.center)),
+                        SizedBox(width: 48, child: Text('${store.standings[i].goalsFor}:${store.standings[i].goalsAgainst}', textAlign: TextAlign.center)),
+                        SizedBox(
+                          width: 28,
+                          child: Text('${store.standings[i].points}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
@@ -214,13 +218,16 @@ class _StatCard extends StatelessWidget {
             const Text('Пока пусто', style: TextStyle(color: AppColors.muted))
           else
             for (final row in rows)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(row.displayName)),
-                    Text('${row.value}', style: const TextStyle(fontWeight: FontWeight.w800)),
-                  ],
+              InkWell(
+                onTap: () => context.push('/players/${row.playerId}'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(row.displayName)),
+                      Text('${row.value}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ],
+                  ),
                 ),
               ),
         ],

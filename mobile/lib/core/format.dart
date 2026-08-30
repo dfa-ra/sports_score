@@ -61,3 +61,60 @@ String weekdayShort(DateTime date) {
   const names = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
   return names[date.weekday - 1];
 }
+
+const eventLabels = {
+  'GOAL': 'Гол',
+  'OWN_GOAL': 'Автогол',
+  'ASSIST': 'Голевая',
+  'YELLOW_CARD': 'Жёлтая',
+  'RED_CARD': 'Красная',
+  'SUBSTITUTION': 'Замена',
+  'POINT': 'Очко',
+  'FOUL': 'Фол',
+  'PERIOD_START': 'Начало тайма',
+  'PERIOD_END': 'Конец тайма',
+  'OTHER': 'Событие',
+};
+
+String eventLabel(String? type) => eventLabels[type] ?? type ?? 'Событие';
+
+String formatClock(int? totalSeconds) {
+  final safe = totalSeconds == null || totalSeconds < 0 ? 0 : totalSeconds;
+  final minutes = safe ~/ 60;
+  final seconds = safe % 60;
+  return '$minutes:${seconds.toString().padLeft(2, '0')}';
+}
+
+String periodLabel(int? period, {String? sportCode, int periodCount = 2}) {
+  if (period == null || period < 1) return 'Ещё не свистнули';
+  if (period > periodCount) return 'Доп. время';
+  if (sportCode == 'BASKETBALL') return '$period-я четверть';
+  if (sportCode == 'VOLLEYBALL') return '$period-я партия';
+  return '$period-й тайм';
+}
+
+String playerTag(String? name, int? jersey) {
+  if ((name == null || name.isEmpty) && jersey == null) return '';
+  if (jersey == null) return name ?? '';
+  return '#$jersey ${name ?? ''}'.trim();
+}
+
+String? matchOutcome({
+  required String status,
+  required String homeTeamId,
+  required String awayTeamId,
+  required int homeScore,
+  required int awayScore,
+  String? teamId,
+}) {
+  if (teamId == null || status != 'FINISHED') return null;
+  final home = teamId == homeTeamId;
+  if (!home && teamId != awayTeamId) return null;
+  final scored = home ? homeScore : awayScore;
+  final conceded = home ? awayScore : homeScore;
+  if (scored > conceded) return 'WIN';
+  if (scored < conceded) return 'LOSS';
+  return 'DRAW';
+}
+
+const outcomeMark = {'WIN': 'В', 'DRAW': 'Н', 'LOSS': 'П'};

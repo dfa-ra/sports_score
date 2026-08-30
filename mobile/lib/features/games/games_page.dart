@@ -68,46 +68,57 @@ class _GamesPageState extends State<GamesPage> {
             ),
           ),
         if (store.loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.ice),
+        if (store.error != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(store.error!, style: const TextStyle(color: AppColors.danger)),
+          ),
         Expanded(
-          child: items.isEmpty
-              ? ListView(
-                  children: [
-                    EmptyHint(
-                      title: widget.liveOnly
-                          ? 'Сейчас никто не играет'
-                          : day == null
-                              ? 'Пока нет ближайших матчей'
-                              : 'В этот день матчей нет',
-                    ),
-                  ],
-                )
-              : ListView(
-                  children: [
-                    for (final entry in groups.entries) ...[
-                      LeagueHead(title: store.tournamentNames[entry.key] ?? 'Турнир'),
-                      for (final match in entry.value)
-                        MatchRow(
-                          match: match,
-                          homeName: store.teamName(match.homeTeamId),
-                          awayName: store.teamName(match.awayTeamId),
-                        ),
-                      if (!widget.liveOnly)
-                        InkWell(
-                          onTap: () => context.go('/table'),
-                          child: const Padding(
-                            padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
-                            child: Row(
-                              children: [
-                                Text('К таблице', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-                                Spacer(),
-                                Icon(Icons.chevron_right, color: AppColors.muted),
-                              ],
+          child: RefreshIndicator(
+            color: AppColors.ice,
+            onRefresh: store.load,
+            child: items.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      EmptyHint(
+                        title: widget.liveOnly
+                            ? 'Сейчас никто не играет'
+                            : day == null
+                                ? 'Пока нет ближайших матчей'
+                                : 'В этот день матчей нет',
+                      ),
+                    ],
+                  )
+                : ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      for (final entry in groups.entries) ...[
+                        LeagueHead(title: store.tournamentNames[entry.key] ?? 'Турнир'),
+                        for (final match in entry.value)
+                          MatchRow(
+                            match: match,
+                            homeName: store.teamName(match.homeTeamId),
+                            awayName: store.teamName(match.awayTeamId),
+                          ),
+                        if (!widget.liveOnly)
+                          InkWell(
+                            onTap: () => context.go('/table'),
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+                              child: Row(
+                                children: [
+                                  Text('К таблице', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+                                  Spacer(),
+                                  Icon(Icons.chevron_right, color: AppColors.muted),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+          ),
         ),
       ],
     );

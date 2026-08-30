@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 
 import '../features/games/games_page.dart';
 import '../features/matches/match_detail_page.dart';
+import '../features/players/player_page.dart';
 import '../features/profile/profile_page.dart';
 import '../features/referee/referee_control_page.dart';
 import '../features/shell/shell_page.dart';
 import '../features/table/table_page.dart';
+import '../features/teams/team_page.dart';
 import '../state/auth_controller.dart';
+import '../state/favorites_store.dart';
 import '../state/league_store.dart';
 import 'api_client.dart';
 import 'theme.dart';
@@ -39,6 +42,16 @@ GoRouter buildRouter() {
         path: '/referee',
         builder: (_, __) => const RefereeControlPage(),
       ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/teams/:id',
+        builder: (_, state) => TeamPage(teamId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/players/:id',
+        builder: (_, state) => PlayerPage(playerId: state.pathParameters['id']!),
+      ),
     ],
   );
 }
@@ -57,6 +70,7 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
   late final ApiClient api;
   late final AuthController auth;
   late final LeagueStore league;
+  late final FavoritesStore favorites;
   late final GoRouter router;
 
   @override
@@ -65,10 +79,12 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
     api = widget.api ?? ApiClient();
     auth = AuthController(api);
     league = LeagueStore(api);
+    favorites = FavoritesStore(persist: widget.autoload);
     router = buildRouter();
     if (widget.autoload) {
       auth.restore();
       league.load();
+      favorites.load();
     }
   }
 
@@ -78,6 +94,7 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
       providers: [
         ChangeNotifierProvider.value(value: auth),
         ChangeNotifierProvider.value(value: league),
+        ChangeNotifierProvider.value(value: favorites),
       ],
       child: MaterialApp.router(
         title: 'KRONBARS',

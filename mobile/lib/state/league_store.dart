@@ -150,12 +150,56 @@ class LeagueStore extends ChangeNotifier {
     return map;
   }
 
+  LeagueMatch? findMatch(String id) {
+    for (final match in matches) {
+      if (match.id == id) return match;
+    }
+    return null;
+  }
+
+  Future<LeagueMatch?> matchById(String id) async {
+    final cached = findMatch(id);
+    if (cached != null) return cached;
+    try {
+      final data = await api.get('/matches/$id');
+      if (data is Map) return LeagueMatch.fromJson(Map<String, dynamic>.from(data));
+    } catch (_) {}
+    return null;
+  }
+
   Future<List<MatchEvent>> eventsFor(String matchId) async {
     final data = await api.get('/matches/$matchId/events');
     return ((data as List?) ?? const [])
         .whereType<Map>()
         .map((item) => MatchEvent.fromJson(Map<String, dynamic>.from(item)))
-        .where((event) => !{'PERIOD_START', 'PERIOD_END', 'OTHER'}.contains(event.eventType))
+        .where((event) => !event.voided && !{'PERIOD_START', 'PERIOD_END', 'OTHER'}.contains(event.eventType))
         .toList();
+  }
+
+  Future<MatchLineups> lineupsFor(String matchId) async {
+    final data = await api.get('/matches/$matchId/lineups');
+    if (data is Map) return MatchLineups.fromJson(Map<String, dynamic>.from(data));
+    return MatchLineups();
+  }
+
+  Future<List<LeagueMatch>> teamForm(String teamId) async {
+    final data = await api.get('/teams/$teamId/form', query: {'limit': '5'});
+    return ((data as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => LeagueMatch.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  Future<List<TeamMember>> teamMembers(String teamId) async {
+    final data = await api.get('/teams/$teamId/members');
+    return ((data as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => TeamMember.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  List<LeagueMatch> teamMatches(String teamId) {
+    return matches.where((m) => m.homeTeamId == teamId || m.awayTeamId == teamId).toList()
+      ..sort((a, b) => (b.scheduledAt ?? DateTime(0)).compareTo(a.scheduledAt ?? DateTime(0)));
   }
 }

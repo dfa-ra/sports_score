@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
+import '../../state/favorites_store.dart';
 
 class ShellPage extends StatelessWidget {
   const ShellPage({super.key, required this.navigationShell});
@@ -10,6 +12,7 @@ class ShellPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final favCount = context.watch<FavoritesStore>().count;
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
@@ -38,13 +41,36 @@ class ShellPage extends StatelessWidget {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: navigationShell.currentIndex,
         onTap: navigationShell.goBranch,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), label: 'Игры'),
-          BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Таблица'),
-          BottomNavigationBarItem(icon: Icon(Icons.wifi_tethering), label: 'Live'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Профиль'),
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.grid_view_outlined), label: 'Игры'),
+          const BottomNavigationBarItem(icon: Icon(Icons.menu), label: 'Таблица'),
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.wifi_tethering, color: AppColors.ice),
+            activeIcon: Icon(Icons.wifi_tethering, color: AppColors.ice),
+            label: 'Live',
+          ),
+          BottomNavigationBarItem(
+            icon: _ProfileIcon(count: favCount),
+            label: 'Профиль',
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileIcon extends StatelessWidget {
+  const _ProfileIcon({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    const icon = Icon(Icons.person_outline);
+    if (count == 0) return icon;
+    return Badge(
+      backgroundColor: AppColors.navy,
+      label: Text('$count', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800)),
+      child: icon,
     );
   }
 }

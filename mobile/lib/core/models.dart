@@ -15,6 +15,8 @@ class LeagueMatch {
     this.scheduledAt,
     this.period,
     this.periodCount = 2,
+    this.sportCode,
+    this.gameTimeSeconds,
   });
 
   final String id;
@@ -27,6 +29,8 @@ class LeagueMatch {
   final DateTime? scheduledAt;
   final int? period;
   final int periodCount;
+  final String? sportCode;
+  final int? gameTimeSeconds;
 
   factory LeagueMatch.fromJson(Map<String, dynamic> json) {
     return LeagueMatch(
@@ -40,6 +44,8 @@ class LeagueMatch {
       scheduledAt: parseTime(json['scheduledAt']),
       period: (json['period'] as num?)?.toInt(),
       periodCount: (json['periodCount'] as num?)?.toInt() ?? 2,
+      sportCode: json['sportCode']?.toString(),
+      gameTimeSeconds: (json['gameTimeSeconds'] as num?)?.toInt(),
     );
   }
 
@@ -139,8 +145,11 @@ class MatchEvent {
     required this.teamId,
     this.playerName,
     this.playerJersey,
+    this.secondaryPlayerName,
+    this.secondaryPlayerJersey,
     this.gameTime,
     this.period,
+    this.voided = false,
   });
 
   final String id;
@@ -148,8 +157,11 @@ class MatchEvent {
   final String teamId;
   final String? playerName;
   final int? playerJersey;
+  final String? secondaryPlayerName;
+  final int? secondaryPlayerJersey;
   final int? gameTime;
   final int? period;
+  final bool voided;
 
   factory MatchEvent.fromJson(Map<String, dynamic> json) {
     return MatchEvent(
@@ -158,8 +170,11 @@ class MatchEvent {
       teamId: json['teamId']?.toString() ?? '',
       playerName: json['playerName']?.toString(),
       playerJersey: (json['playerJersey'] as num?)?.toInt(),
-      gameTime: (json['gameTime'] as num?)?.toInt(),
+      secondaryPlayerName: json['secondaryPlayerName']?.toString(),
+      secondaryPlayerJersey: (json['secondaryPlayerJersey'] as num?)?.toInt(),
+      gameTime: (json['gameTime'] as num?)?.toInt() ?? (json['gameTimeSeconds'] as num?)?.toInt(),
       period: (json['period'] as num?)?.toInt(),
+      voided: json['voided'] == true,
     );
   }
 
@@ -167,6 +182,201 @@ class MatchEvent {
     final name = playerName ?? eventType;
     if (playerJersey != null) return '#$playerJersey $name';
     return name;
+  }
+}
+
+class LineupPlayer {
+  LineupPlayer({required this.playerId, required this.name, this.jerseyNumber, this.position});
+  final String playerId;
+  final String name;
+  final int? jerseyNumber;
+  final String? position;
+
+  factory LineupPlayer.fromJson(Map<String, dynamic> json) {
+    return LineupPlayer(
+      playerId: json['playerId'].toString(),
+      name: json['name']?.toString() ?? 'Игрок',
+      jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
+      position: json['position']?.toString(),
+    );
+  }
+}
+
+class TeamLineup {
+  TeamLineup({
+    required this.teamId,
+    required this.teamName,
+    required this.confirmed,
+    required this.starters,
+    required this.bench,
+  });
+
+  final String teamId;
+  final String teamName;
+  final bool confirmed;
+  final List<LineupPlayer> starters;
+  final List<LineupPlayer> bench;
+
+  factory TeamLineup.fromJson(Map<String, dynamic> json) {
+    List<LineupPlayer> parse(dynamic raw) =>
+        ((raw as List?) ?? const []).whereType<Map>().map((item) => LineupPlayer.fromJson(Map<String, dynamic>.from(item))).toList();
+    return TeamLineup(
+      teamId: json['teamId']?.toString() ?? '',
+      teamName: json['teamName']?.toString() ?? 'Команда',
+      confirmed: json['confirmed'] == true,
+      starters: parse(json['starters']),
+      bench: parse(json['bench']),
+    );
+  }
+}
+
+class MatchLineups {
+  MatchLineups({this.home, this.away});
+  final TeamLineup? home;
+  final TeamLineup? away;
+
+  factory MatchLineups.fromJson(Map<String, dynamic> json) {
+    TeamLineup? side(dynamic raw) => raw is Map ? TeamLineup.fromJson(Map<String, dynamic>.from(raw)) : null;
+    return MatchLineups(home: side(json['home']), away: side(json['away']));
+  }
+}
+
+class TeamMember {
+  TeamMember({required this.playerId, required this.displayName, this.jerseyNumber, this.position});
+  final String playerId;
+  final String displayName;
+  final int? jerseyNumber;
+  final String? position;
+
+  factory TeamMember.fromJson(Map<String, dynamic> json) {
+    final first = json['playerFirstName']?.toString() ?? '';
+    final last = json['playerLastName']?.toString() ?? '';
+    final display = json['displayName']?.toString();
+    return TeamMember(
+      playerId: json['playerId'].toString(),
+      displayName: (display != null && display.isNotEmpty) ? display : '$first $last'.trim(),
+      jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
+      position: json['position']?.toString(),
+    );
+  }
+}
+
+class PlayerProfile {
+  PlayerProfile({
+    this.id,
+    this.firstName = '',
+    this.lastName = '',
+    this.displayName = '',
+    this.jerseyNumber,
+    this.position = '',
+    this.bio = '',
+    this.avatarUrl,
+  });
+
+  final String? id;
+  String firstName;
+  String lastName;
+  String displayName;
+  int? jerseyNumber;
+  String position;
+  String bio;
+  final String? avatarUrl;
+
+  factory PlayerProfile.fromJson(Map<String, dynamic> json) {
+    return PlayerProfile(
+      id: json['id']?.toString(),
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
+      jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
+      position: json['position']?.toString() ?? '',
+      bio: json['bio']?.toString() ?? '',
+      avatarUrl: json['avatarUrl']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toRequest() => {
+        'firstName': firstName,
+        'lastName': lastName,
+        if (displayName.isNotEmpty) 'displayName': displayName,
+        if (jerseyNumber != null) 'jerseyNumber': jerseyNumber,
+        if (position.isNotEmpty) 'position': position,
+        if (bio.isNotEmpty) 'bio': bio,
+      };
+}
+
+class PlayerCard {
+  PlayerCard({
+    required this.id,
+    required this.displayName,
+    this.avatarUrl,
+    this.jerseyNumber,
+    this.position,
+    this.teamName,
+    this.statistics = const {},
+    this.history = const [],
+  });
+
+  final String id;
+  final String displayName;
+  final String? avatarUrl;
+  final int? jerseyNumber;
+  final String? position;
+  final String? teamName;
+  final Map<String, dynamic> statistics;
+  final List<PlayerMatchHistory> history;
+
+  factory PlayerCard.fromJson(Map<String, dynamic> json) {
+    final team = json['team'];
+    return PlayerCard(
+      id: json['id'].toString(),
+      displayName: json['displayName']?.toString() ??
+          '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim(),
+      avatarUrl: json['avatarUrl']?.toString(),
+      jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
+      position: json['position']?.toString(),
+      teamName: team is Map ? team['name']?.toString() : null,
+      statistics: json['statistics'] is Map ? Map<String, dynamic>.from(json['statistics'] as Map) : const {},
+      history: ((json['matchHistory'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => PlayerMatchHistory.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
+    );
+  }
+}
+
+class PlayerMatchHistory {
+  PlayerMatchHistory({
+    required this.matchId,
+    required this.opponentName,
+    required this.homeScore,
+    required this.awayScore,
+    required this.outcome,
+    required this.goals,
+    required this.assists,
+    this.scheduledAt,
+  });
+
+  final String matchId;
+  final String opponentName;
+  final int homeScore;
+  final int awayScore;
+  final String? outcome;
+  final int goals;
+  final int assists;
+  final DateTime? scheduledAt;
+
+  factory PlayerMatchHistory.fromJson(Map<String, dynamic> json) {
+    return PlayerMatchHistory(
+      matchId: json['matchId'].toString(),
+      opponentName: json['opponentName']?.toString() ?? 'Соперник',
+      homeScore: (json['homeScore'] as num?)?.toInt() ?? 0,
+      awayScore: (json['awayScore'] as num?)?.toInt() ?? 0,
+      outcome: json['outcome']?.toString(),
+      goals: (json['goals'] as num?)?.toInt() ?? 0,
+      assists: (json['assists'] as num?)?.toInt() ?? 0,
+      scheduledAt: parseTime(json['scheduledAt']),
+    );
   }
 }
 

@@ -47,6 +47,13 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> put(String path, [Map<String, dynamic>? body]) async {
+    final response = await _http
+        .put(_uri(path), headers: _headers(), body: jsonEncode(body ?? {}))
+        .timeout(const Duration(seconds: 8));
+    return _decode(response);
+  }
+
   dynamic _decode(http.Response response) {
     if (response.statusCode >= 400) {
       String message = 'Ошибка ${response.statusCode}';
