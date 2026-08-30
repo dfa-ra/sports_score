@@ -90,7 +90,7 @@ onMounted(async () => {
     <div class="panel history">
       <h2>История матчей</h2>
       <p v-if="!history.length" class="muted none">Матчей пока нет.</p>
-      <div v-else class="scroll">
+      <div v-else class="table-wrap">
         <table class="table matches">
           <thead>
             <tr>
@@ -180,7 +180,6 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   font-size: 1.35rem;
   color: var(--navy);
 }
-.scroll { overflow-x: auto; }
 .matches { min-width: 640px; }
 .matches th, .matches td { padding: 0.62rem 0.45rem; }
 .matches th.num, .matches td.num { text-align: center; width: 2.4rem; }
@@ -224,4 +223,9 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .result.win { background: #1b8a4a; }
 .result.draw { background: #c47b00; }
 .result.loss { background: var(--danger); }
+@media (max-width: 719px) {
+  .head { gap: 0.7rem; }
+  .who h1 { font-size: 1.35rem; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+}
 </style>

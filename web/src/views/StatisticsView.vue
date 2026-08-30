@@ -37,7 +37,11 @@ onMounted(async () => {
   <section class="stack">
     <div class="page-title">
       <h1>Статистика</h1>
-      <p>Бомбардиры, ассистенты и сухие матчи текущего турнира.</p>
+    </div>
+    <div class="fs-tabs">
+      <RouterLink to="/table">Таблица</RouterLink>
+      <RouterLink to="/calendar?tab=played">Результаты</RouterLink>
+      <RouterLink class="on" to="/statistics">Бомбардиры</RouterLink>
     </div>
     <div v-if="loading" class="grid cards">
       <div class="skeleton" />
@@ -47,7 +51,8 @@ onMounted(async () => {
       <div class="panel">
         <h2>Бомбардиры</h2>
         <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
-        <table v-else class="table">
+        <div v-else class="table-wrap">
+        <table class="table">
           <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
           <tbody>
             <tr v-for="p in scorers" :key="p.playerId">
@@ -57,11 +62,13 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
       <div class="panel">
         <h2>Ассистенты</h2>
         <EmptyState v-if="!assists.length" title="Передач ещё нет" />
-        <table v-else class="table">
+        <div v-else class="table-wrap">
+        <table class="table">
           <thead><tr><th>Игрок</th><th>Пасы</th><th>Игры</th></tr></thead>
           <tbody>
             <tr v-for="p in assists" :key="p.playerId">
@@ -71,11 +78,13 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
       <div class="panel">
         <h2>Сухие матчи</h2>
         <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" text="Считаем по позиции вратаря и нулю пропущенных." />
-        <table v-else class="table">
+        <div v-else class="table-wrap">
+        <table class="table">
           <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
           <tbody>
             <tr v-for="p in keepers" :key="p.playerId">
@@ -85,6 +94,7 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </template>
   </section>

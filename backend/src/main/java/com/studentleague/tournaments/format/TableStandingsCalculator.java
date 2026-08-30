@@ -54,8 +54,11 @@ public class TableStandingsCalculator {
             }
         }
         return table.values().stream()
-                .sorted(Comparator.comparingInt((Accumulator s) -> s.points).reversed()
-                        .thenComparingInt(s -> s.goalsFor - s.goalsAgainst).reversed()
+                .sorted(Comparator
+                        .comparingInt((Accumulator s) -> s.points)
+                        .thenComparingInt(s -> s.goalsFor - s.goalsAgainst)
+                        .thenComparingInt(s -> s.goalsFor)
+                        .reversed()
                         .thenComparing(s -> s.teamName))
                 .map(s -> new StandingRow(
                         s.teamId, s.teamName, s.played, s.wins, s.draws, s.losses,

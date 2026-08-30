@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
+import { useFavorites } from './stores/favorites'
 import { labelOf, roleLabel } from './lib/format'
+import PlayerAvatar from './components/PlayerAvatar.vue'
 
 const auth = useAuthStore()
+const fav = useFavorites()
 const route = useRoute()
 const router = useRouter()
-const menuOpen = ref(false)
 
 const mood = computed(() => {
   if (route.path.startsWith('/login') || route.path.startsWith('/register')) return 'mood-auth'
@@ -17,23 +19,28 @@ const mood = computed(() => {
   return 'mood-home'
 })
 
+const hideDock = computed(() =>
+  route.path.startsWith('/login')
+  || route.path.startsWith('/register')
+  || route.path.startsWith('/admin')
+  || route.path.startsWith('/referee')
+)
+
 watch(mood, (value) => {
   document.body.classList.remove('mood-auth', 'mood-pitch', 'mood-ref', 'mood-admin', 'mood-home')
   document.body.classList.add(value)
 }, { immediate: true })
 
-watch(() => route.fullPath, () => {
-  menuOpen.value = false
-})
-
 async function logout() {
   await auth.logout()
   router.push('/')
 }
+
+const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
 </script>
 
 <template>
-  <div class="shell" :data-mood="mood">
+  <div class="shell" :data-mood="mood" :class="{ docked: !hideDock }">
     <header class="chrome">
       <div class="util">
         <div class="container util-inner">
@@ -45,17 +52,13 @@ async function logout() {
         <div class="container nav-inner">
           <RouterLink class="brand" to="/">
             <span class="brand-mark" aria-hidden="true">SL</span>
-            <span>Student League</span>
+            <span class="brand-name">KRONBARS</span>
           </RouterLink>
 
-          <button class="btn icon menu-btn secondary" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
-            <span>{{ menuOpen ? '✕' : '☰' }}</span>
-          </button>
-
-          <nav :class="{ open: menuOpen }">
+          <nav>
             <RouterLink to="/" exact-active-class="on">Главная</RouterLink>
             <RouterLink to="/table" active-class="on">Таблица</RouterLink>
-            <RouterLink to="/calendar" active-class="on">Календарь</RouterLink>
+            <RouterLink to="/calendar" active-class="on">Игры</RouterLink>
             <RouterLink to="/statistics" active-class="on">Статистика</RouterLink>
             <RouterLink to="/players" active-class="on">Игроки</RouterLink>
             <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
@@ -65,11 +68,16 @@ async function logout() {
 
           <div class="auth">
             <template v-if="auth.isAuthenticated">
-              <RouterLink class="login-pill" to="/profile">Профиль</RouterLink>
-              <button class="login-pill ghost" type="button" @click="logout">Выйти</button>
+              <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
+                <PlayerAvatar :src="auth.user?.photoUrl" :name="auth.user?.firstName || auth.user?.email" :size="32" />
+              </RouterLink>
+              <button class="login-pill ghost wide-only" type="button" @click="logout">Выйти</button>
             </template>
             <template v-else>
-              <RouterLink class="login-pill" to="/login">Войти</RouterLink>
+              <RouterLink class="login-pill wide-only" to="/login">Войти</RouterLink>
+              <RouterLink class="avatar-link phone-only" to="/login" aria-label="Войти">
+                <span class="user-ico">○</span>
+              </RouterLink>
             </template>
           </div>
         </div>
@@ -83,6 +91,37 @@ async function logout() {
     <footer class="foot">
       <div class="container">Смотреть можно без билета. Играть — после регистрации.</div>
     </footer>
+
+    <nav v-if="!hideDock" class="dock" aria-label="Основное меню">
+      <RouterLink
+        to="/calendar"
+        :class="{ on: route.path === '/' || ((route.path.startsWith('/calendar') || route.path.startsWith('/matches')) && String(route.query.tab) !== 'live') }"
+      >
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 12h18M8 6v12"/></svg>
+        </span>
+        <span>Игры</span>
+      </RouterLink>
+      <RouterLink to="/table" :class="{ on: route.path.startsWith('/table') }">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        </span>
+        <span>Таблица</span>
+      </RouterLink>
+      <RouterLink to="/calendar?tab=live" :class="{ on: route.path.startsWith('/calendar') && String(route.query.tab) === 'live' }">
+        <span class="ico live" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9.2"/></svg>
+        </span>
+        <span>Live</span>
+      </RouterLink>
+      <RouterLink :to="profileTo" :class="{ on: route.path.startsWith('/profile') }">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3.2 3.8-4.6 7-4.6S17.6 15.8 19 19"/></svg>
+          <i v-if="fav.count" class="badge">{{ fav.count }}</i>
+        </span>
+        <span>Профиль</span>
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
@@ -146,14 +185,85 @@ nav a.on { color: var(--navy); background: var(--ice); }
 .login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
 .auth { display: flex; gap: 0.4rem; align-items: center; }
-.menu-btn { display: none; }
+.avatar-link { display: grid; place-items: center; }
+.phone-only { display: none; }
+.user-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  color: #fff;
+  font-size: 1rem;
+}
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
-@media (max-width: 980px) {
-  .menu-btn { display: inline-flex; }
-  nav { display: none; width: 100%; order: 4; padding-bottom: 0.7rem; }
-  nav.open { display: flex; }
-  .nav-inner { flex-wrap: wrap; }
+.dock { display: none; }
+
+@media (max-width: 1099px) {
+  .util { display: none; }
+  .nav-inner { min-height: 56px; }
+  nav a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
+}
+
+@media (max-width: 719px) {
+  header nav { display: none; }
+  .nav-inner { min-height: 52px; }
+  .brand-name { font-size: 0.95rem; }
+  .wide-only { display: none; }
+  .phone-only { display: grid; }
+  .shell.docked .main { padding-bottom: 5.6rem; }
+  .shell.docked .foot { display: none; }
+  .dock {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    background: #fff;
+    border-top: 1px solid var(--line);
+    padding: 0.28rem 0.2rem calc(0.28rem + env(safe-area-inset-bottom));
+  }
+  .dock a {
+    display: grid;
+    justify-items: center;
+    gap: 0.12rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 0.25rem 0;
+  }
+  .dock a.on { color: var(--navy); }
+  .dock .ico {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+  }
+  .dock .ico svg { width: 20px; height: 20px; }
+  .dock .ico.live { color: var(--ice); }
+  .dock .badge {
+    position: absolute;
+    top: -0.35rem;
+    right: -0.55rem;
+    min-width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    background: var(--navy);
+    color: #fff;
+    font-size: 0.58rem;
+    display: grid;
+    place-items: center;
+    padding: 0 0.2rem;
+    font-style: normal;
+  }
 }
 </style>

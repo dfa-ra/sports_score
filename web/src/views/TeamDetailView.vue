@@ -5,14 +5,23 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { initials } from '../lib/format'
 import { apiError } from '../lib/errors'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
+import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
+import MatchRow from '../components/MatchRow.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
+const fav = useFavorites()
+const names = useTeamDirectory()
 const team = ref<any>(null)
 const members = ref<any[]>([])
+const matches = ref<any[]>([])
+const tab = ref<'results' | 'calendar' | 'squad'>('results')
+const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED'))
+const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
 const players = ref<any[]>([])
 const me = ref<any>(null)
 const name = ref('')
@@ -29,9 +38,17 @@ onMounted(load)
 
 async function load() {
   const id = route.params.id
-  const [t, m] = await Promise.all([api.get(`/teams/${id}`), api.get(`/teams/${id}/members`)])
+  await names.load()
+  const [t, m, games] = await Promise.all([
+    api.get(`/teams/${id}`),
+    api.get(`/teams/${id}/members`),
+    api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+  ])
   team.value = t.data
   members.value = m.data
+  matches.value = (games.data.content ?? []).filter((row: any) =>
+    row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
+  )
   name.value = t.data.name
   shortName.value = t.data.shortName || ''
   if (auth.isAuthenticated) {
@@ -124,11 +141,26 @@ async function disbandTeam() {
 
 <template>
   <section v-if="team" class="stack">
-    <div class="page-title">
+    <div class="page-title team-head">
       <span class="crest">{{ initials(team.shortName || team.name) }}</span>
-      <h1>{{ team.name }}</h1>
-      <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
-      <p v-else>{{ team.shortName || 'Команда без аббревиатуры' }}{{ team.foundedOn ? ' · осн. ' + team.foundedOn : '' }}</p>
+      <div>
+        <h1>{{ team.name }}</h1>
+        <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
+        <p v-else>{{ team.shortName || 'Команда без аббревиатуры' }}{{ team.foundedOn ? ' · осн. ' + team.foundedOn : '' }}</p>
+      </div>
+      <button
+        class="star"
+        type="button"
+        :class="{ on: fav.hasTeam(team.id) }"
+        @click="fav.toggleTeam(team.id)"
+      >★</button>
+    </div>
+
+    <div class="fs-tabs">
+      <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
+      <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
+      <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
+      <RouterLink to="/table">Таблица</RouterLink>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
@@ -140,7 +172,31 @@ async function disbandTeam() {
       </form>
     </div>
 
-    <div class="panel stack">
+    <div v-if="tab === 'results'" class="sheet">
+      <EmptyState v-if="!played.length" title="Сыгранных матчей пока нет" />
+      <MatchRow
+        v-for="m in played"
+        :key="m.id"
+        :match="m"
+        :home-name="names.fullName(m.homeTeamId)"
+        :away-name="names.fullName(m.awayTeamId)"
+        :highlight-team-id="team.id"
+      />
+    </div>
+
+    <div v-else-if="tab === 'calendar'" class="sheet">
+      <EmptyState v-if="!upcoming.length" title="Ближайших матчей нет" />
+      <MatchRow
+        v-for="m in upcoming"
+        :key="m.id"
+        :match="m"
+        :home-name="names.fullName(m.homeTeamId)"
+        :away-name="names.fullName(m.awayTeamId)"
+        :highlight-team-id="team.id"
+      />
+    </div>
+
+    <div v-else class="panel stack">
       <h2>Состав</h2>
       <EmptyState v-if="!members.length" title="Раздевалка пуста" text="Капитан ещё собирает людей после пар." />
       <div v-for="m in members" :key="m.id" class="member">
@@ -203,6 +259,26 @@ async function disbandTeam() {
 </template>
 
 <style scoped>
+.team-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.8rem;
+}
+.star {
+  border: 0;
+  background: transparent;
+  color: #c5ced8;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+.star.on { color: var(--ice); }
+.sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
 .crest {
   width: 48px;
   height: 48px;

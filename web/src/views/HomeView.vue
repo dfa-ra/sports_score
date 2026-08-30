@@ -3,6 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
+import MatchRow from '../components/MatchRow.vue'
+import StandingTable from '../components/StandingTable.vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Slide = {
   id: string
@@ -14,19 +17,32 @@ type Slide = {
 }
 
 const feed = ref<any>(null)
+const matches = ref<any[]>([])
 const loaded = ref(false)
 const slide = ref(0)
 const storyRail = ref<HTMLElement | null>(null)
+const teams = useTeamDirectory()
 let timer: number | undefined
 
 const heroes = computed<Slide[]>(() => feed.value?.heroes ?? [])
 const stories = computed<Slide[]>(() => feed.value?.stories ?? [])
 const current = computed(() => heroes.value[slide.value] || null)
+const tape = computed(() =>
+  matches.value
+    .slice()
+    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+    .slice(0, 8)
+)
 
 onMounted(async () => {
   try {
-    const { data } = await api.get('/home')
+    await teams.load()
+    const [{ data }, games] = await Promise.all([
+      api.get('/home'),
+      api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
+    ])
     feed.value = data
+    matches.value = games.data.content ?? []
     start()
   } catch {
     feed.value = null
@@ -127,6 +143,23 @@ function nudgeStories(dir: number) {
     </div>
 
     <div class="container blocks">
+      <div v-if="tape.length" class="sheet">
+        <div class="league-head">
+          <div>
+            {{ feed?.tournament?.name || 'Матчи' }}
+            <small>Последние и ближайшие</small>
+          </div>
+          <RouterLink class="more" to="/calendar">Все игры</RouterLink>
+        </div>
+        <MatchRow
+          v-for="m in tape"
+          :key="m.id"
+          :match="m"
+          :home-name="teams.fullName(m.homeTeamId)"
+          :away-name="teams.fullName(m.awayTeamId)"
+        />
+      </div>
+
       <div class="hero-grid">
         <div class="panel table-block">
           <div class="page-title">
@@ -134,21 +167,7 @@ function nudgeStories(dir: number) {
             <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
           </div>
           <EmptyState v-if="loaded && !feed?.standings?.length" title="Нет строк" text="Когда админ запустит турнир — таблица появится здесь." />
-          <table v-else-if="feed?.standings?.length" class="table">
-            <thead>
-              <tr><th>Команда</th><th>И</th><th>В</th><th>Н</th><th>П</th><th>О</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in feed.standings" :key="row.teamId">
-                <td><RouterLink :to="`/teams/${row.teamId}`">{{ row.teamName }}</RouterLink></td>
-                <td>{{ row.played }}</td>
-                <td>{{ row.wins }}</td>
-                <td>{{ row.draws }}</td>
-                <td>{{ row.losses }}</td>
-                <td><strong>{{ row.points }}</strong></td>
-              </tr>
-            </tbody>
-          </table>
+          <StandingTable v-else-if="feed?.standings?.length" :rows="feed.standings" compact />
         </div>
 
         <aside class="panel headlines">
@@ -291,6 +310,14 @@ function nudgeStories(dir: number) {
 }
 .dots button.on { width: 46px; background: #fff; }
 .blocks { display: grid; gap: 1.2rem; padding-top: 1.4rem; }
+.sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.league-head { justify-content: space-between; }
+.more { color: var(--navy); font-size: 0.75rem; font-weight: 800; }
 .hero-grid { display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 1rem; align-items: start; }
 .table-block { padding: 1.4rem 1.5rem; }
 .headlines {
@@ -339,10 +366,23 @@ function nudgeStories(dir: number) {
   background: linear-gradient(transparent, rgba(0, 20, 51, 0.86));
   border-radius: 0 0 16px 16px;
 }
-@media (max-width: 860px) {
+@media (max-width: 1099px) and (min-width: 720px) {
+  .blocks {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+  .sheet { grid-column: 1; grid-row: 1 / span 2; }
+  .hero-grid { grid-column: 2; grid-template-columns: 1fr; }
+  .moments { grid-column: 1 / -1; }
+}
+@media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
   .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
-  .stories-wrap { grid-template-columns: 1fr; }
-  .nudge { display: none; }
+  .stories-wrap { display: none; }
+  .hero img { height: 148px; }
+  .hero-copy h1 { font-size: 1.25rem; }
+  .hero-cta { display: none; }
+  .blocks { padding-top: 0.75rem; gap: 0.7rem; }
+  .table-block { padding: 0.85rem; }
 }
 </style>
