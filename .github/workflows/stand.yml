@@ -118,8 +118,9 @@ jobs:
           DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
           DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
           DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          DEV_SSH_KEY_BASE64: ${{ secrets.DEV_SSH_KEY_BASE64 }}
         run: |
-          if [ -z "${DEV_SSH_HOST}" ] || [ -z "${DEV_SSH_USER}" ] || [ -z "${DEV_SSH_KEY}" ]; then
+          if [ -z "${DEV_SSH_HOST}" ] || [ -z "${DEV_SSH_USER}" ] || { [ -z "${DEV_SSH_KEY}" ] && [ -z "${DEV_SSH_KEY_BASE64}" ]; }; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "DEV_SSH_HOST / DEV_SSH_USER / DEV_SSH_KEY are empty — skip deploy."
             echo "Add them in Settings → Secrets and variables → Actions (see docs/ci.md)."
@@ -127,11 +128,25 @@ jobs:
             echo "configured=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Start ssh-agent
+      - name: Prepare SSH key
         if: steps.stand.outputs.configured == 'true'
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+        env:
+          DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+          DEV_SSH_KEY_BASE64: ${{ secrets.DEV_SSH_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY="$HOME/.ssh/stand_deploy"
+          python3 deploy/normalize_ssh_key.py "$KEY"
+          if ! ssh-keygen -y -P "" -f "$KEY" >/tmp/stand.pub 2>/tmp/stand.keyerr; then
+            echo "Normalized DEV_SSH_KEY is still not a usable private key."
+            echo "ssh-keygen: $(tr '\n' ' ' < /tmp/stand.keyerr)"
+            echo "Typical causes: pasted the .pub file, key has a passphrase, or the PEM body is truncated."
+            echo "Fix:  base64 -w0 studentleague-deploy   → secret DEV_SSH_KEY_BASE64"
+            exit 1
+          fi
+          echo "Private key accepted."
+          ssh-keygen -lf "$KEY"
 
       - name: Trust stand host
         if: steps.stand.outputs.configured == 'true'
@@ -140,10 +155,8 @@ jobs:
           DEV_SSH_KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
           DEV_SSH_PORT: ${{ vars.DEV_SSH_PORT || secrets.DEV_SSH_PORT || '22' }}
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
           if [ -n "${DEV_SSH_KNOWN_HOSTS}" ]; then
-            printf '%s\n' "${DEV_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+            printf '%s\n' "${DEV_SSH_KNOWN_HOSTS}" | sed 's/\r$//' > ~/.ssh/known_hosts
           else
             echo "DEV_SSH_KNOWN_HOSTS is empty — falling back to ssh-keyscan (TOFU)."
             ssh-keyscan -p "${DEV_SSH_PORT}" -T 10 "${DEV_SSH_HOST}" >> ~/.ssh/known_hosts
@@ -159,15 +172,17 @@ jobs:
           DEV_DEPLOY_PATH: ${{ vars.DEV_DEPLOY_PATH || '/opt/studentleague' }}
           DEV_STAND_ENV: ${{ secrets.DEV_STAND_ENV }}
         run: |
+          KEY="$HOME/.ssh/stand_deploy"
           REMOTE="${DEV_SSH_USER}@${DEV_SSH_HOST}"
-          SSH=(ssh -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes)
+          SSH=(ssh -i "$KEY" -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes)
           "${SSH[@]}" "${REMOTE}" "mkdir -p '${DEV_DEPLOY_PATH}/deploy' '${DEV_DEPLOY_PATH}/release'"
-          rsync -az --delete -e "ssh -p ${DEV_SSH_PORT} -o IdentitiesOnly=yes" \
+          rsync -az --delete -e "ssh -i ${KEY} -p ${DEV_SSH_PORT} -o IdentitiesOnly=yes -o BatchMode=yes" \
             deploy/ "${REMOTE}:${DEV_DEPLOY_PATH}/deploy/"
           if [ -n "${DEV_STAND_ENV}" ]; then
             umask 077
             printf '%s\n' "${DEV_STAND_ENV}" > /tmp/stand.env
-            scp -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes /tmp/stand.env "${REMOTE}:/tmp/studentleague.stand.env"
+            scp -i "$KEY" -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes \
+              /tmp/stand.env "${REMOTE}:/tmp/studentleague.stand.env"
             rm -f /tmp/stand.env
             "${SSH[@]}" "${REMOTE}" "if [ ! -f '${DEV_DEPLOY_PATH}/.env' ]; then mv /tmp/studentleague.stand.env '${DEV_DEPLOY_PATH}/.env' && chmod 600 '${DEV_DEPLOY_PATH}/.env'; else rm -f /tmp/studentleague.stand.env; fi"
           fi
@@ -181,12 +196,14 @@ jobs:
           DEV_DEPLOY_PATH: ${{ vars.DEV_DEPLOY_PATH || '/opt/studentleague' }}
           RELEASE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
+          KEY="$HOME/.ssh/stand_deploy"
           REMOTE="${DEV_SSH_USER}@${DEV_SSH_HOST}"
           umask 077
           printf '%s' "${{ github.token }}" > /tmp/deploy.token
-          scp -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes /tmp/deploy.token "${REMOTE}:${DEV_DEPLOY_PATH}/.deploy-token"
+          scp -i "$KEY" -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes \
+            /tmp/deploy.token "${REMOTE}:${DEV_DEPLOY_PATH}/.deploy-token"
           rm -f /tmp/deploy.token
-          ssh -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes "${REMOTE}" \
+          ssh -i "$KEY" -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes "${REMOTE}" \
             "chmod +x '${DEV_DEPLOY_PATH}/deploy/stand.sh' && \
              RELEASE_TAG='${RELEASE_TAG}' \
              GITHUB_REPOSITORY='${{ github.repository }}' \
