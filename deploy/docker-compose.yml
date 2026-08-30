@@ -48,6 +48,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       LOCAL_STORAGE_DIR: /app/data/uploads
       LOCAL_STORAGE_PUBLIC_BASE_URL: /media
+      # nginx and the healthcheck talk to backend:8080. Public host port is WEB_PORT.
+      SERVER_PORT: "8080"
     volumes:
       - uploads_data:/app/data/uploads
     depends_on:
