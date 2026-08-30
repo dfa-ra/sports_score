@@ -122,7 +122,9 @@ compose=(
   -f "${COMPOSE_FILE}"
   --project-name studentleague-dev
 )
-if ! "${compose[@]}" up -d --build --remove-orphans; then
+# Rebuild images from the new JAR/tarball, then always replace backend/web.
+# `up --build` alone can leave running containers on the previous image.
+if ! "${compose[@]}" up -d --build --force-recreate --remove-orphans; then
   echo "docker compose up failed" >&2
   "${compose[@]}" ps >&2 || true
   "${compose[@]}" logs --tail=120 backend >&2 || true
