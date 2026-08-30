@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
 import { labelOf, roleLabel } from '../lib/format'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 
 const auth = useAuthStore()
 const firstName = ref('')
@@ -16,6 +17,7 @@ const pending = ref(false)
 const error = ref('')
 const ok = ref('')
 const exists = ref(false)
+const avatarUrl = ref('')
 
 onMounted(async () => {
   try {
@@ -27,6 +29,7 @@ onMounted(async () => {
     jerseyNumber.value = data.jerseyNumber
     position.value = data.position || ''
     bio.value = data.bio || ''
+    avatarUrl.value = data.avatarUrl || auth.user?.photoUrl || ''
   } catch {
     exists.value = false
   }
@@ -58,10 +61,17 @@ async function submit() {
 
 <template>
   <section class="stack">
-    <div class="page-title">
-      <p class="eyebrow">Кабинет</p>
-      <h1>Профиль</h1>
-      <p>Роль: {{ labelOf(roleLabel, auth.role) }}. Чтобы создать команду, нужен профиль игрока.</p>
+    <div class="page-title profile-head">
+      <PlayerAvatar
+        :src="avatarUrl || auth.user?.photoUrl"
+        :name="displayName || `${firstName} ${lastName}` || auth.user?.email"
+        :size="88"
+      />
+      <div>
+        <p class="eyebrow">Кабинет</p>
+        <h1>Профиль</h1>
+        <p>Роль: {{ labelOf(roleLabel, auth.role) }}. Чтобы создать команду, нужен профиль игрока.</p>
+      </div>
     </div>
     <div class="panel stack">
       <form class="stack" @submit.prevent="submit">
@@ -80,3 +90,11 @@ async function submit() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+</style>
