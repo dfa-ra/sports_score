@@ -207,7 +207,33 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                                 {"role":"REFEREE","enabled":true}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("REFEREE"));
+                .andExpect(jsonPath("$.role").value("REFEREE"))
+                .andExpect(jsonPath("$.roles[?(@.role=='REFEREE' && @.status=='APPROVED')]").exists());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/admin/users/" + fanId)
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roles":["FAN","PLAYER","REFEREE"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("REFEREE"))
+                .andExpect(jsonPath("$.roles[?(@.role=='FAN' && @.status=='APPROVED')]").exists())
+                .andExpect(jsonPath("$.roles[?(@.role=='PLAYER' && @.status=='APPROVED')]").exists())
+                .andExpect(jsonPath("$.roles[?(@.role=='REFEREE' && @.status=='APPROVED')]").exists());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .patch("/api/v1/admin/users/" + fanId)
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roles":["FAN","PLAYER"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("PLAYER"))
+                .andExpect(jsonPath("$.roles[?(@.role=='PLAYER' && @.status=='APPROVED')]").exists())
+                .andExpect(jsonPath("$.roles[?(@.role=='REFEREE' && @.status=='APPROVED')]").doesNotExist());
 
         String fanToken = loginOnly(fanEmail, "Str0ngPass!");
         mockMvc.perform(get("/api/v1/admin/users")

@@ -4,10 +4,12 @@ import com.studentleague.auth.dto.UserResponse;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.config.AppProperties;
 import com.studentleague.users.domain.Role;
+import com.studentleague.users.domain.RoleStatus;
 import com.studentleague.users.dto.RequestRoleRequest;
 import com.studentleague.users.dto.RoleAssignmentResponse;
 import com.studentleague.users.dto.UpdateUserRequest;
 import com.studentleague.users.entity.User;
+import com.studentleague.users.entity.UserRoleAssignment;
 import com.studentleague.users.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -15,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -54,7 +58,9 @@ public class UserAdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ApiException.notFound("User not found"));
 
-        if (request.role() != null) {
+        if (request.roles() != null) {
+            syncAssignableRoles(user, request.roles());
+        } else if (request.role() != null) {
             if (request.role() == Role.ADMIN) {
                 throw ApiException.badRequest("Роль ADMIN задаётся только через ADMIN_EMAIL в .env");
             }
@@ -97,6 +103,36 @@ public class UserAdminService {
     public UserResponse rejectRole(UUID userId, Role role, String note) {
         roleService.reject(userId, role, note);
         return roleService.toUserResponse(userRepository.findById(userId).orElseThrow());
+    }
+
+    private void syncAssignableRoles(User user, List<Role> requested) {
+        if (user.getRole() == Role.ADMIN && isBootstrapAdmin(user.getEmail())) {
+            throw ApiException.forbidden("Нельзя изменить роль основного администратора");
+        }
+        Set<Role> wanted = new HashSet<>();
+        for (Role role : requested) {
+            if (role == Role.ADMIN) {
+                throw ApiException.badRequest("Роль ADMIN задаётся только через ADMIN_EMAIL в .env");
+            }
+            if (!ASSIGNABLE.contains(role)) {
+                throw ApiException.badRequest("Недопустимая роль");
+            }
+            wanted.add(role);
+        }
+        if (wanted.isEmpty()) {
+            wanted.add(Role.FAN);
+        }
+        for (Role role : wanted) {
+            roleService.grantApproved(user, role, user.getPhotoUrl());
+        }
+        for (UserRoleAssignment assignment : roleService.assignmentsOf(user.getId())) {
+            if (assignment.getRole() == Role.ADMIN) {
+                continue;
+            }
+            if (assignment.getStatus() == RoleStatus.APPROVED && !wanted.contains(assignment.getRole())) {
+                roleService.reject(user.getId(), assignment.getRole(), "снято админом");
+            }
+        }
     }
 
     private boolean isBootstrapAdmin(String email) {

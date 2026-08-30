@@ -10,6 +10,13 @@ import CreateTeamForm from '../../components/CreateTeamForm.vue'
 import CreateTournamentForm from '../../components/CreateTournamentForm.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 
+const ASSIGNABLE_ROLES = [
+  { id: 'FAN', label: 'Зритель' },
+  { id: 'PLAYER', label: 'Игрок' },
+  { id: 'CAPTAIN', label: 'Капитан' },
+  { id: 'REFEREE', label: 'Судья' },
+] as const
+
 const users = ref<any[]>([])
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
@@ -66,7 +73,7 @@ async function load() {
     api.get('/admin/role-requests'),
     api.get('/gallery'),
   ])
-  users.value = u.data.content
+  users.value = hydrateUsers(u.data.content)
   tournaments.value = t.data.content
   matches.value = m.data.content
   teams.value = tm.data.content
@@ -82,12 +89,56 @@ async function load() {
 
 onMounted(load)
 
+function approvedRolesOf(user: any): string[] {
+  const from = (user.roles ?? [])
+    .filter((item: any) => item.status === 'APPROVED')
+    .map((item: any) => item.role as string)
+  if (from.length) return from
+  return user.role ? [user.role] : []
+}
+
+function hydrateUsers(list: any[]) {
+  return list.map((user) => ({
+    ...user,
+    selectedRoles: approvedRolesOf(user).filter((role) => role !== 'ADMIN'),
+  }))
+}
+
+function isAdminUser(user: any) {
+  return user.role === 'ADMIN' || approvedRolesOf(user).includes('ADMIN')
+}
+
+function hasSelected(user: any, role: string) {
+  return (user.selectedRoles ?? []).includes(role)
+}
+
+function onRoleToggle(user: any, role: string, event: Event) {
+  const on = (event.target as HTMLInputElement).checked
+  const next = new Set<string>(user.selectedRoles ?? [])
+  if (on) next.add(role)
+  else next.delete(role)
+  user.selectedRoles = [...next]
+}
+
+function pendingRolesOf(user: any): string[] {
+  return (user.roles ?? [])
+    .filter((item: any) => item.status === 'PENDING')
+    .map((item: any) => item.role as string)
+}
+
+function userById(id: string) {
+  return users.value.find((item) => item.id === id)
+}
+
 async function updateUser(user: any) {
   error.value = ''
   ok.value = ''
   pending.value = true
   try {
-    await api.patch(`/admin/users/${user.id}`, { role: user.role, enabled: user.enabled })
+    await api.patch(`/admin/users/${user.id}`, {
+      roles: user.selectedRoles,
+      enabled: user.enabled,
+    })
     ok.value = `${user.email} обновлён.`
     await load()
   } catch (e: any) {
@@ -222,35 +273,50 @@ async function disbandTeam(team: any) {
       <div class="panel" v-if="roleRequests.length">
         <h2>Заявки на роли</h2>
         <div v-for="req in roleRequests" :key="req.id" class="row">
-          <span>{{ req.role }} · {{ req.userId }}</span>
+          <span>
+            {{ userById(req.userId)?.email || req.userId }}
+            · {{ labelOf(roleLabel, req.role) }}
+          </span>
           <button class="btn" :disabled="pending" @click="approveRole(req)">Подтвердить</button>
         </div>
       </div>
       <div class="panel">
       <h2>Пользователи</h2>
-      <p class="muted">Админа через форму не назначают — он из .env. Остальным роли ставятся здесь.</p>
+      <p class="muted">Несколько ролей сразу можно: игрок и судья, капитан и зритель. Админа через форму не назначают — он из .env.</p>
       <table class="table">
-        <thead><tr><th>Email</th><th>Роль</th><th>Активен</th><th></th></tr></thead>
+        <thead><tr><th>Email</th><th>Роли</th><th>Активен</th><th></th></tr></thead>
         <tbody>
           <tr v-for="u in users" :key="u.id">
-            <td>{{ u.email }}</td>
             <td>
-              <select v-if="u.role !== 'ADMIN'" v-model="u.role">
-                <option value="FAN">Зритель</option>
-                <option value="PLAYER">Игрок</option>
-                <option value="CAPTAIN">Капитан</option>
-                <option value="REFEREE">Судья</option>
-              </select>
-              <span v-else>{{ labelOf(roleLabel, u.role) }}</span>
+              {{ u.email }}
+              <small v-if="u.firstName || u.lastName" class="muted name">{{ [u.firstName, u.lastName].filter(Boolean).join(' ') }}</small>
+            </td>
+            <td>
+              <div v-if="isAdminUser(u)" class="roles">
+                <span class="badge">Админ</span>
+              </div>
+              <div v-else class="roles">
+                <label v-for="r in ASSIGNABLE_ROLES" :key="r.id" class="check">
+                  <input
+                    type="checkbox"
+                    :checked="hasSelected(u, r.id)"
+                    @change="onRoleToggle(u, r.id, $event)"
+                  />
+                  {{ r.label }}
+                </label>
+                <p v-if="pendingRolesOf(u).length" class="muted pending">
+                  Заявка: {{ pendingRolesOf(u).map((role) => labelOf(roleLabel, role)).join(', ') }}
+                </p>
+              </div>
             </td>
             <td>
               <label class="check">
-                <input v-model="u.enabled" type="checkbox" :disabled="u.role === 'ADMIN'" />
+                <input v-model="u.enabled" type="checkbox" :disabled="isAdminUser(u)" />
                 {{ u.enabled ? 'да' : 'нет' }}
               </label>
             </td>
             <td>
-              <button v-if="u.role !== 'ADMIN'" class="btn" :disabled="pending" @click="updateUser(u)">Сохранить</button>
+              <button v-if="!isAdminUser(u)" class="btn" :disabled="pending" @click="updateUser(u)">Сохранить</button>
             </td>
           </tr>
         </tbody>
@@ -314,7 +380,7 @@ async function disbandTeam(team: any) {
     <div v-else-if="tab === 'referees'" class="panel stack">
       <h2>Судьи</h2>
       <p class="muted">Роль ставится во вкладке «Пользователи». Потом судью назначают в карточке матча.</p>
-      <div v-for="u in users.filter(x => x.role === 'REFEREE')" :key="u.id" class="row">{{ u.email }}</div>
+      <div v-for="u in users.filter(x => approvedRolesOf(x).includes('REFEREE'))" :key="u.id" class="row">{{ u.email }}</div>
       <p class="muted">Виды спорта: {{ sports.map(s => s.code).join(', ') || 'пока не заданы' }}</p>
     </div>
 
@@ -403,6 +469,8 @@ h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
 .slide-row img { width: 72px; height: 48px; object-fit: cover; border-radius: 8px; }
 .grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .check { display: inline-flex; align-items: center; gap: 0.4rem; }
+.roles { display: flex; flex-wrap: wrap; gap: 0.45rem 0.85rem; align-items: center; }
+.name, .pending { display: block; margin-top: 0.2rem; }
 @media (max-width: 860px) {
   .grid.two { grid-template-columns: 1fr; }
 }
