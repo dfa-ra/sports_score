@@ -138,7 +138,7 @@ async function load() {
 
     <template v-else>
       <div class="panel">
-        <h2>Бомбардиры</h2>
+        <h2>Голы</h2>
         <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table">
