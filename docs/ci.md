@@ -76,7 +76,8 @@ GitHub → репозиторий → **Settings → Secrets and variables → A
 |---|---|---|
 | `DEV_SSH_HOST` | Actions secrets | IP или hostname стенда |
 | `DEV_SSH_USER` | Actions secrets | Linux-пользователь, под которым CI заходит по SSH |
-| `DEV_SSH_KEY` | Actions secrets | **Приватный** ключ целиком, включая строки `-----BEGIN … KEY-----` / `-----END … KEY-----`. Пароля на ключе быть не должно |
+| `DEV_SSH_KEY` | Actions secrets | **Приватный** ключ целиком, включая строки `-----BEGIN … KEY-----` / `-----END … KEY-----`. Не `.pub`. Пароля на ключе быть не должно. Если GitHub «склеил» переносы — можно вставить как одну строку с `\n`, CI развернёт |
+| `DEV_SSH_KEY_BASE64` | Actions secrets, запасной вариант | `base64 -w0 studentleague-deploy` — надёжнее, если `DEV_SSH_KEY` не принимается (`error in libcrypto`) |
 | `DEV_SSH_KNOWN_HOSTS` | Actions secrets, **рекомендуется** | Вывод `ssh-keyscan -p 22 YOUR_HOST` (одна или несколько строк). Без него CI делает TOFU через `ssh-keyscan` |
 | `DEV_SSH_PORT` | Actions secrets, опционально | Если SSH не на 22 и вы не хотите заводить Variable |
 | `DEV_STAND_ENV` | Actions secrets, опционально | Полное содержимое `.env` стенда. CI запишет его в `$DEV_DEPLOY_PATH/.env` **только если файла ещё нет** |
