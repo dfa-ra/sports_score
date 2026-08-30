@@ -59,7 +59,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <RouterLink to="/" exact-active-class="on">Главная</RouterLink>
             <RouterLink to="/table" active-class="on">Таблица</RouterLink>
             <RouterLink to="/calendar" active-class="on">Игры</RouterLink>
-            <RouterLink to="/statistics" active-class="on">Статистика</RouterLink>
+            <RouterLink to="/live" active-class="on">Live</RouterLink>
             <RouterLink to="/players" active-class="on">Игроки</RouterLink>
             <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
             <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
@@ -95,7 +95,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
     <nav v-if="!hideDock" class="dock" aria-label="Основное меню">
       <RouterLink
         to="/calendar"
-        :class="{ on: route.path === '/' || ((route.path.startsWith('/calendar') || route.path.startsWith('/matches')) && String(route.query.tab) !== 'live') }"
+        :class="{ on: route.path.startsWith('/calendar') || route.path.startsWith('/matches') }"
       >
         <span class="ico" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 12h18M8 6v12"/></svg>
@@ -108,7 +108,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
         </span>
         <span>Таблица</span>
       </RouterLink>
-      <RouterLink to="/calendar?tab=live" :class="{ on: route.path.startsWith('/calendar') && String(route.query.tab) === 'live' }">
+      <RouterLink to="/live" :class="{ on: route.path.startsWith('/live') }">
         <span class="ico live" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9.2"/></svg>
         </span>

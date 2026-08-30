@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { ymd } from '../lib/match'
@@ -8,17 +8,16 @@ import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 
 const route = useRoute()
-const router = useRouter()
 const items = ref<any[]>([])
 const tournaments = ref<Record<string, string>>({})
 const error = ref('')
 const loading = ref(true)
-const tab = ref<'upcoming' | 'live' | 'played'>('upcoming')
 const day = ref('')
 const teams = useTeamDirectory()
 
+const liveOnly = computed(() => route.name === 'live')
+
 onMounted(async () => {
-  readTab()
   try {
     await teams.load()
     const [m, t] = await Promise.all([
@@ -35,18 +34,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-watch(() => route.query.tab, readTab)
-
-function readTab() {
-  const value = String(route.query.tab || '')
-  if (value === 'live' || value === 'played' || value === 'upcoming') tab.value = value
-}
-
-function setTab(next: 'upcoming' | 'live' | 'played') {
-  tab.value = next
-  router.replace({ query: next === 'upcoming' ? {} : { tab: next } })
-}
 
 function pad(n: number) {
   return String(n).padStart(2, '0')
@@ -66,7 +53,6 @@ const strip = computed(() => {
     const key = ymd(date)
     days.push({
       key,
-      today: i === 0,
       label: i === 0
         ? `Сегодня ${pad(date.getDate())}.${pad(date.getMonth() + 1)}.`
         : `${weekday(date)} ${pad(date.getDate())}.${pad(date.getMonth() + 1)}.`,
@@ -75,22 +61,22 @@ const strip = computed(() => {
   return days
 })
 
-const upcoming = computed(() =>
-  items.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
+const visible = computed(() => {
+  if (liveOnly.value) {
+    return items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
+  }
+  if (day.value) {
+    return items.value
+      .filter((m) => ymd(m.scheduledAt) === day.value)
+      .slice()
+      .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+  }
+  return items.value
+    .filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
     .slice()
     .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
-)
-const live = computed(() => items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED'))
-const played = computed(() =>
-  items.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED')
-    .slice()
-    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
-)
-const visible = computed(() => {
-  const base = tab.value === 'live' ? live.value : tab.value === 'played' ? played.value : upcoming.value
-  if (!day.value) return base
-  return base.filter((m) => ymd(m.scheduledAt) === day.value)
 })
+
 const grouped = computed(() => {
   const map = new Map<string, any[]>()
   for (const match of visible.value) {
@@ -109,7 +95,10 @@ const grouped = computed(() => {
 
 <template>
   <section class="stack page">
-    <div class="date-strip">
+    <div v-if="liveOnly" class="live-head">
+      <h1>Live</h1>
+    </div>
+    <div v-else class="date-strip">
       <button type="button" :class="{ on: !day }" @click="day = ''">Все</button>
       <button
         v-for="item in strip"
@@ -119,16 +108,11 @@ const grouped = computed(() => {
         @click="day = item.key"
       >{{ item.label }}</button>
     </div>
-    <div class="fs-tabs">
-      <button type="button" :class="{ on: tab === 'upcoming' }" @click="setTab('upcoming')">Ближайшие</button>
-      <button type="button" :class="{ on: tab === 'live' }" @click="setTab('live')">Live</button>
-      <button type="button" :class="{ on: tab === 'played' }" @click="setTab('played')">Результаты</button>
-    </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="skeleton" />
     <EmptyState
       v-else-if="!visible.length"
-      :title="tab === 'live' ? 'Сейчас никто не играет' : tab === 'played' ? 'Прошедших матчей ещё нет' : 'Пока нет ближайших матчей'"
+      :title="liveOnly ? 'Сейчас никто не играет' : day ? 'В этот день матчей нет' : 'Пока нет ближайших матчей'"
     />
     <div v-else class="sheet">
       <section v-for="group in grouped" :key="group.id">
@@ -145,7 +129,7 @@ const grouped = computed(() => {
           :home-name="teams.fullName(m.homeTeamId)"
           :away-name="teams.fullName(m.awayTeamId)"
         />
-        <RouterLink class="sheet-link" to="/table">Таблица <span>›</span></RouterLink>
+        <RouterLink v-if="!liveOnly" class="sheet-link" :to="`/table`">К таблице ›</RouterLink>
       </section>
     </div>
   </section>
@@ -154,6 +138,8 @@ const grouped = computed(() => {
 <style scoped>
 .page { gap: 0; }
 .date-strip { margin: 0 -0.2rem 0.15rem; }
+.live-head { padding: 0.35rem 0 0.15rem; }
+.live-head h1 { font-size: 1.35rem; }
 .sheet {
   background: #fff;
   border: 1px solid var(--line);

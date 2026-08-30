@@ -9,6 +9,7 @@ const router = createRouter({
     { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { guest: true } },
     { path: '/table', name: 'table', component: () => import('../views/TableView.vue') },
     { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue') },
+    { path: '/live', name: 'live', component: () => import('../views/CalendarView.vue') },
     { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue') },
     { path: '/tournaments/:id', name: 'tournament', component: () => import('../views/TournamentDetailView.vue') },
     { path: '/matches', redirect: '/calendar' },
@@ -17,7 +18,7 @@ const router = createRouter({
     { path: '/teams/:id', name: 'team', component: () => import('../views/TeamDetailView.vue') },
     { path: '/players', name: 'players', component: () => import('../views/PlayersView.vue') },
     { path: '/players/:id', name: 'player', component: () => import('../views/PlayerDetailView.vue') },
-    { path: '/statistics', name: 'statistics', component: () => import('../views/StatisticsView.vue') },
+    { path: '/statistics', redirect: { path: '/table', query: { tab: 'scorers' } } },
     { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, myTeam: true } },
     { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { auth: true } },
     { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboard.vue'), meta: { auth: true, roles: ['ADMIN'] } },
@@ -29,6 +30,8 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  if (to.name === 'calendar' && to.query.tab === 'live') return { path: '/live' }
+  if (to.name === 'calendar' && to.query.tab === 'played') return { path: '/table', query: { tab: 'results' } }
   const auth = useAuthStore()
   if (to.meta.auth && !auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
   if (to.meta.guest && auth.isAuthenticated) return { name: 'home' }
