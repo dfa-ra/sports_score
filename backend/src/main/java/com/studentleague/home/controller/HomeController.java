@@ -1,6 +1,6 @@
 package com.studentleague.home.controller;
 
-import com.studentleague.gallery.dto.GalleryFeedResponse;
+import com.studentleague.gallery.domain.GallerySlot;
 import com.studentleague.gallery.service.GalleryService;
 import com.studentleague.home.dto.HomeFeedResponse;
 import com.studentleague.statistics.service.StatisticsService;
@@ -37,14 +37,15 @@ public class HomeController {
     @Operation(summary = "Home widgets: table, top-5, photos")
     public HomeFeedResponse home() {
         TournamentResponse tournament = tournamentService.current();
-        GalleryFeedResponse gallery = galleryService.feed();
         return new HomeFeedResponse(
                 tournament,
                 tournament == null ? List.of() : tournamentService.standings(tournament.id()),
                 tournament == null ? statisticsService.scorers(null, 5) : statisticsService.scorers(tournament.id(), 5),
                 tournament == null ? statisticsService.assists(null, 5) : statisticsService.assists(tournament.id(), 5),
-                gallery.photos(),
-                gallery.vkAlbumUrl()
+                galleryService.enabledSlot(GallerySlot.HERO),
+                galleryService.enabledSlot(GallerySlot.STORY),
+                galleryService.enabledSlot(GallerySlot.GALLERY),
+                galleryService.feed().vkAlbumUrl()
         );
     }
 }

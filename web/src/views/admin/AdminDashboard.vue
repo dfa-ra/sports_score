@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import { labelOf, roleLabel } from '../../lib/format'
@@ -20,7 +20,21 @@ const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'ref
 const roleRequests = ref<any[]>([])
 const gallery = ref<any>({ photos: [], vkAlbumUrl: '' })
 const photoUrl = ref('')
+const photoTitle = ref('')
+const photoCaption = ref('')
+const photoSlot = ref<'HERO' | 'STORY' | 'GALLERY'>('HERO')
+const photoLink = ref('')
+const photoLinkLabel = ref('')
+const photoSort = ref(0)
 const vkAlbumUrl = ref('')
+const slotLabel: Record<string, string> = { HERO: 'Герой', STORY: 'Сюжет', GALLERY: 'Галерея' }
+const galleryPhotos = computed(() => {
+  const order: Record<string, number> = { HERO: 0, STORY: 1, GALLERY: 2 }
+  return [...(gallery.value.photos || [])].sort((a, b) => {
+    const bySlot = (order[a.slot] ?? 9) - (order[b.slot] ?? 9)
+    return bySlot || (Number(a.sortOrder) - Number(b.sortOrder))
+  })
+})
 const teamStats = ref<any[]>([])
 const playerStats = ref<any[]>([])
 const error = ref('')
@@ -99,8 +113,53 @@ async function approveRole(req: any) {
 async function addPhoto() {
   pending.value = true
   try {
-    await api.post('/admin/gallery', { url: photoUrl.value, source: 'URL' })
+    await api.post('/admin/gallery', {
+      url: photoUrl.value,
+      title: photoTitle.value || undefined,
+      caption: photoCaption.value || undefined,
+      slot: photoSlot.value,
+      linkUrl: photoLink.value || undefined,
+      linkLabel: photoLinkLabel.value || undefined,
+      sortOrder: photoSort.value,
+      source: photoUrl.value.startsWith('/media/') ? 'UPLOAD' : 'URL',
+    })
     photoUrl.value = ''
+    photoTitle.value = ''
+    photoCaption.value = ''
+    photoLink.value = ''
+    photoLinkLabel.value = ''
+    photoSort.value = 0
+    ok.value = 'Слайд добавлен на главную.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function uploadPhoto(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  pending.value = true
+  error.value = ''
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post('/uploads/admin/gallery', form)
+    photoUrl.value = data.url
+  } catch (e: any) {
+    error.value = apiError(e, 'Файл не загрузился.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function removePhoto(id: string) {
+  if (!confirm('Убрать этот кадр с сайта?')) return
+  pending.value = true
+  try {
+    await api.delete(`/admin/gallery/${id}`)
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -260,17 +319,51 @@ async function disbandTeam(team: any) {
     </div>
 
     <div v-else-if="tab === 'gallery'" class="panel stack">
-      <h2>Фото с матчей</h2>
+      <h2>Главная: слайды и фото</h2>
+      <p class="muted">
+        <strong>Герой</strong> — большая карусель. <strong>Сюжет</strong> — круглые сторис сверху.
+        <strong>Галерея</strong> — блок «Моменты» внизу.
+      </p>
+      <label class="field">Слот
+        <select v-model="photoSlot">
+          <option value="HERO">Герой (карусель)</option>
+          <option value="STORY">Сюжет (кружок)</option>
+          <option value="GALLERY">Галерея / моменты</option>
+        </select>
+      </label>
+      <label class="field">Загрузить файл
+        <input type="file" accept="image/*" @change="uploadPhoto" />
+      </label>
+      <label class="field">Или URL картинки
+        <input v-model="photoUrl" placeholder="/media/gallery/... или https://..." />
+      </label>
+      <label class="field">Заголовок
+        <input v-model="photoTitle" maxlength="200" placeholder="Как лига помогает кампусу" />
+      </label>
+      <label class="field">Подпись
+        <input v-model="photoCaption" maxlength="300" />
+      </label>
+      <label class="field">Ссылка (необязательно)
+        <input v-model="photoLink" placeholder="/calendar или https://..." />
+      </label>
+      <label class="field">Текст кнопки
+        <input v-model="photoLinkLabel" maxlength="80" placeholder="Подробнее" />
+      </label>
+      <label class="field">Порядок в карусели
+        <input v-model.number="photoSort" type="number" min="0" />
+      </label>
+      <button class="btn" :disabled="pending || !photoUrl" @click="addPhoto">Опубликовать</button>
       <label class="field">Альбом ВК
         <input v-model="vkAlbumUrl" placeholder="https://vk.com/album-..." />
       </label>
-      <button class="btn secondary" :disabled="pending" @click="saveVkAlbum">Сохранить ссылку</button>
-      <label class="field">Добавить фото по URL
-        <input v-model="photoUrl" placeholder="https://..." />
-      </label>
-      <button class="btn" :disabled="pending || !photoUrl" @click="addPhoto">Добавить</button>
-      <div v-for="photo in gallery.photos" :key="photo.id" class="row">
-        <a :href="photo.url" target="_blank">{{ photo.caption || photo.url }}</a>
+      <button class="btn secondary" :disabled="pending" @click="saveVkAlbum">Сохранить ссылку ВК</button>
+      <div v-for="photo in galleryPhotos" :key="photo.id" class="slide-row">
+        <img :src="photo.url" alt="" />
+        <div>
+          <strong>{{ slotLabel[photo.slot] || photo.slot }} · {{ photo.title || photo.caption || 'Без подписи' }}</strong>
+          <p class="muted">{{ photo.sortOrder }} · {{ photo.url }}</p>
+        </div>
+        <button class="btn danger" type="button" :disabled="pending" @click="removePhoto(photo.id)">Удалить</button>
       </div>
     </div>
 
@@ -299,6 +392,15 @@ h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
   padding: 0.65rem 0;
   border-bottom: 1px solid var(--line);
 }
+.slide-row {
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
+  gap: 0.8rem;
+  align-items: center;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.slide-row img { width: 72px; height: 48px; object-fit: cover; border-radius: 8px; }
 .grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .check { display: inline-flex; align-items: center; gap: 0.4rem; }
 @media (max-width: 860px) {

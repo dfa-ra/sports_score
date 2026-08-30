@@ -46,22 +46,23 @@ async function loadTable() {
 
 <template>
   <section class="stack">
-    <div class="page-title">
-      <h1>Таблица</h1>
-      <p>По умолчанию — текущий турнир. Команда открывается по названию.</p>
-    </div>
-    <label class="field">Турнир
-      <select v-model="tournamentId">
-        <option v-for="t in tournaments" :key="t.id" :value="t.id">{{ t.name }}</option>
-      </select>
-    </label>
-    <p v-if="tournament">
-      <RouterLink :to="`/tournaments/${tournament.id}`">Регламент и сетка</RouterLink>
-    </p>
-    <div v-if="loading" class="skeleton" />
-    <EmptyState v-else-if="!standings.length" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
-    <div v-else class="panel">
-      <table class="table">
+    <div class="panel table-card">
+      <div class="page-title">
+        <p class="eyebrow">Турнир</p>
+        <h1>Таблица</h1>
+        <p>По умолчанию — текущий турнир. Команда открывается по названию.</p>
+      </div>
+      <label class="field">Турнир
+        <select v-model="tournamentId">
+          <option v-for="t in tournaments" :key="t.id" :value="t.id">{{ t.name }}</option>
+        </select>
+      </label>
+      <p v-if="tournament">
+        <RouterLink :to="`/tournaments/${tournament.id}`">Регламент и сетка</RouterLink>
+      </p>
+      <div v-if="loading" class="skeleton" />
+      <EmptyState v-else-if="!standings.length" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
+      <table v-else class="table">
         <thead>
           <tr><th>Команда</th><th>И</th><th>В</th><th>Н</th><th>П</th><th>З</th><th>Пр</th><th>О</th></tr>
         </thead>
@@ -81,3 +82,7 @@ async function loadTable() {
     </div>
   </section>
 </template>
+
+<style scoped>
+.table-card { padding: 1.5rem 1.6rem; }
+</style>

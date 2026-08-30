@@ -49,6 +49,17 @@ public class GalleryController {
         return galleryService.add(request);
     }
 
+    @PutMapping("/admin/gallery/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Update a home/gallery slide")
+    public GalleryPhotoResponse update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CreateGalleryPhotoRequest request
+    ) {
+        return galleryService.update(id, request);
+    }
+
     @DeleteMapping("/admin/gallery/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @SecurityRequirement(name = "bearerAuth")
