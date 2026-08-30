@@ -1,0 +1,194 @@
+name: Dev stand
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "mobile/**"
+      - "**/*.md"
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing GitHub Release tag to deploy (dev or v0.2.0). Empty = rebuild rolling dev from this commit."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-dev-stand
+  cancel-in-progress: false
+
+jobs:
+  publish-dev:
+    name: Publish rolling dev release
+    if: |
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.tag == '')
+    runs-on: ubuntu-latest
+    outputs:
+      tag: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Package backend
+        working-directory: backend
+        run: ./mvnw -B -DskipTests package
+
+      - name: Stage backend JAR
+        run: |
+          mkdir -p out
+          JAR="$(find backend/target -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar' | head -n 1)"
+          test -n "${JAR}"
+          cp "${JAR}" out/student-league-backend-dev.jar
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build web
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+          tar -czf "../out/student-league-web-dev.tar.gz" -C dist .
+
+      - name: Publish prerelease tag dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Rolling dev stand build from ${GITHUB_SHA}"
+          if gh release view dev >/dev/null 2>&1; then
+            gh release upload dev out/student-league-backend-dev.jar out/student-league-web-dev.tar.gz --clobber
+            gh release edit dev --prerelease --latest=false --title "Dev stand (rolling)" --notes "${NOTES}"
+          else
+            gh release create dev \
+              --prerelease \
+              --latest=false \
+              --title "Dev stand (rolling)" \
+              --notes "${NOTES}" \
+              out/student-league-backend-dev.jar \
+              out/student-league-web-dev.tar.gz
+          fi
+          git tag -f dev
+          git push -f origin refs/tags/dev
+
+  deploy:
+    name: SSH deploy to stand
+    needs: [publish-dev]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'release' && github.event.release.tag_name != 'dev') ||
+        (github.event_name == 'workflow_dispatch' && inputs.tag != '') ||
+        needs.publish-dev.result == 'success'
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="dev"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Deploying release tag ${TAG}"
+
+      - name: Check SSH secrets
+        id: stand
+        env:
+          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+        run: |
+          if [ -z "${DEV_SSH_HOST}" ] || [ -z "${DEV_SSH_USER}" ] || [ -z "${DEV_SSH_KEY}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "DEV_SSH_HOST / DEV_SSH_USER / DEV_SSH_KEY are empty — skip deploy."
+            echo "Add them in Settings → Secrets and variables → Actions (see docs/ci.md)."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Start ssh-agent
+        if: steps.stand.outputs.configured == 'true'
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY }}
+
+      - name: Trust stand host
+        if: steps.stand.outputs.configured == 'true'
+        env:
+          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          DEV_SSH_KNOWN_HOSTS: ${{ secrets.DEV_SSH_KNOWN_HOSTS }}
+          DEV_SSH_PORT: ${{ vars.DEV_SSH_PORT || secrets.DEV_SSH_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          if [ -n "${DEV_SSH_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${DEV_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          else
+            echo "DEV_SSH_KNOWN_HOSTS is empty — falling back to ssh-keyscan (TOFU)."
+            ssh-keyscan -p "${DEV_SSH_PORT}" -T 10 "${DEV_SSH_HOST}" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload deploy/ and seed .env if missing
+        if: steps.stand.outputs.configured == 'true'
+        env:
+          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          DEV_SSH_PORT: ${{ vars.DEV_SSH_PORT || secrets.DEV_SSH_PORT || '22' }}
+          DEV_DEPLOY_PATH: ${{ vars.DEV_DEPLOY_PATH || '/opt/studentleague' }}
+          DEV_STAND_ENV: ${{ secrets.DEV_STAND_ENV }}
+        run: |
+          REMOTE="${DEV_SSH_USER}@${DEV_SSH_HOST}"
+          SSH=(ssh -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes)
+          "${SSH[@]}" "${REMOTE}" "mkdir -p '${DEV_DEPLOY_PATH}/deploy' '${DEV_DEPLOY_PATH}/release'"
+          rsync -az --delete -e "ssh -p ${DEV_SSH_PORT} -o IdentitiesOnly=yes" \
+            deploy/ "${REMOTE}:${DEV_DEPLOY_PATH}/deploy/"
+          if [ -n "${DEV_STAND_ENV}" ]; then
+            umask 077
+            printf '%s\n' "${DEV_STAND_ENV}" > /tmp/stand.env
+            scp -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes /tmp/stand.env "${REMOTE}:/tmp/studentleague.stand.env"
+            rm -f /tmp/stand.env
+            "${SSH[@]}" "${REMOTE}" "if [ ! -f '${DEV_DEPLOY_PATH}/.env' ]; then mv /tmp/studentleague.stand.env '${DEV_DEPLOY_PATH}/.env' && chmod 600 '${DEV_DEPLOY_PATH}/.env'; else rm -f /tmp/studentleague.stand.env; fi"
+          fi
+
+      - name: Download release on the stand and compose up
+        if: steps.stand.outputs.configured == 'true'
+        env:
+          DEV_SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          DEV_SSH_USER: ${{ secrets.DEV_SSH_USER }}
+          DEV_SSH_PORT: ${{ vars.DEV_SSH_PORT || secrets.DEV_SSH_PORT || '22' }}
+          DEV_DEPLOY_PATH: ${{ vars.DEV_DEPLOY_PATH || '/opt/studentleague' }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          REMOTE="${DEV_SSH_USER}@${DEV_SSH_HOST}"
+          umask 077
+          printf '%s' "${{ github.token }}" > /tmp/deploy.token
+          scp -P "${DEV_SSH_PORT}" -o IdentitiesOnly=yes /tmp/deploy.token "${REMOTE}:${DEV_DEPLOY_PATH}/.deploy-token"
+          rm -f /tmp/deploy.token
+          ssh -p "${DEV_SSH_PORT}" -o IdentitiesOnly=yes "${REMOTE}" \
+            "chmod +x '${DEV_DEPLOY_PATH}/deploy/stand.sh' && \
+             RELEASE_TAG='${RELEASE_TAG}' \
+             GITHUB_REPOSITORY='${{ github.repository }}' \
+             DEPLOY_ROOT='${DEV_DEPLOY_PATH}' \
+             '${DEV_DEPLOY_PATH}/deploy/stand.sh'"
