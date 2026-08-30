@@ -25,21 +25,22 @@ Production-ориентированная платформа студенчес�
 
 См. [docs/architecture.md](docs/architecture.md), [docs/database.md](docs/database.md), [docs/api.md](docs/api.md) и [docs/ci.md](docs/ci.md).
 
-## CI / Релизы
+## CI / Релизы / стенд
 
 GitHub Actions:
 
 - **CI** (`.github/workflows/ci.yml`) — тесты backend, production-сборка Vue, Flutter analyze/test + debug APK
 - **Release** (`.github/workflows/release.yml`) — по тегам `v*` (или ручной запуск): JAR backend, tarball web, Android APK/AAB, опциональный unsigned iOS zip → артефакты GitHub Release
+- **Dev stand** (`.github/workflows/stand.yml`) — push в `main` публикует rolling prerelease `dev`; сервер по SSH скачивает релиз и поднимает Docker. Тот же стенд обновляется и после GitHub Release `v*`
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Важно: обычный push в ветку запускает только **CI**, не Release. Релизные APK/AAB/JAR появляются после тега `v*` или ручного Run workflow в Actions.
+Обычный push в feature-ветку запускает только **CI**. Merge в `main` дополнительно обновляет стенд (если заданы SSH-секреты). Полные APK/AAB — после тега `v*` или ручного Run workflow.
 
-Подробности и подпись билдов: [docs/ci.md](docs/ci.md).
+Какие секреты куда вставить (GitHub Actions + `.env` на сервере): [docs/ci.md](docs/ci.md).
 
 ## Роли
 
@@ -118,7 +119,8 @@ Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — польз
 ├── web/              Vue 3 приложение
 ├── mobile/           Flutter приложение
 ├── docs/             Архитектура, БД, API, CI
-├── .github/workflows CI и релизы
+├── deploy/           Compose/Dockerfile’ы стенда + stand.sh
+├── .github/workflows CI, релизы, автодеплой
 ├── docker-compose.yml
 └── .env.example
 ```

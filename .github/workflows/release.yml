@@ -43,10 +43,17 @@ jobs:
           java-version: "21"
           cache: maven
       - run: ./mvnw -B -DskipTests package
+      - name: Rename JAR
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          mkdir -p ../release-backend
+          JAR="$(find target -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar' | head -n 1)"
+          test -n "${JAR}"
+          cp "${JAR}" "../release-backend/student-league-backend-${VERSION}.jar"
       - uses: actions/upload-artifact@v4
         with:
           name: backend-jar
-          path: backend/target/*.jar
+          path: release-backend/student-league-backend-*.jar
           if-no-files-found: error
 
   web-release:

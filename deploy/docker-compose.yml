@@ -1,0 +1,81 @@
+# Run from the deploy root, not from this folder:
+#   docker compose --project-directory /opt/studentleague -f /opt/studentleague/deploy/docker-compose.yml up -d
+# stand.sh already does that.
+name: studentleague-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Moscow}
+      POSTGRES_DB: ${DATABASE_NAME:-studentleague}
+      POSTGRES_USER: ${DATABASE_USERNAME:-studentleague}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-studentleague}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Moscow}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-Europe/Moscow}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${DATABASE_NAME:-studentleague}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-studentleague}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-studentleague}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      LOCAL_STORAGE_DIR: /app/data/uploads
+      LOCAL_STORAGE_PUBLIC_BASE_URL: /media
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@studentleague.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMeAdmin123!}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-at-least-256-bits-long!!}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80}
+    volumes:
+      - uploads_data:/app/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  uploads_data:
