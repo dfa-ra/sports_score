@@ -11,6 +11,8 @@ public interface MatchLineupPlayerRepository extends JpaRepository<MatchLineupPl
 
     List<MatchLineupPlayer> findByMatchIdAndTeamId(UUID matchId, UUID teamId);
 
+    List<MatchLineupPlayer> findByPlayerId(UUID playerId);
+
     boolean existsByMatchIdAndTeamId(UUID matchId, UUID teamId);
 
     void deleteByMatchIdAndTeamId(UUID matchId, UUID teamId);
