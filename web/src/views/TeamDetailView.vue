@@ -160,7 +160,6 @@ async function disbandTeam() {
       <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
       <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
       <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
-      <RouterLink to="/table">Таблица</RouterLink>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">

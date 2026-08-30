@@ -115,7 +115,7 @@ async function logout() {
       <RouterLink v-if="auth.canOfficiate" class="tile" to="/referee">Пульт судьи</RouterLink>
       <RouterLink v-if="auth.canManageLeague" class="tile" to="/admin">Админка</RouterLink>
       <RouterLink class="tile phone" to="/players">Игроки</RouterLink>
-      <RouterLink class="tile phone" to="/statistics">Статистика</RouterLink>
+      <RouterLink class="tile phone" to="/table?tab=scorers">Бомбардиры</RouterLink>
     </div>
 
     <div class="fs-tabs">

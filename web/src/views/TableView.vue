@@ -1,15 +1,32 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
+import MatchRow from '../components/MatchRow.vue'
 import StandingTable from '../components/StandingTable.vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
+type Tab = 'table' | 'results' | 'scorers'
+
+const route = useRoute()
+const router = useRouter()
+const teams = useTeamDirectory()
 const tournaments = ref<any[]>([])
 const tournamentId = ref('')
 const standings = ref<any[]>([])
+const matches = ref<any[]>([])
+const scorers = ref<any[]>([])
+const assists = ref<any[]>([])
+const keepers = ref<any[]>([])
 const tournament = ref<any>(null)
 const loading = ref(true)
+
+const tab = computed<Tab>(() => {
+  const value = String(route.query.tab || 'table')
+  if (value === 'results' || value === 'scorers') return value
+  return 'table'
+})
 
 const season = computed(() => {
   const start = tournament.value?.startsOn || tournament.value?.startDate
@@ -18,9 +35,21 @@ const season = computed(() => {
   return `${year}/${year + 1}`
 })
 
+const results = computed(() =>
+  matches.value
+    .filter((m) => m.tournamentId === tournamentId.value && (m.status === 'FINISHED' || m.status === 'CANCELLED'))
+    .slice()
+    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+)
+
 onMounted(async () => {
-  const { data } = await api.get('/tournaments', { params: { size: 50 } })
+  await teams.load()
+  const [{ data }, games] = await Promise.all([
+    api.get('/tournaments', { params: { size: 50 } }),
+    api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+  ])
   tournaments.value = data.content ?? []
+  matches.value = games.data.content ?? []
   try {
     const current = await api.get('/tournaments/current')
     if (current.data?.id) tournamentId.value = current.data.id
@@ -28,24 +57,34 @@ onMounted(async () => {
     if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
   }
   if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  await loadTable()
+  await load()
 })
 
-watch(tournamentId, loadTable)
+watch(tournamentId, load)
 
-async function loadTable() {
+function setTab(next: Tab) {
+  router.replace({ query: next === 'table' ? {} : { tab: next } })
+}
+
+async function load() {
   if (!tournamentId.value) {
     loading.value = false
     return
   }
   loading.value = true
   try {
-    const [t, s] = await Promise.all([
+    const [t, s, g, a, k] = await Promise.all([
       api.get(`/tournaments/${tournamentId.value}`),
       api.get(`/tournaments/${tournamentId.value}/standings`),
+      api.get('/statistics/scorers', { params: { tournamentId: tournamentId.value, limit: 30 } }),
+      api.get('/statistics/assists', { params: { tournamentId: tournamentId.value, limit: 30 } }),
+      api.get('/statistics/goalkeepers', { params: { tournamentId: tournamentId.value, limit: 30 } }),
     ])
     tournament.value = t.data
     standings.value = s.data
+    scorers.value = g.data
+    assists.value = a.data
+    keepers.value = k.data
   } finally {
     loading.value = false
   }
@@ -68,21 +107,85 @@ async function loadTable() {
         </label>
       </div>
     </div>
+
     <div class="fs-tabs">
-      <RouterLink class="on" to="/table">Таблица</RouterLink>
-      <RouterLink to="/calendar?tab=played">Результаты</RouterLink>
-      <RouterLink to="/statistics">Бомбардиры</RouterLink>
+      <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
+      <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
+      <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
     </div>
-    <div class="pills">
-      <span class="on">Итого</span>
-      <RouterLink to="/statistics">Бомбардиры</RouterLink>
-      <RouterLink to="/calendar?tab=played">Результаты</RouterLink>
-    </div>
+
     <div v-if="loading" class="skeleton" />
-    <EmptyState v-else-if="!standings.length" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
-    <div v-else class="sheet">
-      <StandingTable :rows="standings" />
-    </div>
+
+    <template v-else-if="tab === 'table'">
+      <EmptyState v-if="!standings.length" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
+      <div v-else class="sheet">
+        <StandingTable :rows="standings" />
+      </div>
+    </template>
+
+    <template v-else-if="tab === 'results'">
+      <EmptyState v-if="!results.length" title="Сыгранных матчей ещё нет" />
+      <div v-else class="sheet">
+        <MatchRow
+          v-for="m in results"
+          :key="m.id"
+          :match="m"
+          :home-name="teams.fullName(m.homeTeamId)"
+          :away-name="teams.fullName(m.awayTeamId)"
+        />
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="panel">
+        <h2>Голы</h2>
+        <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="p in scorers" :key="p.playerId">
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td>{{ p.goals }}</td>
+                <td>{{ p.appearances }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Передачи</h2>
+        <EmptyState v-if="!assists.length" title="Передач ещё нет" />
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Игрок</th><th>Пасы</th><th>Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="p in assists" :key="p.playerId">
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td>{{ p.assists }}</td>
+                <td>{{ p.appearances }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Сухие</h2>
+        <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="p in keepers" :key="p.playerId">
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td>{{ p.cleanSheets }}</td>
+                <td>{{ p.appearances }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
   </section>
 </template>
 
@@ -122,4 +225,5 @@ async function loadTable() {
   border-radius: 12px;
   overflow: hidden;
 }
+h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 </style>
