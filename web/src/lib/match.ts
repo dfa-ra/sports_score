@@ -25,3 +25,36 @@ export function shortKickoff(value?: string | number | Date | null, status?: str
   if (status === 'FINISHED' || status === 'CANCELLED') return `${day}.${month}.`
   return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
+
+export function longKickoff(value?: string | number | Date | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  return `${day}.${month}.${year} ${time}`
+}
+
+export function matchStateLabel(status?: string | null) {
+  if (status === 'FINISHED') return 'Завершен'
+  if (status === 'LIVE') return 'Live'
+  if (status === 'PAUSED') return 'Пауза'
+  if (status === 'CANCELLED') return 'Отменён'
+  if (status === 'SCHEDULED') return 'Не начался'
+  return status || ''
+}
+
+export function eventMinute(gameTime?: number | null) {
+  return Math.max(0, Math.floor((gameTime ?? 0) / 60))
+}
+
+export function ymd(value?: string | number | Date | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}

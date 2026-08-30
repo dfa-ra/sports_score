@@ -6,13 +6,14 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventDetail, eventLabel, formatClock, formatWhen, initials, labelOf, periodLabel, playerTag } from '../lib/format'
+import { eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
-import StatusBadge from '../components/StatusBadge.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -32,13 +33,42 @@ const error = ref('')
 const ok = ref('')
 const pending = ref(false)
 const teams = useTeamDirectory()
-const { elapsed, remaining, expired, cap } = useMatchClock(match)
+const fav = useFavorites()
+const { remaining, expired, cap } = useMatchClock(match)
 let client: Client | null = null
 
 const timeline = computed(() => [...events.value].filter((e) => !e.voided).reverse())
-const goals = computed(() => timeline.value.filter((e) => e.eventType === 'GOAL'))
-const homeGoals = computed(() => goals.value.filter((e) => e.teamId === match.value?.homeTeamId))
-const awayGoals = computed(() => goals.value.filter((e) => e.teamId === match.value?.awayTeamId))
+const periodBlocks = computed(() => {
+  if (!match.value) return []
+  const visibleTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'OWN_GOAL'])
+  const chrono = [...events.value]
+    .filter((e) => !e.voided && visibleTypes.has(e.eventType))
+    .sort((a, b) => (a.gameTime ?? 0) - (b.gameTime ?? 0) || String(a.id).localeCompare(String(b.id)))
+  let home = 0
+  let away = 0
+  const byPeriod = new Map<number, { items: any[]; score: string }>()
+  for (const ev of chrono) {
+    if (ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL') {
+      if (ev.teamId === match.value.homeTeamId) home += 1
+      else away += 1
+    }
+    const period = ev.period || 1
+    const block = byPeriod.get(period) ?? { items: [], score: '0-0' }
+    block.items.push({
+      ...ev,
+      home: ev.teamId === match.value.homeTeamId,
+      scoreline: ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL' ? `${home}-${away}` : null,
+    })
+    block.score = `${home}-${away}`
+    byPeriod.set(period, block)
+  }
+  return [...byPeriod.entries()].map(([period, block]) => ({
+    period,
+    label: periodLabel(period, match.value.sportCode, match.value.periodCount),
+    score: block.score,
+    items: block.items,
+  }))
+})
 
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
@@ -163,61 +193,80 @@ onUnmounted(() => client?.deactivate())
 
 <template>
   <section v-if="match" class="stack">
-    <div class="page-title">
-      <p class="eyebrow">{{ tournament?.name || 'Студенческая сетка' }}</p>
-      <p class="muted">{{ connected ? 'Live, как у Flashscore, только с общаги' : 'Подключаемся к трансляции…' }} · {{ formatWhen(match.scheduledAt) }}</p>
-    </div>
+    <RouterLink class="league-bar" to="/table">
+      {{ tournament?.name || 'KRONBARS' }}
+      <span>›</span>
+    </RouterLink>
 
-    <div class="panel scoreboard" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <StatusBadge :status="match.status" />
-      <p class="period">{{ periodLabel(match.period, match.sportCode, match.periodCount) }}</p>
-      <div class="clock" :class="{ expired }">
-        {{ match.status === 'SCHEDULED' ? formatClock(cap) : formatClock(remaining) }}
-      </div>
-      <p class="muted">
-        <template v-if="match.status === 'SCHEDULED'">до старта · {{ match.periodCount }} × {{ formatClock(cap) }}</template>
-        <template v-else>осталось · прошло {{ formatClock(elapsed) }}</template>
-      </p>
-      <div class="sides">
-        <div class="team">
+    <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
+      <div class="club">
+        <button
+          class="star"
+          type="button"
+          :class="{ on: fav.hasTeam(match.homeTeamId) }"
+          :aria-label="teams.fullName(match.homeTeamId)"
+          @click="fav.toggleTeam(match.homeTeamId)"
+        >★</button>
+        <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
           <span class="crest">{{ initials(teams.name(match.homeTeamId)) }}</span>
           <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
-          <p class="scorers">
-            <span v-for="g in homeGoals" :key="g.id">{{ playerTag(g.playerName, g.playerJersey) || 'гол' }} {{ formatClock(g.gameTime) }}</span>
-            <span v-if="!homeGoals.length" class="muted">ещё без гола</span>
-          </p>
-        </div>
-        <div class="score">{{ match.homeScore }} : {{ match.awayScore }}</div>
-        <div class="team away">
+        </RouterLink>
+      </div>
+      <div class="center">
+        <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
+        <p class="score">{{ match.homeScore }} - {{ match.awayScore }}</p>
+        <p class="state">{{ matchStateLabel(match.status) }}</p>
+        <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
+          {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
+        </p>
+        <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
+          {{ match.periodCount }} × {{ formatClock(cap) }}
+        </p>
+      </div>
+      <div class="club away">
+        <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
           <span class="crest">{{ initials(teams.name(match.awayTeamId)) }}</span>
           <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
-          <p class="scorers">
-            <span v-for="g in awayGoals" :key="g.id">{{ playerTag(g.playerName, g.playerJersey) || 'гол' }} {{ formatClock(g.gameTime) }}</span>
-            <span v-if="!awayGoals.length" class="muted">ещё без гола</span>
-          </p>
-        </div>
+        </RouterLink>
+        <button
+          class="star"
+          type="button"
+          :class="{ on: fav.hasTeam(match.awayTeamId) }"
+          @click="fav.toggleTeam(match.awayTeamId)"
+        >★</button>
       </div>
     </div>
 
-    <div class="tabs">
-      <button class="btn secondary" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
-      <button class="btn secondary" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
-      <button class="btn secondary" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
+    <div class="fs-tabs">
+      <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
+      <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
+      <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
     </div>
 
     <div v-if="tab === 'overview'" class="stack">
-      <div class="panel">
-        <h2>Лента</h2>
-        <p v-if="!timeline.length" class="muted" style="margin-top:0.7rem">Пока ни гола, ни карточки. Тишина перед взрывом, как в очереди в столовку.</p>
-        <ul v-else class="timeline">
-          <li v-for="ev in timeline.slice(0, 12)" :key="ev.id">
-            <span class="t">{{ formatClock(ev.gameTime) }}</span>
-            <div>
-              <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
-              <p class="muted">{{ eventDetail(ev) || periodLabel(ev.period, match.sportCode, match.periodCount) }}</p>
+      <div class="sheet">
+        <template v-if="periodBlocks.length">
+          <section v-for="block in periodBlocks" :key="block.period">
+            <div class="half-head">
+              <span>{{ block.label }}</span>
+              <span>{{ block.score }}</span>
             </div>
-          </li>
-        </ul>
+            <div
+              v-for="ev in block.items"
+              :key="ev.id"
+              class="ev"
+              :class="ev.home ? 'home' : 'away'"
+            >
+              <span class="who-ev">
+                <b>{{ playerTag(ev.playerName, ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
+                <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
+              </span>
+              <i class="mark" :class="ev.eventType.toLowerCase()" />
+              <em>{{ eventMinute(ev.gameTime) }}'</em>
+            </div>
+          </section>
+        </template>
+        <p v-else class="empty-line">Пока ни гола, ни карточки.</p>
       </div>
       <div class="grid two">
         <div class="panel">
@@ -291,40 +340,120 @@ onUnmounted(() => client?.deactivate())
 </template>
 
 <style scoped>
-.scoreboard { display: grid; gap: 0.45rem; justify-items: center; text-align: center; border-radius: 28px 18px 24px 16px; }
-.period { margin: 0; color: var(--accent); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75rem; }
-.clock {
-  font-family: var(--font-display);
-  font-size: clamp(2.2rem, 6vw, 3.4rem);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-strong);
-  line-height: 1;
+.league-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.85rem;
+  background: #eef4f9;
+  color: var(--navy);
+  font-weight: 800;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 10px;
 }
-.clock.expired { color: var(--danger); }
-.sides {
-  width: 100%;
+.board {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
-  gap: 1rem;
-  align-items: start;
-  margin-top: 0.4rem;
+  gap: 0.6rem;
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.9rem 0.7rem 1rem;
 }
-.team { display: grid; gap: 0.35rem; justify-items: center; }
-.team.away { justify-items: center; }
+.club { display: grid; justify-items: center; gap: 0.35rem; min-width: 0; }
+.who {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: inherit;
+  text-align: center;
+  min-width: 0;
+}
 .crest {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
-  border-radius: 14px 11px 13px 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--navy);
   font-weight: 800;
+  box-shadow: var(--shadow);
 }
-.sides strong { font-family: var(--font-display); font-size: 1.05rem; }
-.scorers { display: grid; gap: 0.15rem; font-size: 0.78rem; color: var(--muted); }
-.tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.btn.on { background: var(--accent); color: var(--navy); border-color: transparent; }
+.who strong {
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+.star {
+  border: 0;
+  background: transparent;
+  color: #c5ced8;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+}
+.star.on { color: var(--ice); }
+.center { text-align: center; }
+.when, .state, .clock-note { margin: 0; font-size: 0.78rem; color: var(--muted); }
+.state { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; }
+.score {
+  margin: 0.15rem 0;
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+}
+.clock {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ice);
+}
+.clock.expired { color: var(--danger); }
+.sheet {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.half-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.85rem;
+  background: #f4f7fb;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ev {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+.ev.away { grid-template-columns: auto auto 1fr; }
+.ev.away .who-ev { order: 3; text-align: right; justify-items: end; }
+.ev.away .mark { order: 2; }
+.ev.away em { order: 1; }
+.who-ev { display: grid; gap: 0.1rem; min-width: 0; }
+.ev b { font-weight: 800; color: var(--navy); }
+.ev em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.line { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--navy);
+}
+.mark.yellow_card { border-radius: 3px; background: #f5c400; }
+.mark.red_card { border-radius: 3px; background: var(--danger); }
+.mark.substitution { border-radius: 2px; background: var(--ice); }
+.empty-line { padding: 0.9rem; margin: 0; }
 .lineups { grid-template-columns: 1fr 1fr; gap: 1rem; }
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
@@ -335,15 +464,14 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   align-items: start;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--line);
-  border-radius: 13px 11px 14px 10px;
+  border-radius: 12px;
   background: #f6f9fc;
 }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
-@media (max-width: 860px) {
-  .sides { grid-template-columns: 1fr auto 1fr; gap: 0.45rem; }
-  .sides strong { font-size: 0.82rem; }
+@media (max-width: 719px) {
+  .who strong { font-size: 0.78rem; }
+  .crest { width: 40px; height: 40px; }
   .lineups { grid-template-columns: 1fr; }
-  .scoreboard { border-radius: 14px; padding: 0.9rem; }
-  .clock { font-size: 1.6rem; }
+  .board { padding: 0.75rem 0.5rem 0.85rem; gap: 0.35rem; }
 }
 </style>

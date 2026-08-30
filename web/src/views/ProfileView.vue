@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useFavorites } from '../stores/favorites'
 import api from '../api/client'
@@ -12,6 +12,8 @@ import MatchRow from '../components/MatchRow.vue'
 
 const auth = useAuthStore()
 const fav = useFavorites()
+const router = useRouter()
+const pane = ref<'fav' | 'card'>('fav')
 const teams = useTeamDirectory()
 const firstName = ref('')
 const lastName = ref('')
@@ -25,7 +27,6 @@ const ok = ref('')
 const exists = ref(false)
 const avatarUrl = ref('')
 const playerId = ref('')
-const editOpen = ref(false)
 const allMatches = ref<any[]>([])
 
 const roles = computed(() => {
@@ -84,6 +85,11 @@ async function submit() {
     pending.value = false
   }
 }
+
+async function logout() {
+  await auth.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -108,33 +114,38 @@ async function submit() {
       <RouterLink v-if="auth.canAccessMyTeam" class="tile" to="/my-team">Моя команда</RouterLink>
       <RouterLink v-if="auth.canOfficiate" class="tile" to="/referee">Пульт судьи</RouterLink>
       <RouterLink v-if="auth.canManageLeague" class="tile" to="/admin">Админка</RouterLink>
+      <RouterLink class="tile phone" to="/players">Игроки</RouterLink>
+      <RouterLink class="tile phone" to="/statistics">Статистика</RouterLink>
     </div>
 
-    <div class="sheet">
-      <div class="league-head">Избранные команды</div>
-      <p v-if="!favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
-      <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
-        {{ team.name }}
-      </RouterLink>
+    <div class="fs-tabs">
+      <button type="button" :class="{ on: pane === 'fav' }" @click="pane = 'fav'">Избранное</button>
+      <button type="button" :class="{ on: pane === 'card' }" @click="pane = 'card'">Анкета</button>
     </div>
 
-    <div class="sheet">
-      <div class="league-head">Избранные матчи</div>
-      <p v-if="!favMatches.length" class="empty-line">Отмечайте игры звездой в календаре.</p>
-      <MatchRow
-        v-for="m in favMatches"
-        :key="m.id"
-        :match="m"
-        :home-name="teams.name(m.homeTeamId)"
-        :away-name="teams.name(m.awayTeamId)"
-      />
-    </div>
+    <template v-if="pane === 'fav'">
+      <div class="sheet">
+        <div class="league-head">Избранные команды</div>
+        <p v-if="!favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
+        <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
+          {{ team.name }}
+        </RouterLink>
+      </div>
 
-    <button class="btn secondary" type="button" @click="editOpen = !editOpen">
-      {{ editOpen ? 'Скрыть анкету' : exists ? 'Править анкету игрока' : 'Стать игроком' }}
-    </button>
+      <div class="sheet">
+        <div class="league-head">Избранные матчи</div>
+        <p v-if="!favMatches.length" class="empty-line">Отмечайте игры звездой в календаре.</p>
+        <MatchRow
+          v-for="m in favMatches"
+          :key="m.id"
+          :match="m"
+          :home-name="teams.name(m.homeTeamId)"
+          :away-name="teams.name(m.awayTeamId)"
+        />
+      </div>
+    </template>
 
-    <div v-if="editOpen" class="panel stack">
+    <div v-else class="panel stack">
       <form class="stack" @submit.prevent="submit">
         <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
         <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
@@ -145,10 +156,12 @@ async function submit() {
         <p v-if="error" class="form-error">{{ error }}</p>
         <p v-if="ok" class="form-ok">{{ ok }}</p>
         <button class="btn" type="submit" :disabled="pending">
-          {{ pending ? 'Сохраняем…' : exists ? 'Обновить' : 'Сохранить' }}
+          {{ pending ? 'Сохраняем…' : exists ? 'Обновить' : 'Стать игроком' }}
         </button>
       </form>
     </div>
+
+    <button class="btn secondary" type="button" @click="logout">Выйти</button>
   </section>
 </template>
 
@@ -187,5 +200,9 @@ async function submit() {
   border-top: 1px solid var(--line);
   color: var(--navy);
   font-weight: 700;
+}
+.phone { display: none; }
+@media (max-width: 719px) {
+  .phone { display: block; }
 }
 </style>

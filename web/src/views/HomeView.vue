@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
+import StandingTable from '../components/StandingTable.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Slide = {
@@ -166,21 +167,7 @@ function nudgeStories(dir: number) {
             <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
           </div>
           <EmptyState v-if="loaded && !feed?.standings?.length" title="Нет строк" text="Когда админ запустит турнир — таблица появится здесь." />
-          <table v-else-if="feed?.standings?.length" class="table">
-            <thead>
-              <tr><th>Команда</th><th>И</th><th>В</th><th>Н</th><th>П</th><th>О</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in feed.standings" :key="row.teamId">
-                <td><RouterLink :to="`/teams/${row.teamId}`">{{ row.teamName }}</RouterLink></td>
-                <td>{{ row.played }}</td>
-                <td>{{ row.wins }}</td>
-                <td>{{ row.draws }}</td>
-                <td>{{ row.losses }}</td>
-                <td><strong>{{ row.points }}</strong></td>
-              </tr>
-            </tbody>
-          </table>
+          <StandingTable v-else-if="feed?.standings?.length" :rows="feed.standings" compact />
         </div>
 
         <aside class="panel headlines">
@@ -379,13 +366,23 @@ function nudgeStories(dir: number) {
   background: linear-gradient(transparent, rgba(0, 20, 51, 0.86));
   border-radius: 0 0 16px 16px;
 }
-@media (max-width: 860px) {
+@media (max-width: 1099px) and (min-width: 720px) {
+  .blocks {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+  .sheet { grid-column: 1; grid-row: 1 / span 2; }
+  .hero-grid { grid-column: 2; grid-template-columns: 1fr; }
+  .moments { grid-column: 1 / -1; }
+}
+@media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
   .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
-  .stories-wrap { grid-template-columns: 1fr; }
-  .nudge { display: none; }
-  .hero img { height: 180px; }
-  .blocks { padding-top: 0.9rem; gap: 0.8rem; }
-  .table-block { padding: 1rem; }
+  .stories-wrap { display: none; }
+  .hero img { height: 148px; }
+  .hero-copy h1 { font-size: 1.25rem; }
+  .hero-cta { display: none; }
+  .blocks { padding-top: 0.75rem; gap: 0.7rem; }
+  .table-block { padding: 0.85rem; }
 }
 </style>

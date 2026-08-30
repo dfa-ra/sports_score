@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useFavorites } from './stores/favorites'
@@ -10,7 +10,6 @@ const auth = useAuthStore()
 const fav = useFavorites()
 const route = useRoute()
 const router = useRouter()
-const menuOpen = ref(false)
 
 const mood = computed(() => {
   if (route.path.startsWith('/login') || route.path.startsWith('/register')) return 'mood-auth'
@@ -31,10 +30,6 @@ watch(mood, (value) => {
   document.body.classList.remove('mood-auth', 'mood-pitch', 'mood-ref', 'mood-admin', 'mood-home')
   document.body.classList.add(value)
 }, { immediate: true })
-
-watch(() => route.fullPath, () => {
-  menuOpen.value = false
-})
 
 async function logout() {
   await auth.logout()
@@ -60,11 +55,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <span class="brand-name">KRONBARS</span>
           </RouterLink>
 
-          <button class="btn icon menu-btn secondary" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
-            <span>{{ menuOpen ? '✕' : '☰' }}</span>
-          </button>
-
-          <nav :class="{ open: menuOpen }">
+          <nav>
             <RouterLink to="/" exact-active-class="on">Главная</RouterLink>
             <RouterLink to="/table" active-class="on">Таблица</RouterLink>
             <RouterLink to="/calendar" active-class="on">Игры</RouterLink>
@@ -80,10 +71,13 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
               <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
                 <PlayerAvatar :src="auth.user?.photoUrl" :name="auth.user?.firstName || auth.user?.email" :size="32" />
               </RouterLink>
-              <button class="login-pill ghost desk-only" type="button" @click="logout">Выйти</button>
+              <button class="login-pill ghost wide-only" type="button" @click="logout">Выйти</button>
             </template>
             <template v-else>
-              <RouterLink class="login-pill" to="/login">Войти</RouterLink>
+              <RouterLink class="login-pill wide-only" to="/login">Войти</RouterLink>
+              <RouterLink class="avatar-link phone-only" to="/login" aria-label="Войти">
+                <span class="user-ico">○</span>
+              </RouterLink>
             </template>
           </div>
         </div>
@@ -99,21 +93,30 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
     </footer>
 
     <nav v-if="!hideDock" class="dock" aria-label="Основное меню">
-      <RouterLink to="/calendar" :class="{ on: (route.path.startsWith('/calendar') && String(route.query.tab) !== 'live') || route.path.startsWith('/matches') }">
-        <span class="ico">▣</span>
+      <RouterLink
+        to="/calendar"
+        :class="{ on: route.path === '/' || ((route.path.startsWith('/calendar') || route.path.startsWith('/matches')) && String(route.query.tab) !== 'live') }"
+      >
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 12h18M8 6v12"/></svg>
+        </span>
         <span>Игры</span>
       </RouterLink>
       <RouterLink to="/table" :class="{ on: route.path.startsWith('/table') }">
-        <span class="ico">≡</span>
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        </span>
         <span>Таблица</span>
       </RouterLink>
       <RouterLink to="/calendar?tab=live" :class="{ on: route.path.startsWith('/calendar') && String(route.query.tab) === 'live' }">
-        <span class="ico live">◉</span>
+        <span class="ico live" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9.2"/></svg>
+        </span>
         <span>Live</span>
       </RouterLink>
       <RouterLink :to="profileTo" :class="{ on: route.path.startsWith('/profile') }">
-        <span class="ico">
-          {{ auth.isAuthenticated ? '●' : '○' }}
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3.2 3.8-4.6 7-4.6S17.6 15.8 19 19"/></svg>
           <i v-if="fav.count" class="badge">{{ fav.count }}</i>
         </span>
         <span>Профиль</span>
@@ -183,21 +186,34 @@ nav a.on { color: var(--navy); background: var(--ice); }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
 .auth { display: flex; gap: 0.4rem; align-items: center; }
 .avatar-link { display: grid; place-items: center; }
-.menu-btn { display: none; }
+.phone-only { display: none; }
+.user-ico {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid rgba(255,255,255,0.55);
+  color: #fff;
+  font-size: 1rem;
+}
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
 .dock { display: none; }
 
-@media (max-width: 860px) {
+@media (max-width: 1099px) {
   .util { display: none; }
+  .nav-inner { min-height: 56px; }
+  nav a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
+}
+
+@media (max-width: 719px) {
+  header nav { display: none; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.95rem; }
-  .menu-btn { display: inline-flex; }
-  header nav { display: none; width: 100%; order: 4; padding-bottom: 0.7rem; }
-  header nav.open { display: flex; }
-  .nav-inner { flex-wrap: wrap; }
-  .desk-only { display: none; }
+  .wide-only { display: none; }
+  .phone-only { display: grid; }
   .shell.docked .main { padding-bottom: 5.6rem; }
   .shell.docked .foot { display: none; }
   .dock {
@@ -225,7 +241,14 @@ nav a.on { color: var(--navy); background: var(--ice); }
     padding: 0.25rem 0;
   }
   .dock a.on { color: var(--navy); }
-  .dock .ico { position: relative; font-size: 1.05rem; line-height: 1; }
+  .dock .ico {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+  }
+  .dock .ico svg { width: 20px; height: 20px; }
   .dock .ico.live { color: var(--ice); }
   .dock .badge {
     position: absolute;

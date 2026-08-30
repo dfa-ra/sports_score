@@ -19,7 +19,9 @@ const names = useTeamDirectory()
 const team = ref<any>(null)
 const members = ref<any[]>([])
 const matches = ref<any[]>([])
-const tab = ref<'results' | 'squad'>('results')
+const tab = ref<'results' | 'calendar' | 'squad'>('results')
+const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED'))
+const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
 const players = ref<any[]>([])
 const me = ref<any>(null)
 const name = ref('')
@@ -156,7 +158,9 @@ async function disbandTeam() {
 
     <div class="fs-tabs">
       <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
+      <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
       <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
+      <RouterLink to="/table">Таблица</RouterLink>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
@@ -169,9 +173,21 @@ async function disbandTeam() {
     </div>
 
     <div v-if="tab === 'results'" class="sheet">
-      <EmptyState v-if="!matches.length" title="Матчей пока нет" />
+      <EmptyState v-if="!played.length" title="Сыгранных матчей пока нет" />
       <MatchRow
-        v-for="m in matches"
+        v-for="m in played"
+        :key="m.id"
+        :match="m"
+        :home-name="names.name(m.homeTeamId)"
+        :away-name="names.name(m.awayTeamId)"
+        :highlight-team-id="team.id"
+      />
+    </div>
+
+    <div v-else-if="tab === 'calendar'" class="sheet">
+      <EmptyState v-if="!upcoming.length" title="Ближайших матчей нет" />
+      <MatchRow
+        v-for="m in upcoming"
         :key="m.id"
         :match="m"
         :home-name="names.name(m.homeTeamId)"

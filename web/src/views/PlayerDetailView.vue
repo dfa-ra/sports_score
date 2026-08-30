@@ -223,4 +223,9 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .result.win { background: #1b8a4a; }
 .result.draw { background: #c47b00; }
 .result.loss { background: var(--danger); }
+@media (max-width: 719px) {
+  .head { gap: 0.7rem; }
+  .who h1 { font-size: 1.35rem; }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+}
 </style>
