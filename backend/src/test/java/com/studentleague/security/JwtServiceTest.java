@@ -24,7 +24,8 @@ class JwtServiceTest {
                 new AppProperties.Redis(false),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
                 new AppProperties.Admin("", ""),
-                new AppProperties.Auth(false)
+                new AppProperties.Auth(false),
+                new AppProperties.DemoData(false)
         );
         jwtService = new JwtService(properties);
     }

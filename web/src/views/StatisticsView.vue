@@ -37,7 +37,7 @@ onMounted(async () => {
   <section class="stack">
     <div class="page-title">
       <h1>Статистика</h1>
-      <p>Бомбардиры, ассистенты и вратари по сухим матчам текущего турнира.</p>
+      <p>Бомбардиры, ассистенты и сухие матчи текущего турнира.</p>
     </div>
     <div v-if="loading" class="grid cards">
       <div class="skeleton" />
@@ -73,7 +73,7 @@ onMounted(async () => {
         </table>
       </div>
       <div class="panel">
-        <h2>Вратари</h2>
+        <h2>Сухие матчи</h2>
         <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" text="Считаем по позиции вратаря и нулю пропущенных." />
         <table v-else class="table">
           <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
