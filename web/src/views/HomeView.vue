@@ -92,13 +92,13 @@ function nudgeStories(dir: number) {
           <button class="nudge" type="button" aria-label="Сюжеты вперёд" @click="nudgeStories(1)">›</button>
         </div>
 
-        <div class="hero">
+        <div class="hero" :class="{ photo: !!current?.url }">
           <img v-if="current?.url" :src="current.url" :alt="current.title || 'Главный кадр'" />
-          <div class="hero-shade" />
+          <div v-if="current?.url" class="hero-shade" />
           <div class="hero-copy">
             <p class="eyebrow">{{ feed?.tournament?.name || 'Студенческая лига' }}</p>
             <h1>{{ current?.title || 'Живой сезон KRONBARS' }}</h1>
-            <p>{{ current?.caption || 'Таблица, календарь и статистика — как на большом сайте, только своя лига.' }}</p>
+            <p v-if="current?.caption">{{ current.caption }}</p>
             <a
               v-if="isExternal(hrefOf(current, '/calendar'))"
               class="btn hero-cta"
@@ -188,7 +188,7 @@ function nudgeStories(dir: number) {
   background:
     radial-gradient(720px 280px at 80% 0%, rgba(76, 180, 229, 0.22), transparent 60%),
     var(--navy);
-  padding: 1.1rem 0 1.6rem;
+  padding: 0.85rem 0 1.15rem;
 }
 .stories-wrap {
   display: grid;
@@ -245,30 +245,33 @@ function nudgeStories(dir: number) {
 }
 .hero {
   position: relative;
-  min-height: 380px;
   border-radius: 18px;
   overflow: hidden;
   background: #001433;
 }
-.hero img { width: 100%; height: 420px; object-fit: cover; display: block; }
+.hero img { width: 100%; height: 280px; object-fit: cover; display: block; }
 .hero-shade {
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, rgba(0, 20, 51, 0.82) 0%, rgba(0, 20, 51, 0.2) 70%);
 }
 .hero-copy {
-  position: absolute;
-  left: 2rem;
-  bottom: 2.4rem;
-  right: 2rem;
-  max-width: 560px;
-  color: #fff;
   display: grid;
-  gap: 0.7rem;
+  gap: 0.55rem;
+  padding: 1.25rem 1.5rem 1.35rem;
+  color: #fff;
 }
-.hero-copy h1 { color: #fff; font-size: clamp(1.7rem, 4vw, 2.6rem); }
+.hero.photo .hero-copy {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 560px;
+  padding: 1.2rem 1.5rem 1.35rem;
+}
+.hero-copy h1 { color: #fff; font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
 .hero-copy p { color: rgba(255,255,255,0.86); }
-.hero-cta { width: fit-content; border-radius: 999px; padding-inline: 1.35rem; }
+.hero-cta { width: fit-content; border-radius: 999px; padding: 0.58rem 1.15rem; }
 .dots {
   position: absolute;
   left: 50%;
@@ -338,7 +341,7 @@ function nudgeStories(dir: number) {
 }
 @media (max-width: 860px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .hero-copy { left: 1rem; right: 1rem; }
+  .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
   .stories-wrap { grid-template-columns: 1fr; }
   .nudge { display: none; }
 }
