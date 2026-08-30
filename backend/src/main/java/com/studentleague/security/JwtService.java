@@ -32,6 +32,7 @@ public class JwtService {
                 .subject(principal.getId().toString())
                 .claim("email", principal.getUsername())
                 .claim("role", principal.getRole().name())
+                .claim("roles", principal.getApprovedRoles().stream().map(Enum::name).toList())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(secretKey)

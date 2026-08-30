@@ -20,6 +20,7 @@ import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class MatchService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
+    private final RoleService roleService;
 
     public MatchService(
             MatchRepository matchRepository,
@@ -47,7 +49,8 @@ public class MatchService {
             TournamentTeamRepository tournamentTeamRepository,
             UserRepository userRepository,
             NotificationService notificationService,
-            MatchMapper matchMapper
+            MatchMapper matchMapper,
+            RoleService roleService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -56,6 +59,7 @@ public class MatchService {
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
+        this.roleService = roleService;
     }
 
     @Transactional
@@ -120,7 +124,9 @@ public class MatchService {
         requireMatch(matchId);
         User referee = userRepository.findById(request.refereeId())
                 .orElseThrow(() -> ApiException.notFound("Referee user not found"));
-        if (referee.getRole() != Role.REFEREE && referee.getRole() != Role.ADMIN) {
+        if (referee.getRole() != Role.REFEREE && referee.getRole() != Role.ADMIN
+                && !roleService.hasApproved(referee.getId(), Role.REFEREE)
+                && !roleService.hasApproved(referee.getId(), Role.ADMIN)) {
             throw ApiException.badRequest("User must have REFEREE role");
         }
         if (matchRefereeRepository.existsByMatchIdAndRefereeId(matchId, referee.getId())) {
@@ -139,6 +145,21 @@ public class MatchService {
         );
         return new MatchRefereeResponse(
                 assignment.getId(), assignment.getMatchId(), assignment.getRefereeId(), assignment.getAssignedAt());
+    }
+
+    @Transactional(readOnly = true)
+    public List<MatchResponse> recentForm(UUID teamId, int limit) {
+        int size = Math.max(1, Math.min(limit, 10));
+        return matchRepository.findRecentByTeamAndStatus(
+                        teamId, MatchStatus.FINISHED, Pageable.ofSize(size)
+                ).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MatchResponse> listForTeam(UUID teamId, Pageable pageable) {
+        return matchRepository.findByTeamId(teamId, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

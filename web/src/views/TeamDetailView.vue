@@ -128,7 +128,7 @@ async function disbandTeam() {
       <span class="crest">{{ initials(team.shortName || team.name) }}</span>
       <h1>{{ team.name }}</h1>
       <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
-      <p v-else>{{ team.shortName || 'Команда без аббревиатуры, но с характером.' }}</p>
+      <p v-else>{{ team.shortName || 'Команда без аббревиатуры' }}{{ team.foundedOn ? ' · осн. ' + team.foundedOn : '' }}</p>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">

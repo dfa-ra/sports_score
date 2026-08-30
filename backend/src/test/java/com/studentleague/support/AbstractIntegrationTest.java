@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import io.zonky.test.db.AutoConfigureEmbeddedDatabase;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -36,6 +37,9 @@ public abstract class AbstractIntegrationTest {
     @Autowired
     protected PasswordEncoder passwordEncoder;
 
+    @Autowired
+    protected RoleService roleService;
+
     @DynamicPropertySource
     static void registerProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
@@ -45,19 +49,37 @@ public abstract class AbstractIntegrationTest {
         registry.add("app.jwt.refresh-expiration-ms", () -> "604800000");
         registry.add("app.rate-limit.auth-requests-per-minute", () -> "1000");
         registry.add("app.cors.allowed-origins", () -> "http://localhost:5173");
+        registry.add("app.auth.auto-approve-roles", () -> "true");
         registry.add("spring.autoconfigure.exclude", () ->
                 "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
                         + "org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration");
     }
 
     protected String registerAndLogin(String email, String password) throws Exception {
+        return registerAndLogin(email, password, "FAN", null);
+    }
+
+    protected String registerAndLogin(String email, String password, String role, String photoUrl) throws Exception {
+        String photo = photoUrl == null ? "" : ",\"photoUrl\":\"%s\"".formatted(photoUrl);
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email":"%s","password":"%s","accountType":"FAN"}
-                                """.formatted(email, password)))
+                                {"email":"%s","password":"%s","firstName":"Тест","lastName":"Студент","role":"%s"%s}
+                                """.formatted(email, password, role, photo)))
                 .andExpect(status().isCreated());
+        return loginOnly(email, password);
+    }
 
+    protected String createAdminAndLogin(String email, String password) throws Exception {
+        registerAndLogin(email, password);
+        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        user.setRole(Role.ADMIN);
+        userRepository.save(user);
+        roleService.grantApproved(user, Role.ADMIN, null);
+        return loginOnly(email, password);
+    }
+
+    protected String loginOnly(String email, String password) throws Exception {
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -67,21 +89,6 @@ public abstract class AbstractIntegrationTest {
                 .andReturn();
         JsonNode body = objectMapper.readTree(login.getResponse().getContentAsString());
         return body.get("accessToken").asText();
-    }
-
-    protected String createAdminAndLogin(String email, String password) throws Exception {
-        registerAndLogin(email, password);
-        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
-        user.setRole(Role.ADMIN);
-        userRepository.save(user);
-        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"%s","password":"%s"}
-                                """.formatted(email, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-        return objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
     protected String auth(String token) {

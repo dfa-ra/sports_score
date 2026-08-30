@@ -3,7 +3,9 @@ package com.studentleague.statistics.service;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.entity.MatchLineupPlayer;
 import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
@@ -33,19 +35,22 @@ public class StatisticsService {
     private final TournamentRepository tournamentRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final TeamRepository teamRepository;
+    private final MatchLineupPlayerRepository lineupPlayerRepository;
 
     public StatisticsService(
             MatchEventRepository matchEventRepository,
             MatchRepository matchRepository,
             TournamentRepository tournamentRepository,
             PlayerProfileRepository playerProfileRepository,
-            TeamRepository teamRepository
+            TeamRepository teamRepository,
+            MatchLineupPlayerRepository lineupPlayerRepository
     ) {
         this.matchEventRepository = matchEventRepository;
         this.matchRepository = matchRepository;
         this.tournamentRepository = tournamentRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.teamRepository = teamRepository;
+        this.lineupPlayerRepository = lineupPlayerRepository;
     }
 
     @Transactional(readOnly = true)
@@ -121,11 +126,123 @@ public class StatisticsService {
                             acc.yellowCards,
                             acc.redCards,
                             acc.appearances,
-                            acc.teamId
+                            acc.teamId,
+                            0
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.goals(), a.goals()))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlayerStatisticsResponse> scorers(UUID tournamentId, int limit) {
+        return playerStatistics(tournamentId, null, null, null).stream()
+                .sorted((a, b) -> Long.compare(b.goals(), a.goals()))
+                .limit(Math.max(1, limit))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlayerStatisticsResponse> assists(UUID tournamentId, int limit) {
+        return playerStatistics(tournamentId, null, null, null).stream()
+                .sorted((a, b) -> Long.compare(b.assists(), a.assists()))
+                .limit(Math.max(1, limit))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlayerStatisticsResponse> goalkeepers(UUID tournamentId, int limit) {
+        Map<UUID, Long> sheets = cleanSheetsByPlayer(tournamentId);
+        Map<UUID, PlayerProfile> profiles = playerProfileRepository.findAllById(sheets.keySet()).stream()
+                .collect(Collectors.toMap(PlayerProfile::getId, p -> p));
+        List<PlayerStatisticsResponse> base = playerStatistics(tournamentId, null, null, null);
+        Map<UUID, PlayerStatisticsResponse> byId = base.stream()
+                .collect(Collectors.toMap(PlayerStatisticsResponse::playerId, p -> p, (a, b) -> a));
+        return sheets.entrySet().stream()
+                .map(entry -> {
+                    PlayerStatisticsResponse existing = byId.get(entry.getKey());
+                    PlayerProfile profile = profiles.get(entry.getKey());
+                    if (existing != null) {
+                        return new PlayerStatisticsResponse(
+                                existing.playerId(), existing.displayName(), existing.goals(), existing.assists(),
+                                existing.yellowCards(), existing.redCards(), existing.appearances(),
+                                existing.teamId(), entry.getValue()
+                        );
+                    }
+                    return new PlayerStatisticsResponse(
+                            entry.getKey(),
+                            profile == null ? null : profile.getDisplayName(),
+                            0, 0, 0, 0, entry.getValue(), null, entry.getValue()
+                    );
+                })
+                .sorted((a, b) -> Long.compare(b.cleanSheets(), a.cleanSheets()))
+                .limit(Math.max(1, limit))
+                .toList();
+    }
+
+    private Map<UUID, Long> cleanSheetsByPlayer(UUID tournamentId) {
+        List<Match> matches = tournamentId == null
+                ? matchRepository.findAll()
+                : matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+        Map<UUID, Long> sheets = new HashMap<>();
+        for (Match match : matches) {
+            if (match.getStatus() != MatchStatus.FINISHED) {
+                continue;
+            }
+            countCleanSheet(sheets, match, match.getHomeTeamId(), match.getAwayScore() == 0);
+            countCleanSheet(sheets, match, match.getAwayTeamId(), match.getHomeScore() == 0);
+        }
+        return sheets;
+    }
+
+    private void countCleanSheet(Map<UUID, Long> sheets, Match match, UUID teamId, boolean clean) {
+        if (!clean) {
+            return;
+        }
+        List<MatchLineupPlayer> lineup = lineupPlayerRepository.findByMatchIdAndTeamId(match.getId(), teamId);
+        List<UUID> keepers = lineup.stream()
+                .map(MatchLineupPlayer::getPlayerId)
+                .filter(this::isGoalkeeper)
+                .toList();
+        if (keepers.isEmpty()) {
+            keepers = playerProfileRepository.findAllById(
+                    lineup.stream().map(MatchLineupPlayer::getPlayerId).toList()
+            ).stream()
+                    .filter(profile -> isGoalkeeper(profile.getId()))
+                    .map(PlayerProfile::getId)
+                    .toList();
+        }
+        if (keepers.isEmpty()) {
+            List<MatchEvent> events = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(match.getId());
+            keepers = events.stream()
+                    .filter(event -> teamId.equals(event.getTeamId()) && event.getPlayerId() != null)
+                    .map(MatchEvent::getPlayerId)
+                    .distinct()
+                    .filter(this::isGoalkeeper)
+                    .toList();
+        }
+        for (UUID keeperId : keepers) {
+            sheets.merge(keeperId, 1L, Long::sum);
+        }
+    }
+
+    private boolean isGoalkeeper(UUID playerId) {
+        return playerProfileRepository.findById(playerId)
+                .map(PlayerProfile::getPosition)
+                .map(StatisticsService::looksLikeGoalkeeper)
+                .orElse(false);
+    }
+
+    static boolean looksLikeGoalkeeper(String position) {
+        if (position == null || position.isBlank()) {
+            return false;
+        }
+        String value = position.toLowerCase();
+        return value.contains("gk")
+                || value.contains("goal")
+                || value.contains("вратар")
+                || value.matches(".*\\bвр\\b.*")
+                || value.contains("keeper");
     }
 
     @Transactional(readOnly = true)

@@ -41,7 +41,8 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                                 """))
                 .andExpect(status().isOk());
 
-        String teamA = createTeam(captainToken, "Alpha FC");
+        String captainPlayerId = playerId(captainToken);
+        String teamA = createTeam(adminToken, "Alpha FC", captainPlayerId);
         captainToken = reLogin(captainEmail, "Str0ngPass!");
         String teamBCaptainEmail = "tb-" + System.nanoTime() + "@example.com";
         String teamBToken = registerAndLogin(teamBCaptainEmail, "Str0ngPass!");
@@ -52,7 +53,7 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                                 {"firstName":"Bee","lastName":"Captain"}
                                 """))
                 .andExpect(status().isOk());
-        String teamB = createTeam(teamBToken, "Beta FC");
+        String teamB = createTeam(adminToken, "Beta FC", playerId(teamBToken));
 
         MvcResult sports = mockMvc.perform(get("/api/v1/sports").header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())
@@ -148,14 +149,21 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 
-    private String createTeam(String token, String name) throws Exception {
+    private String createTeam(String adminToken, String name, String captainPlayerId) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/teams")
-                        .header("Authorization", auth(token))
+                        .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"%s","shortName":"%s"}
-                                """.formatted(name, name.substring(0, 2).toUpperCase())))
+                                {"name":"%s","shortName":"%s","captainPlayerId":"%s"}
+                                """.formatted(name, name.substring(0, 2).toUpperCase(), captainPlayerId)))
                 .andExpect(status().isCreated())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+    }
+
+    private String playerId(String token) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/players/me").header("Authorization", auth(token)))
+                .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
     }

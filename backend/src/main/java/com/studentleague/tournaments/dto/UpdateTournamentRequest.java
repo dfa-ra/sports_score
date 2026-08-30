@@ -8,10 +8,12 @@ import java.time.LocalDate;
 public record UpdateTournamentRequest(
         @Size(max = 200) String name,
         String description,
+        String regulations,
         Integer seasonYear,
         LocalDate startDate,
         LocalDate endDate,
         TournamentStatus status,
-        @Size(max = 64) String format
+        @Size(max = 64) String format,
+        Integer maxSquadSize
 ) {
 }

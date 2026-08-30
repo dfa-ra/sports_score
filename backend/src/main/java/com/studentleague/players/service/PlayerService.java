@@ -74,11 +74,6 @@ public class PlayerService {
         apply(profile, request);
         playerProfileRepository.save(profile);
 
-        if (creating && (user.getRole() == Role.FAN)) {
-            user.setRole(Role.PLAYER);
-            userRepository.save(user);
-        }
-
         return toResponse(profile);
     }
 
@@ -95,7 +90,23 @@ public class PlayerService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PlayerProfileResponse> list(String query, Pageable pageable) {
+    public Page<PlayerProfileResponse> list(String query, UUID teamId, Pageable pageable) {
+        if (teamId != null) {
+            var memberIds = teamMemberRepository.findByTeamIdAndStatus(teamId, TeamMemberStatus.ACTIVE).stream()
+                    .map(TeamMember::getPlayerId)
+                    .toList();
+            List<PlayerProfile> profiles = playerProfileRepository.findAllById(memberIds);
+            if (query != null && !query.isBlank()) {
+                String q = query.trim().toLowerCase();
+                profiles = profiles.stream()
+                        .filter(profile -> contains(profile.getFirstName(), q)
+                                || contains(profile.getLastName(), q)
+                                || contains(profile.getDisplayName(), q))
+                        .toList();
+            }
+            List<PlayerProfileResponse> mapped = profiles.stream().map(this::toResponse).toList();
+            return new org.springframework.data.domain.PageImpl<>(mapped, pageable, mapped.size());
+        }
         Page<PlayerProfile> page;
         if (query == null || query.isBlank()) {
             page = playerProfileRepository.findAll(pageable);
@@ -106,6 +117,10 @@ public class PlayerService {
                             q, q, q, pageable);
         }
         return page.map(this::toResponse);
+    }
+
+    private static boolean contains(String value, String query) {
+        return value != null && value.toLowerCase().contains(query);
     }
 
     @Transactional(readOnly = true)

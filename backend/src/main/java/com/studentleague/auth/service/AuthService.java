@@ -12,7 +12,9 @@ import com.studentleague.security.JwtService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
+import com.studentleague.users.repository.UserRoleAssignmentRepository;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PlayerProfileRepository playerProfileRepository;
+    private final UserRoleAssignmentRepository assignmentRepository;
+    private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AppProperties appProperties;
@@ -41,6 +45,8 @@ public class AuthService {
             UserRepository userRepository,
             RefreshTokenRepository refreshTokenRepository,
             PlayerProfileRepository playerProfileRepository,
+            UserRoleAssignmentRepository assignmentRepository,
+            RoleService roleService,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             AppProperties appProperties
@@ -48,6 +54,8 @@ public class AuthService {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.playerProfileRepository = playerProfileRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.roleService = roleService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.appProperties = appProperties;
@@ -60,12 +68,11 @@ public class AuthService {
             throw ApiException.conflict("Email already registered");
         }
 
-        Role role = "PLAYER".equals(request.accountType()) ? Role.PLAYER : Role.FAN;
-        if (role != Role.FAN && role != Role.PLAYER) {
-            throw ApiException.badRequest("Можно зарегистрироваться только как FAN или PLAYER");
+        Role requested = Role.valueOf(request.resolvedRole());
+        if (requested == Role.ADMIN) {
+            throw ApiException.badRequest("Можно зарегистрироваться как FAN, PLAYER, CAPTAIN или REFEREE");
         }
 
-        // Email из ADMIN_EMAIL нельзя зарегистрировать публично
         AppProperties.Admin admin = appProperties.admin();
         if (admin != null && admin.email() != null
                 && normalizedEmail.equalsIgnoreCase(admin.email().trim())) {
@@ -75,20 +82,21 @@ public class AuthService {
         User user = new User();
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole(role);
+        user.setFirstName(request.firstName().trim());
+        user.setLastName(request.lastName().trim());
+        user.setPhotoUrl(blankToNull(request.photoUrl()));
+        user.setRole(Role.FAN);
         user.setEnabled(true);
         userRepository.save(user);
 
-        if (role == Role.PLAYER) {
-            PlayerProfile profile = new PlayerProfile();
-            profile.setUserId(user.getId());
-            profile.setFirstName(request.firstName().trim());
-            profile.setLastName(request.lastName().trim());
-            profile.setDisplayName(request.firstName().trim() + " " + request.lastName().trim());
-            playerProfileRepository.save(profile);
+        roleService.grantApproved(user, Role.FAN, null);
+        if (requested != Role.FAN) {
+            roleService.requestRole(user, requested, request.photoUrl());
         }
 
-        return toUserResponse(user);
+        ensurePlayerProfile(user, request);
+
+        return roleService.toUserResponse(user);
     }
 
     @Transactional
@@ -120,9 +128,9 @@ public class AuthService {
         refreshTokenRepository.save(existing);
         refreshTokenRepository.save(replacement);
 
-        UserPrincipal principal = UserPrincipal.from(user);
+        UserPrincipal principal = UserPrincipal.from(user, assignmentRepository.findByUserId(user.getId()));
         String accessToken = jwtService.createAccessToken(principal);
-        return new AuthTokens(accessToken, replacement.getRawToken(), jwtService.getAccessExpirationMs() / 1000, toUserResponse(user));
+        return new AuthTokens(accessToken, replacement.getRawToken(), jwtService.getAccessExpirationMs() / 1000, roleService.toUserResponse(user));
     }
 
     @Transactional
@@ -139,15 +147,28 @@ public class AuthService {
     public UserResponse me(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ApiException.notFound("User not found"));
-        return toUserResponse(user);
+        return roleService.toUserResponse(user);
     }
 
     private AuthTokens issueTokens(User user) {
         RefreshToken refreshToken = createRefreshTokenEntity(user.getId());
         refreshTokenRepository.save(refreshToken);
-        UserPrincipal principal = UserPrincipal.from(user);
+        UserPrincipal principal = UserPrincipal.from(user, assignmentRepository.findByUserId(user.getId()));
         String accessToken = jwtService.createAccessToken(principal);
-        return new AuthTokens(accessToken, refreshToken.getRawToken(), jwtService.getAccessExpirationMs() / 1000, toUserResponse(user));
+        return new AuthTokens(accessToken, refreshToken.getRawToken(), jwtService.getAccessExpirationMs() / 1000, roleService.toUserResponse(user));
+    }
+
+    private void ensurePlayerProfile(User user, RegisterRequest request) {
+        if (playerProfileRepository.existsByUserId(user.getId())) {
+            return;
+        }
+        PlayerProfile profile = new PlayerProfile();
+        profile.setUserId(user.getId());
+        profile.setFirstName(request.firstName().trim());
+        profile.setLastName(request.lastName().trim());
+        profile.setDisplayName(request.firstName().trim() + " " + request.lastName().trim());
+        profile.setAvatarUrl(blankToNull(request.photoUrl()));
+        playerProfileRepository.save(profile);
     }
 
     private RefreshToken createRefreshTokenEntity(UUID userId) {
@@ -174,8 +195,8 @@ public class AuthService {
         }
     }
 
-    private static UserResponse toUserResponse(User user) {
-        return new UserResponse(user.getId(), user.getEmail(), user.getRole(), user.isEnabled());
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     public record AuthTokens(String accessToken, String refreshToken, long expiresInSeconds, UserResponse user) {

@@ -1,6 +1,8 @@
 package com.studentleague.teams.controller;
 
 import com.studentleague.common.dto.PageResponse;
+import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.service.MatchService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.dto.AddTeamMemberRequest;
 import com.studentleague.teams.dto.AssignCaptainRequest;
@@ -40,9 +42,11 @@ import java.util.UUID;
 public class TeamController {
 
     private final TeamService teamService;
+    private final MatchService matchService;
 
-    public TeamController(TeamService teamService) {
+    public TeamController(TeamService teamService, MatchService matchService) {
         this.teamService = teamService;
+        this.matchService = matchService;
     }
 
     @GetMapping
@@ -57,12 +61,19 @@ public class TeamController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Create a team (caller becomes captain)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Create a team (ADMIN). Captain is assigned by admin.")
     public TeamResponse create(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateTeamRequest request
     ) {
         return teamService.createTeam(principal, request);
+    }
+
+    @GetMapping("/mine")
+    @Operation(summary = "Current user's team")
+    public TeamResponse mine(@AuthenticationPrincipal UserPrincipal principal) {
+        return teamService.myTeam(principal);
     }
 
     @GetMapping("/{id}")
@@ -90,6 +101,24 @@ public class TeamController {
             @PathVariable UUID id
     ) {
         teamService.disbandTeam(principal, id);
+    }
+
+    @GetMapping("/{id}/form")
+    @Operation(summary = "Last finished results of the team")
+    public List<MatchResponse> form(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return matchService.recentForm(id, limit);
+    }
+
+    @GetMapping("/{id}/matches")
+    @Operation(summary = "Team match calendar")
+    public PageResponse<MatchResponse> matches(
+            @PathVariable UUID id,
+            @PageableDefault(size = 20, sort = "scheduledAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        return PageResponse.from(matchService.listForTeam(id, pageable));
     }
 
     @GetMapping("/{id}/members")
@@ -121,7 +150,8 @@ public class TeamController {
     }
 
     @PutMapping("/{id}/captain")
-    @Operation(summary = "Assign team captain (current captain or admin)")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Assign team captain (ADMIN)")
     public TeamResponse assignCaptain(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id,

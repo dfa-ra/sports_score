@@ -47,6 +47,8 @@ app:
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+  auth:
+    auto-approve-roles: ${AUTH_AUTO_APPROVE_ROLES:false}
 
 springdoc:
   api-docs:

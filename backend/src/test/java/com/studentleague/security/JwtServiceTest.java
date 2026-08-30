@@ -23,7 +23,8 @@ class JwtServiceTest {
                 new AppProperties.RateLimit(30),
                 new AppProperties.Redis(false),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
-                new AppProperties.Admin("", "")
+                new AppProperties.Admin("", ""),
+                new AppProperties.Auth(false)
         );
         jwtService = new JwtService(properties);
     }

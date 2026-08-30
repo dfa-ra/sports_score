@@ -42,9 +42,10 @@ public class PlayerController {
     @Operation(summary = "List players")
     public PageResponse<PlayerProfileResponse> list(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) UUID teamId,
             @PageableDefault(size = 20, sort = "lastName", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return PageResponse.from(playerService.list(q, pageable));
+        return PageResponse.from(playerService.list(q, teamId, pageable));
     }
 
     @GetMapping("/me")

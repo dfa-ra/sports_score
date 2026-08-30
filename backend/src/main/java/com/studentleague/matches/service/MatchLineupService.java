@@ -169,10 +169,10 @@ public class MatchLineupService {
     }
 
     private void assertCanSetLineup(UserPrincipal principal, Match match, UUID teamId) {
-        if (principal.getRole() == Role.ADMIN) {
+        if (principal.hasRole(Role.ADMIN)) {
             return;
         }
-        if (principal.getRole() == Role.REFEREE
+        if (principal.hasRole(Role.REFEREE)
                 && matchRefereeRepository.existsByMatchIdAndRefereeId(match.getId(), principal.getId())) {
             return;
         }

@@ -1,5 +1,6 @@
 package com.studentleague.security;
 
+import com.studentleague.users.repository.UserRoleAssignmentRepository;
 import com.studentleague.users.repository.UserRepository;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -20,10 +21,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final UserRoleAssignmentRepository assignmentRepository;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserRepository userRepository) {
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            UserRepository userRepository,
+            UserRoleAssignmentRepository assignmentRepository
+    ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.assignmentRepository = assignmentRepository;
     }
 
     @Override
@@ -46,7 +53,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (!user.isEnabled()) {
                         return;
                     }
-                    UserPrincipal principal = UserPrincipal.from(user);
+                    UserPrincipal principal = UserPrincipal.from(
+                            user, assignmentRepository.findByUserId(user.getId()));
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

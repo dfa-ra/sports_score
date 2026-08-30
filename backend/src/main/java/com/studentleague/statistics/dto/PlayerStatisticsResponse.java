@@ -10,6 +10,7 @@ public record PlayerStatisticsResponse(
         long yellowCards,
         long redCards,
         long appearances,
-        UUID teamId
+        UUID teamId,
+        long cleanSheets
 ) {
 }

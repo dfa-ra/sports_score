@@ -49,11 +49,12 @@ async function logout() {
         </button>
 
         <nav :class="{ open: menuOpen }">
-          <RouterLink to="/tournaments">Турниры</RouterLink>
-          <RouterLink to="/matches">Матчи</RouterLink>
-          <RouterLink to="/teams">Команды</RouterLink>
-          <RouterLink to="/players">Игроки</RouterLink>
+          <RouterLink to="/" active-class="" exact-active-class="router-link-active">Главная</RouterLink>
+          <RouterLink to="/table">Таблица</RouterLink>
+          <RouterLink to="/calendar">Календарь</RouterLink>
           <RouterLink to="/statistics">Статистика</RouterLink>
+          <RouterLink to="/players">Игроки</RouterLink>
+          <RouterLink v-if="auth.canAccessMyTeam" to="/my-team">Моя команда</RouterLink>
           <RouterLink v-if="auth.canManageLeague" to="/admin">Админ</RouterLink>
           <RouterLink v-if="auth.canOfficiate" to="/referee">Судья</RouterLink>
           <RouterLink v-if="auth.isAuthenticated" to="/profile">Профиль</RouterLink>
@@ -118,7 +119,7 @@ async function logout() {
   place-items: center;
   background: var(--accent-soft);
   color: var(--accent);
-  border: 1px solid rgba(98, 181, 229, 0.4);
+  border: 1px solid rgba(76, 180, 229, 0.4);
   font-family: var(--font-display);
   font-size: 0.92rem;
   transform: rotate(-4deg);

@@ -8,20 +8,27 @@ import com.studentleague.auth.dto.RegisterRequest;
 import com.studentleague.auth.dto.UserResponse;
 import com.studentleague.auth.service.AuthRateLimiter;
 import com.studentleague.auth.service.AuthService;
+import com.studentleague.common.exception.ApiException;
 import com.studentleague.security.UserPrincipal;
+import com.studentleague.storage.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -30,14 +37,16 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthRateLimiter authRateLimiter;
+    private final StorageService storageService;
 
-    public AuthController(AuthService authService, AuthRateLimiter authRateLimiter) {
+    public AuthController(AuthService authService, AuthRateLimiter authRateLimiter, StorageService storageService) {
         this.authService = authService;
         this.authRateLimiter = authRateLimiter;
+        this.storageService = storageService;
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Регистрация зрителя (FAN) или игрока (PLAYER)")
+    @Operation(summary = "Регистрация: ФИО, почта, роль. Игрок/капитан/судья прикладывают фото")
     public ResponseEntity<UserResponse> register(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest
@@ -45,6 +54,23 @@ public class AuthController {
         authRateLimiter.check(httpRequest);
         UserResponse user = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
+    }
+
+    @PostMapping(value = "/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Загрузить фото для регистрации (игрок / капитан / судья)")
+    public Map<String, String> uploadRegistrationPhoto(
+            @RequestPart("file") MultipartFile file,
+            HttpServletRequest httpRequest
+    ) {
+        authRateLimiter.check(httpRequest);
+        if (file == null || file.isEmpty()) {
+            throw ApiException.badRequest("Файл обязателен");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw ApiException.badRequest("Нужно изображение");
+        }
+        return Map.of("url", storageService.store("registration", file));
     }
 
     @PostMapping("/login")

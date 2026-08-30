@@ -68,7 +68,7 @@ public class UploadController {
         validateImage(file);
         Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> ApiException.notFound("Team not found"));
-        if (principal.getRole() != Role.ADMIN) {
+        if (!principal.hasRole(Role.ADMIN)) {
             PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
                     .orElseThrow(() -> ApiException.forbidden("Only the team captain can upload a logo"));
             if (!profile.getId().equals(team.getCaptainId())) {

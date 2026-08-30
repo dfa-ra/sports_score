@@ -11,16 +11,20 @@ import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.domain.TournamentFormat;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
 import com.studentleague.tournaments.dto.StandingRow;
+import com.studentleague.tournaments.dto.TournamentFormatResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.entity.TournamentTeam;
+import com.studentleague.tournaments.format.StandingsContext;
+import com.studentleague.tournaments.format.TournamentFormatRegistry;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
@@ -30,11 +34,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class TournamentService {
@@ -46,6 +50,7 @@ public class TournamentService {
     private final PlayerProfileRepository playerProfileRepository;
     private final MatchRepository matchRepository;
     private final NotificationService notificationService;
+    private final TournamentFormatRegistry formatRegistry;
 
     public TournamentService(
             TournamentRepository tournamentRepository,
@@ -54,7 +59,8 @@ public class TournamentService {
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
             MatchRepository matchRepository,
-            NotificationService notificationService
+            NotificationService notificationService,
+            TournamentFormatRegistry formatRegistry
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
@@ -63,6 +69,7 @@ public class TournamentService {
         this.playerProfileRepository = playerProfileRepository;
         this.matchRepository = matchRepository;
         this.notificationService = notificationService;
+        this.formatRegistry = formatRegistry;
     }
 
     @Transactional
@@ -72,12 +79,14 @@ public class TournamentService {
         Tournament tournament = new Tournament();
         tournament.setName(request.name().trim());
         tournament.setDescription(request.description());
+        tournament.setRegulations(request.regulations());
         tournament.setSportId(request.sportId());
         tournament.setSeasonYear(request.seasonYear());
         tournament.setStartDate(request.startDate());
         tournament.setEndDate(request.endDate());
         tournament.setStatus(request.status() == null ? TournamentStatus.DRAFT : request.status());
-        tournament.setFormat(request.format());
+        tournament.setFormat(TournamentFormat.normalize(request.format()));
+        tournament.setMaxSquadSize(request.maxSquadSize());
         return toResponse(tournamentRepository.save(tournament));
     }
 
@@ -89,6 +98,12 @@ public class TournamentService {
         }
         if (request.description() != null) {
             tournament.setDescription(request.description());
+        }
+        if (request.regulations() != null) {
+            tournament.setRegulations(request.regulations());
+        }
+        if (request.maxSquadSize() != null) {
+            tournament.setMaxSquadSize(request.maxSquadSize());
         }
         if (request.seasonYear() != null) {
             tournament.setSeasonYear(request.seasonYear());
@@ -103,7 +118,7 @@ public class TournamentService {
             tournament.setStatus(request.status());
         }
         if (request.format() != null && !request.format().isBlank()) {
-            tournament.setFormat(request.format());
+            tournament.setFormat(TournamentFormat.normalize(request.format()));
         }
         return toResponse(tournamentRepository.save(tournament));
     }
@@ -140,7 +155,7 @@ public class TournamentService {
             throw ApiException.badRequest("Нельзя заявить расформированную команду");
         }
 
-        if (principal.getRole() != Role.ADMIN) {
+        if (!principal.hasRole(Role.ADMIN)) {
             var profile = playerProfileRepository.findByUserId(principal.getId())
                     .orElseThrow(() -> ApiException.forbidden("Only the team captain can register the team"));
             if (!profile.getId().equals(team.getCaptainId())) {
@@ -201,49 +216,38 @@ public class TournamentService {
     }
 
     @Transactional(readOnly = true)
+    public TournamentResponse current() {
+        List<Tournament> active = tournamentRepository.findByStatusOrderByStartDateDescCreatedAtDesc(TournamentStatus.ACTIVE);
+        if (!active.isEmpty()) {
+            return toResponse(active.getFirst());
+        }
+        List<Tournament> all = tournamentRepository.findAllByOrderByStartDateDescCreatedAtDesc();
+        if (all.isEmpty()) {
+            return null;
+        }
+        return toResponse(all.getFirst());
+    }
+
+    @Transactional(readOnly = true)
+    public List<TournamentFormatResponse> formats() {
+        return formatRegistry.list();
+    }
+
+    @Transactional(readOnly = true)
     public List<StandingRow> standings(UUID tournamentId) {
-        requireTournament(tournamentId);
-        Map<UUID, StandingAccumulator> table = new HashMap<>();
-        for (TournamentTeam entry : tournamentTeamRepository.findByTournamentId(tournamentId)) {
-            if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
-                String name = teamRepository.findById(entry.getTeamId()).map(Team::getName).orElse("Unknown");
-                table.put(entry.getTeamId(), new StandingAccumulator(entry.getTeamId(), name));
-            }
+        Tournament tournament = requireTournament(tournamentId);
+        List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
+        List<Match> finished = matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+        Map<UUID, Team> teams = teamRepository.findAllById(
+                entries.stream().map(TournamentTeam::getTeamId).toList()
+        ).stream().collect(Collectors.toMap(Team::getId, Function.identity()));
+        for (Match match : finished) {
+            teams.computeIfAbsent(match.getHomeTeamId(), id -> teamRepository.findById(id).orElse(null));
+            teams.computeIfAbsent(match.getAwayTeamId(), id -> teamRepository.findById(id).orElse(null));
         }
-        for (Match match : matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED)) {
-            StandingAccumulator home = table.computeIfAbsent(match.getHomeTeamId(),
-                    id -> new StandingAccumulator(id, teamRepository.findById(id).map(Team::getName).orElse("Unknown")));
-            StandingAccumulator away = table.computeIfAbsent(match.getAwayTeamId(),
-                    id -> new StandingAccumulator(id, teamRepository.findById(id).map(Team::getName).orElse("Unknown")));
-            home.played++;
-            away.played++;
-            home.goalsFor += match.getHomeScore();
-            home.goalsAgainst += match.getAwayScore();
-            away.goalsFor += match.getAwayScore();
-            away.goalsAgainst += match.getHomeScore();
-            if (match.getHomeScore() > match.getAwayScore()) {
-                home.wins++;
-                home.points += 3;
-                away.losses++;
-            } else if (match.getHomeScore() < match.getAwayScore()) {
-                away.wins++;
-                away.points += 3;
-                home.losses++;
-            } else {
-                home.draws++;
-                away.draws++;
-                home.points++;
-                away.points++;
-            }
-        }
-        return table.values().stream()
-                .sorted(Comparator.comparingInt((StandingAccumulator s) -> s.points).reversed()
-                        .thenComparingInt(s -> s.goalsFor - s.goalsAgainst).reversed()
-                        .thenComparing(s -> s.teamName))
-                .map(s -> new StandingRow(
-                        s.teamId, s.teamName, s.played, s.wins, s.draws, s.losses,
-                        s.goalsFor, s.goalsAgainst, s.points))
-                .toList();
+        teams.values().removeIf(java.util.Objects::isNull);
+        return formatRegistry.handler(tournament.getFormat())
+                .standings(new StandingsContext(tournament, entries, finished, teams));
     }
 
     private Tournament requireTournament(UUID id) {
@@ -253,8 +257,8 @@ public class TournamentService {
 
     private TournamentResponse toResponse(Tournament t) {
         return new TournamentResponse(
-                t.getId(), t.getName(), t.getDescription(), t.getSportId(), t.getSeasonYear(),
-                t.getStartDate(), t.getEndDate(), t.getStatus(), t.getFormat(),
+                t.getId(), t.getName(), t.getDescription(), t.getRegulations(), t.getSportId(), t.getSeasonYear(),
+                t.getStartDate(), t.getEndDate(), t.getStatus(), t.getFormat(), t.getMaxSquadSize(),
                 t.getCreatedAt(), t.getUpdatedAt()
         );
     }
@@ -266,20 +270,5 @@ public class TournamentService {
         );
     }
 
-    private static final class StandingAccumulator {
-        private final UUID teamId;
-        private final String teamName;
-        private int played;
-        private int wins;
-        private int draws;
-        private int losses;
-        private int goalsFor;
-        private int goalsAgainst;
-        private int points;
-
-        private StandingAccumulator(UUID teamId, String teamName) {
-            this.teamId = teamId;
-            this.teamName = teamName;
-        }
-    }
 }
+

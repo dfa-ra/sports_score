@@ -23,6 +23,7 @@ import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class TeamService {
     private final TournamentTeamRepository tournamentTeamRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final UserRepository userRepository;
+    private final RoleService roleService;
     private final NotificationService notificationService;
 
     public TeamService(
@@ -48,6 +50,7 @@ public class TeamService {
             TournamentTeamRepository tournamentTeamRepository,
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
+            RoleService roleService,
             NotificationService notificationService
     ) {
         this.teamRepository = teamRepository;
@@ -55,30 +58,55 @@ public class TeamService {
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
+        this.roleService = roleService;
         this.notificationService = notificationService;
     }
 
     @Transactional
     public TeamResponse createTeam(UserPrincipal principal, CreateTeamRequest request) {
-        if (principal.getRole() == Role.ADMIN) {
-            throw ApiException.forbidden("Админ не создаёт команды — только редактирует и расформировывает");
+        if (!principal.hasRole(Role.ADMIN)) {
+            throw ApiException.forbidden("Команду создаёт только админ");
         }
 
-        PlayerProfile creatorProfile = requireProfileForUser(principal.getId());
         Team team = new Team();
         team.setName(request.name().trim());
         team.setShortName(request.shortName());
         team.setLogoUrl(request.logoUrl());
-        team.setCaptainId(creatorProfile.getId());
-        teamRepository.save(team);
-        ensureActiveMembership(team.getId(), creatorProfile.getId());
-        promoteToCaptain(creatorProfile.getUserId());
+        team.setFoundedOn(request.foundedOn());
+        if (request.captainPlayerId() != null) {
+            PlayerProfile captain = requireCaptainCandidate(request.captainPlayerId());
+            team.setCaptainId(captain.getId());
+            teamRepository.save(team);
+            ensureActiveMembership(team.getId(), captain.getId());
+            roleService.grantApproved(
+                    userRepository.findById(captain.getUserId()).orElseThrow(),
+                    Role.CAPTAIN,
+                    null
+            );
+        } else {
+            teamRepository.save(team);
+        }
         return toTeamResponse(team);
     }
 
     @Transactional(readOnly = true)
     public TeamResponse getTeam(UUID teamId) {
         return toTeamResponse(requireTeam(teamId));
+    }
+
+    @Transactional(readOnly = true)
+    public TeamResponse myTeam(UserPrincipal principal) {
+        if (!principal.hasAnyRole(Role.PLAYER, Role.CAPTAIN, Role.ADMIN, Role.REFEREE)) {
+            throw ApiException.forbidden("У болельщика нет вкладки «Моя команда»");
+        }
+        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
+                .orElseThrow(() -> ApiException.notFound("Сначала заполните профиль игрока"));
+        return teamMemberRepository.findByPlayerIdAndStatus(profile.getId(), TeamMemberStatus.ACTIVE).stream()
+                .map(member -> teamRepository.findById(member.getTeamId()).orElse(null))
+                .filter(team -> team != null && !team.isDisbanded())
+                .findFirst()
+                .map(this::toTeamResponse)
+                .orElseThrow(() -> ApiException.notFound("Вы ещё не в команде"));
     }
 
     @Transactional(readOnly = true)
@@ -111,6 +139,18 @@ public class TeamService {
         if (request.logoUrl() != null) {
             team.setLogoUrl(request.logoUrl());
         }
+        if (request.foundedOn() != null) {
+            if (!principal.hasRole(Role.ADMIN)) {
+                throw ApiException.forbidden("Дату основания меняет только админ");
+            }
+            team.setFoundedOn(request.foundedOn());
+        }
+        if (request.captainPlayerId() != null) {
+            if (!principal.hasRole(Role.ADMIN)) {
+                throw ApiException.forbidden("Капитана назначает только админ");
+            }
+            bindCaptain(team, request.captainPlayerId());
+        }
         return toTeamResponse(teamRepository.save(team));
     }
 
@@ -129,6 +169,10 @@ public class TeamService {
 
         PlayerProfile player = playerProfileRepository.findById(request.playerId())
                 .orElseThrow(() -> ApiException.notFound("Player not found"));
+        if (!roleService.hasApproved(player.getUserId(), Role.PLAYER)
+                && !roleService.hasApproved(player.getUserId(), Role.CAPTAIN)) {
+            throw ApiException.badRequest("Игрока можно добавить только после подтверждения роли ИГРОК");
+        }
 
         TeamMember existing = teamMemberRepository.findByTeamIdAndPlayerId(teamId, player.getId()).orElse(null);
         if (existing != null && existing.getStatus() == TeamMemberStatus.ACTIVE) {
@@ -140,13 +184,6 @@ public class TeamService {
         member.setPlayerId(player.getId());
         member.setStatus(TeamMemberStatus.ACTIVE);
         teamMemberRepository.save(member);
-
-        User user = userRepository.findById(player.getUserId())
-                .orElseThrow(() -> ApiException.notFound("User not found"));
-        if (user.getRole() == Role.FAN) {
-            user.setRole(Role.PLAYER);
-            userRepository.save(user);
-        }
 
         notificationService.publishToUser(
                 player.getUserId(),
@@ -176,25 +213,17 @@ public class TeamService {
 
     @Transactional
     public TeamResponse assignCaptain(UserPrincipal principal, UUID teamId, AssignCaptainRequest request) {
-        Team team = requireActiveTeam(teamId);
-        assertCanManageTeam(principal, team);
-
-        if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(teamId, request.playerId(), TeamMemberStatus.ACTIVE)) {
-            throw ApiException.badRequest("Captain must be an active team member");
+        if (!principal.hasRole(Role.ADMIN)) {
+            throw ApiException.forbidden("Капитана назначает только админ");
         }
-
-        PlayerProfile newCaptain = playerProfileRepository.findById(request.playerId())
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
-
-        team.setCaptainId(newCaptain.getId());
-        teamRepository.save(team);
-        promoteToCaptain(newCaptain.getUserId());
-        return toTeamResponse(team);
+        Team team = requireActiveTeam(teamId);
+        bindCaptain(team, request.playerId());
+        return toTeamResponse(teamRepository.save(team));
     }
 
     @Transactional
     public void disbandTeam(UserPrincipal principal, UUID teamId) {
-        if (principal.getRole() != Role.ADMIN) {
+        if (!principal.hasRole(Role.ADMIN)) {
             throw ApiException.forbidden("Расформировать команду может только админ");
         }
         Team team = requireActiveTeam(teamId);
@@ -212,23 +241,33 @@ public class TeamService {
         }
     }
 
+    private void bindCaptain(Team team, UUID playerId) {
+        PlayerProfile captain = requireCaptainCandidate(playerId);
+        if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(team.getId(), captain.getId(), TeamMemberStatus.ACTIVE)) {
+            ensureActiveMembership(team.getId(), captain.getId());
+        }
+        team.setCaptainId(captain.getId());
+        User user = userRepository.findById(captain.getUserId())
+                .orElseThrow(() -> ApiException.notFound("User not found"));
+        roleService.grantApproved(user, Role.CAPTAIN, user.getPhotoUrl());
+    }
+
+    private PlayerProfile requireCaptainCandidate(UUID playerId) {
+        return playerProfileRepository.findById(playerId)
+                .orElseThrow(() -> ApiException.notFound("Player not found"));
+    }
+
     private void assertCanManageTeam(UserPrincipal principal, Team team) {
-        if (principal.getRole() == Role.ADMIN) {
+        if (principal.hasRole(Role.ADMIN)) {
             return;
+        }
+        if (!principal.hasRole(Role.CAPTAIN)) {
+            throw ApiException.forbidden("Only the team captain can manage this team");
         }
         PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
                 .orElseThrow(() -> ApiException.forbidden("Only the team captain can manage this team"));
         if (!profile.getId().equals(team.getCaptainId())) {
             throw ApiException.forbidden("Only the team captain can manage this team");
-        }
-    }
-
-    private void promoteToCaptain(UUID userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
-        if (user.getRole() == Role.FAN || user.getRole() == Role.PLAYER) {
-            user.setRole(Role.CAPTAIN);
-            userRepository.save(user);
         }
     }
 
@@ -238,11 +277,6 @@ public class TeamService {
         membership.setPlayerId(playerId);
         membership.setStatus(TeamMemberStatus.ACTIVE);
         teamMemberRepository.save(membership);
-    }
-
-    private PlayerProfile requireProfileForUser(UUID userId) {
-        return playerProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> ApiException.badRequest("Create a player profile before creating a team"));
     }
 
     private Team requireTeam(UUID teamId) {
@@ -265,6 +299,7 @@ public class TeamService {
                 team.getShortName(),
                 team.getLogoUrl(),
                 team.getCaptainId(),
+                team.getFoundedOn(),
                 team.isDisbanded(),
                 team.getCreatedAt(),
                 team.getUpdatedAt()
