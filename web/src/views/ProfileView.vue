@@ -139,8 +139,8 @@ async function logout() {
           v-for="m in favMatches"
           :key="m.id"
           :match="m"
-          :home-name="teams.name(m.homeTeamId)"
-          :away-name="teams.name(m.awayTeamId)"
+          :home-name="teams.fullName(m.homeTeamId)"
+          :away-name="teams.fullName(m.awayTeamId)"
         />
       </div>
     </template>

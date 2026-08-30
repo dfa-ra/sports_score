@@ -1,11 +1,21 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { initials } from '../lib/format'
 
-defineProps<{
+const props = defineProps<{
   rows: any[]
   compact?: boolean
 }>()
+
+const ranked = computed(() =>
+  [...props.rows].sort((a, b) =>
+    (Number(b.points) - Number(a.points))
+    || ((Number(b.goalsFor) - Number(b.goalsAgainst)) - (Number(a.goalsFor) - Number(a.goalsAgainst)))
+    || (Number(b.goalsFor) - Number(a.goalsFor))
+    || String(a.teamName || '').localeCompare(String(b.teamName || ''), 'ru')
+  )
+)
 
 function rankClass(index: number) {
   if (index < 2) return 'ice'
@@ -30,7 +40,7 @@ function rankClass(index: number) {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(row, i) in rows" :key="row.teamId">
+        <tr v-for="(row, i) in ranked" :key="row.teamId">
           <td>
             <span class="rank" :class="rankClass(i)">{{ i + 1 }}</span>
           </td>

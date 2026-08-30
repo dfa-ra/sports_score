@@ -142,8 +142,8 @@ const grouped = computed(() => {
           v-for="m in group.matches"
           :key="m.id"
           :match="m"
-          :home-name="teams.name(m.homeTeamId)"
-          :away-name="teams.name(m.awayTeamId)"
+          :home-name="teams.fullName(m.homeTeamId)"
+          :away-name="teams.fullName(m.awayTeamId)"
         />
         <RouterLink class="sheet-link" to="/table">Таблица <span>›</span></RouterLink>
       </section>

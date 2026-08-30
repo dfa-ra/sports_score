@@ -47,7 +47,8 @@ export function matchStateLabel(status?: string | null) {
 }
 
 export function eventMinute(gameTime?: number | null) {
-  return Math.max(0, Math.floor((gameTime ?? 0) / 60))
+  const raw = Math.max(0, gameTime ?? 0)
+  return raw >= 120 ? Math.floor(raw / 60) : raw
 }
 
 export function ymd(value?: string | number | Date | null) {

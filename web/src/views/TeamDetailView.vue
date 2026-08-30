@@ -178,8 +178,8 @@ async function disbandTeam() {
         v-for="m in played"
         :key="m.id"
         :match="m"
-        :home-name="names.name(m.homeTeamId)"
-        :away-name="names.name(m.awayTeamId)"
+        :home-name="names.fullName(m.homeTeamId)"
+        :away-name="names.fullName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
@@ -190,8 +190,8 @@ async function disbandTeam() {
         v-for="m in upcoming"
         :key="m.id"
         :match="m"
-        :home-name="names.name(m.homeTeamId)"
-        :away-name="names.name(m.awayTeamId)"
+        :home-name="names.fullName(m.homeTeamId)"
+        :away-name="names.fullName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
