@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../core/theme.dart';
 
-/// Large-button referee UI optimized for live match event entry.
 class RefereeControlPage extends StatefulWidget {
   const RefereeControlPage({super.key});
 
@@ -40,27 +40,22 @@ class _RefereeControlPageState extends State<RefereeControlPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: live ? AppColors.success.withValues(alpha: 0.45) : AppColors.line,
-                ),
+                border: Border.all(color: live ? AppColors.ice : AppColors.line),
               ),
               child: Column(
                 children: [
                   Text(
-                    status,
+                    matchLiveLabel(status),
                     style: TextStyle(
-                      color: live ? AppColors.success : AppColors.accent,
-                      fontWeight: FontWeight.w700,
+                      color: live ? AppColors.ice : AppColors.navy,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: 0.6,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    '$home : $away',
-                    style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 44),
-                  ),
+                  Text('$home : $away', style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, color: AppColors.navy)),
                 ],
               ),
             ),
@@ -71,10 +66,10 @@ class _RefereeControlPageState extends State<RefereeControlPage> {
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 children: [
-                  _BigAction(label: 'Старт', color: AppColors.success, onTap: () => _setStatus('LIVE')),
+                  _BigAction(label: 'Старт', color: AppColors.ice, onTap: () => _setStatus('LIVE')),
                   _BigAction(label: 'Пауза', onTap: () => _setStatus('PAUSED')),
-                  _BigAction(label: 'Гол дом.', color: AppColors.accent, onTap: () => _goal(forHome: true)),
-                  _BigAction(label: 'Гол гости', color: AppColors.accent, onTap: () => _goal(forHome: false)),
+                  _BigAction(label: 'Гол дом.', color: AppColors.navy, onTap: () => _goal(forHome: true)),
+                  _BigAction(label: 'Гол гости', color: AppColors.navy, onTap: () => _goal(forHome: false)),
                   _BigAction(label: 'Жёлтая', onTap: () {}),
                   _BigAction(label: 'Красная', color: AppColors.danger, onTap: () {}),
                   _BigAction(label: 'Замена', onTap: () {}),
@@ -89,12 +84,17 @@ class _RefereeControlPageState extends State<RefereeControlPage> {
   }
 }
 
+String matchLiveLabel(String status) {
+  return switch (status) {
+    'LIVE' => 'LIVE',
+    'PAUSED' => 'ПАУЗА',
+    'FINISHED' => 'ЗАВЕРШЕН',
+    _ => 'НЕ НАЧАЛСЯ',
+  };
+}
+
 class _BigAction extends StatelessWidget {
-  const _BigAction({
-    required this.label,
-    required this.onTap,
-    this.color,
-  });
+  const _BigAction({required this.label, required this.onTap, this.color});
 
   final String label;
   final VoidCallback onTap;
@@ -102,11 +102,11 @@ class _BigAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = color ?? AppColors.textStrong;
+    final c = color ?? AppColors.navy;
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
         minimumSize: const Size.fromHeight(88),
-        backgroundColor: AppColors.surface,
+        backgroundColor: Colors.white,
         foregroundColor: c,
         side: BorderSide(color: c.withValues(alpha: 0.45)),
       ),
