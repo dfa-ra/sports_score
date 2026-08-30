@@ -115,11 +115,19 @@ mkdir -p "${RELEASE_DIR}/web"
 tar -xzf "${RELEASE_DIR}/web.tar.gz" -C "${RELEASE_DIR}/web"
 
 echo "Starting containers from ${RELEASE_TAG}..."
-docker compose \
-  --project-directory "${DEPLOY_ROOT}" \
-  -f "${COMPOSE_FILE}" \
-  --project-name studentleague-dev \
-  up -d --build --remove-orphans
+compose=(
+  docker compose
+  --project-directory "${DEPLOY_ROOT}"
+  --env-file "${DEPLOY_ROOT}/.env"
+  -f "${COMPOSE_FILE}"
+  --project-name studentleague-dev
+)
+if ! "${compose[@]}" up -d --build --remove-orphans; then
+  echo "docker compose up failed" >&2
+  "${compose[@]}" ps >&2 || true
+  "${compose[@]}" logs --tail=120 backend >&2 || true
+  exit 1
+fi
 
 HEALTH_URL="http://127.0.0.1:${WEB_PORT}/api/v1/health"
 echo "Waiting for ${HEALTH_URL}"
@@ -134,8 +142,8 @@ done
 
 if [[ "${ok}" -ne 1 ]]; then
   echo "Stand did not become healthy in time." >&2
-  docker compose --project-directory "${DEPLOY_ROOT}" -f "${COMPOSE_FILE}" --project-name studentleague-dev ps >&2 || true
-  docker compose --project-directory "${DEPLOY_ROOT}" -f "${COMPOSE_FILE}" --project-name studentleague-dev logs --tail=80 backend >&2 || true
+  "${compose[@]}" ps >&2 || true
+  "${compose[@]}" logs --tail=120 backend >&2 || true
   exit 1
 fi
 
