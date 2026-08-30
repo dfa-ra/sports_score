@@ -1,0 +1,9 @@
+ALTER TABLE gallery_photos
+    ADD COLUMN slot VARCHAR(16) NOT NULL DEFAULT 'GALLERY',
+    ADD COLUMN title VARCHAR(200),
+    ADD COLUMN link_url VARCHAR(2048),
+    ADD COLUMN link_label VARCHAR(80),
+    ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE gallery_photos
+    ADD CONSTRAINT ck_gallery_slot CHECK (slot IN ('HERO', 'STORY', 'GALLERY'));

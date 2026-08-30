@@ -1,5 +1,6 @@
 package com.studentleague.gallery.repository;
 
+import com.studentleague.gallery.domain.GallerySlot;
 import com.studentleague.gallery.entity.GalleryPhoto;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -8,4 +9,6 @@ import java.util.UUID;
 
 public interface GalleryPhotoRepository extends JpaRepository<GalleryPhoto, UUID> {
     List<GalleryPhoto> findAllByOrderBySortOrderAscCreatedAtDesc();
+
+    List<GalleryPhoto> findBySlotAndEnabledTrueOrderBySortOrderAscCreatedAtDesc(GallerySlot slot);
 }

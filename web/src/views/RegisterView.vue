@@ -132,9 +132,9 @@ async function submit() {
   display: grid;
   gap: 0.28rem;
   padding: 0.95rem 1rem;
-  border-radius: 16px 13px 15px 12px;
+  border-radius: 16px;
   border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--navy) 55%, transparent);
+  background: #f6f9fc;
   color: var(--text);
   cursor: pointer;
 }

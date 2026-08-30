@@ -74,8 +74,9 @@ const visible = computed(() => tab.value === 'upcoming' ? upcoming.value : playe
 </template>
 
 <style scoped>
-.match-card { display: grid; gap: 0.45rem; }
+.match-card { display: grid; gap: 0.45rem; border-radius: 16px; }
 .versus { font-weight: 750; color: var(--text-strong); }
 .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.btn.on { background: var(--accent); color: var(--navy); border-color: transparent; }
+.btn.on { background: var(--accent); color: var(--navy); border-color: transparent; border-radius: 999px; }
+.filters .btn { border-radius: 999px; }
 </style>

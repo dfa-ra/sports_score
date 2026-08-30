@@ -2,8 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
-import { initials } from '../lib/format'
 import EmptyState from '../components/EmptyState.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 
 const items = ref<any[]>([])
 const teams = ref<any[]>([])
@@ -54,7 +54,11 @@ onMounted(async () => {
     <EmptyState v-else-if="!items.length" title="Никого не нашли" />
     <div v-else class="grid cards">
       <RouterLink v-for="p in items" :key="p.id" class="panel card-link" :to="`/players/${p.id}`">
-        <span class="avatar">{{ initials(p.displayName || `${p.firstName} ${p.lastName}`) }}</span>
+        <PlayerAvatar
+          :src="p.avatarUrl"
+          :name="p.displayName || `${p.firstName} ${p.lastName}`"
+          :size="42"
+        />
         <h2>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</h2>
         <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
       </RouterLink>
@@ -65,16 +69,6 @@ onMounted(async () => {
 <style scoped>
 .filters { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.7rem; align-items: end; }
 .card-link { display: grid; gap: 0.3rem; justify-items: start; }
-.avatar {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 800;
-}
 h2 { font-size: 1.2rem; }
 @media (max-width: 760px) { .filters { grid-template-columns: 1fr; } }
 </style>

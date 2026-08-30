@@ -1,7 +1,10 @@
 package com.studentleague.gallery.entity;
 
+import com.studentleague.gallery.domain.GallerySlot;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -21,6 +24,22 @@ public class GalleryPhoto {
 
     @Column(length = 300)
     private String caption;
+
+    @Column(length = 200)
+    private String title;
+
+    @Column(name = "link_url", length = 2048)
+    private String linkUrl;
+
+    @Column(name = "link_label", length = 80)
+    private String linkLabel;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private GallerySlot slot = GallerySlot.GALLERY;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
 
     @Column(nullable = false, length = 32)
     private String source;
@@ -59,6 +78,46 @@ public class GalleryPhoto {
 
     public void setCaption(String caption) {
         this.caption = caption;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getLinkUrl() {
+        return linkUrl;
+    }
+
+    public void setLinkUrl(String linkUrl) {
+        this.linkUrl = linkUrl;
+    }
+
+    public String getLinkLabel() {
+        return linkLabel;
+    }
+
+    public void setLinkLabel(String linkLabel) {
+        this.linkLabel = linkLabel;
+    }
+
+    public GallerySlot getSlot() {
+        return slot;
+    }
+
+    public void setSlot(GallerySlot slot) {
+        this.slot = slot == null ? GallerySlot.GALLERY : slot;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public String getSource() {

@@ -12,6 +12,8 @@ public record HomeFeedResponse(
         List<StandingRow> standings,
         List<PlayerStatisticsResponse> scorers,
         List<PlayerStatisticsResponse> assists,
+        List<GalleryPhotoResponse> heroes,
+        List<GalleryPhotoResponse> stories,
         List<GalleryPhotoResponse> photos,
         String vkAlbumUrl
 ) {

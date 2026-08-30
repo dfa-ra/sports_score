@@ -2,7 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
-import { initials, labelOf, statusLabel } from '../lib/format'
+import { labelOf, statusLabel } from '../lib/format'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { useAuthStore } from '../stores/auth'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
@@ -28,7 +29,11 @@ onMounted(async () => {
 <template>
   <section v-if="card" class="stack">
     <div class="page-title">
-      <span class="avatar">{{ initials(card.displayName || `${card.firstName} ${card.lastName}`) }}</span>
+      <PlayerAvatar
+        :src="card.avatarUrl"
+        :name="card.displayName || `${card.firstName} ${card.lastName}`"
+        :size="72"
+      />
       <h1>{{ card.displayName || `${card.firstName} ${card.lastName}` }}</h1>
       <p>{{ card.position || 'Игрок' }} · №{{ card.jerseyNumber ?? '—' }}</p>
       <p v-if="card.team">
@@ -70,17 +75,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.avatar {
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 800;
-  font-size: 1.1rem;
-}
 h2 { font-size: 1.2rem; margin-bottom: 0.5rem; }
 .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.7rem; }
 .stat {

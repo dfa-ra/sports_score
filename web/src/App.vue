@@ -34,163 +34,126 @@ async function logout() {
 
 <template>
   <div class="shell" :data-mood="mood">
-    <header class="topbar">
-      <div class="container topbar-inner">
-        <RouterLink class="brand" to="/">
-          <span class="brand-mark" aria-hidden="true">SL</span>
-          <span class="brand-text">
-            Student League
-            <small>живая студенческая лига</small>
-          </span>
-        </RouterLink>
+    <header class="chrome">
+      <div class="util">
+        <div class="container util-inner">
+          <span>Кронбарз · студенческая лига</span>
+          <span v-if="auth.isAuthenticated">{{ labelOf(roleLabel, auth.role) }}</span>
+        </div>
+      </div>
+      <div class="nav-bar">
+        <div class="container nav-inner">
+          <RouterLink class="brand" to="/">
+            <span class="brand-mark" aria-hidden="true">SL</span>
+            <span>Student League</span>
+          </RouterLink>
 
-        <button class="btn icon menu-btn secondary" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
-          <span>{{ menuOpen ? '✕' : '☰' }}</span>
-        </button>
+          <button class="btn icon menu-btn secondary" type="button" :aria-expanded="menuOpen" @click="menuOpen = !menuOpen">
+            <span>{{ menuOpen ? '✕' : '☰' }}</span>
+          </button>
 
-        <nav :class="{ open: menuOpen }">
-          <RouterLink to="/" active-class="" exact-active-class="router-link-active">Главная</RouterLink>
-          <RouterLink to="/table">Таблица</RouterLink>
-          <RouterLink to="/calendar">Календарь</RouterLink>
-          <RouterLink to="/statistics">Статистика</RouterLink>
-          <RouterLink to="/players">Игроки</RouterLink>
-          <RouterLink v-if="auth.canAccessMyTeam" to="/my-team">Моя команда</RouterLink>
-          <RouterLink v-if="auth.canManageLeague" to="/admin">Админ</RouterLink>
-          <RouterLink v-if="auth.canOfficiate" to="/referee">Судья</RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/profile">Профиль</RouterLink>
-        </nav>
+          <nav :class="{ open: menuOpen }">
+            <RouterLink to="/" exact-active-class="on">Главная</RouterLink>
+            <RouterLink to="/table" active-class="on">Таблица</RouterLink>
+            <RouterLink to="/calendar" active-class="on">Календарь</RouterLink>
+            <RouterLink to="/statistics" active-class="on">Статистика</RouterLink>
+            <RouterLink to="/players" active-class="on">Игроки</RouterLink>
+            <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
+            <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
+            <RouterLink v-if="auth.canOfficiate" to="/referee" active-class="on">Судья</RouterLink>
+          </nav>
 
-        <div class="auth">
-          <template v-if="auth.isAuthenticated">
-            <span class="user-chip">
-              <em>{{ labelOf(roleLabel, auth.role) }}</em>
-              {{ auth.user?.email }}
-            </span>
-            <button class="btn secondary" @click="logout">Выйти</button>
-          </template>
-          <template v-else>
-            <RouterLink class="btn secondary" to="/login">Войти</RouterLink>
-            <RouterLink class="btn" to="/register">Регистрация</RouterLink>
-          </template>
+          <div class="auth">
+            <template v-if="auth.isAuthenticated">
+              <RouterLink class="login-pill" to="/profile">Профиль</RouterLink>
+              <button class="login-pill ghost" type="button" @click="logout">Выйти</button>
+            </template>
+            <template v-else>
+              <RouterLink class="login-pill" to="/login">Войти</RouterLink>
+            </template>
+          </div>
         </div>
       </div>
     </header>
-    <main class="container main rise">
-      <RouterView />
+    <main class="main" :class="{ flush: route.path === '/' }">
+      <div :class="route.path === '/' ? 'home-bleed' : 'container rise'">
+        <RouterView />
+      </div>
     </main>
     <footer class="foot">
-      <div class="container">
-        Смотреть можно без билета. Играть — после регистрации.
-      </div>
+      <div class="container">Смотреть можно без билета. Играть — после регистрации.</div>
     </footer>
   </div>
 </template>
 
 <style scoped>
 .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  backdrop-filter: blur(18px);
-  background: color-mix(in srgb, var(--navy) 82%, transparent);
-  border-bottom: 1px solid var(--line);
-}
-.topbar-inner {
+.chrome { background: var(--navy); color: #fff; }
+.util { background: #00143d; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.util-inner { display: flex; justify-content: space-between; min-height: 32px; align-items: center; color: rgba(255,255,255,0.7); }
+.nav-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 72px;
+  min-height: 68px;
 }
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  color: var(--text-strong);
+  gap: 0.65rem;
+  color: #fff;
   text-decoration: none;
-}
-.brand:hover { text-decoration: none; color: var(--text-strong); }
-.brand-mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px 10px 14px 9px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border: 1px solid rgba(76, 180, 229, 0.4);
-  font-family: var(--font-display);
-  font-size: 0.92rem;
-  transform: rotate(-4deg);
-  transition: transform 220ms var(--spring);
-}
-.brand:hover .brand-mark { transform: rotate(3deg) scale(1.06); }
-.brand-text {
-  display: grid;
   font-family: var(--font-display);
   font-weight: 800;
-  line-height: 1.05;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-.brand-text small {
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.68rem;
   letter-spacing: 0.04em;
 }
-nav { display: flex; gap: 0.12rem; flex-wrap: wrap; }
+.brand:hover { color: #fff; text-decoration: none; }
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--ice);
+  color: var(--navy);
+  font-size: 0.85rem;
+}
+nav { display: flex; gap: 0.15rem; flex-wrap: wrap; }
 nav a {
-  color: var(--muted);
+  color: rgba(255,255,255,0.82);
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 0.42rem 0.72rem;
+  font-size: 0.88rem;
+  padding: 0.4rem 0.85rem;
   border-radius: 999px;
   text-decoration: none;
-  transition: transform 180ms var(--spring), background-color 180ms var(--ease), color 180ms var(--ease);
 }
-nav a:hover { color: var(--text-strong); background: rgba(255, 255, 255, 0.05); transform: translateY(-1px); }
-nav a.router-link-active {
-  color: var(--navy);
-  background: var(--accent);
+nav a:hover { color: #fff; background: rgba(255,255,255,0.08); }
+nav a.on { color: var(--navy); background: var(--ice); }
+.login-pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,0.45);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.38rem 0.9rem;
+  text-decoration: none;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
 }
-.auth { display: flex; gap: 0.55rem; align-items: center; }
-.user-chip {
-  max-width: 210px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-.user-chip em {
-  display: block;
-  font-style: normal;
-  color: var(--accent);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 800;
-}
+.login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
+.auth { display: flex; gap: 0.4rem; align-items: center; }
 .menu-btn { display: none; }
-.main { padding: 1.6rem 0 2.4rem; }
-.foot {
-  color: var(--muted);
-  font-size: 0.78rem;
-  padding: 0 0 1.4rem;
-  opacity: 0.8;
-}
+.main { padding: 1.4rem 0 2.4rem; }
+.main.flush { padding: 0 0 2.4rem; }
+.foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
 @media (max-width: 980px) {
   .menu-btn { display: inline-flex; }
-  nav {
-    display: none;
-    width: 100%;
-    order: 4;
-    padding-bottom: 0.6rem;
-  }
+  nav { display: none; width: 100%; order: 4; padding-bottom: 0.7rem; }
   nav.open { display: flex; }
-  .topbar-inner { flex-wrap: wrap; padding: 0.7rem 0; }
-  .user-chip { display: none; }
+  .nav-inner { flex-wrap: wrap; }
 }
 </style>
