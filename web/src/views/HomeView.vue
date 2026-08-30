@@ -97,7 +97,7 @@ function nudgeStories(dir: number) {
           <div class="hero-shade" />
           <div class="hero-copy">
             <p class="eyebrow">{{ feed?.tournament?.name || 'Студенческая лига' }}</p>
-            <h1>{{ current?.title || 'Живой сезон Kronbars' }}</h1>
+            <h1>{{ current?.title || 'Живой сезон KRONBARS' }}</h1>
             <p>{{ current?.caption || 'Таблица, календарь и статистика — как на большом сайте, только своя лига.' }}</p>
             <a
               v-if="isExternal(hrefOf(current, '/calendar'))"

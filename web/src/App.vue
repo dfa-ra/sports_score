@@ -37,7 +37,7 @@ async function logout() {
     <header class="chrome">
       <div class="util">
         <div class="container util-inner">
-          <span>Кронбарз · студенческая лига</span>
+          <span>KRONBARS · студенческая лига</span>
           <span v-if="auth.isAuthenticated">{{ labelOf(roleLabel, auth.role) }}</span>
         </div>
       </div>
