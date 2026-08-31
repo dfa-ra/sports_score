@@ -28,6 +28,8 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 | Android APK + AAB | Flutter `--release` с `--dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1` (пока default keystore) |
 | iOS unsigned zip | `Runner.app` с `macos-latest` (`--no-codesign`); опционально / не блокирует релиз |
 
+Текст релиза — короткий список коммитов (`scripts/release_notes.sh`), без названий PR и без автоchangelog GitHub.
+
 После публикации релиза `v*` workflow **Dev stand** сам качает эти ассеты на сервер и поднимает контейнеры.
 
 ### Подпись Android (готово к Store)
