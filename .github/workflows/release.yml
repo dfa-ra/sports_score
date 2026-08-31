@@ -163,6 +163,10 @@ jobs:
       needs.android-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -171,12 +175,23 @@ jobs:
           mkdir -p out
           find artifacts -type f \( -name '*.jar' -o -name '*.tar.gz' -o -name '*.apk' -o -name '*.aab' -o -name '*.zip' \) -exec cp {} out/ \;
           ls -la out
+      - name: Write short notes
+        id: notes
+        run: |
+          chmod +x scripts/release_notes.sh
+          BODY="$(scripts/release_notes.sh "v${{ needs.resolve-version.outputs.version }}")"
+          {
+            echo "body<<EOF"
+            printf '%s\n' "${BODY}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.resolve-version.outputs.version }}
-          name: Student League v${{ needs.resolve-version.outputs.version }}
-          generate_release_notes: true
+          name: KRONBARS v${{ needs.resolve-version.outputs.version }}
+          generate_release_notes: false
+          body: ${{ steps.notes.outputs.body }}
           files: out/*
           fail_on_unmatched_files: false
         env:
