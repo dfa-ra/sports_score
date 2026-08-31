@@ -51,6 +51,19 @@ export function formatWhen(value?: string | number | Date | null) {
   })
 }
 
+export function ageLine(value?: string | number | Date | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  let age = now.getFullYear() - date.getFullYear()
+  const monthDiff = now.getMonth() - date.getMonth()
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < date.getDate())) age -= 1
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `Возр: ${age} (${day}.${month}.${date.getFullYear()})`
+}
+
 export function formatMatchDay(value?: string | number | Date | null) {
   if (!value) return '—'
   const date = new Date(value)

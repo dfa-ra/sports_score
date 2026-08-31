@@ -4,10 +4,11 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import StandingTable from '../components/StandingTable.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-type Tab = 'table' | 'results' | 'scorers'
+type Tab = 'table' | 'results' | 'scorers' | 'players'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,12 +20,13 @@ const matches = ref<any[]>([])
 const scorers = ref<any[]>([])
 const assists = ref<any[]>([])
 const keepers = ref<any[]>([])
+const players = ref<any[]>([])
 const tournament = ref<any>(null)
 const loading = ref(true)
 
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
-  if (value === 'results' || value === 'scorers') return value
+  if (value === 'results' || value === 'scorers' || value === 'players') return value
   return 'table'
 })
 
@@ -57,6 +59,12 @@ onMounted(async () => {
     if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
   }
   if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+  try {
+    const list = await api.get('/players', { params: { size: 100 } })
+    players.value = list.data.content ?? []
+  } catch {
+    players.value = []
+  }
   await load()
 })
 
@@ -112,6 +120,7 @@ async function load() {
       <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
+      <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
     </div>
 
     <div v-if="loading" class="skeleton" />
@@ -133,6 +142,19 @@ async function load() {
           :home-name="teams.fullName(m.homeTeamId)"
           :away-name="teams.fullName(m.awayTeamId)"
         />
+      </div>
+    </template>
+
+    <template v-else-if="tab === 'players'">
+      <EmptyState v-if="!players.length" title="Игроков пока нет" />
+      <div v-else class="sheet people">
+        <RouterLink v-for="p in players" :key="p.id" class="person" :to="`/players/${p.id}`">
+          <PlayerAvatar :src="p.avatarUrl" :name="p.displayName || `${p.firstName} ${p.lastName}`" :size="36" />
+          <div>
+            <b>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</b>
+            <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
+          </div>
+        </RouterLink>
       </div>
     </template>
 
@@ -226,4 +248,17 @@ async function load() {
   overflow: hidden;
 }
 h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
+.people { display: grid; }
+.person {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.person b { color: var(--navy); }
+.person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
 </style>

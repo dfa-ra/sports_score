@@ -200,7 +200,6 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
                   matchId: current.id,
                   store: store,
                   canOfficiate: auth.canOfficiate,
-                  matchId: current.id,
                 ),
                 _Lineups(lineups: lineups),
                 _Protocol(events: events, match: current),
@@ -298,7 +297,6 @@ class _Overview extends StatelessWidget {
     required this.matchId,
     required this.store,
     required this.canOfficiate,
-    required this.matchId,
   });
 
   final List<_PeriodBlock> blocks;
@@ -311,7 +309,6 @@ class _Overview extends StatelessWidget {
   final String matchId;
   final LeagueStore store;
   final bool canOfficiate;
-  final String matchId;
 
   @override
   Widget build(BuildContext context) {

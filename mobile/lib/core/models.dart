@@ -269,6 +269,33 @@ class TeamMember {
   }
 }
 
+class PlayerBrief {
+  PlayerBrief({
+    required this.id,
+    required this.displayName,
+    this.avatarUrl,
+    this.jerseyNumber,
+    this.position,
+  });
+
+  final String id;
+  final String displayName;
+  final String? avatarUrl;
+  final int? jerseyNumber;
+  final String? position;
+
+  factory PlayerBrief.fromJson(Map<String, dynamic> json) {
+    return PlayerBrief(
+      id: json['id'].toString(),
+      displayName: json['displayName']?.toString() ??
+          '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim(),
+      avatarUrl: json['avatarUrl']?.toString(),
+      jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
+      position: json['position']?.toString(),
+    );
+  }
+}
+
 class PlayerProfile {
   PlayerProfile({
     this.id,
@@ -279,6 +306,7 @@ class PlayerProfile {
     this.position = '',
     this.bio = '',
     this.avatarUrl,
+    this.dateOfBirth,
   });
 
   final String? id;
@@ -289,6 +317,7 @@ class PlayerProfile {
   String position;
   String bio;
   final String? avatarUrl;
+  final DateTime? dateOfBirth;
 
   factory PlayerProfile.fromJson(Map<String, dynamic> json) {
     return PlayerProfile(
@@ -300,6 +329,7 @@ class PlayerProfile {
       position: json['position']?.toString() ?? '',
       bio: json['bio']?.toString() ?? '',
       avatarUrl: json['avatarUrl']?.toString(),
+      dateOfBirth: parseTime(json['dateOfBirth']),
     );
   }
 
@@ -320,6 +350,7 @@ class PlayerCard {
     this.avatarUrl,
     this.jerseyNumber,
     this.position,
+    this.dateOfBirth,
     this.teamId,
     this.teamName,
     this.teamLogoUrl,
@@ -332,6 +363,7 @@ class PlayerCard {
   final String? avatarUrl;
   final int? jerseyNumber;
   final String? position;
+  final DateTime? dateOfBirth;
   final String? teamId;
   final String? teamName;
   final String? teamLogoUrl;
@@ -347,6 +379,7 @@ class PlayerCard {
       avatarUrl: json['avatarUrl']?.toString(),
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),
+      dateOfBirth: parseTime(json['dateOfBirth']),
       teamId: team is Map ? team['id']?.toString() : null,
       teamName: team is Map ? team['name']?.toString() : null,
       teamLogoUrl: team is Map ? team['logoUrl']?.toString() : null,
@@ -368,27 +401,51 @@ class PlayerMatchHistory {
     required this.outcome,
     required this.goals,
     required this.assists,
+    this.homeTeamName,
+    this.awayTeamName,
+    this.homeTeamLogoUrl,
+    this.awayTeamLogoUrl,
+    this.home = true,
+    this.yellowCards = 0,
+    this.redCards = 0,
+    this.minutesPlayed,
     this.scheduledAt,
   });
 
   final String matchId;
   final String opponentName;
+  final String? homeTeamName;
+  final String? awayTeamName;
+  final String? homeTeamLogoUrl;
+  final String? awayTeamLogoUrl;
+  final bool home;
   final int homeScore;
   final int awayScore;
   final String? outcome;
   final int goals;
   final int assists;
+  final int yellowCards;
+  final int redCards;
+  final int? minutesPlayed;
   final DateTime? scheduledAt;
 
   factory PlayerMatchHistory.fromJson(Map<String, dynamic> json) {
     return PlayerMatchHistory(
       matchId: json['matchId'].toString(),
       opponentName: json['opponentName']?.toString() ?? 'Соперник',
+      homeTeamName: json['homeTeamName']?.toString(),
+      awayTeamName: json['awayTeamName']?.toString(),
+      homeTeamLogoUrl: json['homeTeamLogoUrl']?.toString(),
+      awayTeamLogoUrl: json['awayTeamLogoUrl']?.toString(),
+      home: json['home'] == true,
       homeScore: (json['homeScore'] as num?)?.toInt() ?? 0,
       awayScore: (json['awayScore'] as num?)?.toInt() ?? 0,
       outcome: json['outcome']?.toString(),
       goals: (json['goals'] as num?)?.toInt() ?? 0,
       assists: (json['assists'] as num?)?.toInt() ?? 0,
+      yellowCards: (json['yellowCards'] as num?)?.toInt() ?? 0,
+      redCards: (json['redCards'] as num?)?.toInt() ?? 0,
+      minutesPlayed: (json['minutesPlayed'] as num?)?.toInt(),
       scheduledAt: parseTime(json['scheduledAt']),
     );
   }

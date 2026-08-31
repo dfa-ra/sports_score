@@ -173,3 +173,23 @@ String? matchOutcome({
 }
 
 const outcomeMark = {'WIN': 'В', 'DRAW': 'Н', 'LOSS': 'П'};
+
+String ageLine(DateTime? date) {
+  if (date == null) return '';
+  final now = DateTime.now();
+  var age = now.year - date.year;
+  if (now.month < date.month || (now.month == date.month && now.day < date.day)) {
+    age -= 1;
+  }
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  return 'Возр: $age ($day.$month.${date.year})';
+}
+
+String matchDayShort(DateTime? at) {
+  if (at == null) return '';
+  final local = at.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return '$day.$month.';
+}

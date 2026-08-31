@@ -7,8 +7,9 @@ const props = withDefaults(
     src?: string | null
     name?: string | null
     size?: number
+    tile?: boolean
   }>(),
-  { size: 56 },
+  { size: 56, tile: false },
 )
 
 const broken = ref(false)
@@ -27,6 +28,7 @@ const label = computed(() => initials(props.name || ''))
   <img
     v-if="showImage"
     class="player-avatar"
+    :class="{ tile }"
     :src="src!"
     :alt="name || 'Фото игрока'"
     :style="{ width: `${size}px`, height: `${size}px` }"
@@ -35,6 +37,7 @@ const label = computed(() => initials(props.name || ''))
   <span
     v-else
     class="player-avatar player-avatar--fallback"
+    :class="{ tile }"
     :style="{ width: `${size}px`, height: `${size}px` }"
     aria-hidden="true"
   >{{ label }}</span>
@@ -47,6 +50,9 @@ const label = computed(() => initials(props.name || ''))
   border-radius: 999px;
   object-fit: cover;
   background: var(--accent-soft);
+}
+.player-avatar.tile {
+  border-radius: 12px;
 }
 .player-avatar--fallback {
   display: grid;

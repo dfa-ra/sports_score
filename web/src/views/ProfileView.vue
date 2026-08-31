@@ -8,13 +8,13 @@ import { apiError } from '../lib/errors'
 import { labelOf, roleLabel } from '../lib/format'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
+import PlayerCardPanel from '../components/PlayerCardPanel.vue'
 import MatchRow from '../components/MatchRow.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
 const fav = useFavorites()
 const router = useRouter()
-const pane = ref<'fav' | 'card'>('fav')
 const teams = useTeamDirectory()
 const firstName = ref('')
 const lastName = ref('')
@@ -26,8 +26,10 @@ const pending = ref(false)
 const error = ref('')
 const ok = ref('')
 const exists = ref(false)
+const editing = ref(false)
 const avatarUrl = ref('')
 const playerId = ref('')
+const card = ref<any>(null)
 const allMatches = ref<any[]>([])
 
 const roles = computed(() => {
@@ -37,8 +39,26 @@ const roles = computed(() => {
   return from.length ? from : (auth.user?.role ? [auth.user.role] : [])
 })
 
-const favTeams = computed(() => fav.teams.map((id) => ({ id, name: teams.fullName(id) })))
+const favTeams = computed(() => {
+  const own = card.value?.team?.id
+  return fav.teams
+    .filter((id) => id !== own)
+    .map((id) => ({ id, name: teams.fullName(id), logo: teams.logo(id) }))
+})
 const favMatches = computed(() => allMatches.value.filter((m) => fav.hasMatch(m.id)))
+
+async function loadCard() {
+  if (!playerId.value) {
+    card.value = null
+    return
+  }
+  try {
+    const { data } = await api.get(`/players/${playerId.value}/card`)
+    card.value = data
+  } catch {
+    card.value = null
+  }
+}
 
 onMounted(async () => {
   await teams.load()
@@ -59,6 +79,7 @@ onMounted(async () => {
     position.value = data.position || ''
     bio.value = data.bio || ''
     avatarUrl.value = data.avatarUrl || auth.user?.photoUrl || ''
+    await loadCard()
   } catch {
     exists.value = false
   }
@@ -69,7 +90,7 @@ async function submit() {
   ok.value = ''
   pending.value = true
   try {
-    await api.put('/players/me', {
+    const { data } = await api.put('/players/me', {
       firstName: firstName.value,
       lastName: lastName.value,
       displayName: displayName.value || undefined,
@@ -79,7 +100,10 @@ async function submit() {
     })
     await auth.refreshMe()
     exists.value = true
+    playerId.value = data.id
     ok.value = 'Профиль сохранён.'
+    editing.value = false
+    await loadCard()
   } catch (e: any) {
     error.value = apiError(e, 'Профиль не сохранился.')
   } finally {
@@ -95,72 +119,72 @@ async function logout() {
 
 <template>
   <section class="stack page">
-    <div class="hero">
+    <PlayerCardPanel v-if="card" :card="card" editable @edit="editing = true" />
+
+    <div v-else class="identity">
       <PlayerAvatar
         :src="avatarUrl || auth.user?.photoUrl"
         :name="displayName || `${firstName} ${lastName}` || auth.user?.email"
-        :size="72"
+        :size="76"
+        tile
       />
       <div>
-        <p class="eyebrow">Профиль</p>
         <h1>{{ displayName || `${firstName} ${lastName}`.trim() || auth.user?.email }}</h1>
         <p class="chips">
           <span v-for="role in roles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
         </p>
       </div>
+      <button class="pen" type="button" aria-label="Изменить" @click="editing = true">✎</button>
     </div>
 
-    <div class="shortcuts">
-      <RouterLink v-if="playerId" class="tile" :to="`/players/${playerId}`">Карточка игрока</RouterLink>
+    <div v-if="editing" class="overlay" @click.self="editing = false">
+      <div class="sheet-form" role="dialog" aria-modal="true">
+        <h2>{{ exists ? 'Изменить анкету' : 'Стать игроком' }}</h2>
+        <form class="stack" @submit.prevent="submit">
+          <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
+          <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
+          <label class="field">Как писать на майке<input v-model="displayName" maxlength="150" /></label>
+          <label class="field">Номер<input v-model.number="jerseyNumber" type="number" min="0" max="99" /></label>
+          <label class="field">Позиция<input v-model="position" maxlength="64" placeholder="Нападающий" /></label>
+          <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
+          <p v-if="error" class="form-error">{{ error }}</p>
+          <p v-if="ok" class="form-ok">{{ ok }}</p>
+          <button class="btn" type="submit" :disabled="pending">
+            {{ pending ? 'Сохраняем…' : exists ? 'Сохранить' : 'Стать игроком' }}
+          </button>
+          <button class="btn ghost" type="button" @click="editing = false">Закрыть</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="league-head">Команды</div>
+      <RouterLink v-if="card?.team" class="fav" :to="`/teams/${card.team.id}`">
+        <TeamCrest :src="card.team.logoUrl" :name="card.team.name" :size="22" />
+        {{ card.team.name }}
+      </RouterLink>
+      <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
+        <TeamCrest :src="team.logo" :name="team.name" :size="22" />
+        {{ team.name }}
+      </RouterLink>
+      <p v-if="!card?.team && !favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
+    </div>
+
+    <div v-if="favMatches.length" class="sheet">
+      <div class="league-head">Избранные матчи</div>
+      <MatchRow
+        v-for="m in favMatches"
+        :key="m.id"
+        :match="m"
+        :home-name="teams.fullName(m.homeTeamId)"
+        :away-name="teams.fullName(m.awayTeamId)"
+      />
+    </div>
+
+    <div v-if="auth.canAccessMyTeam || auth.canOfficiate || auth.canManageLeague" class="shortcuts">
       <RouterLink v-if="auth.canAccessMyTeam" class="tile" to="/my-team">Моя команда</RouterLink>
       <RouterLink v-if="auth.canOfficiate" class="tile" to="/referee">Пульт судьи</RouterLink>
       <RouterLink v-if="auth.canManageLeague" class="tile" to="/admin">Админка</RouterLink>
-      <RouterLink class="tile phone" to="/players">Игроки</RouterLink>
-      <RouterLink class="tile phone" to="/table?tab=scorers">Бомбардиры</RouterLink>
-    </div>
-
-    <div class="fs-tabs">
-      <button type="button" :class="{ on: pane === 'fav' }" @click="pane = 'fav'">Избранное</button>
-      <button type="button" :class="{ on: pane === 'card' }" @click="pane = 'card'">Анкета</button>
-    </div>
-
-    <template v-if="pane === 'fav'">
-      <div class="sheet">
-        <div class="league-head">Избранные команды</div>
-        <p v-if="!favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
-        <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
-          <TeamCrest :src="teams.logo(team.id)" :name="team.name" :size="22" />
-          {{ team.name }}
-        </RouterLink>
-      </div>
-
-      <div class="sheet">
-        <div class="league-head">Избранные матчи</div>
-        <p v-if="!favMatches.length" class="empty-line">Отмечайте игры звездой в календаре.</p>
-        <MatchRow
-          v-for="m in favMatches"
-          :key="m.id"
-          :match="m"
-          :home-name="teams.fullName(m.homeTeamId)"
-          :away-name="teams.fullName(m.awayTeamId)"
-        />
-      </div>
-    </template>
-
-    <div v-else class="panel stack">
-      <form class="stack" @submit.prevent="submit">
-        <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
-        <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
-        <label class="field">Как писать на майке<input v-model="displayName" maxlength="150" /></label>
-        <label class="field">Номер<input v-model.number="jerseyNumber" type="number" min="0" max="99" /></label>
-        <label class="field">Позиция<input v-model="position" maxlength="64" placeholder="Нападающий" /></label>
-        <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
-        <p v-if="error" class="form-error">{{ error }}</p>
-        <p v-if="ok" class="form-ok">{{ ok }}</p>
-        <button class="btn" type="submit" :disabled="pending">
-          {{ pending ? 'Сохраняем…' : exists ? 'Обновить' : 'Стать игроком' }}
-        </button>
-      </form>
     </div>
 
     <button class="btn secondary" type="button" @click="logout">Выйти</button>
@@ -169,25 +193,23 @@ async function logout() {
 
 <style scoped>
 .page { gap: 0.75rem; }
-.hero {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-}
-.hero h1 { font-size: clamp(1.3rem, 4vw, 1.8rem); }
-.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
-.shortcuts {
+.identity {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
 }
-.tile {
-  background: #fff;
+.identity h1 { font-size: clamp(1.25rem, 5vw, 1.7rem); margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
+.pen {
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--line);
+  background: #fff;
   border-radius: 12px;
-  padding: 0.85rem 0.9rem;
-  font-weight: 800;
   color: var(--navy);
+  font-size: 1.1rem;
+  cursor: pointer;
 }
 .sheet {
   background: #fff;
@@ -205,8 +227,33 @@ async function logout() {
   color: var(--navy);
   font-weight: 700;
 }
-.phone { display: none; }
-@media (max-width: 719px) {
-  .phone { display: block; }
+.shortcuts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+.tile {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: end center;
+  padding: 0.75rem;
+  background: rgba(0, 32, 91, 0.42);
+}
+.sheet-form {
+  width: min(520px, 100%);
+  max-height: min(82vh, 680px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 20px;
+  padding: 1.1rem 1.15rem 1.2rem;
+}
+@media (min-width: 720px) {
+  .overlay { place-items: center; }
 }
 </style>
