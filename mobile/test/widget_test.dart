@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:student_league/core/api_client.dart';
 import 'package:student_league/core/app.dart';
+import 'package:student_league/core/format.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
 import 'package:student_league/widgets/match_row.dart';
@@ -82,6 +83,21 @@ void main() {
     await tester.pump();
     expect(fav.hasMatch('m1'), isTrue);
     expect(find.byTooltip('Убрать из избранного'), findsOneWidget);
+  });
+
+  test('recent game line names the opponent', () {
+    expect(
+      recentGameLine(
+        teamId: 'h1',
+        homeTeamId: 'h1',
+        awayTeamId: 'a1',
+        homeScore: 2,
+        awayScore: 1,
+        opponentName: 'Политех',
+        scheduledAt: DateTime(2026, 8, 24, 17, 12),
+      ),
+      '2:1 · Политех · 24 авг.',
+    );
   });
 
   test('compiled API points at the stand, not the phone loopback', () {

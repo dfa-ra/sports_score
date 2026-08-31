@@ -23,6 +23,7 @@ const referees = ref<any[]>([])
 const lineups = ref<any>(null)
 const homeForm = ref<any[]>([])
 const awayForm = ref<any[]>([])
+const allMatches = ref<any[]>([])
 const tournament = ref<any>(null)
 const me = ref<any>(null)
 const users = ref<any[]>([])
@@ -38,6 +39,27 @@ const { remaining, expired, cap } = useMatchClock(match)
 let client: Client | null = null
 
 const timeline = computed(() => [...events.value].filter((e) => !e.voided).reverse())
+const headToHead = computed(() => {
+  if (!match.value) return []
+  const a = match.value.homeTeamId
+  const b = match.value.awayTeamId
+  return allMatches.value
+    .filter((row) =>
+      (row.status === 'FINISHED' || row.status === 'CANCELLED')
+      && row.id !== match.value.id
+      && ((row.homeTeamId === a && row.awayTeamId === b) || (row.homeTeamId === b && row.awayTeamId === a))
+    )
+    .slice()
+    .sort((x, y) => String(y.scheduledAt || '').localeCompare(String(x.scheduledAt || '')))
+    .slice(0, 5)
+})
+
+function recentLine(row: any, teamId: string) {
+  const opponentId = row.homeTeamId === teamId ? row.awayTeamId : row.homeTeamId
+  const own = row.homeTeamId === teamId ? row.homeScore : row.awayScore
+  const theirs = row.homeTeamId === teamId ? row.awayScore : row.homeScore
+  return `${own}:${theirs} · ${teams.fullName(opponentId)} · ${formatWhen(row.scheduledAt)}`
+}
 const periodBlocks = computed(() => {
   if (!match.value) return []
   const visibleTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'OWN_GOAL'])
@@ -90,15 +112,18 @@ async function load() {
   referees.value = r.data
   lineups.value = l.data
   try {
-    const [hf, af] = await Promise.all([
+    const [hf, af, games] = await Promise.all([
       api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
       api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
+      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
     ])
     homeForm.value = hf.data
     awayForm.value = af.data
+    allMatches.value = games.data.content ?? []
   } catch {
     homeForm.value = []
     awayForm.value = []
+    allMatches.value = []
   }
   try {
     const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
@@ -268,16 +293,23 @@ onUnmounted(() => client?.deactivate())
         </template>
         <p v-else class="empty-line">Пока ни гола, ни карточки.</p>
       </div>
-      <div class="grid two">
+      <div class="stack recent">
         <div class="panel">
-          <h2>Форма хозяев</h2>
-          <p v-for="f in homeForm" :key="f.id" class="muted">{{ f.homeScore }}:{{ f.awayScore }} · {{ formatWhen(f.scheduledAt) }}</p>
-          <p v-if="!homeForm.length" class="muted">Ещё нет пяти матчей.</p>
+          <h2>Последние игры {{ teams.fullName(match.homeTeamId) }}</h2>
+          <p v-for="f in homeForm" :key="f.id" class="muted">{{ recentLine(f, match.homeTeamId) }}</p>
+          <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
-          <h2>Форма гостей</h2>
-          <p v-for="f in awayForm" :key="f.id" class="muted">{{ f.homeScore }}:{{ f.awayScore }} · {{ formatWhen(f.scheduledAt) }}</p>
-          <p v-if="!awayForm.length" class="muted">Ещё нет пяти матчей.</p>
+          <h2>Последние игры {{ teams.fullName(match.awayTeamId) }}</h2>
+          <p v-for="f in awayForm" :key="f.id" class="muted">{{ recentLine(f, match.awayTeamId) }}</p>
+          <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
+        </div>
+        <div class="panel">
+          <h2>Очные встречи</h2>
+          <p v-for="f in headToHead" :key="f.id" class="muted">
+            {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }} · {{ formatWhen(f.scheduledAt) }}
+          </p>
+          <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
         </div>
       </div>
       <div v-if="referees.length || auth.canOfficiate" class="panel stack">

@@ -206,4 +206,18 @@ class LeagueStore extends ChangeNotifier {
     return matches.where((m) => m.homeTeamId == teamId || m.awayTeamId == teamId).toList()
       ..sort((a, b) => (b.scheduledAt ?? DateTime(0)).compareTo(a.scheduledAt ?? DateTime(0)));
   }
+
+  List<LeagueMatch> headToHead(String homeId, String awayId, {String? exceptMatchId, int limit = 5}) {
+    final rows = matches
+        .where(
+          (m) =>
+              m.isFinished &&
+              m.id != exceptMatchId &&
+              ((m.homeTeamId == homeId && m.awayTeamId == awayId) || (m.homeTeamId == awayId && m.awayTeamId == homeId)),
+        )
+        .toList()
+      ..sort((a, b) => (b.scheduledAt ?? DateTime(0)).compareTo(a.scheduledAt ?? DateTime(0)));
+    if (rows.length <= limit) return rows;
+    return rows.sublist(0, limit);
+  }
 }

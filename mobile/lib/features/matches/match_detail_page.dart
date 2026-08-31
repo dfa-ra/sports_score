@@ -189,6 +189,12 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
                   blocks: _blocks,
                   homeForm: homeForm,
                   awayForm: awayForm,
+                  homeName: home,
+                  awayName: away,
+                  homeId: current.homeTeamId,
+                  awayId: current.awayTeamId,
+                  matchId: current.id,
+                  store: store,
                   canOfficiate: auth.canOfficiate,
                 ),
                 _Lineups(lineups: lineups),
@@ -271,16 +277,29 @@ class _Overview extends StatelessWidget {
     required this.blocks,
     required this.homeForm,
     required this.awayForm,
+    required this.homeName,
+    required this.awayName,
+    required this.homeId,
+    required this.awayId,
+    required this.matchId,
+    required this.store,
     required this.canOfficiate,
   });
 
   final List<_PeriodBlock> blocks;
   final List<LeagueMatch> homeForm;
   final List<LeagueMatch> awayForm;
+  final String homeName;
+  final String awayName;
+  final String homeId;
+  final String awayId;
+  final String matchId;
+  final LeagueStore store;
   final bool canOfficiate;
 
   @override
   Widget build(BuildContext context) {
+    final h2h = store.headToHead(homeId, awayId, exceptMatchId: matchId);
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       children: [
@@ -308,14 +327,11 @@ class _Overview extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _FormCard(title: 'Форма хозяев', rows: homeForm)),
-            const SizedBox(width: 8),
-            Expanded(child: _FormCard(title: 'Форма гостей', rows: awayForm)),
-          ],
-        ),
+        _RecentCard(title: 'Последние игры $homeName', teamId: homeId, rows: homeForm, store: store),
+        const SizedBox(height: 8),
+        _RecentCard(title: 'Последние игры $awayName', teamId: awayId, rows: awayForm, store: store),
+        const SizedBox(height: 8),
+        _H2hCard(rows: h2h, store: store),
         if (canOfficiate) ...[
           const SizedBox(height: 12),
           FilledButton(onPressed: () => context.push('/referee'), child: const Text('Открыть пульт')),
@@ -325,28 +341,75 @@ class _Overview extends StatelessWidget {
   }
 }
 
-class _FormCard extends StatelessWidget {
-  const _FormCard({required this.title, required this.rows});
+class _RecentCard extends StatelessWidget {
+  const _RecentCard({required this.title, required this.teamId, required this.rows, required this.store});
   final String title;
+  final String teamId;
   final List<LeagueMatch> rows;
+  final LeagueStore store;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-          const SizedBox(height: 6),
+          Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+          const SizedBox(height: 8),
           if (rows.isEmpty)
-            const Text('Ещё нет пяти матчей.', style: TextStyle(color: AppColors.muted, fontSize: 12))
+            const Text('Пока нет сыгранных матчей', style: TextStyle(color: AppColors.muted, fontSize: 13))
           else
             for (final row in rows)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text('${row.homeScore}:${row.awayScore} · ${longKickoff(row.scheduledAt)}', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  recentGameLine(
+                    teamId: teamId,
+                    homeTeamId: row.homeTeamId,
+                    awayTeamId: row.awayTeamId,
+                    homeScore: row.homeScore,
+                    awayScore: row.awayScore,
+                    opponentName: store.teamName(row.homeTeamId == teamId ? row.awayTeamId : row.homeTeamId),
+                    scheduledAt: row.scheduledAt,
+                  ),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _H2hCard extends StatelessWidget {
+  const _H2hCard({required this.rows, required this.store});
+  final List<LeagueMatch> rows;
+  final LeagueStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('ОЧНЫЕ ВСТРЕЧИ', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+          const SizedBox(height: 8),
+          if (rows.isEmpty)
+            const Text('Пока не играли друг с другом', style: TextStyle(color: AppColors.muted, fontSize: 13))
+          else
+            for (final row in rows)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '${store.teamName(row.homeTeamId)} ${row.homeScore}:${row.awayScore} ${store.teamName(row.awayTeamId)} · ${formDay(row.scheduledAt)}',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                ),
               ),
         ],
       ),
