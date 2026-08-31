@@ -45,6 +45,11 @@ class AuthController extends ChangeNotifier {
       user = AuthUser.fromJson(Map<String, dynamic>.from(map['user'] as Map));
       await _storage.write(key: 'sl_access', value: api.accessToken);
       await _storage.write(key: 'sl_refresh', value: map['refreshToken']?.toString());
+      if (canManageLeague) {
+        await api.restoreAdminBaseUrl();
+      } else {
+        api.resetToCompiled();
+      }
       return true;
     } catch (e) {
       error = e is ApiException ? e.message : 'Не удалось войти.';
@@ -65,6 +70,7 @@ class AuthController extends ChangeNotifier {
     } finally {
       api.accessToken = null;
       user = null;
+      api.resetToCompiled();
       await _storage.delete(key: 'sl_access');
       await _storage.delete(key: 'sl_refresh');
       notifyListeners();
