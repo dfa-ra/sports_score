@@ -25,7 +25,7 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 |---|---|
 | `student-league-backend-<ver>.jar` | Spring Boot fat JAR |
 | `student-league-web-<ver>.tar.gz` | Production `dist/` Vite |
-| Android APK + AAB | Flutter `--release` (пока default keystore, пока не добавлены secrets подписи) |
+| Android APK + AAB | Flutter `--release` с `--dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1` (пока default keystore) |
 | iOS unsigned zip | `Runner.app` с `macos-latest` (`--no-codesign`); опционально / не блокирует релиз |
 
 После публикации релиза `v*` workflow **Dev stand** сам качает эти ассеты на сервер и поднимает контейнеры.

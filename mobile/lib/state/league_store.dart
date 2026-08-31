@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/api_client.dart';
@@ -67,8 +69,10 @@ class LeagueStore extends ChangeNotifier {
       } catch (_) {}
       tournamentId ??= tournaments.isEmpty ? null : tournaments.first.id;
       await loadTournament();
+    } on TimeoutException {
+      error = 'Сервер не ответил: ${api.baseUrl}';
     } catch (e) {
-      error = e is ApiException ? e.message : 'Не удалось загрузить лигу.';
+      error = e is ApiException ? e.message : 'Не удалось загрузить лигу с ${api.baseUrl}';
     } finally {
       loading = false;
       notifyListeners();

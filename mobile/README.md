@@ -15,8 +15,13 @@ lib/
 flutter pub get
 flutter analyze
 flutter test
+# стенд по умолчанию: http://144.31.153.52:3000/api/v1
 flutter run
+# локальный backend
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8080/api/v1
 ```
+
+Релизный APK ходит на стенд через nginx (`:3000/api/v1`). Порт `8080` в Docker не проброшен наружу — это нормально. Адрес можно сменить в профиле.
 
 Режим судьи использует крупные кнопки для быстрого ввода событий во время матча.
 
