@@ -104,10 +104,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   }
 
   Future<void> _saveServer() async {
-    final api = context.read<AuthController>().api;
+    final auth = context.read<AuthController>();
+    if (!auth.canManageLeague) return;
     final league = context.read<LeagueStore>();
-    await api.setBaseUrl(server.text);
-    server.text = api.baseUrl;
+    await auth.api.setAdminBaseUrl(server.text);
+    server.text = auth.api.baseUrl;
     await league.load();
     if (mounted) setState(() {});
   }
@@ -118,7 +119,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       children: [
         const Text('Сервер', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
         const SizedBox(height: 6),
-        const Text('Тот же адрес, что у веба: порт 3000 и путь /api/v1. Порт 8080 снаружи не открыт.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        const Text('Только админ. Можно переключить API, например с прода на dev.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
         const SizedBox(height: 10),
         TextField(controller: server, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'API')),
         const SizedBox(height: 10),
@@ -150,13 +151,17 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             onPressed: auth.busy
                 ? null
                 : () async {
+                    final league = context.read<LeagueStore>();
                     final ok = await auth.login(email.text, password.text);
-                    if (ok) await _loadProfile();
+                    if (!ok || !mounted) return;
+                    if (auth.canManageLeague) {
+                      server.text = auth.api.baseUrl;
+                      await league.load();
+                    }
+                    await _loadProfile();
                   },
             child: Text(auth.busy ? 'Входим…' : 'Войти'),
           ),
-          const SizedBox(height: 24),
-          _serverCard(),
         ],
       );
     }
@@ -291,10 +296,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: _serverCard(),
-        ),
+        if (auth.canManageLeague)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: _serverCard(),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: OutlinedButton(onPressed: auth.logout, child: const Text('Выйти')),

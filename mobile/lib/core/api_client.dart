@@ -36,7 +36,11 @@ class ApiClient {
     return next;
   }
 
-  Future<void> restoreBaseUrl() async {
+  void resetToCompiled() {
+    baseUrl = compiledBaseUrl;
+  }
+
+  Future<void> restoreAdminBaseUrl() async {
     try {
       final saved = await _storage.read(key: storageKey);
       if (saved != null && saved.trim().isNotEmpty) {
@@ -45,7 +49,7 @@ class ApiClient {
     } catch (_) {}
   }
 
-  Future<void> setBaseUrl(String value) async {
+  Future<void> setAdminBaseUrl(String value) async {
     baseUrl = normalizeBaseUrl(value);
     await _storage.write(key: storageKey, value: baseUrl);
   }

@@ -87,11 +87,15 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
   }
 
   Future<void> _boot() async {
-    await api.restoreBaseUrl();
     await Future.wait([
       auth.restore(),
       favorites.load(),
     ]);
+    if (auth.canManageLeague) {
+      await api.restoreAdminBaseUrl();
+    } else {
+      api.resetToCompiled();
+    }
     await league.load();
   }
 

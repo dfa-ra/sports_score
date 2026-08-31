@@ -50,6 +50,8 @@ void main() {
 
     expect(find.text('Войти'), findsOneWidget);
     expect(find.text('Почта'), findsOneWidget);
+    expect(find.text('Сервер'), findsNothing);
+    expect(find.text('Сохранить и обновить'), findsNothing);
   });
 
   testWidgets('match row stars a game without leaving the list', (WidgetTester tester) async {
