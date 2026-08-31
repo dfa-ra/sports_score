@@ -82,10 +82,17 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
     favorites = FavoritesStore(persist: widget.autoload);
     router = buildRouter();
     if (widget.autoload) {
-      auth.restore();
-      league.load();
-      favorites.load();
+      _boot();
     }
+  }
+
+  Future<void> _boot() async {
+    await api.restoreBaseUrl();
+    await Future.wait([
+      auth.restore(),
+      favorites.load(),
+    ]);
+    await league.load();
   }
 
   @override

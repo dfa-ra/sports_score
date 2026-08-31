@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:student_league/core/api_client.dart';
 import 'package:student_league/core/app.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
@@ -79,6 +80,11 @@ void main() {
     await tester.pump();
     expect(fav.hasMatch('m1'), isTrue);
     expect(find.byTooltip('Убрать из избранного'), findsOneWidget);
+  });
+
+  test('compiled API points at the stand, not the phone loopback', () {
+    expect(ApiClient.compiledBaseUrl, contains('144.31.153.52:3000'));
+    expect(ApiClient.compiledBaseUrl, isNot(contains('127.0.0.1')));
   });
 
   test('favorites toggle teams and matches in memory', () {

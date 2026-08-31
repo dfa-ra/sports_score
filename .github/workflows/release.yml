@@ -105,9 +105,9 @@ jobs:
           # pubspec: version: x.y.z+build → keep build number 1 for tag releases
           sed -i "s/^version: .*/version: ${VERSION}+1/" pubspec.yaml
       - name: Build release APK (unsigned / debug-keystore default)
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1
       - name: Build release App Bundle
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1
       - name: Rename artifacts
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
@@ -139,7 +139,7 @@ jobs:
           VERSION="${{ needs.resolve-version.outputs.version }}"
           sed -i.bak "s/^version: .*/version: ${VERSION}+1/" pubspec.yaml
       - name: Build iOS (no codesign)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1
       - name: Archive app payload
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"

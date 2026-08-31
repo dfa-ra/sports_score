@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
@@ -12,17 +13,42 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient({String? baseUrl, http.Client? httpClient})
-      : baseUrl = baseUrl ??
-            const String.fromEnvironment(
-              'API_BASE_URL',
-              defaultValue: 'http://127.0.0.1:8080/api/v1',
-            ),
-        _http = httpClient ?? http.Client();
+  ApiClient({String? baseUrl, http.Client? httpClient, FlutterSecureStorage? storage})
+      : baseUrl = normalizeBaseUrl(baseUrl ?? compiledBaseUrl),
+        _http = httpClient ?? http.Client(),
+        _storage = storage ?? const FlutterSecureStorage();
 
-  final String baseUrl;
+  /// Dev stand nginx — same origin the web app uses. Backend :8080 is not published.
+  static const compiledBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://144.31.153.52:3000/api/v1',
+  );
+  static const storageKey = 'kb_api_base';
+
+  String baseUrl;
   final http.Client _http;
+  final FlutterSecureStorage _storage;
   String? accessToken;
+
+  static String normalizeBaseUrl(String value) {
+    var next = value.trim();
+    if (next.endsWith('/')) next = next.substring(0, next.length - 1);
+    return next;
+  }
+
+  Future<void> restoreBaseUrl() async {
+    try {
+      final saved = await _storage.read(key: storageKey);
+      if (saved != null && saved.trim().isNotEmpty) {
+        baseUrl = normalizeBaseUrl(saved);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setBaseUrl(String value) async {
+    baseUrl = normalizeBaseUrl(value);
+    await _storage.write(key: storageKey, value: baseUrl);
+  }
 
   Uri _uri(String path, [Map<String, String>? query]) {
     final normalized = path.startsWith('/') ? path : '/$path';

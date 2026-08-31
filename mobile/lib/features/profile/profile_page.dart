@@ -27,6 +27,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   final jersey = TextEditingController();
   final position = TextEditingController();
   final bio = TextEditingController();
+  final server = TextEditingController();
   late final TabController _tabs;
   PlayerProfile? profile;
   bool saving = false;
@@ -37,7 +38,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      server.text = context.read<AuthController>().api.baseUrl;
+      _loadProfile();
+    });
   }
 
   @override
@@ -50,6 +54,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     jersey.dispose();
     position.dispose();
     bio.dispose();
+    server.dispose();
     _tabs.dispose();
     super.dispose();
   }
@@ -98,6 +103,30 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     }
   }
 
+  Future<void> _saveServer() async {
+    final api = context.read<AuthController>().api;
+    final league = context.read<LeagueStore>();
+    await api.setBaseUrl(server.text);
+    server.text = api.baseUrl;
+    await league.load();
+    if (mounted) setState(() {});
+  }
+
+  Widget _serverCard() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Сервер', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+        const SizedBox(height: 6),
+        const Text('Тот же адрес, что у веба: порт 3000 и путь /api/v1. Порт 8080 снаружи не открыт.', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        const SizedBox(height: 10),
+        TextField(controller: server, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'API')),
+        const SizedBox(height: 10),
+        OutlinedButton(onPressed: _saveServer, child: const Text('Сохранить и обновить')),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthController>();
@@ -126,6 +155,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   },
             child: Text(auth.busy ? 'Входим…' : 'Войти'),
           ),
+          const SizedBox(height: 24),
+          _serverCard(),
         ],
       );
     }
@@ -261,7 +292,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: _serverCard(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: OutlinedButton(onPressed: auth.logout, child: const Text('Выйти')),
         ),
       ],
