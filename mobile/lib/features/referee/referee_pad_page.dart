@@ -32,6 +32,8 @@ class _RefereePadPageState extends State<RefereePadPage> {
   String? ok;
   Timer? _tick;
   DateTime now = DateTime.now();
+  bool heldClock = false;
+  ApiClient? _api;
 
   @override
   void initState() {
@@ -46,11 +48,16 @@ class _RefereePadPageState extends State<RefereePadPage> {
   @override
   void dispose() {
     _tick?.cancel();
+    if (heldClock) {
+      heldClock = false;
+      _api?.post('/referee/matches/${widget.matchId}/resume').catchError((_) => null);
+    }
     super.dispose();
   }
 
   Future<void> _load() async {
     final api = context.read<AuthController>().api;
+    _api = api;
     final store = context.read<LeagueStore>();
     try {
       final data = await api.get('/matches/${widget.matchId}');
@@ -110,6 +117,28 @@ class _RefereePadPageState extends State<RefereePadPage> {
     }
   }
 
+  Future<void> _holdClock() async {
+    if (heldClock || match?.status != 'LIVE') return;
+    try {
+      await context.read<AuthController>().api.post('/referee/matches/${widget.matchId}/pause');
+      heldClock = true;
+      await _load();
+    } catch (_) {
+      heldClock = false;
+    }
+  }
+
+  Future<void> _releaseClock() async {
+    if (!heldClock) return;
+    heldClock = false;
+    try {
+      if (match?.status == 'PAUSED') {
+        await context.read<AuthController>().api.post('/referee/matches/${widget.matchId}/resume');
+      }
+      await _load();
+    } catch (_) {}
+  }
+
   Future<void> _openSheet(_Kind kind) async {
     final current = match;
     if (current == null) return;
@@ -117,13 +146,15 @@ class _RefereePadPageState extends State<RefereePadPage> {
       setState(() => error = 'Сначала стартуйте матч.');
       return;
     }
+    await _holdClock();
+    if (!mounted) return;
     final store = context.read<LeagueStore>();
     final teamId = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (context) => _SheetFrame(
         title: kind == _Kind.goal ? 'Кто забил?' : kind == _Kind.yellow ? 'Кому жёлтая?' : 'Кому красная?',
-        hint: 'Сначала команда.',
+        hint: heldClock ? 'Часы стоят. Сначала команда.' : 'Сначала команда.',
         step: '1 / ${kind == _Kind.goal ? 3 : 2}',
         child: Column(
           children: [
@@ -133,7 +164,11 @@ class _RefereePadPageState extends State<RefereePadPage> {
         ),
       ),
     );
-    if (!mounted || teamId == null) return;
+    if (!mounted) return;
+    if (teamId == null) {
+      await _releaseClock();
+      return;
+    }
 
     final roster = teamId == current.homeTeamId ? homeRoster : awayRoster;
     final player = await showModalBottomSheet<TeamMember>(
@@ -142,7 +177,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
       isScrollControlled: true,
       builder: (context) => _SheetFrame(
         title: kind == _Kind.goal ? 'Кто забил гол?' : kind == _Kind.yellow ? 'Кому показать жёлтую?' : 'Кому показать красную?',
-        hint: 'Выберите игрока из заявки.',
+        hint: heldClock ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.',
         step: '2 / ${kind == _Kind.goal ? 3 : 2}',
         child: roster.isEmpty
             ? const Text('В заявке никого.', style: TextStyle(color: AppColors.muted))
@@ -154,7 +189,11 @@ class _RefereePadPageState extends State<RefereePadPage> {
               ),
       ),
     );
-    if (!mounted || player == null) return;
+    if (!mounted) return;
+    if (player == null) {
+      await _releaseClock();
+      return;
+    }
 
     if (kind != _Kind.goal) {
       await _addEvent({
@@ -162,6 +201,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
         'teamId': teamId,
         'playerId': player.playerId,
       });
+      await _releaseClock();
       return;
     }
 
@@ -183,13 +223,18 @@ class _RefereePadPageState extends State<RefereePadPage> {
         ),
       ),
     );
-    if (!mounted || assist == null) return;
+    if (!mounted) return;
+    if (assist == null) {
+      await _releaseClock();
+      return;
+    }
     await _addEvent({
       'eventType': 'GOAL',
       'teamId': teamId,
       'playerId': player.playerId,
       if (assist.isNotEmpty) 'secondaryPlayerId': assist,
     });
+    await _releaseClock();
   }
 
   @override
