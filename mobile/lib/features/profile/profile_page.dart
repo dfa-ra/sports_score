@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../state/auth_controller.dart';
 import '../../state/favorites_store.dart';
 import '../../state/league_store.dart';
+import '../../widgets/marks.dart';
 import '../../widgets/match_row.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -178,13 +179,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: const Color(0x294CB4E5),
-                backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
-                child: user.photoUrl == null || user.photoUrl!.isEmpty
-                    ? Text(initials(user.displayName), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy))
-                    : null,
+              PlayerPhoto(
+                name: user.displayName,
+                photoUrl: auth.api.resolveMedia(profile?.avatarUrl ?? user.photoUrl),
+                size: 64,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -245,6 +243,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   else
                     for (final team in favTeams)
                       ListTile(
+                        leading: TeamMark(name: team.name, logoUrl: store.teamLogo(team.id), size: 28),
                         title: Text(team.name, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
                         trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
                         onTap: () => context.push('/teams/${team.id}'),

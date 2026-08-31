@@ -7,6 +7,7 @@ import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/favorites_store.dart';
 import '../../state/league_store.dart';
+import '../../widgets/marks.dart';
 import '../../widgets/match_row.dart';
 
 class TeamPage extends StatefulWidget {
@@ -62,13 +63,7 @@ class _TeamPageState extends State<TeamPage> with SingleTickerProviderStateMixin
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Color(0x1400205B), blurRadius: 8)]),
-                  child: Text(initials(name), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 18)),
-                ),
+                TeamMark(name: name, logoUrl: store.teamLogo(widget.teamId), size: 56),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

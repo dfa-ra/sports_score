@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
+import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
   side: any
@@ -11,6 +13,7 @@ const emit = defineEmits<{
   save: [payload: { teamId: string; starterPlayerIds: string[]; benchPlayerIds: string[] }]
 }>()
 
+const teams = useTeamDirectory()
 const selected = ref<string[]>([])
 
 const roster = computed(() => [
@@ -49,7 +52,10 @@ function save() {
 <template>
   <div v-if="side" class="lineup">
     <header>
-      <h3>{{ side.teamName }}</h3>
+      <h3>
+        <TeamCrest :src="teams.logo(side.teamId)" :name="side.teamName" :size="22" />
+        {{ side.teamName }}
+      </h3>
       <p class="muted">
         {{ side.confirmed ? 'Стартовый состав записан' : 'Капитан ещё не написал, кто выходит с первой минуты' }}
       </p>
@@ -84,7 +90,13 @@ function save() {
 
 <style scoped>
 .lineup { display: grid; gap: 0.85rem; }
-h3 { font-size: 1.15rem; margin: 0; }
+h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.15rem;
+  margin: 0;
+}
 h4 {
   margin: 0 0 0.4rem;
   font-size: 0.72rem;

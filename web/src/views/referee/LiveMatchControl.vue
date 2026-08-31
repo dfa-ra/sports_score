@@ -7,6 +7,7 @@ import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import StatusBadge from '../../components/StatusBadge.vue'
+import TeamCrest from '../../components/TeamCrest.vue'
 
 const route = useRoute()
 const match = ref<any>(null)
@@ -126,9 +127,15 @@ onMounted(reload)
       <div class="clock" :class="{ expired }">{{ formatClock(remaining) }}</div>
       <p class="muted">осталось из {{ formatClock(cap) }} · прошло {{ formatClock(elapsed) }}</p>
       <div class="sides">
-        <strong>{{ homeLabel }}</strong>
+        <strong class="club">
+          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="28" />
+          {{ homeLabel }}
+        </strong>
         <div class="score">{{ match.homeScore }} : {{ match.awayScore }}</div>
-        <strong>{{ awayLabel }}</strong>
+        <strong class="club">
+          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="28" />
+          {{ awayLabel }}
+        </strong>
       </div>
     </div>
 
@@ -177,7 +184,10 @@ onMounted(reload)
 
     <div class="grid rosters">
       <div class="panel stack">
-        <h2>{{ homeLabel }}</h2>
+        <h2 class="club">
+          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="22" />
+          {{ homeLabel }}
+        </h2>
         <p v-if="!homeRoster.length" class="muted">В заявке никого. Капитан ещё собирает людей.</p>
         <div v-for="p in homeRoster" :key="p.playerId" class="row">
           <div>
@@ -194,7 +204,10 @@ onMounted(reload)
         </div>
       </div>
       <div class="panel stack">
-        <h2>{{ awayLabel }}</h2>
+        <h2 class="club">
+          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="22" />
+          {{ awayLabel }}
+        </h2>
         <p v-if="!awayRoster.length" class="muted">Гости тоже без заявки. Странный матч.</p>
         <div v-for="p in awayRoster" :key="p.playerId" class="row">
           <div>
@@ -245,7 +258,13 @@ onMounted(reload)
   align-items: center;
 }
 .sides strong { font-family: var(--font-display); }
-.sides strong:last-child { text-align: right; }
+.sides strong:last-child { text-align: right; justify-content: flex-end; }
+.club {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+h2.club { display: flex; }
 .controls { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .rosters { grid-template-columns: 1fr 1fr; gap: 1rem; }
 h2 { font-size: 1.15rem; }

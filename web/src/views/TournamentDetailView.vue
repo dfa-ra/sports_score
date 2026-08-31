@@ -7,10 +7,14 @@ import { apiError } from '../lib/errors'
 import AdminOnly from '../components/AdminOnly.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
+import StandingTable from '../components/StandingTable.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import TeamCrest from '../components/TeamCrest.vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const route = useRoute()
 const auth = useAuthStore()
+const names = useTeamDirectory()
 const tournament = ref<any>(null)
 const teams = ref<any[]>([])
 const standings = ref<any[]>([])
@@ -36,6 +40,7 @@ onMounted(load)
 
 async function load() {
   const id = route.params.id
+  await names.load()
   const [t, teamRes, standingRes, matchRes] = await Promise.all([
     api.get(`/tournaments/${id}`),
     api.get(`/tournaments/${id}/teams`),
@@ -176,29 +181,17 @@ async function exclude(id: string) {
     <div v-if="tab === 'table'" class="panel">
       <h2>Таблица</h2>
       <EmptyState v-if="!standings.length" title="Ещё рано считать" text="Очки появятся после первых свистков." />
-      <table v-else class="table">
-        <thead>
-          <tr><th>Команда</th><th>И</th><th>В</th><th>Н</th><th>П</th><th>Мячи</th><th>Очки</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in standings" :key="row.teamId">
-            <td><RouterLink :to="`/teams/${row.teamId}`">{{ row.teamName }}</RouterLink></td>
-            <td>{{ row.played }}</td>
-            <td>{{ row.wins }}</td>
-            <td>{{ row.draws }}</td>
-            <td>{{ row.losses }}</td>
-            <td>{{ row.goalsFor }}:{{ row.goalsAgainst }}</td>
-            <td><strong>{{ row.points }}</strong></td>
-          </tr>
-        </tbody>
-      </table>
+      <StandingTable v-else :rows="standings" />
     </div>
 
     <div class="panel stack">
       <h2>Команды</h2>
       <EmptyState v-if="!teams.length" title="Заявок нет" text="Капитаны ещё выбирают цвет формы." />
       <div v-for="team in teams" :key="team.id" class="row">
-        <RouterLink :to="`/teams/${team.teamId}`">{{ team.teamName }}</RouterLink>
+        <RouterLink class="club" :to="`/teams/${team.teamId}`">
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          {{ team.teamName }}
+        </RouterLink>
         <StatusBadge :status="team.status" />
       </div>
     </div>
@@ -256,7 +249,10 @@ async function exclude(id: string) {
 
       <h2>Заявки</h2>
       <div v-for="team in teams" :key="`admin-${team.id}`" class="row">
-        <span>{{ team.teamName }}</span>
+        <span class="club">
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          {{ team.teamName }}
+        </span>
         <StatusBadge :status="team.status" />
         <div class="actions">
           <button v-if="team.status !== 'APPROVED'" class="btn" :disabled="pending" @click="approve(team.teamId)">Допустить</button>
@@ -297,4 +293,9 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
 }
 .row:hover { color: var(--accent); }
 .actions { display: flex; gap: 0.45rem; }
+.club {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
 </style>

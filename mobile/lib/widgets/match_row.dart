@@ -6,6 +6,8 @@ import '../core/format.dart';
 import '../core/models.dart';
 import '../core/theme.dart';
 import '../state/favorites_store.dart';
+import '../state/league_store.dart';
+import 'marks.dart';
 
 class MatchRow extends StatelessWidget {
   const MatchRow({
@@ -24,6 +26,7 @@ class MatchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fav = context.watch<FavoritesStore>();
+    final store = context.watch<LeagueStore>();
     final outcome = matchOutcome(
       status: match.status,
       homeTeamId: match.homeTeamId,
@@ -70,9 +73,17 @@ class MatchRow extends StatelessWidget {
                     Expanded(
                       child: Column(
                         children: [
-                          _Side(name: homeName, own: highlightTeamId == match.homeTeamId),
+                          _Side(
+                            name: homeName,
+                            logoUrl: store.teamLogo(match.homeTeamId),
+                            own: highlightTeamId == match.homeTeamId,
+                          ),
                           const SizedBox(height: 4),
-                          _Side(name: awayName, own: highlightTeamId == match.awayTeamId),
+                          _Side(
+                            name: awayName,
+                            logoUrl: store.teamLogo(match.awayTeamId),
+                            own: highlightTeamId == match.awayTeamId,
+                          ),
                         ],
                       ),
                     ),
@@ -100,27 +111,16 @@ class MatchRow extends StatelessWidget {
 }
 
 class _Side extends StatelessWidget {
-  const _Side({required this.name, this.own = false});
+  const _Side({required this.name, this.logoUrl, this.own = false});
   final String name;
+  final String? logoUrl;
   final bool own;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 18,
-          height: 18,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: const Color(0x294CB4E5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            initials(name),
-            style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w800, color: AppColors.navy),
-          ),
-        ),
+        TeamMark(name: name, logoUrl: logoUrl, size: 18),
         const SizedBox(width: 8),
         Expanded(
           child: Text(

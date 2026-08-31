@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/league_store.dart';
+import '../../widgets/marks.dart';
 import '../../widgets/match_row.dart';
 
 class TablePage extends StatefulWidget {
@@ -136,6 +137,8 @@ class _Standings extends StatelessWidget {
                     child: Row(
                       children: [
                         _Rank(index: i),
+                        const SizedBox(width: 6),
+                        TeamMark(name: store.standings[i].teamName, logoUrl: store.teamLogo(store.standings[i].teamId), size: 18),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(store.standings[i].teamName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),

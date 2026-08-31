@@ -62,6 +62,29 @@ String weekdayShort(DateTime date) {
   return names[date.weekday - 1];
 }
 
+const monthShort = ['янв.', 'фев.', 'мар.', 'апр.', 'мая', 'июн.', 'июл.', 'авг.', 'сен.', 'окт.', 'ноя.', 'дек.'];
+
+String formDay(DateTime? at) {
+  if (at == null) return '—';
+  final d = at.toLocal();
+  return '${d.day} ${monthShort[d.month - 1]}';
+}
+
+String recentGameLine({
+  required String teamId,
+  required String homeTeamId,
+  required String awayTeamId,
+  required int homeScore,
+  required int awayScore,
+  required String opponentName,
+  DateTime? scheduledAt,
+}) {
+  final home = teamId == homeTeamId;
+  final own = home ? homeScore : awayScore;
+  final theirs = home ? awayScore : homeScore;
+  return '$own:$theirs · $opponentName · ${formDay(scheduledAt)}';
+}
+
 const eventLabels = {
   'GOAL': 'Гол',
   'OWN_GOAL': 'Автогол',

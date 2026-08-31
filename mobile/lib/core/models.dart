@@ -54,16 +54,18 @@ class LeagueMatch {
 }
 
 class TeamBrief {
-  TeamBrief({required this.id, required this.name, this.shortName});
+  TeamBrief({required this.id, required this.name, this.shortName, this.logoUrl});
   final String id;
   final String name;
   final String? shortName;
+  final String? logoUrl;
 
   factory TeamBrief.fromJson(Map<String, dynamic> json) {
     return TeamBrief(
       id: json['id'].toString(),
       name: json['name']?.toString() ?? 'Команда',
       shortName: json['shortName']?.toString(),
+      logoUrl: json['logoUrl']?.toString(),
     );
   }
 }
@@ -312,7 +314,9 @@ class PlayerCard {
     this.avatarUrl,
     this.jerseyNumber,
     this.position,
+    this.teamId,
     this.teamName,
+    this.teamLogoUrl,
     this.statistics = const {},
     this.history = const [],
   });
@@ -322,7 +326,9 @@ class PlayerCard {
   final String? avatarUrl;
   final int? jerseyNumber;
   final String? position;
+  final String? teamId;
   final String? teamName;
+  final String? teamLogoUrl;
   final Map<String, dynamic> statistics;
   final List<PlayerMatchHistory> history;
 
@@ -335,7 +341,9 @@ class PlayerCard {
       avatarUrl: json['avatarUrl']?.toString(),
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),
+      teamId: team is Map ? team['id']?.toString() : null,
       teamName: team is Map ? team['name']?.toString() : null,
+      teamLogoUrl: team is Map ? team['logoUrl']?.toString() : null,
       statistics: json['statistics'] is Map ? Map<String, dynamic>.from(json['statistics'] as Map) : const {},
       history: ((json['matchHistory'] as List?) ?? const [])
           .whereType<Map>()

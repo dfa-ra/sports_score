@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:student_league/core/api_client.dart';
 import 'package:student_league/core/app.dart';
+import 'package:student_league/core/format.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
+import 'package:student_league/state/league_store.dart';
 import 'package:student_league/widgets/match_row.dart';
 
 void main() {
@@ -66,8 +68,11 @@ void main() {
       awayScore: 0,
     );
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: fav,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: fav),
+          ChangeNotifierProvider(create: (_) => LeagueStore(ApiClient())),
+        ],
         child: MaterialApp(
           home: Scaffold(
             body: MatchRow(match: match, homeName: 'ФК Общага', awayName: 'Политех'),
@@ -84,9 +89,31 @@ void main() {
     expect(find.byTooltip('Убрать из избранного'), findsOneWidget);
   });
 
+  test('recent game line names the opponent', () {
+    expect(
+      recentGameLine(
+        teamId: 'h1',
+        homeTeamId: 'h1',
+        awayTeamId: 'a1',
+        homeScore: 2,
+        awayScore: 1,
+        opponentName: 'Политех',
+        scheduledAt: DateTime(2026, 8, 24, 17, 12),
+      ),
+      '2:1 · Политех · 24 авг.',
+    );
+  });
+
   test('compiled API points at the stand, not the phone loopback', () {
     expect(ApiClient.compiledBaseUrl, contains('144.31.153.52:3000'));
     expect(ApiClient.compiledBaseUrl, isNot(contains('127.0.0.1')));
+  });
+
+  test('resolveMedia joins relative paths to the stand origin', () {
+    final api = ApiClient(baseUrl: 'http://144.31.153.52:3000/api/v1');
+    expect(api.resolveMedia('/media/teams/a.png'), 'http://144.31.153.52:3000/media/teams/a.png');
+    expect(api.resolveMedia('https://cdn.example/logo.png'), 'https://cdn.example/logo.png');
+    expect(api.resolveMedia('  '), isNull);
   });
 
   test('favorites toggle teams and matches in memory', () {

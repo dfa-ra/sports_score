@@ -6,6 +6,7 @@ import '../../core/format.dart';
 import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/league_store.dart';
+import '../../widgets/marks.dart';
 import '../../widgets/match_row.dart';
 
 class PlayerPage extends StatefulWidget {
@@ -50,8 +51,10 @@ class _PlayerPageState extends State<PlayerPage> {
         body: const Center(child: EmptyHint(title: 'Карточка не найдена')),
       );
     }
+    final store = context.watch<LeagueStore>();
     final goals = current.statistics['goals'] ?? current.statistics['Goals'];
     final assists = current.statistics['assists'] ?? current.statistics['Assists'];
+    final photo = store.api.resolveMedia(current.avatarUrl);
     return Scaffold(
       appBar: AppBar(title: Text(current.displayName)),
       body: ListView(
@@ -59,22 +62,31 @@ class _PlayerPageState extends State<PlayerPage> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: const Color(0x294CB4E5),
-                backgroundImage: current.avatarUrl != null && current.avatarUrl!.isNotEmpty ? NetworkImage(current.avatarUrl!) : null,
-                child: current.avatarUrl == null || current.avatarUrl!.isEmpty
-                    ? Text(initials(current.displayName), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy))
-                    : null,
-              ),
+              PlayerPhoto(name: current.displayName, photoUrl: photo, size: 64),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(current.displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.navy)),
+                    if (current.teamName != null && current.teamName!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          TeamMark(
+                            name: current.teamName!,
+                            logoUrl: store.teamLogo(current.teamId) ?? store.api.resolveMedia(current.teamLogoUrl),
+                            size: 18,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(current.teamName!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.muted)),
+                          ),
+                        ],
+                      ),
+                    ],
                     Text(
-                      [if (current.jerseyNumber != null) '#${current.jerseyNumber}', current.position, current.teamName].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
+                      [if (current.jerseyNumber != null) '#${current.jerseyNumber}', current.position].whereType<String>().where((s) => s.isNotEmpty).join(' · '),
                       style: const TextStyle(color: AppColors.muted),
                     ),
                   ],

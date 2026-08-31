@@ -9,6 +9,7 @@ import { labelOf, roleLabel } from '../lib/format'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import MatchRow from '../components/MatchRow.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
 const fav = useFavorites()
@@ -128,6 +129,7 @@ async function logout() {
         <div class="league-head">Избранные команды</div>
         <p v-if="!favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
         <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
+          <TeamCrest :src="teams.logo(team.id)" :name="team.name" :size="22" />
           {{ team.name }}
         </RouterLink>
       </div>
@@ -195,7 +197,9 @@ async function logout() {
 }
 .empty-line { padding: 0.85rem; margin: 0; }
 .fav {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   padding: 0.8rem 0.9rem;
   border-top: 1px solid var(--line);
   color: var(--navy);

@@ -30,6 +30,15 @@ class ApiClient {
   final FlutterSecureStorage _storage;
   String? accessToken;
 
+  String? resolveMedia(String? raw) {
+    if (raw == null) return null;
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final origin = baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+    return value.startsWith('/') ? '$origin$value' : '$origin/$value';
+  }
+
   static String normalizeBaseUrl(String value) {
     var next = value.trim();
     if (next.endsWith('/')) next = next.substring(0, next.length - 1);

@@ -29,6 +29,11 @@ class LeagueStore extends ChangeNotifier {
     return teams[id]?.name ?? 'Команда';
   }
 
+  String? teamLogo(String? id) {
+    if (id == null) return null;
+    return api.resolveMedia(teams[id]?.logoUrl);
+  }
+
   Future<void> load() async {
     loading = true;
     error = null;
@@ -205,5 +210,19 @@ class LeagueStore extends ChangeNotifier {
   List<LeagueMatch> teamMatches(String teamId) {
     return matches.where((m) => m.homeTeamId == teamId || m.awayTeamId == teamId).toList()
       ..sort((a, b) => (b.scheduledAt ?? DateTime(0)).compareTo(a.scheduledAt ?? DateTime(0)));
+  }
+
+  List<LeagueMatch> headToHead(String homeId, String awayId, {String? exceptMatchId, int limit = 5}) {
+    final rows = matches
+        .where(
+          (m) =>
+              m.isFinished &&
+              m.id != exceptMatchId &&
+              ((m.homeTeamId == homeId && m.awayTeamId == awayId) || (m.homeTeamId == awayId && m.awayTeamId == homeId)),
+        )
+        .toList()
+      ..sort((a, b) => (b.scheduledAt ?? DateTime(0)).compareTo(a.scheduledAt ?? DateTime(0)));
+    if (rows.length <= limit) return rows;
+    return rows.sublist(0, limit);
   }
 }
