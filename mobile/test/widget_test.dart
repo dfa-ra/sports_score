@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:student_league/core/api_client.dart';
 import 'package:student_league/core/app.dart';
+import 'package:student_league/core/format.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
 import 'package:student_league/widgets/match_row.dart';
@@ -87,6 +88,28 @@ void main() {
   test('compiled API points at the stand, not the phone loopback', () {
     expect(ApiClient.compiledBaseUrl, contains('144.31.153.52:3000'));
     expect(ApiClient.compiledBaseUrl, isNot(contains('127.0.0.1')));
+  });
+
+  test('match clock counts remaining time while live', () {
+    final start = DateTime.utc(2026, 8, 31, 10, 0, 0);
+    expect(
+      matchElapsedSeconds(
+        status: 'LIVE',
+        gameTimeSeconds: 60,
+        clockRunningSince: start,
+        cap: 1200,
+        now: start.add(const Duration(seconds: 30)),
+      ),
+      90,
+    );
+    expect(
+      matchRemainingSeconds(
+        status: 'PAUSED',
+        gameTimeSeconds: 200,
+        cap: 1200,
+      ),
+      1000,
+    );
   });
 
   test('favorites toggle teams and matches in memory', () {

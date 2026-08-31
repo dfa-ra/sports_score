@@ -190,6 +190,7 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
                   homeForm: homeForm,
                   awayForm: awayForm,
                   canOfficiate: auth.canOfficiate,
+                  matchId: current.id,
                 ),
                 _Lineups(lineups: lineups),
                 _Protocol(events: events, match: current),
@@ -272,12 +273,14 @@ class _Overview extends StatelessWidget {
     required this.homeForm,
     required this.awayForm,
     required this.canOfficiate,
+    required this.matchId,
   });
 
   final List<_PeriodBlock> blocks;
   final List<LeagueMatch> homeForm;
   final List<LeagueMatch> awayForm;
   final bool canOfficiate;
+  final String matchId;
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +321,7 @@ class _Overview extends StatelessWidget {
         ),
         if (canOfficiate) ...[
           const SizedBox(height: 12),
-          FilledButton(onPressed: () => context.push('/referee'), child: const Text('Открыть пульт')),
+          FilledButton(onPressed: () => context.push('/referee/$matchId'), child: const Text('Открыть пульт')),
         ],
       ],
     );

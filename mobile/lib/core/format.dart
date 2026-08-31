@@ -78,6 +78,38 @@ const eventLabels = {
 
 String eventLabel(String? type) => eventLabels[type] ?? type ?? 'Событие';
 
+int matchElapsedSeconds({
+  required String status,
+  int gameTimeSeconds = 0,
+  DateTime? clockRunningSince,
+  int cap = 1200,
+  DateTime? now,
+}) {
+  var base = gameTimeSeconds;
+  if (status == 'LIVE' && clockRunningSince != null) {
+    base += (now ?? DateTime.now()).difference(clockRunningSince).inSeconds;
+  }
+  if (base < 0) return 0;
+  return base > cap ? cap : base;
+}
+
+int matchRemainingSeconds({
+  required String status,
+  int gameTimeSeconds = 0,
+  DateTime? clockRunningSince,
+  int cap = 1200,
+  DateTime? now,
+}) {
+  return cap -
+      matchElapsedSeconds(
+        status: status,
+        gameTimeSeconds: gameTimeSeconds,
+        clockRunningSince: clockRunningSince,
+        cap: cap,
+        now: now,
+      );
+}
+
 String formatClock(int? totalSeconds) {
   final safe = totalSeconds == null || totalSeconds < 0 ? 0 : totalSeconds;
   final minutes = safe ~/ 60;

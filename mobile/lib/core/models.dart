@@ -17,6 +17,8 @@ class LeagueMatch {
     this.periodCount = 2,
     this.sportCode,
     this.gameTimeSeconds,
+    this.periodLengthSeconds = 1200,
+    this.clockRunningSince,
   });
 
   final String id;
@@ -31,6 +33,8 @@ class LeagueMatch {
   final int periodCount;
   final String? sportCode;
   final int? gameTimeSeconds;
+  final int periodLengthSeconds;
+  final DateTime? clockRunningSince;
 
   factory LeagueMatch.fromJson(Map<String, dynamic> json) {
     return LeagueMatch(
@@ -46,6 +50,8 @@ class LeagueMatch {
       periodCount: (json['periodCount'] as num?)?.toInt() ?? 2,
       sportCode: json['sportCode']?.toString(),
       gameTimeSeconds: (json['gameTimeSeconds'] as num?)?.toInt(),
+      periodLengthSeconds: (json['periodLengthSeconds'] as num?)?.toInt() ?? 1200,
+      clockRunningSince: parseTime(json['clockRunningSince']),
     );
   }
 

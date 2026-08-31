@@ -6,7 +6,8 @@ import '../features/games/games_page.dart';
 import '../features/matches/match_detail_page.dart';
 import '../features/players/player_page.dart';
 import '../features/profile/profile_page.dart';
-import '../features/referee/referee_control_page.dart';
+import '../features/referee/referee_matches_page.dart';
+import '../features/referee/referee_pad_page.dart';
 import '../features/shell/shell_page.dart';
 import '../features/table/table_page.dart';
 import '../features/teams/team_page.dart';
@@ -40,7 +41,12 @@ GoRouter buildRouter() {
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: '/referee',
-        builder: (_, __) => const RefereeControlPage(),
+        builder: (_, __) => const RefereeMatchesPage(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/referee/:id',
+        builder: (_, state) => RefereePadPage(matchId: state.pathParameters['id']!),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,
