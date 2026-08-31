@@ -43,7 +43,15 @@ jobs:
 
       - name: Package backend
         working-directory: backend
-        run: ./mvnw -B -DskipTests package
+        run: |
+          for attempt in 1 2 3; do
+            if ./mvnw -B -DskipTests package; then
+              exit 0
+            fi
+            echo "Maven package failed (attempt ${attempt}), retrying..."
+            sleep $((attempt * 5))
+          done
+          exit 1
 
       - name: Stage backend JAR
         run: |
