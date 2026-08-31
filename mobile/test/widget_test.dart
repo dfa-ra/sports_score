@@ -29,6 +29,7 @@ void main() {
     expect(find.text('ТАБЛИЦА'), findsWidgets);
     expect(find.text('РЕЗУЛЬТАТЫ'), findsOneWidget);
     expect(find.text('БОМБАРДИРЫ'), findsOneWidget);
+    expect(find.text('ИГРОКИ'), findsOneWidget);
   });
 
   testWidgets('live tab is its own empty screen', (WidgetTester tester) async {

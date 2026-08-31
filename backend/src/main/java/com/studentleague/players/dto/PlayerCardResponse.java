@@ -1,6 +1,7 @@
 package com.studentleague.players.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -13,6 +14,7 @@ public record PlayerCardResponse(
         String avatarUrl,
         Integer jerseyNumber,
         String position,
+        LocalDate dateOfBirth,
         TeamSummary team,
         Map<String, Object> statistics,
         List<MatchHistoryItem> matchHistory
@@ -26,6 +28,8 @@ public record PlayerCardResponse(
             String tournamentName,
             String homeTeamName,
             String awayTeamName,
+            String homeTeamLogoUrl,
+            String awayTeamLogoUrl,
             String opponentName,
             boolean home,
             Integer homeScore,

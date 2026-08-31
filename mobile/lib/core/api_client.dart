@@ -54,6 +54,14 @@ class ApiClient {
     await _storage.write(key: storageKey, value: baseUrl);
   }
 
+  String? resolveMedia(String? url) {
+    if (url == null || url.trim().isEmpty) return null;
+    final value = url.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final origin = baseUrl.replaceFirst(RegExp(r'/api/v1/?$'), '');
+    return value.startsWith('/') ? '$origin$value' : '$origin/$value';
+  }
+
   Uri _uri(String path, [Map<String, String>? query]) {
     final normalized = path.startsWith('/') ? path : '/$path';
     return Uri.parse('$baseUrl$normalized').replace(queryParameters: query);

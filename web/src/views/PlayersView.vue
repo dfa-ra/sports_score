@@ -52,15 +52,17 @@ onMounted(async () => {
       <div v-for="n in 4" :key="n" class="skeleton" />
     </div>
     <EmptyState v-else-if="!items.length" title="Никого не нашли" />
-    <div v-else class="grid cards">
-      <RouterLink v-for="p in items" :key="p.id" class="panel card-link" :to="`/players/${p.id}`">
+    <div v-else class="grid cards people">
+      <RouterLink v-for="p in items" :key="p.id" class="panel card-link person" :to="`/players/${p.id}`">
         <PlayerAvatar
           :src="p.avatarUrl"
           :name="p.displayName || `${p.firstName} ${p.lastName}`"
           :size="42"
         />
-        <h2>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</h2>
-        <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
+        <div>
+          <h2>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</h2>
+          <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
+        </div>
       </RouterLink>
     </div>
   </section>
@@ -69,6 +71,15 @@ onMounted(async () => {
 <style scoped>
 .filters { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.7rem; align-items: end; }
 .card-link { display: grid; gap: 0.3rem; justify-items: start; }
-h2 { font-size: 1.2rem; }
-@media (max-width: 760px) { .filters { grid-template-columns: 1fr; } }
+h2 { font-size: 1.2rem; margin: 0; }
+@media (max-width: 760px) {
+  .filters { grid-template-columns: 1fr; }
+  .people { grid-template-columns: 1fr; }
+  .person {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.7rem;
+    align-items: center;
+  }
+}
 </style>

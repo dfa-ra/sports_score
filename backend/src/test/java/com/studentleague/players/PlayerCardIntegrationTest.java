@@ -40,7 +40,9 @@ class PlayerCardIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.matchHistory[0].assists").value(0))
                 .andExpect(jsonPath("$.matchHistory[0].yellowCards").value(1))
                 .andExpect(jsonPath("$.matchHistory[0].outcome").value("WIN"))
-                .andExpect(jsonPath("$.matchHistory[0].tournamentName").value("Player Card Cup"));
+                .andExpect(jsonPath("$.matchHistory[0].tournamentName").value("Player Card Cup"))
+                .andExpect(jsonPath("$.matchHistory[0].homeTeamName").value("Home Side"))
+                .andExpect(jsonPath("$.matchHistory[0].awayTeamName").value("Away Side"));
 
         mockMvc.perform(get("/api/v1/players/" + fx.assisterId + "/card"))
                 .andExpect(status().isOk())
@@ -60,6 +62,12 @@ class PlayerCardIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.matchHistory.length()").value(1))
                 .andExpect(jsonPath("$.matchHistory[0].goals").value(0))
                 .andExpect(jsonPath("$.matchHistory[0].outcome").value("WIN"));
+    }
+
+    @Test
+    void publicPlayerListDoesNotRequireLogin() throws Exception {
+        mockMvc.perform(get("/api/v1/players"))
+                .andExpect(status().isOk());
     }
 
     private Fixture setupFinishedMatch(String adminToken) throws Exception {

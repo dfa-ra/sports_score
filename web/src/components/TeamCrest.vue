@@ -7,9 +7,8 @@ const props = withDefaults(
     src?: string | null
     name?: string | null
     size?: number
-    tile?: boolean
   }>(),
-  { size: 56, tile: false },
+  { size: 22 },
 )
 
 const broken = ref(false)
@@ -22,43 +21,39 @@ watch(
 
 const showImage = computed(() => Boolean(props.src) && !broken.value)
 const label = computed(() => initials(props.name || ''))
+const radius = computed(() => (props.size < 28 ? 4 : 8))
 </script>
 
 <template>
   <img
     v-if="showImage"
-    class="player-avatar"
-    :class="{ tile }"
+    class="team-crest"
     :src="src!"
-    :alt="name || 'Фото игрока'"
-    :style="{ width: `${size}px`, height: `${size}px` }"
+    :alt="name || 'Эмблема'"
+    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px` }"
     @error="broken = true"
   />
   <span
     v-else
-    class="player-avatar player-avatar--fallback"
-    :class="{ tile }"
-    :style="{ width: `${size}px`, height: `${size}px` }"
+    class="team-crest team-crest--fallback"
+    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, fontSize: `${Math.max(8, size * 0.38)}px` }"
     aria-hidden="true"
   >{{ label }}</span>
 </template>
 
 <style scoped>
-.player-avatar {
+.team-crest {
   display: block;
   flex: 0 0 auto;
-  border-radius: 999px;
   object-fit: cover;
   background: var(--accent-soft);
 }
-.player-avatar.tile {
-  border-radius: 12px;
-}
-.player-avatar--fallback {
+.team-crest--fallback {
   display: grid;
   place-items: center;
-  color: var(--accent);
+  color: var(--navy);
   font-weight: 800;
-  font-size: 0.95em;
+  font-style: normal;
+  line-height: 1;
 }
 </style>

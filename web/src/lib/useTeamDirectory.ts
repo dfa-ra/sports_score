@@ -37,5 +37,16 @@ export function useTeamDirectory() {
     return cache.value[id]?.name || fallback
   }
 
-  return { teams: cache, load, name, fullName }
+  function logo(id?: string | null) {
+    if (!id) return ''
+    return cache.value[id]?.logoUrl || ''
+  }
+
+  function logoByName(value?: string | null) {
+    if (!value) return ''
+    const hit = Object.values(cache.value).find((team) => team.name === value || team.shortName === value)
+    return hit?.logoUrl || ''
+  }
+
+  return { teams: cache, load, name, fullName, logo, logoByName }
 }

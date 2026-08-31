@@ -154,6 +154,7 @@ public class PlayerService {
                 profile.getAvatarUrl(),
                 profile.getJerseyNumber(),
                 profile.getPosition(),
+                profile.getDateOfBirth(),
                 teamSummary,
                 statistics,
                 history
@@ -271,6 +272,8 @@ public class PlayerService {
                     tournament == null ? null : tournament.getName(),
                     homeName,
                     awayName,
+                    homeTeam == null ? null : homeTeam.getLogoUrl(),
+                    awayTeam == null ? null : awayTeam.getLogoUrl(),
                     opponentName,
                     home,
                     match.getHomeScore(),

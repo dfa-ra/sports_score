@@ -19,6 +19,7 @@ class LeagueStore extends ChangeNotifier {
   List<PlayerStat> scorers = [];
   List<PlayerStat> assists = [];
   List<PlayerStat> keepers = [];
+  List<PlayerBrief> players = [];
   String? tournamentId;
   String? tournamentName;
   bool loading = false;
@@ -68,6 +69,17 @@ class LeagueStore extends ChangeNotifier {
         }
       } catch (_) {}
       tournamentId ??= tournaments.isEmpty ? null : tournaments.first.id;
+      try {
+        final playerPage = await api.get('/players', query: {'size': '100'});
+        if (playerPage is Map) {
+          players = ((playerPage['content'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((item) => PlayerBrief.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+      } catch (_) {
+        players = [];
+      }
       await loadTournament();
     } on TimeoutException {
       error = 'Сервер не ответил: ${api.baseUrl}';

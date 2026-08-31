@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/league_store.dart';
 import '../../widgets/match_row.dart';
+import '../../widgets/player_photo.dart';
 
 class TablePage extends StatefulWidget {
   const TablePage({super.key});
@@ -20,7 +21,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -78,10 +79,13 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
         ),
         TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(text: 'ТАБЛИЦА'),
             Tab(text: 'РЕЗУЛЬТАТЫ'),
             Tab(text: 'БОМБАРДИРЫ'),
+            Tab(text: 'ИГРОКИ'),
           ],
         ),
         if (store.loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.ice),
@@ -92,6 +96,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
               _Standings(store: store),
               _Results(store: store),
               _Scorers(store: store),
+              _Players(store: store),
             ],
           ),
         ),
@@ -193,6 +198,32 @@ class _Scorers extends StatelessWidget {
         _StatCard(title: 'Голы', rows: store.scorers),
         _StatCard(title: 'Передачи', rows: store.assists),
         _StatCard(title: 'Сухие', rows: store.keepers),
+      ],
+    );
+  }
+}
+
+class _Players extends StatelessWidget {
+  const _Players({required this.store});
+  final LeagueStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    if (store.players.isEmpty) {
+      return ListView(children: const [EmptyHint(title: 'Игроков пока нет')]);
+    }
+    return ListView(
+      children: [
+        for (final player in store.players)
+          ListTile(
+            leading: PlayerPhoto(url: store.api.resolveMedia(player.avatarUrl), name: player.displayName, size: 36),
+            title: Text(player.displayName, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
+            subtitle: Text(
+              '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
+              style: const TextStyle(color: AppColors.muted),
+            ),
+            onTap: () => context.push('/players/${player.id}'),
+          ),
       ],
     );
   }

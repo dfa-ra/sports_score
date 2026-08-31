@@ -10,6 +10,9 @@ import '../../state/auth_controller.dart';
 import '../../state/favorites_store.dart';
 import '../../state/league_store.dart';
 import '../../widgets/match_row.dart';
+import '../../widgets/player_card_sheet.dart';
+import '../../widgets/player_photo.dart';
+import '../../widgets/team_mark.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -18,7 +21,7 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
+class _ProfilePageState extends State<ProfilePage> {
   final email = TextEditingController();
   final password = TextEditingController();
   final firstName = TextEditingController();
@@ -28,8 +31,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   final position = TextEditingController();
   final bio = TextEditingController();
   final server = TextEditingController();
-  late final TabController _tabs;
   PlayerProfile? profile;
+  PlayerCard? card;
   bool saving = false;
   String? formError;
   String? formOk;
@@ -37,7 +40,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       server.text = context.read<AuthController>().api.baseUrl;
       _loadProfile();
@@ -55,7 +57,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     position.dispose();
     bio.dispose();
     server.dispose();
-    _tabs.dispose();
     super.dispose();
   }
 
@@ -73,9 +74,25 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         position.text = next.position;
         bio.text = next.bio;
         setState(() => profile = next);
+        await _loadCard(next.id);
       }
     } catch (_) {
       if (mounted) setState(() => profile = PlayerProfile());
+    }
+  }
+
+  Future<void> _loadCard(String? id) async {
+    if (id == null) {
+      if (mounted) setState(() => card = null);
+      return;
+    }
+    try {
+      final data = await context.read<AuthController>().api.get('/players/$id/card');
+      if (data is Map && mounted) {
+        setState(() => card = PlayerCard.fromJson(Map<String, dynamic>.from(data)));
+      }
+    } catch (_) {
+      if (mounted) setState(() => card = null);
     }
   }
 
@@ -94,8 +111,16 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         position: position.text.trim(),
         bio: bio.text.trim(),
       ).toRequest();
-      await context.read<AuthController>().api.put('/players/me', body);
-      if (mounted) setState(() => formOk = 'Профиль сохранён.');
+      final data = await context.read<AuthController>().api.put('/players/me', body);
+      if (data is Map && mounted) {
+        final next = PlayerProfile.fromJson(Map<String, dynamic>.from(data));
+        setState(() {
+          profile = next;
+          formOk = 'Профиль сохранён.';
+        });
+        await _loadCard(next.id);
+      }
+      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => formError = e is ApiException ? e.message : 'Профиль не сохранился.');
     } finally {
@@ -111,6 +136,59 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     server.text = auth.api.baseUrl;
     await league.load();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _openEdit() async {
+    formError = null;
+    formOk = null;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheet) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(profile?.id != null ? 'Изменить анкету' : 'Стать игроком', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
+                    const SizedBox(height: 12),
+                    TextField(controller: firstName, decoration: const InputDecoration(labelText: 'Имя')),
+                    const SizedBox(height: 10),
+                    TextField(controller: lastName, decoration: const InputDecoration(labelText: 'Фамилия')),
+                    const SizedBox(height: 10),
+                    TextField(controller: displayName, decoration: const InputDecoration(labelText: 'Как писать на майке')),
+                    const SizedBox(height: 10),
+                    TextField(controller: jersey, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Номер')),
+                    const SizedBox(height: 10),
+                    TextField(controller: position, decoration: const InputDecoration(labelText: 'Позиция')),
+                    const SizedBox(height: 10),
+                    TextField(controller: bio, maxLines: 3, decoration: const InputDecoration(labelText: 'О себе')),
+                    if (formError != null) ...[
+                      const SizedBox(height: 10),
+                      Text(formError!, style: const TextStyle(color: AppColors.danger)),
+                    ],
+                    const SizedBox(height: 14),
+                    FilledButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              await _save();
+                              setSheet(() {});
+                            },
+                      child: Text(saving ? 'Сохраняем…' : profile?.id != null ? 'Сохранить' : 'Стать игроком'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _serverCard() {
@@ -170,169 +248,99 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final store = context.watch<LeagueStore>();
     final fav = context.watch<FavoritesStore>();
     final favMatches = store.matches.where((m) => fav.hasMatch(m.id)).toList();
-    final favTeams = fav.teams.map((id) => (id: id, name: store.teamName(id))).toList();
+    final currentTeamId = card?.teamId;
+    final favTeams = fav.teams
+        .where((id) => id != currentTeamId)
+        .map((id) => (id: id, name: store.teamName(id), logo: store.teams[id]?.logoUrl))
+        .toList();
 
-    return Column(
+    return ListView(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 32,
-                backgroundColor: const Color(0x294CB4E5),
-                backgroundImage: user.photoUrl != null && user.photoUrl!.isNotEmpty ? NetworkImage(user.photoUrl!) : null,
-                child: user.photoUrl == null || user.photoUrl!.isEmpty
-                    ? Text(initials(user.displayName), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy))
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('ПРОФИЛЬ', style: TextStyle(color: AppColors.ice, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
-                    Text(user.displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.navy)),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        for (final role in user.roles)
-                          Chip(
-                            label: Text(roleLabels[role] ?? role, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                            backgroundColor: const Color(0x294CB4E5),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
-                  ],
+        if (card != null)
+          PlayerCardSheet(card: card!, onEdit: _openEdit, resolveMedia: auth.api.resolveMedia)
+        else
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+            child: Row(
+              children: [
+                PlayerPhoto(
+                  url: auth.api.resolveMedia(user.photoUrl ?? profile?.avatarUrl),
+                  name: displayName.text.isNotEmpty ? displayName.text : user.displayName,
+                  size: 76,
+                  tile: true,
                 ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              if (profile?.id != null) _Shortcut(title: 'Карточка игрока', onTap: () => context.push('/players/${profile!.id}')),
-              if (auth.canOfficiate) _Shortcut(title: 'Пульт судьи', onTap: () => context.push('/referee')),
-              _Shortcut(title: 'Бомбардиры', onTap: () => context.go('/table')),
-              if (auth.canManageLeague) const _Shortcut(title: 'Админка в вебе', onTap: null),
-            ],
-          ),
-        ),
-        TabBar(
-          controller: _tabs,
-          tabs: const [
-            Tab(text: 'ИЗБРАННОЕ'),
-            Tab(text: 'АНКЕТА'),
-          ],
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabs,
-            children: [
-              ListView(
-                children: [
-                  const LeagueHead(title: 'Избранные команды'),
-                  if (favTeams.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: Text('Звезда на карточке команды — и она будет здесь.', style: TextStyle(color: AppColors.muted)),
-                    )
-                  else
-                    for (final team in favTeams)
-                      ListTile(
-                        title: Text(team.name, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
-                        trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
-                        onTap: () => context.push('/teams/${team.id}'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName.text.isNotEmpty ? displayName.text : user.displayName,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.navy),
                       ),
-                  const LeagueHead(title: 'Избранные матчи'),
-                  if (favMatches.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(14),
-                      child: Text('Отмечайте игры звездой в календаре.', style: TextStyle(color: AppColors.muted)),
-                    )
-                  else
-                    for (final match in favMatches)
-                      MatchRow(
-                        match: match,
-                        homeName: store.teamName(match.homeTeamId),
-                        awayName: store.teamName(match.awayTeamId),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          for (final role in user.roles)
+                            Chip(
+                              label: Text(roleLabels[role] ?? role, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                              backgroundColor: const Color(0x294CB4E5),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                        ],
                       ),
-                ],
-              ),
-              ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                children: [
-                  TextField(controller: firstName, decoration: const InputDecoration(labelText: 'Имя')),
-                  const SizedBox(height: 10),
-                  TextField(controller: lastName, decoration: const InputDecoration(labelText: 'Фамилия')),
-                  const SizedBox(height: 10),
-                  TextField(controller: displayName, decoration: const InputDecoration(labelText: 'Как писать на майке')),
-                  const SizedBox(height: 10),
-                  TextField(controller: jersey, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Номер')),
-                  const SizedBox(height: 10),
-                  TextField(controller: position, decoration: const InputDecoration(labelText: 'Позиция')),
-                  const SizedBox(height: 10),
-                  TextField(controller: bio, maxLines: 3, decoration: const InputDecoration(labelText: 'О себе')),
-                  if (formError != null) ...[
-                    const SizedBox(height: 10),
-                    Text(formError!, style: const TextStyle(color: AppColors.danger)),
-                  ],
-                  if (formOk != null) ...[
-                    const SizedBox(height: 10),
-                    Text(formOk!, style: const TextStyle(color: AppColors.win)),
-                  ],
-                  const SizedBox(height: 14),
-                  FilledButton(
-                    onPressed: saving ? null : _save,
-                    child: Text(saving ? 'Сохраняем…' : profile?.id != null ? 'Обновить' : 'Стать игроком'),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+                IconButton(tooltip: 'Изменить', onPressed: _openEdit, icon: const Icon(Icons.edit_outlined, color: AppColors.navy)),
+              ],
+            ),
           ),
-        ),
+        const LeagueHead(title: 'Команды'),
+        if (card?.teamId != null)
+          ListTile(
+            leading: TeamMark(url: auth.api.resolveMedia(card!.teamLogoUrl), name: card!.teamName ?? 'Команда', size: 22),
+            title: Text(card!.teamName ?? 'Команда', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
+            onTap: () => context.push('/teams/${card!.teamId}'),
+          ),
+        for (final team in favTeams)
+          ListTile(
+            leading: TeamMark(url: auth.api.resolveMedia(team.logo), name: team.name, size: 22),
+            title: Text(team.name, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
+            onTap: () => context.push('/teams/${team.id}'),
+          ),
+        if (card?.teamId == null && favTeams.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(14),
+            child: Text('Звезда на карточке команды — и она будет здесь.', style: TextStyle(color: AppColors.muted)),
+          ),
+        if (favMatches.isNotEmpty) ...[
+          const LeagueHead(title: 'Избранные матчи'),
+          for (final match in favMatches)
+            MatchRow(
+              match: match,
+              homeName: store.teamName(match.homeTeamId),
+              awayName: store.teamName(match.awayTeamId),
+            ),
+        ],
+        if (auth.canOfficiate)
+          ListTile(
+            title: const Text('Пульт судьи', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+            trailing: const Icon(Icons.chevron_right, color: AppColors.muted),
+            onTap: () => context.push('/referee'),
+          ),
         if (auth.canManageLeague)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: _serverCard(),
           ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           child: OutlinedButton(onPressed: auth.logout, child: const Text('Выйти')),
         ),
       ],
-    );
-  }
-}
-
-class _Shortcut extends StatelessWidget {
-  const _Shortcut({required this.title, required this.onTap});
-  final String title;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Container(
-          width: 158,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-        ),
-      ),
     );
   }
 }
