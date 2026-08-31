@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { initials, outcomeMark } from '../lib/format'
+import { outcomeMark } from '../lib/format'
 import { matchOutcome, shortKickoff } from '../lib/match'
 import { useFavorites } from '../stores/favorites'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
+import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
   match: any
@@ -13,8 +15,11 @@ const props = defineProps<{
 }>()
 
 const fav = useFavorites()
+const teams = useTeamDirectory()
 const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
 const when = computed(() => shortKickoff(props.match.scheduledAt, props.match.status))
+const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
+const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
 </script>
 
 <template>
@@ -30,11 +35,11 @@ const when = computed(() => shortKickoff(props.match.scheduledAt, props.match.st
       <span class="when" :class="{ live: match.status === 'LIVE' || match.status === 'PAUSED' }">{{ when }}</span>
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
-          <i>{{ initials(homeName) }}</i>
+          <TeamCrest :src="homeLogo" :name="homeName" :size="18" />
           <b>{{ homeName }}</b>
         </span>
         <span class="side" :class="{ own: highlightTeamId === match.awayTeamId }">
-          <i>{{ initials(awayName) }}</i>
+          <TeamCrest :src="awayLogo" :name="awayName" :size="18" />
           <b>{{ awayName }}</b>
         </span>
       </span>
@@ -88,18 +93,6 @@ const when = computed(() => shortKickoff(props.match.scheduledAt, props.match.st
   gap: 0.4rem;
   align-items: center;
   min-width: 0;
-}
-.side i {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
-  color: var(--navy);
-  font-size: 0.48rem;
-  font-style: normal;
-  font-weight: 800;
 }
 .side b {
   font-weight: 500;

@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { initials } from '../lib/format'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
+import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
   rows: any[]
   compact?: boolean
 }>()
+
+const teams = useTeamDirectory()
 
 const ranked = computed(() =>
   [...props.rows].sort((a, b) =>
@@ -46,7 +49,7 @@ function rankClass(index: number) {
           </td>
           <td>
             <RouterLink class="club" :to="`/teams/${row.teamId}`">
-              <i>{{ initials(row.teamName) }}</i>
+              <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
               <b>{{ row.teamName }}</b>
             </RouterLink>
           </td>
@@ -83,18 +86,6 @@ function rankClass(index: number) {
   align-items: center;
   color: inherit;
   min-width: 0;
-}
-.club i {
-  width: 22px;
-  height: 22px;
-  border-radius: 5px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
-  color: var(--navy);
-  font-size: 0.52rem;
-  font-style: normal;
-  font-weight: 800;
 }
 .club b {
   font-weight: 600;

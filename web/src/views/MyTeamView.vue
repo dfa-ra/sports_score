@@ -7,6 +7,7 @@ import { formatWhen } from '../lib/format'
 import { apiError } from '../lib/errors'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
 const team = ref<any>(null)
@@ -74,9 +75,12 @@ async function removeMember(id: string) {
 
 <template>
   <section class="stack">
-    <div class="page-title">
-      <h1>Моя команда</h1>
-      <p v-if="team">{{ team.name }} · основана {{ team.foundedOn || '—' }}</p>
+    <div class="page-title team-head">
+      <TeamCrest v-if="team" :src="team.logoUrl" :name="team.name" :size="42" />
+      <div>
+        <h1>Моя команда</h1>
+        <p v-if="team">{{ team.name }} · основана {{ team.foundedOn || '—' }}</p>
+      </div>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
@@ -114,6 +118,7 @@ async function removeMember(id: string) {
 </template>
 
 <style scoped>
+.team-head { display: flex; align-items: center; gap: 0.8rem; }
 .toolbar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }
 .row { display: flex; gap: 0.7rem; align-items: center; padding: 0.45rem 0; }
 </style>

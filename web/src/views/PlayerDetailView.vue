@@ -4,7 +4,9 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { formatMatchDay, outcomeMark } from '../lib/format'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 import { useAuthStore } from '../stores/auth'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 
@@ -38,6 +40,7 @@ const STATS: { key: string; label: string }[] = [
 
 const auth = useAuthStore()
 const route = useRoute()
+const teams = useTeamDirectory()
 const card = ref<any>(null)
 
 const stats = computed(() => {
@@ -51,6 +54,7 @@ const stats = computed(() => {
 const history = computed<MatchRow[]>(() => card.value?.matchHistory ?? [])
 
 onMounted(async () => {
+  await teams.load()
   const { data } = await api.get(`/players/${route.params.id}/card`)
   card.value = data
 })
@@ -66,7 +70,10 @@ onMounted(async () => {
       />
       <div class="who">
         <p v-if="card.team" class="eyebrow">
-          <RouterLink :to="`/teams/${card.team.id}`">{{ card.team.shortName || card.team.name }}</RouterLink>
+          <RouterLink class="club-link" :to="`/teams/${card.team.id}`">
+            <TeamCrest :src="card.team.logoUrl || teams.logo(card.team.id)" :name="card.team.name" :size="18" />
+            {{ card.team.shortName || card.team.name }}
+          </RouterLink>
         </p>
         <h1>{{ card.displayName || `${card.firstName} ${card.lastName}` }}</h1>
         <p class="meta">
@@ -112,9 +119,15 @@ onMounted(async () => {
               </td>
               <td>
                 <RouterLink class="fixture" :to="`/matches/${m.matchId}`">
-                  <span :class="{ own: m.home }">{{ m.homeTeamName }}</span>
+                  <span :class="{ own: m.home }">
+                    <TeamCrest :src="teams.logoByName(m.homeTeamName)" :name="m.homeTeamName" :size="16" />
+                    {{ m.homeTeamName }}
+                  </span>
                   <strong class="scoreline">{{ m.homeScore }}:{{ m.awayScore }}</strong>
-                  <span :class="{ own: !m.home }">{{ m.awayTeamName }}</span>
+                  <span :class="{ own: !m.home }">
+                    <TeamCrest :src="teams.logoByName(m.awayTeamName)" :name="m.awayTeamName" :size="16" />
+                    {{ m.awayTeamName }}
+                  </span>
                 </RouterLink>
               </td>
               <td class="num">{{ m.minutesPlayed ?? '—' }}</td>
@@ -155,6 +168,13 @@ onMounted(async () => {
   line-height: 1.05;
 }
 .meta { color: var(--muted); margin: 0; }
+.club-link, .fixture span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.club-link { color: inherit; }
 h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .none { margin: 0; }
 .stats {
@@ -199,7 +219,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   text-decoration: none;
 }
 .fixture span { min-width: 0; }
-.fixture span:last-child { text-align: right; }
+.fixture span:last-child { justify-content: flex-end; text-align: right; }
 .fixture .own { color: var(--navy); font-weight: 700; }
 .scoreline {
   font-variant-numeric: tabular-nums;

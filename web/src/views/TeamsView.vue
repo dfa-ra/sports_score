@@ -3,9 +3,9 @@ import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { initials } from '../lib/format'
 import CreateTeamForm from '../components/CreateTeamForm.vue'
 import EmptyState from '../components/EmptyState.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
 const items = ref<any[]>([])
@@ -42,7 +42,7 @@ onMounted(load)
     <EmptyState v-else-if="!items.length" title="Пока без эмблем" text="Первая команда может назвать себя как угодно. Кроме «Без названия»." />
     <div v-else class="grid cards">
       <RouterLink v-for="t in items" :key="t.id" class="panel card-link" :to="`/teams/${t.id}`">
-        <span class="crest">{{ initials(t.shortName || t.name) }}</span>
+        <TeamCrest :src="t.logoUrl" :name="t.shortName || t.name" :size="42" />
         <h2>{{ t.name }}</h2>
         <p>{{ t.shortName || 'без короткого имени — тоже стиль' }}</p>
       </RouterLink>
@@ -53,16 +53,5 @@ onMounted(load)
 <style scoped>
 .toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .card-link { display: grid; gap: 0.35rem; justify-items: start; }
-.crest {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 14px 11px 13px 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 800;
-  transform: rotate(-3deg);
-}
 h2 { font-size: 1.2rem; }
 </style>

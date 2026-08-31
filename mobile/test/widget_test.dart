@@ -6,6 +6,7 @@ import 'package:student_league/core/app.dart';
 import 'package:student_league/core/format.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
+import 'package:student_league/state/league_store.dart';
 import 'package:student_league/widgets/match_row.dart';
 
 void main() {
@@ -67,8 +68,11 @@ void main() {
       awayScore: 0,
     );
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: fav,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: fav),
+          ChangeNotifierProvider(create: (_) => LeagueStore(ApiClient())),
+        ],
         child: MaterialApp(
           home: Scaffold(
             body: MatchRow(match: match, homeName: 'ФК Общага', awayName: 'Политех'),
@@ -103,6 +107,13 @@ void main() {
   test('compiled API points at the stand, not the phone loopback', () {
     expect(ApiClient.compiledBaseUrl, contains('144.31.153.52:3000'));
     expect(ApiClient.compiledBaseUrl, isNot(contains('127.0.0.1')));
+  });
+
+  test('resolveMedia joins relative paths to the stand origin', () {
+    final api = ApiClient(baseUrl: 'http://144.31.153.52:3000/api/v1');
+    expect(api.resolveMedia('/media/teams/a.png'), 'http://144.31.153.52:3000/media/teams/a.png');
+    expect(api.resolveMedia('https://cdn.example/logo.png'), 'https://cdn.example/logo.png');
+    expect(api.resolveMedia('  '), isNull);
   });
 
   test('favorites toggle teams and matches in memory', () {

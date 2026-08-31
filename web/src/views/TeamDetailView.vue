@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { initials } from '../lib/format'
 import { apiError } from '../lib/errors'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
@@ -11,6 +10,7 @@ import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -142,7 +142,7 @@ async function disbandTeam() {
 <template>
   <section v-if="team" class="stack">
     <div class="page-title team-head">
-      <span class="crest">{{ initials(team.shortName || team.name) }}</span>
+      <TeamCrest :src="team.logoUrl" :name="team.shortName || team.name" :size="48" />
       <div>
         <h1>{{ team.name }}</h1>
         <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
@@ -277,17 +277,6 @@ async function disbandTeam() {
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-}
-.crest {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 16px 12px 14px 11px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 800;
-  transform: rotate(-4deg);
 }
 h2 { font-size: 1.2rem; }
 .member {

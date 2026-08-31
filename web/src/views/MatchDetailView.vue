@@ -5,7 +5,7 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventDetail, eventLabel, formatClock, formatWhen, initials, labelOf, periodLabel, playerTag } from '../lib/format'
+import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
 import { eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -14,6 +14,7 @@ import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -233,7 +234,7 @@ onUnmounted(() => client?.deactivate())
           @click="fav.toggleTeam(match.homeTeamId)"
         >★</button>
         <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
-          <span class="crest">{{ initials(teams.name(match.homeTeamId)) }}</span>
+          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="36" />
           <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
         </RouterLink>
       </div>
@@ -250,7 +251,7 @@ onUnmounted(() => client?.deactivate())
       </div>
       <div class="club away">
         <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
-          <span class="crest">{{ initials(teams.name(match.awayTeamId)) }}</span>
+          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="36" />
           <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
         </RouterLink>
         <button
@@ -296,18 +297,35 @@ onUnmounted(() => client?.deactivate())
       <div class="stack recent">
         <div class="panel">
           <h2>Последние игры {{ teams.fullName(match.homeTeamId) }}</h2>
-          <p v-for="f in homeForm" :key="f.id" class="muted">{{ recentLine(f, match.homeTeamId) }}</p>
+          <p v-for="f in homeForm" :key="f.id" class="muted recent-line">
+            <TeamCrest
+              :src="teams.logo(f.homeTeamId === match.homeTeamId ? f.awayTeamId : f.homeTeamId)"
+              :name="teams.fullName(f.homeTeamId === match.homeTeamId ? f.awayTeamId : f.homeTeamId)"
+              :size="16"
+            />
+            {{ recentLine(f, match.homeTeamId) }}
+          </p>
           <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
           <h2>Последние игры {{ teams.fullName(match.awayTeamId) }}</h2>
-          <p v-for="f in awayForm" :key="f.id" class="muted">{{ recentLine(f, match.awayTeamId) }}</p>
+          <p v-for="f in awayForm" :key="f.id" class="muted recent-line">
+            <TeamCrest
+              :src="teams.logo(f.homeTeamId === match.awayTeamId ? f.awayTeamId : f.homeTeamId)"
+              :name="teams.fullName(f.homeTeamId === match.awayTeamId ? f.awayTeamId : f.homeTeamId)"
+              :size="16"
+            />
+            {{ recentLine(f, match.awayTeamId) }}
+          </p>
           <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
           <h2>Очные встречи</h2>
-          <p v-for="f in headToHead" :key="f.id" class="muted">
-            {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }} · {{ formatWhen(f.scheduledAt) }}
+          <p v-for="f in headToHead" :key="f.id" class="muted recent-line">
+            <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
+            {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
+            <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
+            · {{ formatWhen(f.scheduledAt) }}
           </p>
           <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
         </div>
@@ -395,29 +413,28 @@ onUnmounted(() => client?.deactivate())
   border-radius: 12px;
   padding: 0.9rem 0.7rem 1rem;
 }
-.club { display: grid; justify-items: center; gap: 0.35rem; min-width: 0; }
-.who {
-  display: grid;
-  justify-items: center;
-  gap: 0.35rem;
-  color: inherit;
-  text-align: center;
+.club {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   min-width: 0;
 }
-.crest {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  background: #fff;
-  color: var(--navy);
-  font-weight: 800;
-  box-shadow: var(--shadow);
+.club.away { flex-direction: row-reverse; }
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  color: inherit;
 }
+.club.away .who { flex-direction: row-reverse; }
 .who strong {
   font-size: 0.88rem;
   line-height: 1.2;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 .star {
   border: 0;
@@ -488,6 +505,13 @@ onUnmounted(() => client?.deactivate())
 .empty-line { padding: 0.9rem; margin: 0; }
 .lineups { grid-template-columns: 1fr 1fr; gap: 1rem; }
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
+.recent-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.25rem 0;
+}
 .timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
 .timeline li {
   display: grid;
@@ -502,7 +526,6 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
   .who strong { font-size: 0.78rem; }
-  .crest { width: 40px; height: 40px; }
   .lineups { grid-template-columns: 1fr; }
   .board { padding: 0.75rem 0.5rem 0.85rem; gap: 0.35rem; }
 }

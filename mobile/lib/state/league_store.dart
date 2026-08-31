@@ -29,6 +29,11 @@ class LeagueStore extends ChangeNotifier {
     return teams[id]?.name ?? 'Команда';
   }
 
+  String? teamLogo(String? id) {
+    if (id == null) return null;
+    return api.resolveMedia(teams[id]?.logoUrl);
+  }
+
   Future<void> load() async {
     loading = true;
     error = null;
