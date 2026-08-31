@@ -116,6 +116,28 @@ void main() {
     expect(api.resolveMedia('  '), isNull);
   });
 
+  test('match clock counts remaining time while live', () {
+    final start = DateTime.utc(2026, 8, 31, 10, 0, 0);
+    expect(
+      matchElapsedSeconds(
+        status: 'LIVE',
+        gameTimeSeconds: 60,
+        clockRunningSince: start,
+        cap: 1200,
+        now: start.add(const Duration(seconds: 30)),
+      ),
+      90,
+    );
+    expect(
+      matchRemainingSeconds(
+        status: 'PAUSED',
+        gameTimeSeconds: 200,
+        cap: 1200,
+      ),
+      1000,
+    );
+  });
+
   test('favorites toggle teams and matches in memory', () {
     final fav = FavoritesStore(persist: false);
     fav.toggleMatch('m1');
