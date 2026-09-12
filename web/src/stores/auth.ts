@@ -76,7 +76,8 @@ export const useAuthStore = defineStore('auth', () => {
     password: string
     firstName: string
     lastName: string
-    role: Role
+    role?: Role
+    roles?: Role[]
     photoUrl?: string
   }) {
     await api.post('/auth/register', payload)

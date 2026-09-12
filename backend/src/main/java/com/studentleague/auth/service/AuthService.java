@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -68,8 +69,8 @@ public class AuthService {
             throw ApiException.conflict("Email already registered");
         }
 
-        Role requested = Role.valueOf(request.resolvedRole());
-        if (requested == Role.ADMIN) {
+        List<Role> requested = request.resolvedRoles();
+        if (requested.isEmpty() || requested.stream().anyMatch(role -> role == Role.ADMIN)) {
             throw ApiException.badRequest("Можно зарегистрироваться как FAN, PLAYER, CAPTAIN или REFEREE");
         }
 
@@ -90,8 +91,10 @@ public class AuthService {
         userRepository.save(user);
 
         roleService.grantApproved(user, Role.FAN, null);
-        if (requested != Role.FAN) {
-            roleService.requestRole(user, requested, request.photoUrl());
+        for (Role role : requested) {
+            if (role != Role.FAN) {
+                roleService.requestRole(user, role, request.photoUrl());
+            }
         }
 
         ensurePlayerProfile(user, request);
