@@ -108,9 +108,9 @@ class LeagueStore extends ChangeNotifier {
       final results = await Future.wait([
         api.get('/tournaments/$tournamentId'),
         api.get('/tournaments/$tournamentId/standings'),
-        api.get('/statistics/scorers', query: {'tournamentId': tournamentId!, 'limit': '30'}),
-        api.get('/statistics/assists', query: {'tournamentId': tournamentId!, 'limit': '30'}),
-        api.get('/statistics/goalkeepers', query: {'tournamentId': tournamentId!, 'limit': '30'}),
+        api.get('/statistics/scorers', query: {'tournamentId': tournamentId!, 'limit': '200'}),
+        api.get('/statistics/assists', query: {'tournamentId': tournamentId!, 'limit': '200'}),
+        api.get('/statistics/goalkeepers', query: {'tournamentId': tournamentId!, 'limit': '200'}),
       ]);
       if (results[0] is Map) {
         tournamentName = (results[0] as Map)['name']?.toString();

@@ -8,7 +8,8 @@ import PlayerAvatar from '../components/PlayerAvatar.vue'
 import StandingTable from '../components/StandingTable.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-type Tab = 'table' | 'results' | 'scorers' | 'players'
+type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'players'
+const TOP = 10
 
 const route = useRoute()
 const router = useRouter()
@@ -23,12 +24,20 @@ const keepers = ref<any[]>([])
 const players = ref<any[]>([])
 const tournament = ref<any>(null)
 const loading = ref(true)
+const expanded = ref({ scorers: false, assists: false, keepers: false })
 
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
-  if (value === 'results' || value === 'scorers' || value === 'players') return value
+  if (value === 'results' || value === 'scorers' || value === 'assists' || value === 'players') return value
   return 'table'
 })
+
+const fullList = computed(() => String(route.query.list || '') === 'all')
+
+function shown(rows: any[], key: keyof typeof expanded.value) {
+  if (fullList.value || expanded.value[key]) return rows
+  return rows.slice(0, TOP)
+}
 
 const season = computed(() => {
   const start = tournament.value?.startsOn || tournament.value?.startDate
@@ -70,8 +79,12 @@ onMounted(async () => {
 
 watch(tournamentId, load)
 
-function setTab(next: Tab) {
-  router.replace({ query: next === 'table' ? {} : { tab: next } })
+function setTab(next: Tab, list?: 'all') {
+  expanded.value = { scorers: false, assists: false, keepers: false }
+  const query: Record<string, string> = {}
+  if (next !== 'table') query.tab = next
+  if (list === 'all') query.list = 'all'
+  router.replace({ query })
 }
 
 async function load() {
@@ -84,9 +97,9 @@ async function load() {
     const [t, s, g, a, k] = await Promise.all([
       api.get(`/tournaments/${tournamentId.value}`),
       api.get(`/tournaments/${tournamentId.value}/standings`),
-      api.get('/statistics/scorers', { params: { tournamentId: tournamentId.value, limit: 30 } }),
-      api.get('/statistics/assists', { params: { tournamentId: tournamentId.value, limit: 30 } }),
-      api.get('/statistics/goalkeepers', { params: { tournamentId: tournamentId.value, limit: 30 } }),
+      api.get('/statistics/scorers', { params: { tournamentId: tournamentId.value, limit: 200 } }),
+      api.get('/statistics/assists', { params: { tournamentId: tournamentId.value, limit: 200 } }),
+      api.get('/statistics/goalkeepers', { params: { tournamentId: tournamentId.value, limit: 200 } }),
     ])
     tournament.value = t.data
     standings.value = s.data
@@ -120,6 +133,7 @@ async function load() {
       <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
+      <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
       <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
     </div>
 
@@ -158,15 +172,18 @@ async function load() {
       </div>
     </template>
 
-    <template v-else>
+    <template v-else-if="tab === 'scorers'">
       <div class="panel">
-        <h2>Голы</h2>
+        <div class="stat-head">
+          <h2>Бомбардиры</h2>
+          <p v-if="!fullList && scorers.length > TOP" class="muted">Топ-{{ TOP }} из {{ scorers.length }}</p>
+        </div>
         <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table">
             <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
             <tbody>
-              <tr v-for="p in scorers" :key="p.playerId">
+              <tr v-for="p in shown(scorers, 'scorers')" :key="p.playerId">
                 <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
                 <td>{{ p.goals }}</td>
                 <td>{{ p.appearances }}</td>
@@ -174,15 +191,52 @@ async function load() {
             </tbody>
           </table>
         </div>
+        <div v-if="scorers.length > TOP" class="stat-more">
+          <button v-if="!fullList" class="btn ghost" type="button" @click="expanded.scorers = !expanded.scorers">
+            {{ expanded.scorers ? 'Свернуть' : 'Показать всех' }}
+          </button>
+          <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('scorers', 'all')">Полный список</button>
+          <button v-else class="btn ghost" type="button" @click="setTab('scorers')">← К топ-10</button>
+        </div>
       </div>
-      <div class="panel">
-        <h2>Передачи</h2>
-        <EmptyState v-if="!assists.length" title="Передач ещё нет" />
+      <div v-if="!fullList" class="panel">
+        <div class="stat-head">
+          <h2>Сухие</h2>
+          <p v-if="keepers.length > TOP" class="muted">Топ-{{ TOP }} из {{ keepers.length }}</p>
+        </div>
+        <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table">
-            <thead><tr><th>Игрок</th><th>Пасы</th><th>Игры</th></tr></thead>
+            <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
             <tbody>
-              <tr v-for="p in assists" :key="p.playerId">
+              <tr v-for="p in shown(keepers, 'keepers')" :key="p.playerId">
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td>{{ p.cleanSheets }}</td>
+                <td>{{ p.appearances }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="keepers.length > TOP" class="stat-more">
+          <button class="btn ghost" type="button" @click="expanded.keepers = !expanded.keepers">
+            {{ expanded.keepers ? 'Свернуть' : 'Показать всех' }}
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <template v-else-if="tab === 'assists'">
+      <div class="panel">
+        <div class="stat-head">
+          <h2>Ассистенты</h2>
+          <p v-if="!fullList && assists.length > TOP" class="muted">Топ-{{ TOP }} из {{ assists.length }}</p>
+        </div>
+        <EmptyState v-if="!assists.length" title="Ассистов ещё нет" />
+        <div v-else class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Игрок</th><th>Ассисты</th><th>Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="p in shown(assists, 'assists')" :key="p.playerId">
                 <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
                 <td>{{ p.assists }}</td>
                 <td>{{ p.appearances }}</td>
@@ -190,21 +244,12 @@ async function load() {
             </tbody>
           </table>
         </div>
-      </div>
-      <div class="panel">
-        <h2>Сухие</h2>
-        <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
-        <div v-else class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
-            <tbody>
-              <tr v-for="p in keepers" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
-                <td>{{ p.cleanSheets }}</td>
-                <td>{{ p.appearances }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="assists.length > TOP" class="stat-more">
+          <button v-if="!fullList" class="btn ghost" type="button" @click="expanded.assists = !expanded.assists">
+            {{ expanded.assists ? 'Свернуть' : 'Показать всех' }}
+          </button>
+          <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('assists', 'all')">Полный список</button>
+          <button v-else class="btn ghost" type="button" @click="setTab('assists')">← К топ-10</button>
         </div>
       </div>
     </template>
@@ -248,6 +293,20 @@ async function load() {
   overflow: hidden;
 }
 h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
+.stat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.stat-head h2 { margin-bottom: 0.35rem; }
+.stat-head .muted { margin: 0; }
+.stat-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
 .people { display: grid; }
 .person {
   display: grid;
