@@ -10,6 +10,7 @@ import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
+import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
@@ -22,8 +23,8 @@ const matches = ref<any[]>([])
 const tab = ref<'results' | 'calendar' | 'squad'>('results')
 const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED'))
 const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
-const players = ref<any[]>([])
 const me = ref<any>(null)
+const memberIds = computed(() => members.value.map((item) => item.playerId))
 const name = ref('')
 const shortName = ref('')
 const playerId = ref('')
@@ -57,11 +58,6 @@ async function load() {
       me.value = data
     } catch {
       me.value = null
-    }
-    if (canManage.value) {
-      const { data } = await api.get('/players', { params: { size: 100 } })
-      players.value = data.content ?? []
-      if (!playerId.value && players.value[0]) playerId.value = players.value[0].id
     }
   }
 }
@@ -210,13 +206,9 @@ async function disbandTeam() {
       </div>
       <form v-if="canManage && isCaptain" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
-          <select v-model="playerId" required>
-            <option v-for="p in players" :key="p.id" :value="p.id">
-              {{ p.displayName || `${p.firstName} ${p.lastName}` }}
-            </option>
-          </select>
+          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
         </label>
-        <button class="btn" type="submit" :disabled="pending">Добавить в состав</button>
+        <button class="btn" type="submit" :disabled="pending || !playerId">Добавить в состав</button>
       </form>
       <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
       <p v-if="ok && !auth.canManageLeague" class="form-ok">{{ ok }}</p>
@@ -232,13 +224,9 @@ async function disbandTeam() {
       </form>
       <form v-if="!team.disbanded" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
-          <select v-model="playerId" required>
-            <option v-for="p in players" :key="p.id" :value="p.id">
-              {{ p.displayName || `${p.firstName} ${p.lastName}` }}
-            </option>
-          </select>
+          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
         </label>
-        <button class="btn" type="submit" :disabled="pending">Добавить в состав</button>
+        <button class="btn" type="submit" :disabled="pending || !playerId">Добавить в состав</button>
       </form>
       <div v-if="!team.disbanded && members.length" class="stack">
         <div v-for="m in members" :key="`admin-${m.id}`" class="member">
