@@ -10,6 +10,7 @@ import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
+import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
@@ -24,8 +25,6 @@ const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED
 const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
 const players = ref<any[]>([])
 const me = ref<any>(null)
-const name = ref('')
-const shortName = ref('')
 const playerId = ref('')
 const error = ref('')
 const ok = ref('')
@@ -49,8 +48,6 @@ async function load() {
   matches.value = (games.data.content ?? []).filter((row: any) =>
     row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
   )
-  name.value = t.data.name
-  shortName.value = t.data.shortName || ''
   if (auth.isAuthenticated) {
     try {
       const { data } = await api.get('/players/me')
@@ -63,21 +60,6 @@ async function load() {
       players.value = data.content ?? []
       if (!playerId.value && players.value[0]) playerId.value = players.value[0].id
     }
-  }
-}
-
-async function saveTeam() {
-  error.value = ''
-  ok.value = ''
-  pending.value = true
-  try {
-    await api.put(`/teams/${team.value.id}`, { name: name.value, shortName: shortName.value || undefined })
-    ok.value = 'Команда обновлена.'
-    await load()
-  } catch (e: any) {
-    error.value = apiError(e)
-  } finally {
-    pending.value = false
   }
 }
 
@@ -163,12 +145,8 @@ async function disbandTeam() {
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
-      <h2>Редактировать</h2>
-      <form class="stack" @submit.prevent="saveTeam">
-        <label class="field">Название<input v-model="name" required /></label>
-        <label class="field">Короткое имя<input v-model="shortName" /></label>
-        <button class="btn secondary" type="submit" :disabled="pending">Сохранить</button>
-      </form>
+      <h2>Карточка</h2>
+      <TeamCardEditor :team="team" @saved="load" />
     </div>
 
     <div v-if="tab === 'results'" class="sheet">
@@ -225,11 +203,7 @@ async function disbandTeam() {
     <AdminOnly v-if="auth.canManageLeague" title="Для админа">
       <p class="muted">Служебные действия. На публичной карточке их нет.</p>
       <CopyChip :value="String(team.id)" label="Скопировать id команды" />
-      <form v-if="!team.disbanded" class="stack" @submit.prevent="saveTeam">
-        <label class="field">Название<input v-model="name" required /></label>
-        <label class="field">Короткое имя<input v-model="shortName" /></label>
-        <button class="btn secondary" type="submit" :disabled="pending">Сохранить карточку</button>
-      </form>
+      <TeamCardEditor v-if="!team.disbanded" :team="team" @saved="load" />
       <form v-if="!team.disbanded" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
           <select v-model="playerId" required>

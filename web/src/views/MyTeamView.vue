@@ -7,6 +7,7 @@ import { formatWhen } from '../lib/format'
 import { apiError } from '../lib/errors'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
@@ -86,6 +87,11 @@ async function removeMember(id: string) {
     <p v-if="ok" class="form-ok">{{ ok }}</p>
     <EmptyState v-if="!team && !error" title="Команды нет" text="Админ создаёт команду и назначает капитана." />
     <template v-if="team">
+      <div v-if="canEditRoster" class="panel stack">
+        <h2>Карточка</h2>
+        <p class="muted">Название и логотип видят в таблице и в календаре.</p>
+        <TeamCardEditor :team="team" @saved="load" />
+      </div>
       <div class="panel" v-if="stats">
         <h2>Статистика</h2>
         <p>В {{ stats.wins }} · Н {{ stats.draws }} · П {{ stats.losses }} · {{ stats.points }} очков</p>

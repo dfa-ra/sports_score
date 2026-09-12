@@ -122,6 +122,16 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.team.name").value("Campus United"))
                 .andExpect(jsonPath("$.jerseyNumber").value(7));
 
+        mockMvc.perform(put("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Ломоносовские Пумы","shortName":"ЛП"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Ломоносовские Пумы"))
+                .andExpect(jsonPath("$.shortName").value("ЛП"));
+
         mockMvc.perform(delete("/api/v1/teams/" + teamId + "/members/" + playerId)
                         .header("Authorization", auth(captainToken)))
                 .andExpect(status().isNoContent());
