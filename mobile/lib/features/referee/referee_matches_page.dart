@@ -8,6 +8,7 @@ import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/auth_controller.dart';
 import '../../state/league_store.dart';
+import '../../widgets/marks.dart';
 import '../../widgets/match_row.dart';
 
 class RefereeMatchesPage extends StatefulWidget {
@@ -57,39 +58,72 @@ class _RefereeMatchesPageState extends State<RefereeMatchesPage> {
   Widget build(BuildContext context) {
     final store = context.watch<LeagueStore>();
     return Scaffold(
-      appBar: AppBar(title: const Text('Пульт судьи')),
+      appBar: AppBar(title: const Text('Пульт')),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Выберите матч', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.navy)),
-            ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text('Только игры, на которые вас назначили.', style: TextStyle(color: AppColors.muted)),
-            ),
+            const Text('ПУЛЬТ', style: TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800, letterSpacing: 0.8, fontSize: 12)),
+            const SizedBox(height: 4),
+            const Text('Выберите матч', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.navy)),
+            const SizedBox(height: 6),
+            const Text('Только игры, на которые вас назначили. Дальше — часы, гол и карточки.', style: TextStyle(color: AppColors.muted)),
+            const SizedBox(height: 16),
             if (loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.ice),
             if (error != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(error!, style: const TextStyle(color: AppColors.danger)),
-              )
+              Text(error!, style: const TextStyle(color: AppColors.danger))
             else if (!loading && matches.isEmpty)
-              const EmptyHint(title: 'Нет назначений')
+              const EmptyHint(title: 'Нет назначений', text: 'Когда поставят на игру — карточка появится сама.')
             else
               for (final match in matches)
-                ListTile(
-                  onTap: () => context.push('/referee/${match.id}'),
-                  title: Text(
-                    '${store.teamName(match.homeTeamId)} — ${store.teamName(match.awayTeamId)}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy),
-                  ),
-                  subtitle: Text('${matchStateLabel(match.status)} · ${longKickoff(match.scheduledAt)}'),
-                  trailing: Text(
-                    '${match.homeScore}:${match.awayScore}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => context.push('/referee/${match.id}'),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.line),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              matchStateLabel(match.status).toUpperCase(),
+                              style: TextStyle(
+                                color: match.isLive ? AppColors.ice : AppColors.muted,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                TeamMark(name: store.teamName(match.homeTeamId), logoUrl: store.teamLogo(match.homeTeamId), size: 22),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${store.teamName(match.homeTeamId)} — ${store.teamName(match.awayTeamId)}',
+                                    style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy),
+                                  ),
+                                ),
+                                TeamMark(name: store.teamName(match.awayTeamId), logoUrl: store.teamLogo(match.awayTeamId), size: 22),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('${match.homeScore} : ${match.awayScore}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 20)),
+                            Text(formatWhen(match.scheduledAt), style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ),
           ],
