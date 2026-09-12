@@ -79,6 +79,12 @@ function isExternal(url: string) {
 function nudgeStories(dir: number) {
   storyRail.value?.scrollBy({ left: dir * 140, behavior: 'smooth' })
 }
+
+function heroHeading(slide: Slide | null | undefined) {
+  const title = slide?.title?.trim()
+  if (!title || /живой сезон/i.test(title)) return 'Лига ИТМО по футзалу'
+  return title
+}
 </script>
 
 <template>
@@ -113,7 +119,7 @@ function nudgeStories(dir: number) {
           <div v-if="current?.url" class="hero-shade" />
           <div class="hero-copy">
             <p class="eyebrow">{{ feed?.tournament?.name || 'Студенческая лига' }}</p>
-            <h1>{{ current?.title || 'Живой сезон KRONBARS' }}</h1>
+            <h1>{{ heroHeading(current) }}</h1>
             <p v-if="current?.caption">{{ current.caption }}</p>
             <a
               v-if="isExternal(hrefOf(current, '/calendar'))"
@@ -171,13 +177,13 @@ function nudgeStories(dir: number) {
         </div>
 
         <aside class="panel headlines">
-          <h2>Лидеры</h2>
+          <h2>Бомбардиры</h2>
           <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
           <RouterLink v-for="p in feed?.scorers" :key="p.playerId" class="headline" :to="`/players/${p.playerId}`">
             <strong>{{ p.displayName || 'Игрок' }}</strong>
             <span>{{ p.goals }} гол.</span>
           </RouterLink>
-          <h2>Передачи</h2>
+          <h2>Ассистенты</h2>
           <RouterLink v-for="p in feed?.assists" :key="'a-' + p.playerId" class="headline" :to="`/players/${p.playerId}`">
             <strong>{{ p.displayName || 'Игрок' }}</strong>
             <span>{{ p.assists }}</span>
@@ -290,7 +296,13 @@ function nudgeStories(dir: number) {
 }
 .hero-copy h1 { color: #fff; font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
 .hero-copy p { color: rgba(255,255,255,0.86); }
-.hero-cta { width: fit-content; border-radius: 999px; padding: 0.58rem 1.15rem; }
+.hero-cta,
+.hero-cta:hover {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.58rem 1.15rem;
+  color: #fff;
+}
 .dots {
   position: absolute;
   left: 50%;
