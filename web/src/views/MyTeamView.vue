@@ -7,6 +7,7 @@ import { formatWhen } from '../lib/format'
 import { apiError } from '../lib/errors'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const auth = useAuthStore()
@@ -14,8 +15,8 @@ const team = ref<any>(null)
 const members = ref<any[]>([])
 const matches = ref<any[]>([])
 const stats = ref<any>(null)
-const players = ref<any[]>([])
 const playerId = ref('')
+const memberIds = computed(() => members.value.map((item) => item.playerId))
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
@@ -36,11 +37,6 @@ async function load() {
     members.value = m.data
     matches.value = cal.data.content ?? []
     stats.value = (st.data ?? [])[0] || null
-    if (canEditRoster.value) {
-      const { data: list } = await api.get('/players', { params: { size: 100 } })
-      players.value = list.content ?? []
-      if (!playerId.value && players.value[0]) playerId.value = players.value[0].id
-    }
   } catch (e: any) {
     error.value = apiError(e, 'Команда ещё не назначена.')
   }
@@ -99,10 +95,8 @@ async function removeMember(id: string) {
           </li>
         </ul>
         <form v-if="canEditRoster" class="toolbar" @submit.prevent="addMember">
-          <select v-model="playerId">
-            <option v-for="p in players" :key="p.id" :value="p.id">{{ p.displayName || `${p.firstName} ${p.lastName}` }}</option>
-          </select>
-          <button class="btn" :disabled="pending">Добавить игрока</button>
+          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
+          <button class="btn" :disabled="pending || !playerId">Добавить игрока</button>
         </form>
       </div>
       <div class="panel">
