@@ -13,6 +13,19 @@ export const statusLabel: Record<string, string> = {
   WITHDRAWN: 'Снялись',
 }
 
+export const sportLabel: Record<string, string> = {
+  FOOTBALL: 'Футбол',
+  FUTSAL: 'Футзал',
+  BASKETBALL: 'Баскетбол',
+  VOLLEYBALL: 'Волейбол',
+  HOCKEY: 'Хоккей',
+}
+
+export function labelOfSport(code?: string | null, fallback?: string | null) {
+  if (!code) return fallback || 'Спорт'
+  return sportLabel[code] || fallback || code
+}
+
 export const roleLabel: Record<string, string> = {
   FAN: 'Зритель',
   PLAYER: 'Игрок',

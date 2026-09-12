@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
-import { labelOf, roleLabel } from '../../lib/format'
+import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import CreateMatchForm from '../../components/CreateMatchForm.vue'
@@ -381,7 +381,7 @@ async function disbandTeam(team: any) {
       <h2>Судьи</h2>
       <p class="muted">Роль ставится во вкладке «Пользователи». Потом судью назначают в карточке матча.</p>
       <div v-for="u in users.filter(x => approvedRolesOf(x).includes('REFEREE'))" :key="u.id" class="row">{{ u.email }}</div>
-      <p class="muted">Виды спорта: {{ sports.map(s => s.code).join(', ') || 'пока не заданы' }}</p>
+      <p class="muted">Виды спорта: {{ sports.map(s => labelOfSport(s.code, s.name)).join(', ') || 'пока не заданы' }}</p>
     </div>
 
     <div v-else-if="tab === 'gallery'" class="panel stack">

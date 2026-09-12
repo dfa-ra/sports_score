@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
+import { labelOfSport } from '../lib/format'
 
 const emit = defineEmits<{ created: [tournament: any] }>()
 const router = useRouter()
@@ -64,7 +65,7 @@ async function submit() {
     </label>
     <label class="field">Вид спорта
       <select v-model="sportId" required>
-        <option v-for="s in sports" :key="s.id" :value="s.id">{{ s.name }}</option>
+        <option v-for="s in sports" :key="s.id" :value="s.id">{{ labelOfSport(s.code, s.name) }}</option>
       </select>
     </label>
     <label class="field">Сезон
