@@ -247,6 +247,9 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/sports").header("Authorization", auth(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.code=='FOOTBALL')]").exists())
+                .andExpect(jsonPath("$[0].code").value("FOOTBALL"))
+                .andExpect(jsonPath("$[1].code").value("FUTSAL"))
+                .andExpect(jsonPath("$[?(@.code=='FUTSAL' && @.name=='Футзал')]").exists())
                 .andExpect(jsonPath("$[?(@.code=='BASKETBALL')]").exists());
     }
 }

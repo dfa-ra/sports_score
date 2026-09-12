@@ -21,6 +21,10 @@ public class ScorePolicyRegistry {
         policies.putIfAbsent("BASKETBALL", new PointBasedScorePolicy("BASKETBALL"));
         policies.putIfAbsent("VOLLEYBALL", new PointBasedScorePolicy("VOLLEYBALL"));
         policies.putIfAbsent("HOCKEY", new PointBasedScorePolicy("HOCKEY"));
+        ScorePolicy football = policies.get("FOOTBALL");
+        if (football != null) {
+            policies.putIfAbsent("FUTSAL", football);
+        }
     }
 
     public ScorePolicy forSportCode(String code) {
