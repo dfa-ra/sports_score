@@ -113,6 +113,6 @@ async function removeMember(id: string) {
 
 <style scoped>
 .team-head { display: flex; align-items: center; gap: 0.8rem; }
-.toolbar { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.8rem; }
+.toolbar { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; margin-top: 0.8rem; }
 .row { display: flex; gap: 0.7rem; align-items: center; padding: 0.45rem 0; }
 </style>
