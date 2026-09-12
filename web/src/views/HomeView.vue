@@ -177,13 +177,13 @@ function heroHeading(slide: Slide | null | undefined) {
         </div>
 
         <aside class="panel headlines">
-          <h2>Лидеры</h2>
+          <h2>Бомбардиры</h2>
           <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
           <RouterLink v-for="p in feed?.scorers" :key="p.playerId" class="headline" :to="`/players/${p.playerId}`">
             <strong>{{ p.displayName || 'Игрок' }}</strong>
             <span>{{ p.goals }} гол.</span>
           </RouterLink>
-          <h2>Передачи</h2>
+          <h2>Ассистенты</h2>
           <RouterLink v-for="p in feed?.assists" :key="'a-' + p.playerId" class="headline" :to="`/players/${p.playerId}`">
             <strong>{{ p.displayName || 'Игрок' }}</strong>
             <span>{{ p.assists }}</span>
