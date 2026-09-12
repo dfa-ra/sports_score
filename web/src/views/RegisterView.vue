@@ -9,7 +9,7 @@ type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE'
 
 const email = ref('')
 const password = ref('')
-const role = ref<Role>('FAN')
+const roles = ref<Role[]>(['FAN'])
 const firstName = ref('')
 const lastName = ref('')
 const photoUrl = ref('')
@@ -19,8 +19,21 @@ const showPassword = ref(false)
 const auth = useAuthStore()
 const router = useRouter()
 
-const needsPhoto = computed(() => role.value === 'PLAYER' || role.value === 'CAPTAIN' || role.value === 'REFEREE')
+const needsPhoto = computed(() => roles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'REFEREE'))
 const hint = computed(() => passwordHint(password.value))
+
+function hasRole(role: Role) {
+  return roles.value.includes(role)
+}
+
+function toggleRole(role: Role) {
+  if (hasRole(role)) {
+    if (roles.value.length === 1) return
+    roles.value = roles.value.filter((item) => item !== role)
+    return
+  }
+  roles.value = [...roles.value, role]
+}
 
 async function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement
@@ -41,7 +54,8 @@ async function submit() {
       password: password.value,
       firstName: firstName.value,
       lastName: lastName.value,
-      role: role.value,
+      roles: roles.value,
+      role: roles.value[0],
       photoUrl: needsPhoto.value ? photoUrl.value : undefined,
     })
     router.push('/')
@@ -59,7 +73,7 @@ async function submit() {
       <div class="page-title">
         <p class="eyebrow">Регистрация</p>
         <h1>Студент лиги</h1>
-        <p>ФИО и почта обязательны. Игрок, капитан и судья прикладывают фото. Роль подтверждает админ.</p>
+        <p>ФИО и почта обязательны. Можно выбрать несколько ролей. Игрок, капитан и судья прикладывают фото. Роли подтверждает админ.</p>
       </div>
       <form class="stack" @submit.prevent="submit">
         <label class="field">Имя
@@ -87,20 +101,21 @@ async function submit() {
           <span class="field-hint">{{ hint }}</span>
         </label>
 
-        <div class="role-pick">
-          <button type="button" class="role-card" :class="{ active: role === 'FAN' }" @click="role = 'FAN'">
+        <p class="field-hint">Выберите одну или несколько ролей</p>
+        <div class="role-pick" role="group" aria-label="Роли">
+          <button type="button" class="role-card" :class="{ active: hasRole('FAN') }" :aria-pressed="hasRole('FAN')" @click="toggleRole('FAN')">
             <strong>Болельщик</strong>
             <span>Смотрит матчи и таблицу. Вкладки «Моя команда» нет.</span>
           </button>
-          <button type="button" class="role-card" :class="{ active: role === 'PLAYER' }" @click="role = 'PLAYER'">
+          <button type="button" class="role-card" :class="{ active: hasRole('PLAYER') }" :aria-pressed="hasRole('PLAYER')" @click="toggleRole('PLAYER')">
             <strong>Игрок</strong>
             <span>После подтверждения админом капитан может взять в состав.</span>
           </button>
-          <button type="button" class="role-card" :class="{ active: role === 'CAPTAIN' }" @click="role = 'CAPTAIN'">
+          <button type="button" class="role-card" :class="{ active: hasRole('CAPTAIN') }" :aria-pressed="hasRole('CAPTAIN')" @click="toggleRole('CAPTAIN')">
             <strong>Капитан</strong>
             <span>Назначает только админ. Здесь — заявка на роль.</span>
           </button>
-          <button type="button" class="role-card" :class="{ active: role === 'REFEREE' }" @click="role = 'REFEREE'">
+          <button type="button" class="role-card" :class="{ active: hasRole('REFEREE') }" :aria-pressed="hasRole('REFEREE')" @click="toggleRole('REFEREE')">
             <strong>Судья</strong>
             <span>Live-протокол после подтверждения и назначения на матч.</span>
           </button>
@@ -143,5 +158,10 @@ async function submit() {
 .role-card.active {
   border-color: rgba(76, 180, 229, 0.55);
   background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(76, 180, 229, 0.35);
+}
+.role-card.active strong::after {
+  content: " ✓";
+  color: var(--ice);
 }
 </style>

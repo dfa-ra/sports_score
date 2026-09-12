@@ -135,6 +135,30 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void registerAcceptsSeveralRoles() throws Exception {
+        String email = "multi-" + System.nanoTime() + "@example.com";
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s","password":"Str0ngPass!","firstName":"Иван","lastName":"Иванов","roles":["PLAYER","REFEREE"],"photoUrl":"https://example.com/p.jpg"}
+                                """.formatted(email)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.roles[?(@.role=='FAN' && @.status=='APPROVED')]").exists())
+                .andExpect(jsonPath("$.roles[?(@.role=='PLAYER' && @.status=='APPROVED')]").exists())
+                .andExpect(jsonPath("$.roles[?(@.role=='REFEREE' && @.status=='APPROVED')]").exists());
+    }
+
+    @Test
+    void registerPhotoRolesNeedPhoto() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"nophoto-%s@example.com","password":"Str0ngPass!","firstName":"Иван","lastName":"Иванов","roles":["PLAYER","CAPTAIN"]}
+                                """.formatted(System.nanoTime())))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void healthIsPublic() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
