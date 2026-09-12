@@ -45,7 +45,7 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
     final stats = <({String label, Object value})>[
       if (card.statistics['appearances'] != null) (label: 'Игры', value: card.statistics['appearances']!),
       if (card.statistics['goals'] != null) (label: 'Голы', value: card.statistics['goals']!),
-      if (card.statistics['assists'] != null) (label: 'Пас', value: card.statistics['assists']!),
+      if (card.statistics['assists'] != null) (label: 'Ассисты', value: card.statistics['assists']!),
       if (card.statistics['yellowCards'] != null) (label: 'Жёлтые', value: card.statistics['yellowCards']!),
       if (card.statistics['redCards'] != null) (label: 'Красные', value: card.statistics['redCards']!),
       if (card.statistics['cleanSheets'] != null) (label: 'Сухие', value: card.statistics['cleanSheets']!),
