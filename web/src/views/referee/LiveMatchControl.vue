@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
@@ -28,6 +28,7 @@ const message = ref('')
 const error = ref('')
 const pending = ref(false)
 const sheet = ref<Sheet | null>(null)
+const heldClock = ref(false)
 const teams = useTeamDirectory()
 const { elapsed, remaining, expired, cap } = useMatchClock(match)
 
@@ -65,8 +66,8 @@ const sheetHint = computed(() => {
   if (current.kind === 'GOAL' && current.step === 'assist' && current.player) {
     return `Гол: ${nameOf(current.player)}. Если паса не было — пропустите.`
   }
-  if (current.step === 'team') return 'Сначала команда.'
-  return 'Выберите игрока из заявки.'
+  if (current.step === 'team') return heldClock.value ? 'Часы стоят. Сначала команда.' : 'Сначала команда.'
+  return heldClock.value ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.'
 })
 
 async function reload() {
@@ -84,6 +85,40 @@ async function reload() {
   ])
   homeRoster.value = home.data
   awayRoster.value = away.data
+}
+
+async function refreshMatch() {
+  const { data } = await api.get(`/matches/${route.params.id}`)
+  match.value = data
+}
+
+async function holdClock() {
+  if (heldClock.value || match.value?.status !== 'LIVE') return
+  try {
+    await api.post(`/referee/matches/${route.params.id}/pause`)
+    heldClock.value = true
+    await refreshMatch()
+  } catch {
+    heldClock.value = false
+  }
+}
+
+async function releaseClock() {
+  if (!heldClock.value) return
+  heldClock.value = false
+  try {
+    if (match.value?.status === 'PAUSED') {
+      await api.post(`/referee/matches/${route.params.id}/resume`)
+    }
+    await refreshMatch()
+  } catch {
+    /* keep going — the referee can hit Продолжить */
+  }
+}
+
+async function closeSheet() {
+  sheet.value = null
+  await releaseClock()
 }
 
 async function action(path: string) {
@@ -109,6 +144,7 @@ async function addEvent(payload: Record<string, unknown>) {
     await api.post(`/referee/matches/${route.params.id}/events`, payload)
     sheet.value = null
     message.value = 'В протоколе.'
+    await releaseClock()
     await reload()
   } catch (e: any) {
     error.value = apiError(e, 'Не удалось записать событие')
@@ -117,12 +153,13 @@ async function addEvent(payload: Record<string, unknown>) {
   }
 }
 
-function openSheet(kind: EventKind) {
+async function openSheet(kind: EventKind) {
   error.value = ''
   if (!live.value) {
     error.value = 'Сначала стартуйте матч.'
     return
   }
+  await holdClock()
   sheet.value = { kind, step: 'team' }
 }
 
@@ -163,10 +200,16 @@ function backSheet() {
     sheet.value = { kind: current.kind, step: 'team' }
     return
   }
-  sheet.value = null
+  void closeSheet()
 }
 
 onMounted(reload)
+onUnmounted(() => {
+  if (heldClock.value) {
+    heldClock.value = false
+    api.post(`/referee/matches/${route.params.id}/resume`).catch(() => {})
+  }
+})
 </script>
 
 <template>
@@ -225,7 +268,7 @@ onMounted(reload)
     <p v-if="message" class="form-ok">{{ message }}</p>
     <p v-if="error" class="form-error">{{ error }}</p>
 
-    <div v-if="sheet" class="overlay" @click.self="sheet = null">
+    <div v-if="sheet" class="overlay" @click.self="closeSheet">
       <div class="popover" role="dialog" aria-modal="true">
         <p class="step">
           {{ sheet.step === 'team' ? '1' : sheet.step === 'player' ? '2' : '3' }}
@@ -264,7 +307,7 @@ onMounted(reload)
 
         <div class="sheet-nav">
           <button class="btn ghost" type="button" @click="backSheet">Назад</button>
-          <button class="btn ghost" type="button" @click="sheet = null">Закрыть</button>
+          <button class="btn ghost" type="button" @click="closeSheet">Закрыть</button>
         </div>
       </div>
     </div>

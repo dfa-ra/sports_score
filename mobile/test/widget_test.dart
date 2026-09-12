@@ -90,6 +90,39 @@ void main() {
     expect(find.byTooltip('Убрать из избранного'), findsOneWidget);
   });
 
+  test('eventDetail names the scorer and assist like the web pad', () {
+    expect(
+      eventDetail(
+        eventType: 'GOAL',
+        playerName: 'Иванов',
+        playerJersey: 9,
+        secondaryPlayerName: 'Петров',
+        secondaryPlayerJersey: 8,
+      ),
+      '#9 Иванов · пас #8 Петров',
+    );
+    expect(
+      eventDetail(eventType: 'YELLOW_CARD', playerName: 'Иванов', playerJersey: 9),
+      '#9 Иванов',
+    );
+    expect(
+      eventDetail(
+        eventType: 'SUBSTITUTION',
+        playerName: 'А',
+        playerJersey: 1,
+        secondaryPlayerName: 'Б',
+        secondaryPlayerJersey: 2,
+      ),
+      '#1 А → #2 Б',
+    );
+    expect(eventDetail(eventType: 'GOAL', playerName: 'Иванов', playerJersey: 9), '#9 Иванов');
+  });
+
+  test('formatWhen matches the web kickoff line', () {
+    expect(formatWhen(DateTime(2026, 9, 12, 18, 0)), '12 сен., 18:00');
+    expect(formatWhen(null), '—');
+  });
+
   test('recent game line names the opponent', () {
     expect(
       recentGameLine(

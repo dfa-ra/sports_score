@@ -40,6 +40,14 @@ String longKickoff(DateTime? at) {
   return '$day.$month.${d.year} $h:$min';
 }
 
+String formatWhen(DateTime? at) {
+  if (at == null) return '—';
+  final d = at.toLocal();
+  final h = d.hour.toString().padLeft(2, '0');
+  final min = d.minute.toString().padLeft(2, '0');
+  return '${d.day} ${monthShort[d.month - 1]}, $h:$min';
+}
+
 String matchStateLabel(String status) {
   return switch (status) {
     'FINISHED' => 'Завершен',
@@ -100,6 +108,20 @@ const eventLabels = {
 };
 
 String eventLabel(String? type) => eventLabels[type] ?? type ?? 'Событие';
+
+String eventDetail({
+  String? eventType,
+  String? playerName,
+  int? playerJersey,
+  String? secondaryPlayerName,
+  int? secondaryPlayerJersey,
+}) {
+  final main = playerTag(playerName, playerJersey);
+  final second = playerTag(secondaryPlayerName, secondaryPlayerJersey);
+  if (eventType == 'GOAL' && second.isNotEmpty) return '$main · пас $second';
+  if (eventType == 'SUBSTITUTION' && second.isNotEmpty) return '$main → $second';
+  return main;
+}
 
 int matchElapsedSeconds({
   required String status,
