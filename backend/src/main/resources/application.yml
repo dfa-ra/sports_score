@@ -54,7 +54,7 @@ app:
   auth:
     auto-approve-roles: ${AUTH_AUTO_APPROVE_ROLES:false}
   demo-data:
-    enabled: ${APP_DEMO_DATA:true}
+    enabled: ${APP_DEMO_DATA:false}
 
 springdoc:
   api-docs:
