@@ -30,7 +30,7 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 
 Текст релиза — короткий список коммитов (`scripts/release_notes.sh`), без названий PR и без автоchangelog GitHub.
 
-После публикации релиза `v*` workflow **Dev stand** сам качает эти ассеты на сервер и поднимает контейнеры.
+После публикации релиза `v*` workflow **Prod stand** качает эти ассеты на прод. Dev по-прежнему обновляется с каждого push в `main`.
 
 ### Подпись Android (готово к Store)
 
@@ -47,66 +47,79 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 
 Нужны сертификаты Apple, provisioning profiles и желательно [Fastlane Match](https://docs.fastlane.tools/actions/match/). Текущий job только проверяет, что iOS-таргет собирается без codesign.
 
-## Автодеплой на dev-стенд (`stand.yml`)
+## Два стенда: dev и prod
 
-Полностью автоматический контур:
+Не ветки git, а **два сервера** и два workflow.
 
-1. CI собирает backend JAR + web tarball и публикует их в GitHub Release.
-2. По SSH на сервер копируется папка `deploy/` (compose + Dockerfile’ы под **готовые** ассеты, не сборка из исходников).
-3. На сервере `deploy/stand.sh` скачивает релиз через GitHub API и делает `docker compose up -d --build`.
-4. Проверяется `http://127.0.0.1:$WEB_PORT/api/v1/health`.
+| Контур | Workflow | Когда едет | Куда |
+|---|---|---|---|
+| **Dev** | `stand.yml` (Dev stand) | Push в `main` или Actions → Dev stand | Секреты `DEV_*` |
+| **Prod** | `prod.yml` (Prod stand) | GitHub Release `v*` (не prerelease) или Actions → Prod stand | Секреты `PROD_*` |
 
-Триггеры:
+Оба вызывают один и тот же SSH-деплой (`deploy-remote.yml` → `deploy/stand.sh`). На сервере Caddy слушает 80/443 и проксирует на nginx. Для Let's Encrypt нужен **DNS-имя**, не голый IP.
 
-| Событие | Что выкатывается |
-|---|---|
-| Push в `main` | Rolling prerelease с тегом `dev` (без мобильных сборок) → сразу деплой |
-| GitHub Release `v*` | Тот же стенд переключается на версию из релиза |
-| **Actions → Dev stand → Run workflow** | Пустой tag = пересобрать `dev`; либо указать уже существующий tag (`dev`, `v0.2.0`) |
+Если SSH-секреты контура пустые, деплой этого контура **пропускается**.
 
-Если SSH-секреты ещё не заданы, job деплоя **пропускается** (CI и релизы продолжают работать).
-
-Корневой `docker-compose.yml` — только локальная разработка (сборка из исходников). Стенд использует `deploy/docker-compose.yml`, проект `studentleague-dev`.
+Корневой `docker-compose.yml` — только локалка. Стенд: `deploy/docker-compose.yml`. Имена проектов: `studentleague-dev` и `studentleague-prod`.
 
 ### Куда вставить секреты
 
 GitHub → репозиторий → **Settings → Secrets and variables → Actions**.
 
-#### Secrets (вкладка Secrets)
+#### Dev — уже может быть заполнено
 
-| Имя | Куда вставить | Что это |
+| Имя | Тип | Что это |
 |---|---|---|
-| `DEV_SSH_HOST` | Actions secrets | IP или hostname стенда |
-| `DEV_SSH_USER` | Actions secrets | Linux-пользователь, под которым CI заходит по SSH |
-| `DEV_SSH_KEY` | Actions secrets | **Приватный** ключ целиком, включая строки `-----BEGIN … KEY-----` / `-----END … KEY-----`. Не `.pub`. Пароля на ключе быть не должно. Если GitHub «склеил» переносы — можно вставить как одну строку с `\n`, CI развернёт |
-| `DEV_SSH_KEY_BASE64` | Actions secrets, запасной вариант | `base64 -w0 studentleague-deploy` — надёжнее, если `DEV_SSH_KEY` не принимается (`error in libcrypto`) |
-| `DEV_SSH_KNOWN_HOSTS` | Actions secrets, **рекомендуется** | Вывод `ssh-keyscan -p 22 YOUR_HOST` (одна или несколько строк). Без него CI делает TOFU через `ssh-keyscan` |
-| `DEV_SSH_PORT` | Actions secrets, опционально | Если SSH не на 22 и вы не хотите заводить Variable |
-| `DEV_STAND_ENV` | Actions secrets, опционально | Полное содержимое `.env` стенда. CI запишет его в `$DEV_DEPLOY_PATH/.env` **только если файла ещё нет** |
+| `DEV_SSH_HOST` | secret | IP или hostname **dev**-сервера |
+| `DEV_SSH_USER` | secret | Linux-пользователь для SSH |
+| `DEV_SSH_KEY` | secret | Приватный ключ целиком (`BEGIN`/`END`). Не `.pub`, без пароля |
+| `DEV_SSH_KEY_BASE64` | secret, запасной | `base64 -w0 studentleague-deploy-dev` |
+| `DEV_SSH_KNOWN_HOSTS` | secret, рекомендуется | `ssh-keyscan -p 22 DEV_HOST` |
+| `DEV_STAND_ENV` | secret, опционально | Текст `.env` dev. Пишется только если файла ещё нет |
+| `DEV_DEPLOY_PATH` | variable | По умолчанию `/opt/studentleague` |
+| `DEV_SSH_PORT` | variable | По умолчанию `22` |
 
-`GITHUB_TOKEN` добавлять не нужно: его выдаёт сам Actions на время job. Скрипт на сервере использует этот токен, чтобы скачать ассеты (в том числе из private-репозитория), и сразу удаляет файл токена.
+#### Prod — вставить для нового сервера
 
-#### Variables (вкладка Variables)
+Те же поля, префикс `PROD_`. **Другой SSH-ключ**, не копия dev.
 
-| Имя | Куда вставить | Значение по умолчанию |
+| Имя | Тип | Что это |
 |---|---|---|
-| `DEV_DEPLOY_PATH` | Actions variables | `/opt/studentleague` |
-| `DEV_SSH_PORT` | Actions variables | `22` |
+| `PROD_SSH_HOST` | secret | IP или hostname **prod**-сервера (тот DE-R9-8) |
+| `PROD_SSH_USER` | secret | Linux-пользователь для SSH |
+| `PROD_SSH_KEY` | secret | Приватный ключ prod (`ssh-keygen -t ed25519 -C "github-actions-prod" -N ""`) |
+| `PROD_SSH_KEY_BASE64` | secret, запасной | `base64 -w0 studentleague-deploy-prod` |
+| `PROD_SSH_KNOWN_HOSTS` | secret, рекомендуется | `ssh-keyscan -p 22 PROD_HOST` |
+| `PROD_STAND_ENV` | secret, опционально | Текст `.env` prod из `deploy/.env.prod.example`. Только первый раз |
+| `PROD_DEPLOY_PATH` | variable | По умолчанию `/opt/studentleague` |
+| `PROD_SSH_PORT` | variable | По умолчанию `22` |
 
-#### На сервере (не в GitHub)
+`GITHUB_TOKEN` добавлять не нужно.
 
-Файл `$DEV_DEPLOY_PATH/.env` (шаблон `deploy/.env.example`). CI его **не перезаписывает**.
+На GitHub появятся environments `development` и `production` — на prod можно включить required reviewers.
+
+#### На каждом сервере (не в GitHub)
+
+Файл `/opt/studentleague/.env`. CI его **не перезаписывает**.
+
+Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**другие** JWT и пароль БД).
 
 | Переменная | Зачем |
 |---|---|
-| `JWT_SECRET` | Секрет JWT, длинный (≥32 символа). В профиле `prod` без него backend не стартует |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Единственный админ, создаётся при первом старте |
-| `DATABASE_PASSWORD` | Пароль Postgres (контейнер на стенде, порт наружу не публикуется) |
-| `CORS_ORIGINS` | Публичный URL стенда, например `http://1.2.3.4` или `https://dev.example.com` |
-| `WEB_PORT` | Хостовый порт nginx (по умолчанию `80`) |
-| `SPRING_PROFILES_ACTIVE` | На стенде лучше `prod` |
+| `JWT_SECRET` | ≥32 символа, свой на каждый стенд |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Админ при первом старте |
+| `DATABASE_PASSWORD` | Postgres внутри Docker |
+| `CORS_ORIGINS` | Публичный URL, для prod `https://ваш.домен` |
+| `CADDY_SITE` | Dev без домена: `http://:80`. Prod: `league.example.com` (без https://) |
+| `CADDY_EMAIL` | Почта для Let's Encrypt (prod) |
+| `CADDY_HTTP_PORT` | Хостовый порт Caddy :80. Старый стенд: `3000`. Prod: `80` |
+| `CADDY_HTTPS_PORT` | Обычно `443` |
+| `APP_DEMO_DATA` | Dev `true`, prod `false` |
+| `COMPOSE_PROJECT_NAME` | `studentleague-dev` / `studentleague-prod` |
 
-Не кладите SSH-ключ и GitHub token в этот `.env`.
+Для TLS на prod: A-запись домена на IP VPS, в файрволе открыты **80 и 443**. Caddy сам возьмёт сертификат.
+
+Не кладите SSH-ключ и GitHub token в `.env`.
 
 ### Один раз на сервере
 
@@ -145,13 +158,15 @@ ssh-keyscan -p 22 YOUR_HOST
 5. `.env` на сервере:
 
 ```bash
-# после первого деплоя папка deploy/ уже будет на сервере, либо скопируйте из репозитория
+# dev
 cp /opt/studentleague/deploy/.env.example /opt/studentleague/.env
+# prod
+cp /opt/studentleague/deploy/.env.prod.example /opt/studentleague/.env
 chmod 600 /opt/studentleague/.env
-# отредактируйте JWT_SECRET, ADMIN_*, DATABASE_PASSWORD, CORS_ORIGINS
+# JWT_SECRET, ADMIN_*, DATABASE_PASSWORD, CORS_ORIGINS, CADDY_SITE, CADDY_EMAIL
 ```
 
-Либо вставьте готовый текст в секрет `DEV_STAND_ENV` **до** первого деплоя.
+Либо вставьте готовый текст в `DEV_STAND_ENV` / `PROD_STAND_ENV` **до** первого деплоя.
 
 6. Можно прогнать проверки:
 
@@ -159,14 +174,14 @@ chmod 600 /opt/studentleague/.env
 DEPLOY_ROOT=/opt/studentleague /opt/studentleague/deploy/bootstrap.sh
 ```
 
-После этого любой merge в `main` выкатывает стенд сам. Версионный релиз:
+Merge в `main` → только **dev**. Тег `v*` → GitHub Release → **prod**.
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.3
+git push origin v0.2.3
 ```
 
-Тег `dev` rolling: CI его перезаписывает (`git push --force` только этого тега). Не защищайте тег `dev` в правилах репозитория.
+Тег `dev` rolling: CI его перезаписывает. Не защищайте тег `dev`.
 
 ## Как получить релиз прямо сейчас
 
@@ -189,14 +204,14 @@ git push origin v0.1.0
 
 Secrets (`ANDROID_KEYSTORE_*`, Apple certs) нужны только для публикации в Google Play / App Store.
 
-Автодеплой на стенд начнётся только после заполнения `DEV_SSH_HOST`, `DEV_SSH_USER`, `DEV_SSH_KEY`.
+Автодеплой на **dev** — после `DEV_SSH_*`. На **prod** — после `PROD_SSH_*` и тега `v*`.
 
 ## Пример релизного потока
 
 ```bash
-# убедиться, что CI на ветке/main зелёный
-git tag v0.1.0
-git push origin v0.1.0
-# GitHub Actions → Release загружает ассеты в GitHub Release
-# GitHub Actions → Dev stand скачивает их по SSH и поднимает Docker
+# main зелёный → dev уже обновился сам
+git tag v0.2.3
+git push origin v0.2.3
+# Actions → Release собирает jar/web/apk
+# Actions → Prod stand качает релиз на прод и поднимает Docker + Caddy
 ```

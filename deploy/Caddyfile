@@ -1,0 +1,11 @@
+{
+	email {$CADDY_EMAIL:admin@localhost}
+}
+
+{$CADDY_SITE} {
+	encode zstd gzip
+	request_body {
+		max_size 8MB
+	}
+	reverse_proxy web:80
+}

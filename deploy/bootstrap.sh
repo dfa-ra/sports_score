@@ -51,7 +51,7 @@ if [[ ! -f "${DEPLOY_ROOT}/.env" ]]; then
   if [[ -f "${DEPLOY_ROOT}/deploy/.env.example" ]]; then
     cp "${DEPLOY_ROOT}/deploy/.env.example" "${DEPLOY_ROOT}/.env"
     chmod 600 "${DEPLOY_ROOT}/.env"
-    echo "Created ${DEPLOY_ROOT}/.env from example — edit JWT_SECRET, ADMIN_*, DATABASE_PASSWORD, CORS_ORIGINS."
+    echo "Created ${DEPLOY_ROOT}/.env from example — edit JWT_SECRET, ADMIN_*, DATABASE_PASSWORD, CORS_ORIGINS, CADDY_SITE."
   else
     echo "Create ${DEPLOY_ROOT}/.env before the first deploy (see deploy/.env.example)."
   fi
