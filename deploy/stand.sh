@@ -127,11 +127,15 @@ mkdir -p "${RELEASE_DIR}/web"
 tar -xzf "${RELEASE_DIR}/web.tar.gz" -C "${RELEASE_DIR}/web"
 
 echo "Starting containers from ${RELEASE_TAG} (project ${COMPOSE_PROJECT})..."
+compose_files=( -f "${COMPOSE_FILE}" )
+if [[ "${COMPOSE_PROJECT}" == *prod* ]]; then
+  compose_files+=( -f "${DEPLOY_ROOT}/deploy/docker-compose.tls.yml" )
+fi
 compose=(
   docker compose
   --project-directory "${DEPLOY_ROOT}"
   --env-file "${DEPLOY_ROOT}/.env"
-  -f "${COMPOSE_FILE}"
+  "${compose_files[@]}"
   --project-name "${COMPOSE_PROJECT}"
 )
 # Rebuild images from the new JAR/tarball, then always replace backend/web.

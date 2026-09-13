@@ -1,0 +1,6 @@
+# Extra file for prod only. Dev VPS already has something on :443.
+services:
+  caddy:
+    ports:
+      - "${CADDY_HTTPS_PORT:-443}:443"
+      - "${CADDY_HTTPS_PORT:-443}:443/udp"

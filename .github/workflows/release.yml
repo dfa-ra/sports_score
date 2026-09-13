@@ -201,3 +201,22 @@ jobs:
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-prod:
+    name: SSH deploy to prod
+    needs: [resolve-version, github-release]
+    if: needs.github-release.result == 'success'
+    uses: ./.github/workflows/deploy-remote.yml
+    with:
+      release_tag: v${{ needs.resolve-version.outputs.version }}
+      environment_name: production
+      deploy_path: ${{ vars.PROD_DEPLOY_PATH || '/opt/studentleague' }}
+      compose_project: studentleague-prod
+      ssh_port: ${{ vars.PROD_SSH_PORT || '22' }}
+    secrets:
+      SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+      SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+      SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+      SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+      STAND_ENV: ${{ secrets.PROD_STAND_ENV }}

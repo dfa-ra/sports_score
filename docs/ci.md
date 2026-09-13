@@ -54,9 +54,9 @@ Workflows GitHub Actions лежат в `.github/workflows/`.
 | Контур | Workflow | Когда едет | Куда |
 |---|---|---|---|
 | **Dev** | `stand.yml` (Dev stand) | Push в `main` или Actions → Dev stand | Секреты `DEV_*` |
-| **Prod** | `prod.yml` (Prod stand) | GitHub Release `v*` (не prerelease) или Actions → Prod stand | Секреты `PROD_*` |
+| **Prod** | `release.yml` (job SSH deploy to prod) и запасной `prod.yml` | Тег `v*` → Release собирает артефакты и сразу деплоит prod. `prod.yml` сам по `release` не стартует, если релиз создан `GITHUB_TOKEN` | Секреты `PROD_*` |
 
-Оба вызывают один и тот же SSH-деплой (`deploy-remote.yml` → `deploy/stand.sh`). На сервере Caddy слушает 80/443 и проксирует на nginx. Для Let's Encrypt нужен **DNS-имя**, не голый IP.
+Оба вызывают один и тот же SSH-деплой (`deploy-remote.yml` → `deploy/stand.sh`). Caddy проксирует на nginx. **Dev** публикует только HTTP (`WEB_PORT`, обычно `:3000`) — на старом VPS `:443` уже занят. **Prod** дополнительно берёт `deploy/docker-compose.tls.yml` (`:443` tcp/udp) для Let's Encrypt. Нужен **DNS-имя**, не голый IP.
 
 Если SSH-секреты контура пустые, деплой этого контура **пропускается**.
 
@@ -114,7 +114,7 @@ Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**д�
 | `CADDY_SITE` | Dev без домена: `http://:80`. Prod задаёт Caddyfile.prod |
 | `CADDY_EMAIL` | Почта для Let's Encrypt (prod) |
 | `CADDY_HTTP_PORT` | Хостовый порт Caddy :80. Старый стенд: `3000`. Prod: `80` |
-| `CADDY_HTTPS_PORT` | Обычно `443` |
+| `CADDY_HTTPS_PORT` | Prod: `443`. На dev не публикуется |
 | `APP_DEMO_DATA` | Dev `true`, prod `false` |
 | `COMPOSE_PROJECT_NAME` | `studentleague-dev` / `studentleague-prod` |
 
@@ -178,8 +178,8 @@ DEPLOY_ROOT=/opt/studentleague /opt/studentleague/deploy/bootstrap.sh
 Merge в `main` → только **dev**. Тег `v*` → GitHub Release → **prod**.
 
 ```bash
-git tag v0.2.3
-git push origin v0.2.3
+git tag v0.2.4
+git push origin v0.2.4
 ```
 
 Тег `dev` rolling: CI его перезаписывает. Не защищайте тег `dev`.
@@ -211,8 +211,7 @@ Secrets (`ANDROID_KEYSTORE_*`, Apple certs) нужны только для пу�
 
 ```bash
 # main зелёный → dev уже обновился сам
-git tag v0.2.3
-git push origin v0.2.3
-# Actions → Release собирает jar/web/apk
-# Actions → Prod stand качает релиз на прод и поднимает Docker + Caddy
+git tag v0.2.4
+git push origin v0.2.4
+# Actions → Release собирает jar/web/apk и сам качает их на прод (Docker + Caddy)
 ```

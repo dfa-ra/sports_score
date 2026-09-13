@@ -1,3 +1,5 @@
+# Fallback / manual prod deploy. A GitHub Release created with GITHUB_TOKEN
+# does not start other workflows, so the real prod path is release.yml → deploy-prod.
 name: Prod stand
 
 on:
