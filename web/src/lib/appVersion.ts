@@ -1,4 +1,4 @@
-const version = import.meta.env.VITE_APP_VERSION || '0.2.4'
+const version = import.meta.env.VITE_APP_VERSION || '0.2.5'
 const revision = import.meta.env.VITE_APP_REVISION || 'local'
 const channel = import.meta.env.VITE_APP_CHANNEL || 'local'
 

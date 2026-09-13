@@ -31,7 +31,7 @@ if [[ ! -f "${DEPLOY_ROOT}/.env" ]]; then
 fi
 
 if [[ ! -f "${COMPOSE_FILE}" ]]; then
-  echo "Missing ${COMPOSE_FILE} — CI should rsync the deploy/ folder first." >&2
+  echo "Missing ${COMPOSE_FILE} — CI should upload the deploy/ folder first." >&2
   exit 1
 fi
 

@@ -118,13 +118,13 @@ Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**д�
 | `APP_DEMO_DATA` | Dev `true`, prod `false` |
 | `COMPOSE_PROJECT_NAME` | `studentleague-dev` / `studentleague-prod` |
 
-Для TLS на prod: A-запись домена на IP VPS, в файрволе открыты **80 и 443**. Caddy сам возьмёт сертификат.
+Для TLS на prod: **A-запись `itmoliga.ru` и `www` должна смотреть на IP VPS**, не на shared-хостинг регистратора (парковочная страница «домен привязан к хостингу»). В файрволе открыты **80 и 443**. Caddy сам возьмёт сертификат.
 
 Не кладите SSH-ключ и GitHub token в `.env`.
 
 ### Один раз на сервере
 
-1. Пользователь для деплоя, Docker Engine + плагин `docker compose`, `curl`, `python3`, `rsync`, `tar`. С сервера должен открываться исходящий HTTPS на `api.github.com` (скачивание релизов).
+1. Пользователь для деплоя, Docker Engine + плагин `docker compose`, `curl`, `python3`, `tar`. С сервера должен открываться исходящий HTTPS на `api.github.com` (скачивание релизов). CI заливает `deploy/` через `tar` по SSH, `rsync` на VPS не нужен.
 2. Пользователь в группе `docker` (без интерактивного sudo).
 3. Каталог деплоя:
 
@@ -178,8 +178,8 @@ DEPLOY_ROOT=/opt/studentleague /opt/studentleague/deploy/bootstrap.sh
 Merge в `main` → только **dev**. Тег `v*` → GitHub Release → **prod**.
 
 ```bash
-git tag v0.2.4
-git push origin v0.2.4
+git tag v0.2.5
+git push origin v0.2.5
 ```
 
 Тег `dev` rolling: CI его перезаписывает. Не защищайте тег `dev`.
@@ -211,7 +211,7 @@ Secrets (`ANDROID_KEYSTORE_*`, Apple certs) нужны только для пу�
 
 ```bash
 # main зелёный → dev уже обновился сам
-git tag v0.2.4
-git push origin v0.2.4
+git tag v0.2.5
+git push origin v0.2.5
 # Actions → Release собирает jar/web/apk и сам качает их на прод (Docker + Caddy)
 ```

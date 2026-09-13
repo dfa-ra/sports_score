@@ -108,9 +108,9 @@ jobs:
           KEY="$HOME/.ssh/stand_deploy"
           REMOTE="${SSH_USER}@${SSH_HOST}"
           SSH=(ssh -i "$KEY" -p "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes)
-          "${SSH[@]}" "${REMOTE}" "mkdir -p '${DEPLOY_PATH}/deploy' '${DEPLOY_PATH}/release'"
-          rsync -az --delete -e "ssh -i ${KEY} -p ${SSH_PORT} -o IdentitiesOnly=yes -o BatchMode=yes" \
-            deploy/ "${REMOTE}:${DEPLOY_PATH}/deploy/"
+          "${SSH[@]}" "${REMOTE}" "mkdir -p '${DEPLOY_PATH}/deploy' '${DEPLOY_PATH}/release' && find '${DEPLOY_PATH}/deploy' -mindepth 1 -delete"
+          # Fresh VPS often has no rsync. tar + ssh is enough.
+          tar -C deploy -czf - . | "${SSH[@]}" "${REMOTE}" "tar -xzf - -C '${DEPLOY_PATH}/deploy'"
           if [ -n "${STAND_ENV}" ]; then
             umask 077
             printf '%s\n' "${STAND_ENV}" > /tmp/stand.env
@@ -119,6 +119,27 @@ jobs:
             rm -f /tmp/stand.env
             "${SSH[@]}" "${REMOTE}" "if [ ! -f '${DEPLOY_PATH}/.env' ]; then mv /tmp/studentleague.stand.env '${DEPLOY_PATH}/.env' && chmod 600 '${DEPLOY_PATH}/.env'; else rm -f /tmp/studentleague.stand.env; fi"
           fi
+          "${SSH[@]}" "${REMOTE}" "set -e
+            miss=0
+            for c in docker curl python3 tar; do
+              if ! command -v \"\$c\" >/dev/null 2>&1; then
+                echo \"Missing command on the stand: \$c\"
+                miss=1
+              fi
+            done
+            if ! docker compose version >/dev/null 2>&1; then
+              echo 'Missing: docker compose plugin v2'
+              miss=1
+            fi
+            if [ ! -f '${DEPLOY_PATH}/.env' ]; then
+              echo \"Missing ${DEPLOY_PATH}/.env — copy deploy/.env.prod.example (prod) or deploy/.env.example (dev), fill secrets, or set DEV_STAND_ENV / PROD_STAND_ENV before the first deploy.\"
+              miss=1
+            fi
+            if [ \"\$miss\" -ne 0 ]; then
+              echo 'See docs/ci.md — one-time stand setup.'
+              exit 1
+            fi
+          "
 
       - name: Download release on the stand and compose up
         if: steps.stand.outputs.configured == 'true'

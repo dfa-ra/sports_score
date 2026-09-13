@@ -18,7 +18,6 @@ need docker
 need curl
 need python3
 need tar
-need rsync
 if ! docker compose version >/dev/null 2>&1; then
   echo "Missing: docker compose (plugin v2)" >&2
   MISSING=1
