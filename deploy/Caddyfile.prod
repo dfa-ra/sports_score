@@ -1,0 +1,11 @@
+{
+	email {$CADDY_EMAIL:admin@itmoliga.ru}
+}
+
+itmoliga.ru, www.itmoliga.ru {
+	encode zstd gzip
+	request_body {
+		max_size 8MB
+	}
+	reverse_proxy web:80
+}

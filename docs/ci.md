@@ -109,8 +109,9 @@ Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**д�
 | `JWT_SECRET` | ≥32 символа, свой на каждый стенд |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Админ при первом старте |
 | `DATABASE_PASSWORD` | Postgres внутри Docker |
-| `CORS_ORIGINS` | Публичный URL, для prod `https://ваш.домен` |
-| `CADDY_SITE` | Dev без домена: `http://:80`. Prod: `league.example.com` (без https://) |
+| `CORS_ORIGINS` | Публичный URL, для prod `https://itmoliga.ru,https://www.itmoliga.ru` |
+| `CADDY_FILE` | Prod: `Caddyfile.prod` (itmoliga.ru + www) |
+| `CADDY_SITE` | Dev без домена: `http://:80`. Prod задаёт Caddyfile.prod |
 | `CADDY_EMAIL` | Почта для Let's Encrypt (prod) |
 | `CADDY_HTTP_PORT` | Хостовый порт Caddy :80. Старый стенд: `3000`. Prod: `80` |
 | `CADDY_HTTPS_PORT` | Обычно `443` |

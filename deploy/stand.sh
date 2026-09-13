@@ -45,6 +45,10 @@ CADDY_HTTP_PORT="${CADDY_HTTP_PORT:-${WEB_PORT:-80}}"
 export CADDY_HTTP_PORT
 COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-$(env_get COMPOSE_PROJECT_NAME)}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-studentleague}"
+if [[ "${COMPOSE_PROJECT}" == *prod* ]]; then
+  export CADDY_FILE="${CADDY_FILE:-$(env_get CADDY_FILE)}"
+  export CADDY_FILE="${CADDY_FILE:-Caddyfile.prod}"
+fi
 
 mkdir -p "${RELEASE_DIR}"
 rm -rf "${RELEASE_DIR}/web"
