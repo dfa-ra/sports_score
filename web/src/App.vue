@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/auth'
 import { useFavorites } from './stores/favorites'
 import { labelOf, roleLabel } from './lib/format'
 import PlayerAvatar from './components/PlayerAvatar.vue'
+import { appVersionLabel, appVersionTitle } from './lib/appVersion'
 
 const auth = useAuthStore()
 const fav = useFavorites()
@@ -50,9 +51,12 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
       </div>
       <div class="nav-bar">
         <div class="container nav-inner">
-          <RouterLink class="brand" to="/">
+          <RouterLink class="brand" to="/" :title="appVersionTitle">
             <span class="brand-mark" aria-hidden="true">SL</span>
-            <span class="brand-name">KRONBARS</span>
+            <span class="brand-copy">
+              <span class="brand-name">KRONBARS</span>
+              <span class="brand-ver">{{ appVersionLabel }}</span>
+            </span>
           </RouterLink>
 
           <nav>
@@ -149,6 +153,14 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
   letter-spacing: 0.04em;
 }
 .brand:hover { color: #fff; text-decoration: none; }
+.brand-copy { display: grid; line-height: 1.05; }
+.brand-ver {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: rgba(255, 255, 255, 0.58);
+}
 .brand-mark {
   width: 34px;
   height: 34px;

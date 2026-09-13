@@ -8,8 +8,8 @@ import com.studentleague.auth.dto.RegisterRequest;
 import com.studentleague.auth.dto.UserResponse;
 import com.studentleague.auth.service.AuthRateLimiter;
 import com.studentleague.auth.service.AuthService;
-import com.studentleague.common.exception.ApiException;
 import com.studentleague.security.UserPrincipal;
+import com.studentleague.storage.ImageUploads;
 import com.studentleague.storage.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -63,13 +63,7 @@ public class AuthController {
             HttpServletRequest httpRequest
     ) {
         authRateLimiter.check(httpRequest);
-        if (file == null || file.isEmpty()) {
-            throw ApiException.badRequest("Файл обязателен");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw ApiException.badRequest("Нужно изображение");
-        }
+        ImageUploads.requireRasterImage(file);
         return Map.of("url", storageService.store("registration", file));
     }
 

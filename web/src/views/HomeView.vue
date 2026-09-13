@@ -27,6 +27,10 @@ let timer: number | undefined
 const heroes = computed<Slide[]>(() => feed.value?.heroes ?? [])
 const stories = computed<Slide[]>(() => feed.value?.stories ?? [])
 const current = computed(() => heroes.value[slide.value] || null)
+const storyIndex = ref<number | null>(null)
+const openedStory = computed(() =>
+  storyIndex.value == null ? null : stories.value[storyIndex.value] || null
+)
 const tape = computed(() =>
   matches.value
     .slice()
@@ -53,14 +57,41 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (timer) window.clearInterval(timer)
+  window.removeEventListener('keydown', onStoryKeys)
 })
 
 function start() {
   if (timer) window.clearInterval(timer)
-  if (heroes.value.length < 2) return
+  if (heroes.value.length < 2 || openedStory.value) return
   timer = window.setInterval(() => {
     slide.value = (slide.value + 1) % heroes.value.length
   }, 6500)
+}
+
+function openStory(index: number) {
+  storyIndex.value = index
+  if (timer) window.clearInterval(timer)
+  window.addEventListener('keydown', onStoryKeys)
+}
+
+function closeStory() {
+  storyIndex.value = null
+  window.removeEventListener('keydown', onStoryKeys)
+  start()
+}
+
+function stepStory(dir: number) {
+  if (storyIndex.value == null || !stories.value.length) return
+  const next = storyIndex.value + dir
+  if (next < 0 || next >= stories.value.length) return
+  storyIndex.value = next
+}
+
+function onStoryKeys(event: KeyboardEvent) {
+  if (storyIndex.value == null) return
+  if (event.key === 'Escape') closeStory()
+  if (event.key === 'ArrowLeft') stepStory(-1)
+  if (event.key === 'ArrowRight') stepStory(1)
 }
 
 function go(index: number | string) {
@@ -94,22 +125,16 @@ function heroHeading(slide: Slide | null | undefined) {
         <div v-if="stories.length" class="stories-wrap">
           <button class="nudge" type="button" aria-label="Сюжеты назад" @click="nudgeStories(-1)">‹</button>
           <div ref="storyRail" class="stories">
-            <template v-for="item in stories" :key="item.id">
-              <a
-                v-if="isExternal(hrefOf(item))"
-                class="story"
-                :href="hrefOf(item)"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <img :src="item.url" :alt="item.title || item.caption || 'Сюжет'" />
-                <span>{{ item.title || item.caption || 'Сюжет' }}</span>
-              </a>
-              <RouterLink v-else class="story" :to="hrefOf(item)">
-                <img :src="item.url" :alt="item.title || item.caption || 'Сюжет'" />
-                <span>{{ item.title || item.caption || 'Сюжет' }}</span>
-              </RouterLink>
-            </template>
+            <button
+              v-for="(item, index) in stories"
+              :key="item.id"
+              type="button"
+              class="story"
+              @click="openStory(Number(index))"
+            >
+              <img :src="item.url" :alt="item.title || item.caption || 'Сюжет'" />
+              <span>{{ item.title || item.caption || 'Сюжет' }}</span>
+            </button>
           </div>
           <button class="nudge" type="button" aria-label="Сюжеты вперёд" @click="nudgeStories(1)">›</button>
         </div>
@@ -205,6 +230,53 @@ function heroHeading(slide: Slide | null | undefined) {
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="openedStory"
+        class="story-overlay"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="openedStory.title || openedStory.caption || 'Сюжет'"
+        @click.self="closeStory"
+      >
+        <button class="story-close" type="button" aria-label="Закрыть" @click="closeStory">×</button>
+        <button
+          v-if="stories.length > 1 && storyIndex"
+          class="story-step"
+          type="button"
+          aria-label="Предыдущий сюжет"
+          @click="stepStory(-1)"
+        >‹</button>
+        <figure class="story-card">
+          <img :src="openedStory.url" :alt="openedStory.title || openedStory.caption || 'Сюжет'" />
+          <figcaption v-if="openedStory.title || openedStory.caption">
+            <strong v-if="openedStory.title">{{ openedStory.title }}</strong>
+            <span v-if="openedStory.caption">{{ openedStory.caption }}</span>
+          </figcaption>
+          <a
+            v-if="openedStory.linkUrl && isExternal(openedStory.linkUrl)"
+            class="btn story-link"
+            :href="openedStory.linkUrl"
+            target="_blank"
+            rel="noreferrer"
+          >{{ openedStory.linkLabel || 'Открыть' }}</a>
+          <RouterLink
+            v-else-if="openedStory.linkUrl"
+            class="btn story-link"
+            :to="openedStory.linkUrl"
+            @click="closeStory"
+          >{{ openedStory.linkLabel || 'Открыть' }}</RouterLink>
+        </figure>
+        <button
+          v-if="stories.length > 1 && storyIndex != null && storyIndex < stories.length - 1"
+          class="story-step next"
+          type="button"
+          aria-label="Следующий сюжет"
+          @click="stepStory(1)"
+        >›</button>
+      </div>
+    </Teleport>
   </section>
 </template>
 
@@ -249,8 +321,13 @@ function heroHeading(slide: Slide | null | undefined) {
   gap: 0.4rem;
   color: #fff;
   text-decoration: none;
+  font: inherit;
   font-size: 0.72rem;
   text-align: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
 }
 .story:hover { color: #fff; text-decoration: none; }
 .story img {
@@ -378,6 +455,67 @@ function heroHeading(slide: Slide | null | undefined) {
   background: linear-gradient(transparent, rgba(0, 20, 51, 0.86));
   border-radius: 0 0 16px 16px;
 }
+.story-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 20, 51, 0.88);
+  padding: 1.2rem;
+}
+.story-card {
+  margin: 0;
+  width: min(520px, 100%);
+  display: grid;
+  gap: 0.75rem;
+  justify-items: center;
+}
+.story-card img {
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 16px;
+  background: #001433;
+}
+.story-card figcaption {
+  display: grid;
+  gap: 0.25rem;
+  color: #fff;
+  text-align: center;
+}
+.story-card strong { font-size: 1.05rem; }
+.story-card span { color: rgba(255, 255, 255, 0.82); font-size: 0.9rem; }
+.story-link { width: fit-content; }
+.story-close,
+.story-step {
+  position: absolute;
+  border: 0;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+}
+.story-close {
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.6rem;
+}
+.story-step {
+  left: 0.8rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.6rem;
+}
+.story-step.next { left: auto; right: 0.8rem; }
+.story-close:hover,
+.story-step:hover { background: rgba(255, 255, 255, 0.28); }
 @media (max-width: 1099px) and (min-width: 720px) {
   .blocks {
     grid-template-columns: 1.15fr 0.85fr;
@@ -390,7 +528,10 @@ function heroHeading(slide: Slide | null | undefined) {
 @media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
   .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
-  .stories-wrap { display: none; }
+  .stories-wrap { gap: 0.2rem; }
+  .nudge { width: 28px; height: 28px; }
+  .story { width: 72px; }
+  .story img { width: 60px; height: 60px; }
   .hero img { height: 148px; }
   .hero-copy h1 { font-size: 1.25rem; }
   .hero-cta { display: none; }

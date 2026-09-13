@@ -1,0 +1,43 @@
+name: Prod stand
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing GitHub Release tag to deploy to prod (v0.2.2)."
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod-stand
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH deploy to prod
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.tag != '') ||
+      (
+        github.event_name == 'release' &&
+        github.event.release.prerelease == false &&
+        github.event.release.tag_name != 'dev'
+      )
+    uses: ./.github/workflows/deploy-remote.yml
+    with:
+      release_tag: ${{ github.event.release.tag_name || inputs.tag }}
+      environment_name: production
+      deploy_path: ${{ vars.PROD_DEPLOY_PATH || '/opt/studentleague' }}
+      compose_project: studentleague-prod
+      ssh_port: ${{ vars.PROD_SSH_PORT || '22' }}
+    secrets:
+      SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+      SSH_USER: ${{ secrets.PROD_SSH_USER }}
+      SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+      SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+      SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+      STAND_ENV: ${{ secrets.PROD_STAND_ENV }}

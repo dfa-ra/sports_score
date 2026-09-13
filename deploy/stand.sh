@@ -35,8 +35,20 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
   exit 1
 fi
 
-WEB_PORT="$(grep -E '^WEB_PORT=' "${DEPLOY_ROOT}/.env" | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' | tr -d "\"'" || true)"
-WEB_PORT="${WEB_PORT:-80}"
+env_get() {
+  grep -E "^${1}=" "${DEPLOY_ROOT}/.env" | tail -n 1 | cut -d= -f2- | tr -d '[:space:]' | tr -d "\"'" || true
+}
+
+WEB_PORT="$(env_get WEB_PORT)"
+CADDY_HTTP_PORT="$(env_get CADDY_HTTP_PORT)"
+CADDY_HTTP_PORT="${CADDY_HTTP_PORT:-${WEB_PORT:-80}}"
+export CADDY_HTTP_PORT
+COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-$(env_get COMPOSE_PROJECT_NAME)}"
+COMPOSE_PROJECT="${COMPOSE_PROJECT:-studentleague}"
+if [[ "${COMPOSE_PROJECT}" == *prod* ]]; then
+  export CADDY_FILE="${CADDY_FILE:-$(env_get CADDY_FILE)}"
+  export CADDY_FILE="${CADDY_FILE:-Caddyfile.prod}"
+fi
 
 mkdir -p "${RELEASE_DIR}"
 rm -rf "${RELEASE_DIR}/web"
@@ -114,13 +126,13 @@ PY
 mkdir -p "${RELEASE_DIR}/web"
 tar -xzf "${RELEASE_DIR}/web.tar.gz" -C "${RELEASE_DIR}/web"
 
-echo "Starting containers from ${RELEASE_TAG}..."
+echo "Starting containers from ${RELEASE_TAG} (project ${COMPOSE_PROJECT})..."
 compose=(
   docker compose
   --project-directory "${DEPLOY_ROOT}"
   --env-file "${DEPLOY_ROOT}/.env"
   -f "${COMPOSE_FILE}"
-  --project-name studentleague-dev
+  --project-name "${COMPOSE_PROJECT}"
 )
 # Rebuild images from the new JAR/tarball, then always replace backend/web.
 # `up --build` alone can leave running containers on the previous image.
@@ -131,11 +143,15 @@ if ! "${compose[@]}" up -d --build --force-recreate --remove-orphans; then
   exit 1
 fi
 
-HEALTH_URL="http://127.0.0.1:${WEB_PORT}/api/v1/health"
-echo "Waiting for ${HEALTH_URL}"
+HEALTH_URL="http://127.0.0.1:${CADDY_HTTP_PORT}/api/v1/health"
+echo "Waiting for ${HEALTH_URL} (or backend health inside compose)"
 ok=0
 for _ in $(seq 1 60); do
   if curl -fsS "${HEALTH_URL}" | grep -q UP; then
+    ok=1
+    break
+  fi
+  if "${compose[@]}" exec -T backend curl -fsS "http://127.0.0.1:8080/api/v1/health" | grep -q UP; then
     ok=1
     break
   fi

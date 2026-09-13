@@ -71,7 +71,12 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npm run build
+      - name: Build web
+        env:
+          VITE_APP_VERSION: ${{ needs.resolve-version.outputs.version }}
+          VITE_APP_REVISION: ${{ github.sha }}
+          VITE_APP_CHANNEL: prod
+        run: npm run build
       - name: Pack dist
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"

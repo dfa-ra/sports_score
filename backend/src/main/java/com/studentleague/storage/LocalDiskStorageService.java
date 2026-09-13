@@ -38,14 +38,12 @@ public class LocalDiskStorageService implements StorageService {
 
     @Override
     public String store(String folder, MultipartFile file) {
-        String original = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
-        String safeName = original.replaceAll("[^a-zA-Z0-9._-]", "_");
-        String filename = UUID.randomUUID() + "-" + safeName;
+        String filename = UUID.randomUUID() + "-" + ImageUploads.safeFilename(file);
         Path dir = rootDir.resolve(sanitize(folder));
         try {
             Files.createDirectories(dir);
             Path target = dir.resolve(filename);
-            file.transferTo(target);
+            Files.write(target, file.getBytes());
             return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
         } catch (IOException e) {
             throw ApiException.badRequest("Failed to store uploaded file");
