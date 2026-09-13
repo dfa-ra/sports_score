@@ -93,6 +93,18 @@ class ApiClient {
     return _decode(response);
   }
 
+  Future<dynamic> postMultipart(String path, String field, String filePath) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    if (accessToken != null) {
+      request.headers['Authorization'] = 'Bearer $accessToken';
+      request.headers['Accept'] = 'application/json';
+    }
+    request.files.add(await http.MultipartFile.fromPath(field, filePath));
+    final streamed = await _http.send(request).timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamed);
+    return _decode(response);
+  }
+
   dynamic _decode(http.Response response) {
     if (response.statusCode >= 400) {
       String message = 'Ошибка ${response.statusCode}';

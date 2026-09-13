@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -110,6 +111,7 @@ class _ProfilePageState extends State<ProfilePage> {
         jerseyNumber: int.tryParse(jersey.text),
         position: position.text.trim(),
         bio: bio.text.trim(),
+        avatarUrl: profile?.avatarUrl,
       ).toRequest();
       final data = await context.read<AuthController>().api.put('/players/me', body);
       if (data is Map && mounted) {
@@ -138,6 +140,44 @@ class _ProfilePageState extends State<ProfilePage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _pickPhoto(void Function(void Function()) setSheet) async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1600);
+    if (picked == null || !mounted) return;
+    setState(() {
+      saving = true;
+      formError = null;
+      formOk = null;
+    });
+    setSheet(() {});
+    try {
+      final data = await context.read<AuthController>().api.postMultipart('/uploads/players/me/avatar', 'file', picked.path);
+      if (data is Map && mounted) {
+        final url = data['url']?.toString();
+        final next = PlayerProfile(
+          id: profile?.id,
+          firstName: profile?.firstName ?? firstName.text,
+          lastName: profile?.lastName ?? lastName.text,
+          displayName: profile?.displayName ?? displayName.text,
+          jerseyNumber: profile?.jerseyNumber,
+          position: profile?.position ?? position.text,
+          bio: profile?.bio ?? bio.text,
+          avatarUrl: url ?? profile?.avatarUrl,
+        );
+        setState(() {
+          profile = next;
+          formOk = 'Фото обновлено.';
+        });
+        await context.read<AuthController>().restore();
+        await _loadCard(next.id);
+      }
+    } catch (e) {
+      if (mounted) setState(() => formError = e is ApiException ? e.message : 'Фото не загрузилось.');
+    } finally {
+      if (mounted) setState(() => saving = false);
+      setSheet(() {});
+    }
+  }
+
   Future<void> _openEdit() async {
     formError = null;
     formOk = null;
@@ -161,6 +201,28 @@ class _ProfilePageState extends State<ProfilePage> {
                     TextField(controller: lastName, decoration: const InputDecoration(labelText: 'Фамилия')),
                     const SizedBox(height: 10),
                     TextField(controller: displayName, decoration: const InputDecoration(labelText: 'Как писать на майке')),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        PlayerPhoto(
+                          url: context.read<AuthController>().api.resolveMedia(profile?.avatarUrl ?? context.read<AuthController>().user?.photoUrl),
+                          name: displayName.text.isNotEmpty ? displayName.text : (profile?.displayName ?? ''),
+                          size: 56,
+                          tile: true,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: saving ? null : () => _pickPhoto(setSheet),
+                            child: const Text('Обновить фото'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (formOk != null) ...[
+                      const SizedBox(height: 10),
+                      Text(formOk!, style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w700)),
+                    ],
                     const SizedBox(height: 10),
                     TextField(controller: jersey, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Номер')),
                     const SizedBox(height: 10),

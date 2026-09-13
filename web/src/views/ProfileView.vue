@@ -97,10 +97,12 @@ async function submit() {
       jerseyNumber: jerseyNumber.value || undefined,
       position: position.value || undefined,
       bio: bio.value || undefined,
+      avatarUrl: avatarUrl.value || undefined,
     })
     await auth.refreshMe()
     exists.value = true
     playerId.value = data.id
+    avatarUrl.value = data.avatarUrl || avatarUrl.value
     ok.value = 'Профиль сохранён.'
     editing.value = false
     await loadCard()
@@ -108,6 +110,29 @@ async function submit() {
     error.value = apiError(e, 'Профиль не сохранился.')
   } finally {
     pending.value = false
+  }
+}
+
+async function onPhoto(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post('/uploads/players/me/avatar', form)
+    avatarUrl.value = data.url
+    await auth.refreshMe()
+    if (playerId.value) await loadCard()
+    ok.value = 'Фото обновлено.'
+  } catch (e: any) {
+    error.value = apiError(e, 'Фото не загрузилось.')
+  } finally {
+    pending.value = false
+    input.value = ''
   }
 }
 
@@ -144,6 +169,19 @@ async function logout() {
           <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
           <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
           <label class="field">Как писать на майке<input v-model="displayName" maxlength="150" /></label>
+          <div class="photo-row">
+            <PlayerAvatar
+              :src="avatarUrl || auth.user?.photoUrl"
+              :name="displayName || `${firstName} ${lastName}`"
+              :size="56"
+              tile
+            />
+            <label class="field grow">
+              Фото
+              <input type="file" accept="image/*" :disabled="pending" @change="onPhoto" />
+              <span class="field-hint">PNG, JPG, WebP или GIF. Сохраняется сразу.</span>
+            </label>
+          </div>
           <label class="field">Номер<input v-model.number="jerseyNumber" type="number" min="0" max="99" /></label>
           <label class="field">Позиция<input v-model="position" maxlength="64" placeholder="Нападающий" /></label>
           <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
@@ -245,6 +283,12 @@ async function logout() {
   padding: 0.75rem;
   background: rgba(0, 32, 91, 0.42);
 }
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.grow { flex: 1; min-width: 0; }
 .sheet-form {
   width: min(520px, 100%);
   max-height: min(82vh, 680px);

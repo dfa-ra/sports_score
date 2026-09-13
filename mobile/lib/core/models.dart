@@ -340,6 +340,7 @@ class PlayerProfile {
         if (jerseyNumber != null) 'jerseyNumber': jerseyNumber,
         if (position.isNotEmpty) 'position': position,
         if (bio.isNotEmpty) 'bio': bio,
+        if (avatarUrl != null && avatarUrl!.isNotEmpty) 'avatarUrl': avatarUrl,
       };
 }
 

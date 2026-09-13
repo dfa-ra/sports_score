@@ -9,6 +9,8 @@ import com.studentleague.storage.StorageService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.users.domain.Role;
+import com.studentleague.users.entity.User;
+import com.studentleague.users.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,15 +36,18 @@ public class UploadController {
     private final StorageService storageService;
     private final PlayerProfileRepository playerProfileRepository;
     private final TeamRepository teamRepository;
+    private final UserRepository userRepository;
 
     public UploadController(
             StorageService storageService,
             PlayerProfileRepository playerProfileRepository,
-            TeamRepository teamRepository
+            TeamRepository teamRepository,
+            UserRepository userRepository
     ) {
         this.storageService = storageService;
         this.playerProfileRepository = playerProfileRepository;
         this.teamRepository = teamRepository;
+        this.userRepository = userRepository;
     }
 
     @PostMapping(value = "/players/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -52,11 +57,15 @@ public class UploadController {
             @RequestPart("file") MultipartFile file
     ) {
         validateImage(file);
-        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> ApiException.badRequest("Create a player profile first"));
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> ApiException.notFound("User not found"));
         String url = storageService.store("avatars", file);
-        profile.setAvatarUrl(url);
-        playerProfileRepository.save(profile);
+        user.setPhotoUrl(url);
+        userRepository.save(user);
+        playerProfileRepository.findByUserId(principal.getId()).ifPresent(profile -> {
+            profile.setAvatarUrl(url);
+            playerProfileRepository.save(profile);
+        });
         return Map.of("url", url);
     }
 

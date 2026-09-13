@@ -77,10 +77,16 @@ public class PlayerService {
                 .orElseThrow(() -> ApiException.notFound("User not found"));
 
         PlayerProfile profile = playerProfileRepository.findByUserId(userId).orElseGet(PlayerProfile::new);
-        boolean creating = profile.getId() == null;
         profile.setUserId(userId);
         apply(profile, request);
+        if (!hasText(profile.getAvatarUrl()) && hasText(user.getPhotoUrl())) {
+            profile.setAvatarUrl(user.getPhotoUrl());
+        }
         playerProfileRepository.save(profile);
+        if (hasText(profile.getAvatarUrl()) && !profile.getAvatarUrl().equals(user.getPhotoUrl())) {
+            user.setPhotoUrl(profile.getAvatarUrl());
+            userRepository.save(user);
+        }
 
         return toResponse(profile);
     }
@@ -151,7 +157,7 @@ public class PlayerService {
                 profile.getFirstName(),
                 profile.getLastName(),
                 profile.getDisplayName(),
-                profile.getAvatarUrl(),
+                avatarOf(profile),
                 profile.getJerseyNumber(),
                 profile.getPosition(),
                 profile.getDateOfBirth(),
@@ -364,7 +370,9 @@ public class PlayerService {
                 ? request.firstName() + " " + request.lastName()
                 : request.displayName());
         profile.setDateOfBirth(request.dateOfBirth());
-        profile.setAvatarUrl(request.avatarUrl());
+        if (hasText(request.avatarUrl())) {
+            profile.setAvatarUrl(request.avatarUrl().trim());
+        }
         profile.setJerseyNumber(request.jerseyNumber());
         profile.setPosition(request.position());
         profile.setBio(request.bio());
@@ -378,10 +386,21 @@ public class PlayerService {
                 profile.getLastName(),
                 profile.getDisplayName(),
                 profile.getDateOfBirth(),
-                profile.getAvatarUrl(),
+                avatarOf(profile),
                 profile.getJerseyNumber(),
                 profile.getPosition(),
                 profile.getBio()
         );
+    }
+
+    private String avatarOf(PlayerProfile profile) {
+        if (hasText(profile.getAvatarUrl())) {
+            return profile.getAvatarUrl();
+        }
+        return userRepository.findById(profile.getUserId()).map(User::getPhotoUrl).orElse(null);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
