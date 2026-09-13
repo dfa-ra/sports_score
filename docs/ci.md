@@ -179,8 +179,8 @@ DEPLOY_ROOT=/opt/studentleague /opt/studentleague/deploy/bootstrap.sh
 Merge в `main` → только **dev**. Тег `v*` → GitHub Release → **prod**.
 
 ```bash
-git tag v0.2.5
-git push origin v0.2.5
+git tag v0.2.6
+git push origin v0.2.6
 ```
 
 Тег `dev` rolling: CI его перезаписывает. Не защищайте тег `dev`.
@@ -212,7 +212,7 @@ Secrets (`ANDROID_KEYSTORE_*`, Apple certs) нужны только для пу�
 
 ```bash
 # main зелёный → dev уже обновился сам
-git tag v0.2.5
-git push origin v0.2.5
+git tag v0.2.6
+git push origin v0.2.6
 # Actions → Release собирает jar/web/apk и сам качает их на прод (Docker + Caddy)
 ```
