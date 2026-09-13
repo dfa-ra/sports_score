@@ -139,14 +139,14 @@ void main() {
     );
   });
 
-  test('compiled API points at the stand, not the phone loopback', () {
-    expect(ApiClient.compiledBaseUrl, contains('144.31.153.52:3000'));
+  test('compiled API points at prod, not the phone loopback', () {
+    expect(ApiClient.compiledBaseUrl, contains('itmoliga.ru'));
     expect(ApiClient.compiledBaseUrl, isNot(contains('127.0.0.1')));
   });
 
   test('resolveMedia joins relative paths to the stand origin', () {
-    final api = ApiClient(baseUrl: 'http://144.31.153.52:3000/api/v1');
-    expect(api.resolveMedia('/media/teams/a.png'), 'http://144.31.153.52:3000/media/teams/a.png');
+    final api = ApiClient(baseUrl: 'https://itmoliga.ru/api/v1');
+    expect(api.resolveMedia('/media/teams/a.png'), 'https://itmoliga.ru/media/teams/a.png');
     expect(api.resolveMedia('https://cdn.example/logo.png'), 'https://cdn.example/logo.png');
     expect(api.resolveMedia('  '), isNull);
   });

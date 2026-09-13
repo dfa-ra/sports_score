@@ -15,13 +15,15 @@ lib/
 flutter pub get
 flutter analyze
 flutter test
-# стенд по умолчанию: http://144.31.153.52:3000/api/v1
+# прод по умолчанию: https://itmoliga.ru/api/v1
 flutter run
+# закрытый дев-стенд
+flutter run --dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1
 # локальный backend
 flutter run --dart-define=API_BASE_URL=http://127.0.0.1:8080/api/v1
 ```
 
-Релизный APK ходит на стенд через nginx (`:3000/api/v1`). Порт `8080` в Docker не проброшен наружу — это нормально. Сменить адрес в профиле может только админ.
+Релизный APK/AAB ходит на прод (`https://itmoliga.ru/api/v1`, VPS `212.113.109.203`). HTTP по голому IP не использовать: снаружи `:80` отвечает чужой прокси (502). Закрытый тестовый APK (`student-league-dev-android.apk`) лежит в GitHub prerelease `dev` и смотрит на `http://144.31.153.52:3000/api/v1`. Сменить адрес в профиле может только админ.
 
 Режим судьи использует крупные кнопки для быстрого ввода событий во время матча.
 

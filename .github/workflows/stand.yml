@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths-ignore:
       - "docs/**"
-      - "mobile/**"
       - "**/*.md"
   workflow_dispatch:
     inputs:
@@ -74,22 +73,38 @@ jobs:
           npm run build
           tar -czf "../out/student-league-web-dev.tar.gz" -C dist .
 
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Closed-test Android APK (dev stand)
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter build apk --release --dart-define=API_BASE_URL=http://144.31.153.52:3000/api/v1
+          cp build/app/outputs/flutter-apk/app-release.apk ../out/student-league-dev-android.apk
+
       - name: Publish prerelease tag dev
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTES="Rolling dev stand build from ${GITHUB_SHA}"
+          NOTES="Rolling dev stand (web + closed Android APK) from ${GITHUB_SHA}"
           if gh release view dev >/dev/null 2>&1; then
-            gh release upload dev out/student-league-backend-dev.jar out/student-league-web-dev.tar.gz --clobber
-            gh release edit dev --prerelease --latest=false --title "Dev stand (rolling)" --notes "${NOTES}"
+            gh release upload dev out/student-league-backend-dev.jar out/student-league-web-dev.tar.gz out/student-league-dev-android.apk --clobber
+            gh release edit dev --prerelease --latest=false --title "Dev stand (rolling, closed)" --notes "${NOTES}"
           else
             gh release create dev \
               --prerelease \
               --latest=false \
-              --title "Dev stand (rolling)" \
+              --title "Dev stand (rolling, closed)" \
               --notes "${NOTES}" \
               out/student-league-backend-dev.jar \
-              out/student-league-web-dev.tar.gz
+              out/student-league-web-dev.tar.gz \
+              out/student-league-dev-android.apk
           fi
           git tag -f dev
           git push -f origin refs/tags/dev

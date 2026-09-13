@@ -18,10 +18,10 @@ class ApiClient {
         _http = httpClient ?? http.Client(),
         _storage = storage ?? const FlutterSecureStorage();
 
-  /// Dev stand nginx — same origin the web app uses. Backend :8080 is not published.
+  /// Public prod API. Closed test APKs pass the dev stand via `--dart-define`.
   static const compiledBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://144.31.153.52:3000/api/v1',
+    defaultValue: 'https://itmoliga.ru/api/v1',
   );
   static const storageKey = 'kb_api_base';
 
