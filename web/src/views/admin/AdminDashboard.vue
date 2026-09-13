@@ -387,8 +387,9 @@ async function disbandTeam(team: any) {
     <div v-else-if="tab === 'gallery'" class="panel stack">
       <h2>Главная: слайды и фото</h2>
       <p class="muted">
-        <strong>Герой</strong> — большая карусель. <strong>Сюжет</strong> — круглые сторис сверху.
+        <strong>Герой</strong> — большая карусель. <strong>Сюжет</strong> — круглые сторис сверху, по нажатию открывается кадр.
         <strong>Галерея</strong> — блок «Моменты» внизу.
+        Файлы: JPEG, PNG, WebP, GIF, до 8 МБ.
       </p>
       <label class="field">Слот
         <select v-model="photoSlot">
@@ -398,7 +399,11 @@ async function disbandTeam(team: any) {
         </select>
       </label>
       <label class="field">Загрузить файл
-        <input type="file" accept="image/*" @change="uploadPhoto" />
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+          @change="uploadPhoto"
+        />
       </label>
       <label class="field">Или URL картинки
         <input v-model="photoUrl" placeholder="/media/gallery/... или https://..." />

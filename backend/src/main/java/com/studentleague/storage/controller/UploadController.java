@@ -4,6 +4,7 @@ import com.studentleague.common.exception.ApiException;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
+import com.studentleague.storage.ImageUploads;
 import com.studentleague.storage.StorageService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
@@ -91,12 +92,6 @@ public class UploadController {
     }
 
     private void validateImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw ApiException.badRequest("File is required");
-        }
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
-            throw ApiException.badRequest("Only image uploads are supported");
-        }
+        ImageUploads.requireRasterImage(file);
     }
 }
