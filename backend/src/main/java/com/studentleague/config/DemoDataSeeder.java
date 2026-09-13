@@ -48,6 +48,7 @@ import java.util.List;
 /**
  * Fills an empty league so the public site has a table, calendar and scorers.
  * Runs once: skipped when any team already exists, or when {@code app.demo-data.enabled=false}.
+ * Default is off — prod and a forgotten env stay empty. Dev stand sets {@code APP_DEMO_DATA=true}.
  */
 @Component
 @Order(200)
