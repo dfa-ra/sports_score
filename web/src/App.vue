@@ -3,9 +3,9 @@ import { computed, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useFavorites } from './stores/favorites'
-import { labelOf, roleLabel } from './lib/format'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
+import { SITE_NAME } from './lib/brand'
 import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
@@ -44,17 +44,11 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
 <template>
   <div class="shell" :data-mood="mood" :class="{ docked: !hideDock }">
     <header class="chrome">
-      <div class="util">
-        <div class="container util-inner">
-          <span>Студенческая лига</span>
-          <span v-if="auth.isAuthenticated">{{ labelOf(roleLabel, auth.role) }}</span>
-        </div>
-      </div>
       <div class="nav-bar">
         <div class="container nav-inner">
-          <RouterLink class="brand" to="/" :title="appVersionTitle">
+          <RouterLink class="brand" to="/" :title="SITE_NAME">
             <BrandMark :size="36" />
-            <span class="brand-ver">{{ appVersionLabel }}</span>
+            <span class="brand-name">{{ SITE_NAME }}</span>
           </RouterLink>
 
           <nav>
@@ -91,7 +85,10 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
       </div>
     </main>
     <footer class="foot">
-      <div class="container">Смотреть можно без билета. Играть — после регистрации.</div>
+      <div class="container foot-inner">
+        <span>Смотреть можно без билета. Играть — после регистрации.</span>
+        <span class="foot-ver" :title="appVersionTitle">{{ appVersionLabel }}</span>
+      </div>
     </footer>
 
     <nav v-if="!hideDock" class="dock" aria-label="Основное меню">
@@ -130,8 +127,6 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
 <style scoped>
 .shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
 .chrome { background: var(--navy); color: #fff; }
-.util { background: #00143d; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
-.util-inner { display: flex; justify-content: space-between; min-height: 32px; align-items: center; color: rgba(255,255,255,0.7); }
 .nav-inner {
   display: flex;
   align-items: center;
@@ -151,12 +146,12 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
   letter-spacing: 0.04em;
 }
 .brand:hover { color: #fff; text-decoration: none; }
-.brand-ver {
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  color: rgba(255, 255, 255, 0.58);
+.brand-name {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
 }
 .brand :deep(.brand-mark) {
   width: 36px;
@@ -203,10 +198,23 @@ nav a.on { color: var(--navy); background: var(--ice); }
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
+.foot-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.foot-ver {
+  font-size: 0.68rem;
+  color: var(--muted);
+  opacity: 0.65;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 .dock { display: none; }
 
 @media (max-width: 1099px) {
-  .util { display: none; }
   .nav-inner { min-height: 56px; }
   nav a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
 }
@@ -214,10 +222,14 @@ nav a.on { color: var(--navy); background: var(--ice); }
 @media (max-width: 719px) {
   header nav { display: none; }
   .nav-inner { min-height: 52px; }
+  .brand-name { font-size: 0.82rem; }
   .wide-only { display: none; }
   .phone-only { display: grid; }
-  .shell.docked .main { padding-bottom: 5.6rem; }
-  .shell.docked .foot { display: none; }
+  .shell.docked .main { padding-bottom: 1.2rem; }
+  .shell.docked .foot {
+    display: block;
+    padding: 0 0 calc(0.85rem + 4.8rem + env(safe-area-inset-bottom));
+  }
   .dock {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
