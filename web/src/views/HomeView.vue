@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import StandingTable from '../components/StandingTable.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import { SITE_NAME } from '../lib/brand'
 
 type Slide = {
   id: string
@@ -113,7 +114,7 @@ function nudgeStories(dir: number) {
 
 function heroHeading(slide: Slide | null | undefined) {
   const title = slide?.title?.trim()
-  if (!title || /живой сезон/i.test(title)) return 'Студенческая лига'
+  if (!title || /живой сезон/i.test(title)) return SITE_NAME
   return title
 }
 </script>
@@ -143,7 +144,7 @@ function heroHeading(slide: Slide | null | undefined) {
           <img v-if="current?.url" :src="current.url" :alt="current.title || 'Главный кадр'" />
           <div v-if="current?.url" class="hero-shade" />
           <div class="hero-copy">
-            <p class="eyebrow">{{ feed?.tournament?.name || 'Студенческая лига' }}</p>
+            <p class="eyebrow">{{ feed?.tournament?.name || SITE_NAME }}</p>
             <h1>{{ heroHeading(current) }}</h1>
             <p v-if="current?.caption">{{ current.caption }}</p>
             <a

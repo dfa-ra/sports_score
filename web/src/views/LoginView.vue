@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { BRAND_MARK_SRC } from '../lib/brand'
+import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 
 const email = ref('')
 const password = ref('')
@@ -35,7 +35,7 @@ async function submit() {
     <div class="split">
       <aside class="promo">
         <img class="promo-logo" :src="BRAND_MARK_SRC" alt="" />
-        <p class="eyebrow">Студенческая лига</p>
+        <p class="eyebrow">{{ SITE_NAME }}</p>
         <h1>Одна лига для игроков, судей и трибуны</h1>
         <ul>
           <li>Смотреть live и таблицу без регистрации</li>
