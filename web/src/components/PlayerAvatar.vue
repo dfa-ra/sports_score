@@ -49,7 +49,7 @@ const label = computed(() => initials(props.name || ''))
   flex: 0 0 auto;
   border-radius: 999px;
   object-fit: cover;
-  background: var(--accent-soft);
+  background: transparent;
 }
 .player-avatar.tile {
   border-radius: 12px;
@@ -60,5 +60,6 @@ const label = computed(() => initials(props.name || ''))
   color: var(--accent);
   font-weight: 800;
   font-size: 0.95em;
+  background: var(--accent-soft);
 }
 </style>

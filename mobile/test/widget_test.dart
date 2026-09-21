@@ -7,7 +7,10 @@ import 'package:student_league/core/format.dart';
 import 'package:student_league/core/models.dart';
 import 'package:student_league/state/favorites_store.dart';
 import 'package:student_league/state/league_store.dart';
+import 'package:student_league/widgets/marks.dart' as marks;
 import 'package:student_league/widgets/match_row.dart';
+import 'package:student_league/widgets/player_photo.dart';
+import 'package:student_league/widgets/team_mark.dart';
 
 void main() {
   testWidgets('renders the phone shell', (WidgetTester tester) async {
@@ -169,6 +172,75 @@ void main() {
         cap: 1200,
       ),
       1000,
+    );
+  });
+
+  testWidgets('team and player marks stay clear once a photo is present', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              TeamMark(url: 'https://example.com/crest.png', name: 'Пумы', size: 48),
+              PlayerPhoto(url: 'https://example.com/photo.png', name: 'Игрок', size: 48),
+              marks.TeamMark(logoUrl: 'https://example.com/crest.png', name: 'Пумы', size: 48),
+              marks.PlayerPhoto(photoUrl: 'https://example.com/photo.png', name: 'Игрок', size: 48),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(TeamMark), matching: find.byType(Container))).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', Colors.transparent),
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(PlayerPhoto), matching: find.byType(Container))).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', Colors.transparent),
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(marks.TeamMark), matching: find.byType(Container))).color,
+      Colors.transparent,
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(marks.PlayerPhoto), matching: find.byType(Container))).color,
+      Colors.transparent,
+    );
+  });
+
+  testWidgets('empty team and player marks keep a soft placeholder', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              TeamMark(name: 'Пумы', size: 48),
+              PlayerPhoto(name: 'Игрок', size: 48),
+              marks.TeamMark(name: 'Пумы', size: 48),
+              marks.PlayerPhoto(name: 'Игрок', size: 48),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    const ice = Color(0x294CB4E5);
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(TeamMark), matching: find.byType(Container))).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', ice),
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(PlayerPhoto), matching: find.byType(Container))).decoration,
+      isA<BoxDecoration>().having((d) => d.color, 'color', ice),
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(marks.TeamMark), matching: find.byType(Container))).color,
+      ice,
+    );
+    expect(
+      tester.widget<Container>(find.descendant(of: find.byType(marks.PlayerPhoto), matching: find.byType(Container))).color,
+      ice,
     );
   });
 

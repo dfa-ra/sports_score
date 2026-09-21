@@ -45,8 +45,8 @@ const radius = computed(() => (props.size < 28 ? 4 : 8))
 .team-crest {
   display: block;
   flex: 0 0 auto;
-  object-fit: cover;
-  background: var(--accent-soft);
+  object-fit: contain;
+  background: transparent;
 }
 .team-crest--fallback {
   display: grid;
@@ -55,5 +55,6 @@ const radius = computed(() => (props.size < 28 ? 4 : 8))
   font-weight: 800;
   font-style: normal;
   line-height: 1;
+  background: var(--accent-soft);
 }
 </style>

@@ -18,9 +18,9 @@ class TeamMark extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0x294CB4E5),
+        color: image == null ? const Color(0x294CB4E5) : Colors.transparent,
         borderRadius: BorderRadius.circular(size < 28 ? 4 : 8),
-        image: image == null ? null : DecorationImage(image: image, fit: BoxFit.cover),
+        image: image == null ? null : DecorationImage(image: image, fit: BoxFit.contain),
       ),
       child: image == null
           ? Text(

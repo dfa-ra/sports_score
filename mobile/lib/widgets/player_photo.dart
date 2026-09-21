@@ -26,7 +26,7 @@ class PlayerPhoto extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0x294CB4E5),
+        color: image == null ? const Color(0x294CB4E5) : Colors.transparent,
         shape: tile ? BoxShape.rectangle : BoxShape.circle,
         borderRadius: radius,
         image: image == null ? null : DecorationImage(image: image, fit: BoxFit.cover),

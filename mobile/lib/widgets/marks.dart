@@ -12,30 +12,31 @@ class TeamMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasLogo = logoUrl != null && logoUrl!.isNotEmpty;
     return ClipRRect(
       borderRadius: BorderRadius.circular(size < 28 ? 4 : 8),
       child: Container(
         width: size,
         height: size,
-        color: const Color(0x294CB4E5),
+        color: hasLogo ? Colors.transparent : const Color(0x294CB4E5),
         alignment: Alignment.center,
-        child: logoUrl == null || logoUrl!.isEmpty
-            ? Text(
+        child: hasLogo
+            ? Image.network(
+                logoUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Text(
+                  initials(name),
+                  style: TextStyle(fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppColors.navy),
+                ),
+              )
+            : Text(
                 initials(name),
                 style: TextStyle(
                   fontSize: size * 0.38,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy,
-                ),
-              )
-            : Image.network(
-                logoUrl!,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Text(
-                  initials(name),
-                  style: TextStyle(fontSize: size * 0.38, fontWeight: FontWeight.w800, color: AppColors.navy),
                 ),
               ),
       ),
@@ -52,18 +53,15 @@ class PlayerPhoto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasPhoto = photoUrl != null && photoUrl!.isNotEmpty;
     return ClipOval(
       child: Container(
         width: size,
         height: size,
-        color: const Color(0x294CB4E5),
+        color: hasPhoto ? Colors.transparent : const Color(0x294CB4E5),
         alignment: Alignment.center,
-        child: photoUrl == null || photoUrl!.isEmpty
-            ? Text(
-                initials(name),
-                style: TextStyle(fontSize: size * 0.32, fontWeight: FontWeight.w800, color: AppColors.navy),
-              )
-            : Image.network(
+        child: hasPhoto
+            ? Image.network(
                 photoUrl!,
                 width: size,
                 height: size,
@@ -72,6 +70,10 @@ class PlayerPhoto extends StatelessWidget {
                   initials(name),
                   style: TextStyle(fontSize: size * 0.32, fontWeight: FontWeight.w800, color: AppColors.navy),
                 ),
+              )
+            : Text(
+                initials(name),
+                style: TextStyle(fontSize: size * 0.32, fontWeight: FontWeight.w800, color: AppColors.navy),
               ),
       ),
     );
