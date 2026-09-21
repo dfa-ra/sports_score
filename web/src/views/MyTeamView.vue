@@ -72,11 +72,14 @@ async function removeMember(id: string) {
 
 <template>
   <section class="stack">
-    <div class="page-title team-head">
-      <TeamCrest v-if="team" :src="team.logoUrl" :name="team.name" :size="42" />
+    <div v-if="team" class="page-title team-head">
+      <TeamCrest :src="team.logoUrl" :name="team.name" :size="52" />
       <div>
-        <h1>Моя команда</h1>
-        <p v-if="team">{{ team.name }} · основана {{ team.foundedOn || '—' }}</p>
+        <h1>{{ team.name }}</h1>
+        <p>
+          <template v-if="team.shortName && team.shortName !== team.name">{{ team.shortName }} · </template>
+          основана {{ team.foundedOn || '—' }}
+        </p>
       </div>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
@@ -118,7 +121,8 @@ async function removeMember(id: string) {
 </template>
 
 <style scoped>
-.team-head { display: flex; align-items: center; gap: 0.8rem; }
+.team-head { display: flex; align-items: center; gap: 0.9rem; }
+.team-head h1 { line-height: 1.05; }
 .toolbar { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; margin-top: 0.8rem; }
 .row { display: flex; gap: 0.7rem; align-items: center; padding: 0.45rem 0; }
 </style>
