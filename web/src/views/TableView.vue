@@ -7,7 +7,6 @@ import MatchRow from '../components/MatchRow.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
-import { BRAND_NAME } from '../lib/brand'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'players'
@@ -119,7 +118,6 @@ async function load() {
     <div class="league">
       <BrandMark :size="56" rounded="tile" />
       <div>
-        <p class="where">{{ BRAND_NAME }}</p>
         <h1>{{ tournament?.name || 'Таблица' }}</h1>
         <label class="field season">
           <select v-model="tournamentId">
@@ -266,14 +264,6 @@ async function load() {
   gap: 0.75rem;
   align-items: center;
   padding: 0.35rem 0 0.2rem;
-}
-.where {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
 }
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .season { max-width: 360px; margin-top: 0.35rem; }

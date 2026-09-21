@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BRAND_MARK_SRC, BRAND_NAME } from '../lib/brand'
+import { BRAND_MARK_SRC } from '../lib/brand'
 
 withDefaults(
   defineProps<{
@@ -15,7 +15,7 @@ withDefaults(
     class="brand-mark"
     :class="rounded"
     :src="BRAND_MARK_SRC"
-    :alt="BRAND_NAME"
+    alt=""
     :width="size"
     :height="size"
     :style="{ width: `${size}px`, height: `${size}px` }"
@@ -25,8 +25,8 @@ withDefaults(
 <style scoped>
 .brand-mark {
   display: block;
-  object-fit: cover;
-  background: #00b6e8;
+  object-fit: contain;
+  background: transparent;
   flex-shrink: 0;
 }
 .brand-mark.circle { border-radius: 50%; }
