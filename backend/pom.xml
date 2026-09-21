@@ -13,7 +13,7 @@
 
     <groupId>com.studentleague</groupId>
     <artifactId>student-league-backend</artifactId>
-    <version>0.2.10-SNAPSHOT</version>
+    <version>0.2.11-SNAPSHOT</version>
     <name>student-league-backend</name>
     <description>KronScore modular monolith API</description>
 
