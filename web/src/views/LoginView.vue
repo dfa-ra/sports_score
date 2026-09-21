@@ -98,10 +98,12 @@ async function submit() {
 }
 .promo h1 { font-size: 1.7rem; }
 .promo-logo {
-  width: 132px;
-  height: 132px;
-  object-fit: cover;
+  width: 148px;
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
   border-radius: 18px;
+  background: #00b6e8;
 }
 .promo ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; }
 .card { border: 0; box-shadow: none; border-radius: 0; }
