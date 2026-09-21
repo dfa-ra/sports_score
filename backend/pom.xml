@@ -15,7 +15,7 @@
     <artifactId>student-league-backend</artifactId>
     <version>0.2.7-SNAPSHOT</version>
     <name>student-league-backend</name>
-    <description>Student League modular monolith API</description>
+    <description>KronScore modular monolith API</description>
 
     <properties>
         <java.version>21</java.version>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/brand.dart';
 import '../core/format.dart';
 import '../core/models.dart';
 import '../core/theme.dart';
@@ -161,7 +162,7 @@ class _Outcome extends StatelessWidget {
 }
 
 class LeagueHead extends StatelessWidget {
-  const LeagueHead({super.key, required this.title, this.subtitle = 'KRONBARS'});
+  const LeagueHead({super.key, required this.title, this.subtitle = brandName});
   final String title;
   final String subtitle;
 

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import { BRAND_NAME } from '../lib/brand'
 import { ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
@@ -119,7 +120,7 @@ const grouped = computed(() => {
         <div class="league-head">
           <div>
             {{ group.name }}
-            <small>KRONBARS</small>
+            <small>{{ BRAND_NAME }}</small>
           </div>
         </div>
         <MatchRow

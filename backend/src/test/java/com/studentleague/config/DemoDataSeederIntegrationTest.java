@@ -41,7 +41,7 @@ class DemoDataSeederIntegrationTest {
     void emptyDatabaseGetsAPlayableLeague() throws Exception {
         mockMvc.perform(get("/api/v1/home"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tournament.name").value("KRONBARS Cup 2026"))
+                .andExpect(jsonPath("$.tournament.name").value("KronScore Cup 2026"))
                 .andExpect(jsonPath("$.standings.length()").value(8))
                 .andExpect(jsonPath("$.scorers.length()").value(5))
                 .andExpect(jsonPath("$.assists.length()").value(5));

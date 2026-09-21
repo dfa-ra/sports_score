@@ -6,6 +6,8 @@ import { useFavorites } from './stores/favorites'
 import { labelOf, roleLabel } from './lib/format'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
+import { BRAND_NAME } from './lib/brand'
+import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
 const fav = useFavorites()
@@ -45,16 +47,16 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
     <header class="chrome">
       <div class="util">
         <div class="container util-inner">
-          <span>KRONBARS · студенческая лига</span>
+          <span>{{ BRAND_NAME }} · студенческая лига</span>
           <span v-if="auth.isAuthenticated">{{ labelOf(roleLabel, auth.role) }}</span>
         </div>
       </div>
       <div class="nav-bar">
         <div class="container nav-inner">
           <RouterLink class="brand" to="/" :title="appVersionTitle">
-            <span class="brand-mark" aria-hidden="true">SL</span>
+            <BrandMark :size="36" />
             <span class="brand-copy">
-              <span class="brand-name">KRONBARS</span>
+              <span class="brand-name">{{ BRAND_NAME }}</span>
               <span class="brand-ver">{{ appVersionLabel }}</span>
             </span>
           </RouterLink>
@@ -161,15 +163,9 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
   text-transform: none;
   color: rgba(255, 255, 255, 0.58);
 }
-.brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--ice);
-  color: var(--navy);
-  font-size: 0.85rem;
+.brand :deep(.brand-mark) {
+  width: 36px;
+  height: 36px;
 }
 nav { display: flex; gap: 0.15rem; flex-wrap: wrap; }
 nav a {

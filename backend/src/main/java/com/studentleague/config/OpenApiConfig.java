@@ -16,8 +16,8 @@ public class OpenApiConfig {
     OpenAPI studentLeagueOpenApi() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Student League API")
-                        .description("REST API платформы студенческой спортивной лиги Student League")
+                        .title("KronScore API")
+                        .description("REST API платформы студенческой спортивной лиги KronScore")
                         .version("v1"))
                 .components(new Components().addSecuritySchemes(
                         "bearerAuth",

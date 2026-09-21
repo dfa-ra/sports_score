@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
 import '../../core/theme.dart';
+import '../../core/brand.dart';
 import '../../state/league_store.dart';
+import '../../widgets/brand_mark.dart';
 import '../../widgets/marks.dart' hide PlayerPhoto;
 import '../../widgets/match_row.dart';
 import '../../widgets/player_photo.dart';
@@ -40,23 +42,13 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: const [BoxShadow(color: Color(0x1400205B), blurRadius: 8)],
-                ),
-                child: const Text('KB', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-              ),
+              const BrandMark(size: 48, radius: 12),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('KRONBARS', style: TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                    const Text(brandName, style: TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
                     Text(store.tournamentName ?? 'Таблица', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.navy)),
                     if (store.tournaments.isNotEmpty)
                       DropdownButtonHideUnderline(
