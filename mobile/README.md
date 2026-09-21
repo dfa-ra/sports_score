@@ -1,4 +1,4 @@
-# Student League — Mobile
+# KronScore — Mobile
 
 Flutter-клиент (одна codebase для Android и iOS) с feature-based архитектурой.
 

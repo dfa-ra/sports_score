@@ -6,6 +6,8 @@ import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import StandingTable from '../components/StandingTable.vue'
+import BrandMark from '../components/BrandMark.vue'
+import { BRAND_NAME } from '../lib/brand'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'players'
@@ -115,9 +117,9 @@ async function load() {
 <template>
   <section class="stack page">
     <div class="league">
-      <span class="mark">KB</span>
+      <BrandMark :size="56" rounded="tile" />
       <div>
-        <p class="where">KRONBARS</p>
+        <p class="where">{{ BRAND_NAME }}</p>
         <h1>{{ tournament?.name || 'Таблица' }}</h1>
         <label class="field season">
           <select v-model="tournamentId">
@@ -264,17 +266,6 @@ async function load() {
   gap: 0.75rem;
   align-items: center;
   padding: 0.35rem 0 0.2rem;
-}
-.mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  color: var(--navy);
-  font-weight: 800;
-  box-shadow: var(--shadow);
 }
 .where {
   margin: 0;

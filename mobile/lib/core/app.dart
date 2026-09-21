@@ -15,6 +15,7 @@ import '../state/auth_controller.dart';
 import '../state/favorites_store.dart';
 import '../state/league_store.dart';
 import 'api_client.dart';
+import 'brand.dart';
 import 'theme.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -114,7 +115,7 @@ class _StudentLeagueAppState extends State<StudentLeagueApp> {
         ChangeNotifierProvider.value(value: favorites),
       ],
       child: MaterialApp.router(
-        title: 'KRONBARS',
+        title: brandName,
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
         routerConfig: router,

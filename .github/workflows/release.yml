@@ -194,7 +194,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.resolve-version.outputs.version }}
-          name: KRONBARS v${{ needs.resolve-version.outputs.version }}
+          name: KronScore v${{ needs.resolve-version.outputs.version }}
           generate_release_notes: false
           body: ${{ steps.notes.outputs.body }}
           files: out/*

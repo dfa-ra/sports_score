@@ -136,7 +136,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         }
 
         Tournament tournament = new Tournament();
-        tournament.setName("KRONBARS Cup 2026");
+        tournament.setName("KronScore Cup 2026");
         tournament.setDescription("Демо-сезон, чтобы таблица и статистика не были пустыми.");
         tournament.setSportId(football.getId());
         tournament.setSeasonYear(2026);

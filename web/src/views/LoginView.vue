@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { BRAND_LOGO_SRC, BRAND_NAME } from '../lib/brand'
 
 const email = ref('')
 const password = ref('')
@@ -33,7 +34,8 @@ async function submit() {
   <section class="auth-wrap rise">
     <div class="split">
       <aside class="promo">
-        <p class="eyebrow">My League</p>
+        <img class="promo-logo" :src="BRAND_LOGO_SRC" :alt="BRAND_NAME" />
+        <p class="eyebrow">{{ BRAND_NAME }}</p>
         <h1>Одна лига для игроков, судей и трибуны</h1>
         <ul>
           <li>Смотреть live и таблицу без регистрации</li>
@@ -95,6 +97,12 @@ async function submit() {
   gap: 0.8rem;
 }
 .promo h1 { font-size: 1.7rem; }
+.promo-logo {
+  width: 132px;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 18px;
+}
 .promo ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; }
 .card { border: 0; box-shadow: none; border-radius: 0; }
 .pass-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }

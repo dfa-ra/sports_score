@@ -1,4 +1,4 @@
-# Student League — Web
+# KronScore — Web
 
 Клиентское Vue 3 + TypeScript + Vite приложение студенческой спортивной лиги.
 
