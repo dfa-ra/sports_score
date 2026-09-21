@@ -90,6 +90,9 @@ jobs:
     name: Android release APK/AAB
     needs: resolve-version
     runs-on: ubuntu-latest
+    # Same as iOS: a Maven Central 403 must not block the GitHub Release or prod SSH deploy.
+    # stand.sh only needs the backend JAR and web tarball.
+    continue-on-error: true
     defaults:
       run:
         working-directory: mobile
@@ -110,9 +113,25 @@ jobs:
           # pubspec: version: x.y.z+build → keep build number 1 for tag releases
           sed -i "s/^version: .*/version: ${VERSION}+1/" pubspec.yaml
       - name: Build release APK (unsigned / debug-keystore default)
-        run: flutter build apk --release --dart-define=API_BASE_URL=https://itmoliga.ru/api/v1
+        run: |
+          for i in 1 2 3; do
+            if flutter build apk --release --dart-define=API_BASE_URL=https://itmoliga.ru/api/v1; then
+              exit 0
+            fi
+            echo "APK build failed (attempt ${i}/3)"
+            sleep $((i * 20))
+          done
+          exit 1
       - name: Build release App Bundle
-        run: flutter build appbundle --release --dart-define=API_BASE_URL=https://itmoliga.ru/api/v1
+        run: |
+          for i in 1 2 3; do
+            if flutter build appbundle --release --dart-define=API_BASE_URL=https://itmoliga.ru/api/v1; then
+              exit 0
+            fi
+            echo "AAB build failed (attempt ${i}/3)"
+            sleep $((i * 20))
+          done
+          exit 1
       - name: Rename artifacts
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
@@ -123,6 +142,7 @@ jobs:
         with:
           name: android-release
           path: release-android/*
+          if-no-files-found: warn
 
   ios-release:
     name: iOS IPA (unsigned stub)
@@ -164,8 +184,7 @@ jobs:
     if: |
       always() &&
       needs.backend-jar.result == 'success' &&
-      needs.web-release.result == 'success' &&
-      needs.android-release.result == 'success'
+      needs.web-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
