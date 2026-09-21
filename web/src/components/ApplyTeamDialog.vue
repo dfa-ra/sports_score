@@ -73,8 +73,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
           <p>Нет команды, которую можно заявить. Капитану нужна своя команда, админ выбирает из списка лиги.</p>
         </template>
         <form v-else class="stack" @submit.prevent="submit">
-          <label v-if="needsPicker" class="field">Команда
-            <select v-model="teamId" required>
+          <label v-if="needsPicker" class="field" for="apply-team-select">Команда
+            <select id="apply-team-select" v-model="teamId" required>
               <option v-for="team in teams" :key="team.id" :value="team.id">
                 {{ team.name }}{{ registeredTeamIds.has(team.id) ? ' · уже в заявке' : '' }}
               </option>
