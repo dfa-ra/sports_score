@@ -10,11 +10,10 @@ import 'package:student_league/state/league_store.dart';
 import 'package:student_league/widgets/match_row.dart';
 
 void main() {
-  testWidgets('renders KronScore phone shell', (WidgetTester tester) async {
+  testWidgets('renders the phone shell', (WidgetTester tester) async {
     await tester.pumpWidget(const StudentLeagueApp(autoload: false));
     await tester.pump();
 
-    expect(find.text('KronScore'), findsWidgets);
     expect(find.text('Игры'), findsOneWidget);
     expect(find.text('Таблица'), findsOneWidget);
     expect(find.text('Live'), findsOneWidget);

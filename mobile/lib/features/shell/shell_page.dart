@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme.dart';
-import '../../core/brand.dart';
 import '../../state/favorites_store.dart';
 import '../../widgets/brand_mark.dart';
 
@@ -18,13 +17,7 @@ class ShellPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: const Row(
-          children: [
-            BrandMark(size: 28),
-            SizedBox(width: 8),
-            Text(brandName, style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.4)),
-          ],
-        ),
+        title: const BrandMark(size: 28),
         actions: [
           IconButton(
             tooltip: 'Профиль',

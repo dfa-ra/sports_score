@@ -6,7 +6,6 @@ import { useFavorites } from './stores/favorites'
 import { labelOf, roleLabel } from './lib/format'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
-import { BRAND_NAME } from './lib/brand'
 import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
@@ -47,7 +46,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
     <header class="chrome">
       <div class="util">
         <div class="container util-inner">
-          <span>{{ BRAND_NAME }} · студенческая лига</span>
+          <span>Студенческая лига</span>
           <span v-if="auth.isAuthenticated">{{ labelOf(roleLabel, auth.role) }}</span>
         </div>
       </div>
@@ -55,10 +54,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
         <div class="container nav-inner">
           <RouterLink class="brand" to="/" :title="appVersionTitle">
             <BrandMark :size="36" />
-            <span class="brand-copy">
-              <span class="brand-name">{{ BRAND_NAME }}</span>
-              <span class="brand-ver">{{ appVersionLabel }}</span>
-            </span>
+            <span class="brand-ver">{{ appVersionLabel }}</span>
           </RouterLink>
 
           <nav>
@@ -155,7 +151,6 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
   letter-spacing: 0.04em;
 }
 .brand:hover { color: #fff; text-decoration: none; }
-.brand-copy { display: grid; line-height: 1.05; }
 .brand-ver {
   font-size: 0.62rem;
   font-weight: 700;
@@ -219,7 +214,6 @@ nav a.on { color: var(--navy); background: var(--ice); }
 @media (max-width: 719px) {
   header nav { display: none; }
   .nav-inner { min-height: 52px; }
-  .brand-name { font-size: 0.95rem; }
   .wide-only { display: none; }
   .phone-only { display: grid; }
   .shell.docked .main { padding-bottom: 5.6rem; }

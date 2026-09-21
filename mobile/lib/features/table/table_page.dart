@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
 import '../../core/theme.dart';
-import '../../core/brand.dart';
 import '../../state/league_store.dart';
 import '../../widgets/brand_mark.dart';
 import '../../widgets/marks.dart' hide PlayerPhoto;
@@ -48,7 +47,6 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(brandName, style: TextStyle(color: AppColors.muted, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
                     Text(store.tournamentName ?? 'Таблица', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: AppColors.navy)),
                     if (store.tournaments.isNotEmpty)
                       DropdownButtonHideUnderline(

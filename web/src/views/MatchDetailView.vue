@@ -6,7 +6,6 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
-import { BRAND_NAME } from '../lib/brand'
 import { eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -221,7 +220,7 @@ onUnmounted(() => client?.deactivate())
 <template>
   <section v-if="match" class="stack">
     <RouterLink class="league-bar" to="/table">
-      {{ tournament?.name || BRAND_NAME }}
+      {{ tournament?.name || 'Матч' }}
       <span>›</span>
     </RouterLink>
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../core/brand.dart';
 import '../core/format.dart';
 import '../core/models.dart';
 import '../core/theme.dart';
@@ -162,7 +161,7 @@ class _Outcome extends StatelessWidget {
 }
 
 class LeagueHead extends StatelessWidget {
-  const LeagueHead({super.key, required this.title, this.subtitle = brandName});
+  const LeagueHead({super.key, required this.title, this.subtitle = ''});
   final String title;
   final String subtitle;
 
@@ -176,7 +175,8 @@ class LeagueHead extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(title.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: AppColors.navy)),
-          Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+          if (subtitle.isNotEmpty)
+            Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
         ],
       ),
     );

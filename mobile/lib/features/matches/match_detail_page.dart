@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/brand.dart';
 import '../../core/format.dart';
 import '../../core/models.dart';
 import '../../core/theme.dart';
@@ -131,10 +130,10 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
     final away = store.teamName(current.awayTeamId);
 
     return Scaffold(
-      appBar: AppBar(title: Text(store.tournamentNames[current.tournamentId] ?? brandName)),
+      appBar: AppBar(title: Text(store.tournamentNames[current.tournamentId] ?? 'Матч')),
       body: Column(
         children: [
-          _LeagueBar(title: store.tournamentNames[current.tournamentId] ?? brandName, onTap: () => context.go('/table')),
+          _LeagueBar(title: store.tournamentNames[current.tournamentId] ?? 'Матч', onTap: () => context.go('/table')),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
             child: Container(

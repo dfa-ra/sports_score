@@ -6,7 +6,7 @@ export const appVersion = version
 export const appRevision = revision
 export const appChannel = channel
 
-/** Short label next to KronScore, e.g. `v0.2.2 · 4bd85f3`. */
+/** Short label next to the crest, e.g. `v0.2.2 · 4bd85f3`. */
 export const appVersionLabel = revision && revision !== 'local'
   ? `v${version} · ${revision}`
   : `v${version}`
