@@ -21,6 +21,34 @@ export const sportLabel: Record<string, string> = {
   HOCKEY: 'Хоккей',
 }
 
+export const formatLabel: Record<string, string> = {
+  ROUND_ROBIN: 'Круговой турнир',
+  CUP: 'Кубок / плей-офф',
+  GROUPS_PLAYOFF: 'Группы + плей-офф',
+  SWISS: 'Швейцарская система',
+  DOUBLE_ELIMINATION: 'Double elimination',
+}
+
+export function isTournamentOpenForApply(status?: string | null) {
+  return status === 'REGISTRATION' || status === 'DRAFT'
+}
+
+export function formatDateRange(start?: string | null, end?: string | null) {
+  const from = formatIsoDate(start)
+  const to = formatIsoDate(end)
+  if (!from && !to) return ''
+  if (from && to && from !== to) return `${from} — ${to}`
+  return from || to
+}
+
+function formatIsoDate(value?: string | null) {
+  if (!value) return ''
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (match) return `${match[3]}.${match[2]}.${match[1]}`
+  const formatted = formatMatchDay(value)
+  return formatted === '—' ? '' : formatted
+}
+
 export function labelOfSport(code?: string | null, fallback?: string | null) {
   if (!code) return fallback || 'Спорт'
   return sportLabel[code] || fallback || code

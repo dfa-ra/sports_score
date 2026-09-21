@@ -56,6 +56,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <RouterLink to="/table" active-class="on">Таблица</RouterLink>
             <RouterLink to="/calendar" active-class="on">Игры</RouterLink>
             <RouterLink to="/live" active-class="on">Live</RouterLink>
+            <RouterLink to="/tournaments" active-class="on">Турниры</RouterLink>
             <RouterLink to="/players" active-class="on">Игроки</RouterLink>
             <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
             <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
@@ -112,6 +113,12 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9.2"/></svg>
         </span>
         <span>Live</span>
+      </RouterLink>
+      <RouterLink to="/tournaments" :class="{ on: route.path.startsWith('/tournaments') }">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 5h8v3.2a4 4 0 0 1-8 0V5z"/><path d="M8 6.8H5.4A2.6 2.6 0 0 0 8 9.6"/><path d="M16 6.8h2.6A2.6 2.6 0 0 1 16 9.6"/><path d="M12 12.4V16"/><path d="M9 20h6"/><path d="M10.2 16h3.6v2.4h-3.6z"/></svg>
+        </span>
+        <span>Турниры</span>
       </RouterLink>
       <RouterLink :to="profileTo" :class="{ on: route.path.startsWith('/profile') }">
         <span class="ico" aria-hidden="true">
@@ -232,7 +239,7 @@ nav a.on { color: var(--navy); background: var(--ice); }
   }
   .dock {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     position: fixed;
     left: 0;
     right: 0;
@@ -248,7 +255,7 @@ nav a.on { color: var(--navy); background: var(--ice); }
     gap: 0.12rem;
     color: var(--muted);
     text-decoration: none;
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.02em;
     text-transform: uppercase;
