@@ -18,11 +18,11 @@ class ShellPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: Row(
+        title: const Row(
           children: [
-            const BrandMark(size: 28),
-            const SizedBox(width: 8),
-            const Text(brandName, style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.4)),
+            BrandMark(size: 28),
+            SizedBox(width: 8),
+            Text(brandName, style: TextStyle(fontWeight: FontWeight.w800, letterSpacing: 0.4)),
           ],
         ),
         actions: [
