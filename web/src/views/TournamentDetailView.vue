@@ -4,7 +4,9 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
+import { isTournamentOpenForApply } from '../lib/format'
 import AdminOnly from '../components/AdminOnly.vue'
+import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 import StandingTable from '../components/StandingTable.vue'
@@ -19,8 +21,6 @@ const tournament = ref<any>(null)
 const teams = ref<any[]>([])
 const standings = ref<any[]>([])
 const matches = ref<any[]>([])
-const myTeams = ref<any[]>([])
-const teamId = ref('')
 const name = ref('')
 const description = ref('')
 const status = ref('REGISTRATION')
@@ -33,8 +33,13 @@ const error = ref('')
 const ok = ref('')
 const pending = ref(false)
 const showMatchForm = ref(false)
+const applying = ref(false)
 
-const canRegister = computed(() => auth.role === 'CAPTAIN')
+const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
+const showApply = computed(() =>
+  registrationOpen.value
+  && (auth.hasRole('CAPTAIN') || auth.canManageLeague || !auth.isAuthenticated)
+)
 
 onMounted(load)
 
@@ -57,20 +62,6 @@ async function load() {
   format.value = t.data.format
   regulations.value = t.data.regulations || ''
   seasonYear.value = t.data.seasonYear
-  if (auth.isAuthenticated) {
-    const { data } = await api.get('/teams', { params: { size: 100 } })
-    let mine = (data.content ?? []).filter((x: any) => !x.disbanded)
-    if (auth.role === 'CAPTAIN') {
-      try {
-        const me = await api.get('/players/me')
-        mine = mine.filter((x: any) => x.captainId === me.data.id)
-      } catch {
-        mine = []
-      }
-    }
-    myTeams.value = mine
-    if (!teamId.value && myTeams.value[0]) teamId.value = myTeams.value[0].id
-  }
 }
 
 async function save() {
@@ -86,20 +77,6 @@ async function save() {
       seasonYear: Number(seasonYear.value),
     })
     ok.value = 'Турнир обновлён.'
-    await load()
-  } catch (e: any) {
-    error.value = apiError(e)
-  } finally {
-    pending.value = false
-  }
-}
-
-async function registerTeam() {
-  error.value = ''
-  pending.value = true
-  try {
-    await api.post(`/tournaments/${tournament.value.id}/teams`, { teamId: teamId.value })
-    ok.value = 'Заявка ушла. Ждём допуск админа.'
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -158,16 +135,13 @@ async function exclude(id: string) {
       <p>{{ tournament.description || 'Таблица, заявки и характер сезона — всё на одной странице.' }}</p>
     </div>
 
-    <div v-if="canRegister" class="panel stack">
+    <div v-if="showApply" class="panel stack">
       <h2>Заявить команду</h2>
-      <form class="stack" @submit.prevent="registerTeam">
-        <label class="field">Команда
-          <select v-model="teamId" required>
-            <option v-for="t in myTeams" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
-        </label>
-        <button class="btn" type="submit" :disabled="pending || !myTeams.length">Подать заявку</button>
-      </form>
+      <p>Пока идёт набор, капитан и админ могут подать заявку. В сетку команду всё равно допускает админ.</p>
+      <button v-if="auth.isAuthenticated" class="btn" type="button" @click="applying = true">Заявиться</button>
+      <RouterLink v-else class="btn" :to="{ name: 'login', query: { redirect: route.fullPath } }">
+        Войти и заявиться
+      </RouterLink>
     </div>
 
     <div class="filters">
@@ -207,17 +181,14 @@ async function exclude(id: string) {
     <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
     <p v-if="ok && !auth.canManageLeague" class="form-ok">{{ ok }}</p>
 
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
-      <h2>Заявить команду</h2>
-      <form class="stack" @submit.prevent="registerTeam">
-        <label class="field">Команда
-          <select v-model="teamId" required>
-            <option v-for="t in myTeams" :key="t.id" :value="t.id">{{ t.name }}</option>
-          </select>
-        </label>
-        <button class="btn" type="submit" :disabled="pending || !myTeams.length">Подать заявку</button>
-      </form>
+    <ApplyTeamDialog
+      v-if="applying && tournament"
+      :tournament="tournament"
+      @close="applying = false"
+      @applied="load"
+    />
 
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
       <h2>Настройки турнира</h2>
       <form class="stack" @submit.prevent="save">
         <label class="field">Название<input v-model="name" required /></label>

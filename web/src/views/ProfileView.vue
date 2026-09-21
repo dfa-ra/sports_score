@@ -220,6 +220,7 @@ async function logout() {
     </div>
 
     <div v-if="auth.canAccessMyTeam || auth.canOfficiate || auth.canManageLeague" class="shortcuts">
+      <RouterLink class="tile" to="/tournaments">Турниры</RouterLink>
       <RouterLink v-if="auth.canAccessMyTeam" class="tile" to="/my-team">Моя команда</RouterLink>
       <RouterLink v-if="auth.canOfficiate" class="tile" to="/referee">Пульт судьи</RouterLink>
       <RouterLink v-if="auth.canManageLeague" class="tile" to="/admin">Админка</RouterLink>
