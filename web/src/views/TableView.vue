@@ -280,7 +280,7 @@ async function load() {
 }
 .group-title {
   margin: 0;
-  padding: 0.75rem 0.85rem 0;
+  padding: 0.8rem 0.85rem 0.15rem;
   font-size: 0.92rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;

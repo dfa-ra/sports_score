@@ -20,7 +20,8 @@ defineProps<{
 <style scoped>
 .groups { display: grid; gap: 1.1rem; }
 .group h3 {
-  margin: 0 0 0.45rem;
+  margin: 0;
+  padding: 0.15rem 0.85rem 0.35rem;
   font-size: 0.92rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
