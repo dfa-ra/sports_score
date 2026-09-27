@@ -376,7 +376,7 @@ class _ProfilePageState extends State<ProfilePage> {
         if (card?.teamId == null && favTeams.isEmpty)
           const Padding(
             padding: EdgeInsets.all(14),
-            child: Text('Звезда на карточке команды — и она будет здесь.', style: TextStyle(color: AppColors.muted)),
+            child: Text('Избранных команд нет.', style: TextStyle(color: AppColors.muted)),
           ),
         if (favMatches.isNotEmpty) ...[
           const LeagueHead(title: 'Избранные матчи'),

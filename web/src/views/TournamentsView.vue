@@ -59,13 +59,12 @@ onMounted(load)
   <section class="stack">
     <div class="page-title">
       <h1>Турниры</h1>
-      <p>Карточка сезона и кнопка «Заявиться», пока идёт набор. Смотреть можно без аккаунта.</p>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="grid cards">
       <div v-for="n in 3" :key="n" class="skeleton" />
     </div>
-    <EmptyState v-else-if="!items.length" title="Календарь пуст" text="Админ может завести первый турнир одной кнопкой." />
+    <EmptyState v-else-if="!items.length" title="Турниров нет" />
     <div v-else class="grid cards">
       <TournamentCard
         v-for="t in sorted"

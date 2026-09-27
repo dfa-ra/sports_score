@@ -68,13 +68,12 @@ class _RefereeMatchesPageState extends State<RefereeMatchesPage> {
             const SizedBox(height: 4),
             const Text('Выберите матч', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text('Только игры, на которые вас назначили. Дальше — часы, гол и карточки.', style: TextStyle(color: AppColors.muted)),
             const SizedBox(height: 16),
             if (loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.ice),
             if (error != null)
               Text(error!, style: const TextStyle(color: AppColors.danger))
             else if (!loading && matches.isEmpty)
-              const EmptyHint(title: 'Нет назначений', text: 'Когда поставят на игру — карточка появится сама.')
+              const EmptyHint(title: 'Нет назначений')
             else
               for (final match in matches)
                 Padding(

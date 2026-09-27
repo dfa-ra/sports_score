@@ -205,7 +205,7 @@ async function logout() {
         <TeamCrest :src="team.logo" :name="team.name" :size="22" />
         {{ team.name }}
       </RouterLink>
-      <p v-if="!card?.team && !favTeams.length" class="empty-line">Звезда на карточке команды — и она будет здесь.</p>
+      <p v-if="!card?.team && !favTeams.length" class="empty-line">Избранных команд нет.</p>
     </div>
 
     <div v-if="favMatches.length" class="sheet">

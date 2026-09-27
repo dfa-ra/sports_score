@@ -255,7 +255,6 @@ async function disbandTeam(team: any) {
     <div class="page-title">
       <p class="eyebrow">Служебный вход</p>
       <h1>Админ-панель</h1>
-      <p>Всё управление лигой — здесь. Без curl, без Swagger, только кнопки.</p>
     </div>
     <div class="tabs">
       <button

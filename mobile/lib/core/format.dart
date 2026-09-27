@@ -163,7 +163,7 @@ String formatClock(int? totalSeconds) {
 }
 
 String periodLabel(int? period, {String? sportCode, int periodCount = 2}) {
-  if (period == null || period < 1) return 'Ещё не свистнули';
+  if (period == null || period < 1) return 'Матч не начат';
   if (period > periodCount) return 'Доп. время';
   if (sportCode == 'BASKETBALL') return '$period-я четверть';
   if (sportCode == 'VOLLEYBALL') return '$period-я партия';

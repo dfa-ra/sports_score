@@ -248,7 +248,7 @@ onUnmounted(() => {
       >Следующий {{ match.sportCode === 'BASKETBALL' ? 'четверть' : 'тайм' }}</button>
       <button class="btn large danger" :disabled="pending || !live" @click="action('finish')">Финиш</button>
     </div>
-    <p v-if="expired && live" class="form-ok">Время тайма вышло. Можно свистеть следующий или финиш.</p>
+    <p v-if="expired && live" class="form-ok">Время тайма вышло.</p>
 
     <div class="grid events">
       <button class="btn large goal" :disabled="pending || !live" @click="openSheet('GOAL')">Гол</button>
@@ -258,7 +258,7 @@ onUnmounted(() => {
 
     <div class="panel stack">
       <h2>Протокол</h2>
-      <p v-if="!protocol.length" class="muted">Пока тихо.</p>
+      <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
         <span class="t">{{ formatClock(ev.gameTime) }}</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>

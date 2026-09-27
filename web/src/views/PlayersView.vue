@@ -34,7 +34,6 @@ onMounted(async () => {
   <section class="stack">
     <div class="page-title">
       <h1>Игроки</h1>
-      <p>Поиск по ФИО или команде. Карточка — статистика выступлений.</p>
     </div>
     <form class="filters" @submit.prevent="load">
       <label class="field">ФИО

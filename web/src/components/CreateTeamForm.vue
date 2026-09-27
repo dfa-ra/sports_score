@@ -64,6 +64,6 @@ async function submit() {
     </label>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
-    <button class="btn" type="submit" :disabled="pending">{{ pending ? 'Собираем состав…' : 'Создать команду' }}</button>
+    <button class="btn" type="submit" :disabled="pending">{{ pending ? 'Создаём…' : 'Создать команду' }}</button>
   </form>
 </template>

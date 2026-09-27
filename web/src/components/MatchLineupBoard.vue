@@ -57,24 +57,24 @@ function save() {
         {{ side.teamName }}
       </h3>
       <p class="muted">
-        {{ side.confirmed ? 'Стартовый состав записан' : 'Капитан ещё не написал, кто выходит с первой минуты' }}
+        {{ side.confirmed ? 'Стартовый состав записан' : 'Состав не подан' }}
       </p>
     </header>
 
     <section>
       <h4>Основа</h4>
-      <p v-if="!side.starters?.length && !editable" class="muted">Пока все в заявке, без «первых номеров».</p>
+      <p v-if="!side.starters?.length && !editable" class="muted">Стартовый состав не указан.</p>
       <label v-for="p in (editable ? roster : side.starters)" :key="p.playerId" class="player" :class="{ starter: !editable || selected.includes(p.playerId) }">
         <input v-if="editable" type="checkbox" :checked="selected.includes(p.playerId)" @change="toggle(p.playerId)" />
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
         <span>{{ p.name }}</span>
-        <span class="muted">{{ p.position || 'универсал с пары' }}</span>
+        <span v-if="p.position" class="muted">{{ p.position }}</span>
       </label>
     </section>
 
     <section v-if="!editable">
       <h4>Скамейка</h4>
-      <p v-if="!side.bench?.length" class="muted">Пусто. Либо все в основе, либо ещё делают лабу.</p>
+      <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
         <span>{{ p.name }}</span>

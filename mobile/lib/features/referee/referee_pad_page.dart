@@ -413,7 +413,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
               ),
               if (expired) ...[
                 const SizedBox(height: 8),
-                const Text('Время тайма вышло. Можно свистеть следующий или финиш.', style: TextStyle(color: AppColors.win, fontWeight: FontWeight.w700)),
+                const Text('Время тайма вышло.', style: TextStyle(color: AppColors.win, fontWeight: FontWeight.w700)),
               ],
               const SizedBox(height: 12),
               Row(
@@ -471,7 +471,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
                     const Text('Протокол', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 18)),
                     const SizedBox(height: 8),
                     if (protocol.isEmpty)
-                      const Text('Пока тихо.', style: TextStyle(color: AppColors.muted))
+                      const Text('Событий нет.', style: TextStyle(color: AppColors.muted))
                     else
                       for (final ev in protocol)
                         Opacity(

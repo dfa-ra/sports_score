@@ -319,7 +319,7 @@ class _Overview extends StatelessWidget {
         Container(
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
           child: blocks.isEmpty
-              ? const EmptyHint(title: 'Пока ни гола, ни карточки')
+              ? const EmptyHint(title: 'Событий нет')
               : Column(
                   children: [
                     for (final block in blocks) ...[
@@ -518,13 +518,13 @@ class _LineupCard extends StatelessWidget {
             ],
           ),
           Text(
-            side.confirmed ? 'Стартовый состав записан' : 'Капитан ещё не написал, кто выходит с первой минуты',
+            side.confirmed ? 'Стартовый состав записан' : 'Состав не подан',
             style: const TextStyle(color: AppColors.muted, fontSize: 12),
           ),
           const SizedBox(height: 10),
           const Text('Основа', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.muted)),
           if (side.starters.isEmpty)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Text('Пока все в заявке, без первых номеров.', style: TextStyle(color: AppColors.muted)))
+            const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Text('Стартовый состав не указан.', style: TextStyle(color: AppColors.muted)))
           else
             for (final p in side.starters) _PlayerLine(player: p),
           const SizedBox(height: 8),

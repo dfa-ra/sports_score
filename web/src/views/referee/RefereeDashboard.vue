@@ -31,9 +31,8 @@ onMounted(async () => {
     <div class="page-title">
       <p class="eyebrow">Пульт</p>
       <h1>Выберите матч</h1>
-      <p>Только игры, на которые вас назначили. Дальше — часы, гол и карточки.</p>
     </div>
-    <EmptyState v-if="!ordered.length" title="Нет назначений" text="Когда поставят на игру — карточка появится сама." />
+    <EmptyState v-if="!ordered.length" title="Нет назначений" />
     <div v-else class="grid cards">
       <RouterLink v-for="m in ordered" :key="m.id" class="panel card-link" :to="`/referee/matches/${m.id}`">
         <StatusBadge :status="m.status" />

@@ -135,7 +135,7 @@ export function periodNoun(sportCode?: string | null) {
 }
 
 export function periodLabel(period?: number | null, sportCode?: string | null, periodCount?: number | null) {
-  if (!period) return 'Ещё не свистнули'
+  if (!period) return 'Матч не начат'
   if (periodCount && period > periodCount) return 'Доп. время'
   const noun = periodNoun(sportCode)
   if (noun === 'четверть') return `${period}-я четверть`
@@ -170,8 +170,6 @@ export function initials(name?: string | null) {
 }
 
 export function passwordHint(password: string) {
-  if (!password) return 'Минимум 8 символов. Можно без спецэффектов — главное, чтобы помнили.'
-  if (password.length < 8) return 'Ещё чуть-чуть: пароль любит длину больше, чем остроумие.'
-  if (password.length < 12) return 'Уже можно. Если добавите ещё пару знаков — судья кивнёт.'
-  return 'Крепко. Этот пароль не забьёт автогол.'
+  if (password.length >= 8) return ''
+  return 'Минимум 8 символов'
 }

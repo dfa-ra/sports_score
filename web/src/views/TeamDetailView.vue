@@ -124,7 +124,7 @@ async function disbandTeam() {
       <div>
         <h1>{{ team.name }}</h1>
         <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
-        <p v-else>{{ team.shortName || 'Команда без аббревиатуры' }}{{ team.foundedOn ? ' · осн. ' + team.foundedOn : '' }}</p>
+        <p v-else-if="team.shortName || team.foundedOn">{{ team.shortName }}{{ team.shortName && team.foundedOn ? ' · ' : '' }}{{ team.foundedOn ? 'осн. ' + team.foundedOn : '' }}</p>
       </div>
       <button
         class="star"
@@ -171,7 +171,7 @@ async function disbandTeam() {
 
     <div v-else class="panel stack">
       <h2>Состав</h2>
-      <EmptyState v-if="!members.length" title="Раздевалка пуста" text="Капитан ещё собирает людей после пар." />
+      <EmptyState v-if="!members.length" title="В составе никого нет" />
       <div v-for="m in members" :key="m.id" class="member">
         <RouterLink :to="`/players/${m.playerId}`">
           <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>

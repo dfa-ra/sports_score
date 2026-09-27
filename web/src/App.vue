@@ -87,7 +87,6 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
     </main>
     <footer class="foot">
       <div class="container foot-inner">
-        <span>Смотреть можно без билета. Играть — после регистрации.</span>
         <span class="foot-ver" :title="appVersionTitle">{{ appVersionLabel }}</span>
       </div>
     </footer>
@@ -207,7 +206,7 @@ nav a.on { color: var(--navy); background: var(--ice); }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
 .foot-inner {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: baseline;
   gap: 1rem;
   flex-wrap: wrap;
