@@ -185,7 +185,7 @@ async function exclude(id: string) {
     <div class="page-title">
       <StatusBadge :status="tournament.status" />
       <h1>{{ tournament.name }}</h1>
-      <p>{{ tournament.description || 'Таблица, заявки и характер сезона — всё на одной странице.' }}</p>
+      <p v-if="tournament.description">{{ tournament.description }}</p>
     </div>
 
     <div v-if="showApply" class="panel stack">
@@ -207,13 +207,13 @@ async function exclude(id: string) {
     </div>
     <div v-if="tab === 'table'" class="panel">
       <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
-      <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Ещё рано считать" text="Очки появятся после первых свистков." />
+      <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Результатов пока нет" />
       <StandingGroups v-else :tables="standings" />
     </div>
 
     <div class="panel stack">
       <h2>Команды</h2>
-      <EmptyState v-if="!teams.length" title="Заявок нет" text="Капитаны ещё выбирают цвет формы." />
+      <EmptyState v-if="!teams.length" title="Заявок нет" />
       <div v-for="team in teams" :key="team.id" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
@@ -225,7 +225,7 @@ async function exclude(id: string) {
 
     <div class="panel stack">
       <h2>Матчи</h2>
-      <EmptyState v-if="!matches.length" title="Сетки ещё нет" />
+      <EmptyState v-if="!matches.length" title="Матчей нет" />
       <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
         <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         <StatusBadge :status="m.status" />

@@ -200,7 +200,7 @@ function heroHeading(slide: Slide | null | undefined) {
             <p class="eyebrow">Таблица</p>
             <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
           </div>
-          <EmptyState v-if="loaded && !standingGroupsHaveRows(homeTables)" title="Нет строк" text="Когда админ запустит турнир — таблица появится здесь." />
+          <EmptyState v-if="loaded && !standingGroupsHaveRows(homeTables)" title="Таблицы пока нет" />
           <StandingGroups v-else-if="standingGroupsHaveRows(homeTables)" :tables="homeTables" compact />
         </div>
 
@@ -224,7 +224,7 @@ function heroHeading(slide: Slide | null | undefined) {
           <h2>Моменты</h2>
           <a v-if="feed?.vkAlbumUrl" :href="feed.vkAlbumUrl" target="_blank" rel="noreferrer">Все кадры →</a>
         </div>
-        <EmptyState v-if="loaded && !feed?.photos?.length" title="Кадров ещё нет" text="Админ загружает фото во вкладке «Фото» — слот «Галерея»." />
+        <EmptyState v-if="loaded && !feed?.photos?.length" title="Фото пока нет" />
         <div v-else class="photos">
           <figure v-for="photo in feed?.photos" :key="photo.id">
             <img :src="photo.url" :alt="photo.caption || photo.title || 'Момент'" />

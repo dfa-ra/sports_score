@@ -248,7 +248,7 @@ onUnmounted(() => {
       >Следующий {{ match.sportCode === 'BASKETBALL' ? 'четверть' : 'тайм' }}</button>
       <button class="btn large danger" :disabled="pending || !live" @click="action('finish')">Финиш</button>
     </div>
-    <p v-if="expired && live" class="form-ok">Время тайма вышло. Можно свистеть следующий или финиш.</p>
+    <p v-if="expired && live" class="form-ok">Время тайма вышло.</p>
 
     <div class="grid events">
       <button class="btn large goal" :disabled="pending || !live" @click="openSheet('GOAL')">Гол</button>

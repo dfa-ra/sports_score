@@ -413,7 +413,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
               ),
               if (expired) ...[
                 const SizedBox(height: 8),
-                const Text('Время тайма вышло. Можно свистеть следующий или финиш.', style: TextStyle(color: AppColors.win, fontWeight: FontWeight.w700)),
+                const Text('Время тайма вышло.', style: TextStyle(color: AppColors.win, fontWeight: FontWeight.w700)),
               ],
               const SizedBox(height: 12),
               Row(

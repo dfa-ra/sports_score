@@ -186,7 +186,7 @@ public class RefereeMatchService {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() == MatchStatus.FINISHED) {
             if (!principal.hasRole(Role.ADMIN)) {
-                throw ApiException.forbidden("После финального свистка протокол правит только админ");
+                throw ApiException.forbidden("После окончания матча протокол правит только админ");
             }
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
@@ -229,7 +229,7 @@ public class RefereeMatchService {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() == MatchStatus.FINISHED) {
             if (!principal.hasRole(Role.ADMIN)) {
-                throw ApiException.forbidden("После финального свистка протокол правит только админ");
+                throw ApiException.forbidden("После окончания матча протокол правит только админ");
             }
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Cannot void events for this match status");

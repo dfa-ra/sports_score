@@ -10,10 +10,10 @@ const { copied, copy } = useCopy()
     type="button"
     class="copy-chip"
     :class="{ done: copied }"
-    :title="copied ? 'Уже в кармане' : 'Скопировать'"
+    :title="copied ? 'Скопировано' : 'Скопировать'"
     @click="copy(props.value)"
   >
     <span aria-hidden="true">{{ copied ? '✓' : '⎘' }}</span>
-    <span>{{ copied ? 'Скопировано. Не хвастайтесь слишком громко.' : (label || value) }}</span>
+    <span>{{ copied ? 'Скопировано' : (label || value) }}</span>
   </button>
 </template>

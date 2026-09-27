@@ -171,7 +171,7 @@ async function disbandTeam() {
 
     <div v-else class="panel stack">
       <h2>Состав</h2>
-      <EmptyState v-if="!members.length" title="Раздевалка пуста" text="Капитан ещё собирает людей после пар." />
+      <EmptyState v-if="!members.length" title="В составе никого нет" />
       <div v-for="m in members" :key="m.id" class="member">
         <RouterLink :to="`/players/${m.playerId}`">
           <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>

@@ -292,7 +292,7 @@ onUnmounted(() => client?.deactivate())
             </div>
           </section>
         </template>
-        <p v-else class="empty-line">Пока ни гола, ни карточки.</p>
+        <p v-else class="empty-line">Событий нет.</p>
       </div>
       <div class="stack recent">
         <div class="panel">
@@ -333,7 +333,7 @@ onUnmounted(() => client?.deactivate())
       <div v-if="referees.length || auth.canOfficiate" class="panel stack">
         <h2>Бригада</h2>
         <p v-for="r in referees" :key="r.id" class="muted">Судья {{ r.refereeEmail || r.refereeId }}</p>
-        <p v-if="!referees.length" class="muted">Судья ещё не назначен — свисток сам себя не найдёт.</p>
+        <p v-if="!referees.length" class="muted">Судья не назначен.</p>
         <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
       </div>
     </div>
@@ -359,7 +359,6 @@ onUnmounted(() => client?.deactivate())
 
     <div v-else class="panel">
       <h2>Протокол</h2>
-      <p class="muted">Как у SofaScore, только без рекламы буклинии и с характером общаги.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id">
           <span class="t">{{ formatClock(ev.gameTime) }}</span>

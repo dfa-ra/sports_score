@@ -57,7 +57,7 @@ function save() {
         {{ side.teamName }}
       </h3>
       <p class="muted">
-        {{ side.confirmed ? 'Стартовый состав записан' : 'Капитан ещё не написал, кто выходит с первой минуты' }}
+        {{ side.confirmed ? 'Стартовый состав записан' : 'Состав не подан' }}
       </p>
     </header>
 
@@ -74,7 +74,7 @@ function save() {
 
     <section v-if="!editable">
       <h4>Скамейка</h4>
-      <p v-if="!side.bench?.length" class="muted">Пусто. Либо все в основе, либо ещё делают лабу.</p>
+      <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
         <span>{{ p.name }}</span>

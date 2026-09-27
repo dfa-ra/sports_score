@@ -60,7 +60,7 @@ async function submit() {
     })
     router.push('/')
   } catch (e: any) {
-    error.value = e.response?.data?.message || 'Регистрация споткнулась. Проверьте ФИО, роль и фото.'
+    error.value = e.response?.data?.message || 'Не удалось зарегистрироваться. Проверьте данные.'
   } finally {
     pending.value = false
   }
@@ -71,8 +71,7 @@ async function submit() {
   <section class="auth-wrap rise">
     <div class="panel stack card">
       <div class="page-title">
-        <p class="eyebrow">Регистрация</p>
-        <h1>Студент лиги</h1>
+        <h1>Регистрация</h1>
         <p>ФИО и почта обязательны. Можно выбрать несколько ролей. Игрок, капитан и судья прикладывают фото. Роли подтверждает админ.</p>
       </div>
       <form class="stack" @submit.prevent="submit">
@@ -128,7 +127,7 @@ async function submit() {
 
         <p v-if="error" class="form-error">{{ error }}</p>
         <button class="btn success" type="submit" :disabled="pending || (needsPhoto && !photoUrl)">
-          {{ pending ? 'Печатаем бейдж…' : 'Создать аккаунт' }}
+          {{ pending ? 'Создаём…' : 'Создать аккаунт' }}
         </button>
       </form>
       <p class="muted">Уже есть аккаунт? <RouterLink to="/login">Войти</RouterLink></p>

@@ -64,7 +64,7 @@ async function loadTeams() {
 async function submit() {
   error.value = ''
   if (homeTeamId.value === awayTeamId.value) {
-    error.value = 'Две одинаковые команды — это тренировка, не матч.'
+    error.value = 'Команды должны быть разными.'
     return
   }
   pending.value = true
@@ -120,7 +120,7 @@ async function submit() {
         <input v-model.number="periodLengthMinutes" type="number" min="1" max="90" required />
       </label>
     </div>
-    <p class="muted">По умолчанию — два тайма по 20 минут, как на студенческом поле после пар.</p>
+    <p class="muted">По умолчанию — два тайма по 20 минут.</p>
     <p v-if="!approved.length" class="muted">Сначала допустите хотя бы две команды в турнир.</p>
     <p v-if="error" class="form-error">{{ error }}</p>
     <button class="btn" type="submit" :disabled="pending || approved.length < 2">

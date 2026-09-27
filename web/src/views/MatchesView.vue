@@ -19,7 +19,7 @@ onMounted(async () => {
     const { data } = await api.get('/matches', { params: { size: 50, sort: 'scheduledAt,desc' } })
     items.value = data.content
   } catch (e: any) {
-    error.value = e.response?.data?.message || 'Матчи спрятались. Попробуем ещё раз чуть позже.'
+    error.value = e.response?.data?.message || 'Не удалось загрузить матчи.'
   } finally {
     loading.value = false
   }
@@ -36,7 +36,6 @@ const visible = computed(() => {
   <section class="stack">
     <div class="page-title">
       <h1>Матчи</h1>
-      <p>Live и расписание. Смотреть можно без регистрации.</p>
     </div>
     <div class="filters">
       <button class="btn secondary" :class="{ on: filter === 'ALL' }" @click="filter = 'ALL'">Все</button>
@@ -48,7 +47,7 @@ const visible = computed(() => {
     <div v-if="loading" class="grid cards">
       <div v-for="n in 4" :key="n" class="skeleton" />
     </div>
-    <EmptyState v-else-if="!visible.length" title="Пока тишина" text="Ни одного матча в этом фильтре. Можно подождать или выбрать другой." />
+    <EmptyState v-else-if="!visible.length" title="Матчей нет" />
     <div v-else class="grid cards">
       <RouterLink
         v-for="m in visible"

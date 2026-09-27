@@ -23,7 +23,7 @@ async function submit() {
     await auth.login(email.value, password.value)
     router.push((router.currentRoute.value.query.redirect as string) || '/')
   } catch (e: any) {
-    error.value = e.response?.data?.message || 'Не пускает. Проверьте почту и пароль.'
+    error.value = e.response?.data?.message || 'Неверный email или пароль.'
   } finally {
     pending.value = false
   }
@@ -36,12 +36,6 @@ async function submit() {
       <aside class="promo">
         <img class="promo-logo" :src="BRAND_MARK_SRC" alt="" />
         <p class="eyebrow">{{ SITE_NAME }}</p>
-        <h1>Одна лига для игроков, судей и трибуны</h1>
-        <ul>
-          <li>Смотреть live и таблицу без регистрации</li>
-          <li>Играть и судить после подтверждения роли</li>
-          <li>Календарь и статистика как на большом сайте</li>
-        </ul>
       </aside>
       <div class="panel stack card">
         <h2>Вход</h2>

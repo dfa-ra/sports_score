@@ -5,9 +5,7 @@ import { RouterLink } from 'vue-router'
 <template>
   <section class="lost rise">
     <div class="panel stack">
-      <p class="eyebrow">Офсайд</p>
       <h1>Такой страницы нет</h1>
-      <p>Либо свисток ещё не прозвучал, либо кто-то придумал свой маршрут. Вернёмся на поле.</p>
       <div class="cta">
         <RouterLink class="btn" to="/">На главную</RouterLink>
         <RouterLink class="btn secondary" to="/matches">К матчам</RouterLink>

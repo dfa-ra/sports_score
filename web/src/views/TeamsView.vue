@@ -28,7 +28,6 @@ onMounted(load)
   <section class="stack">
     <div class="page-title">
       <h1>Команды</h1>
-      <p>Составы и капитаны студенческой лиги. Смотреть можно всем.</p>
     </div>
     <div v-if="auth.canManageLeague" class="toolbar">
       <button class="btn" @click="showForm = !showForm">{{ showForm ? 'Скрыть форму' : 'Создать команду' }}</button>
@@ -39,12 +38,12 @@ onMounted(load)
     <div v-if="loading" class="grid cards">
       <div v-for="n in 4" :key="n" class="skeleton" />
     </div>
-    <EmptyState v-else-if="!items.length" title="Пока без эмблем" text="Первая команда может назвать себя как угодно. Кроме «Без названия»." />
+    <EmptyState v-else-if="!items.length" title="Команд нет" />
     <div v-else class="grid cards">
       <RouterLink v-for="t in items" :key="t.id" class="panel card-link" :to="`/teams/${t.id}`">
         <TeamCrest :src="t.logoUrl" :name="t.shortName || t.name" :size="42" />
         <h2>{{ t.name }}</h2>
-        <p>{{ t.shortName || 'без короткого имени — тоже стиль' }}</p>
+        <p v-if="t.shortName">{{ t.shortName }}</p>
       </RouterLink>
     </div>
   </section>
