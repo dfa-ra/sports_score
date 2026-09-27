@@ -39,7 +39,7 @@ class TournamentTablesIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"ITMO Groups","sportId":"%s","seasonYear":2026,"format":"GROUPS_PLAYOFF","status":"ACTIVE"}
+                                {"name":"ITMO Groups","sportId":"%s","seasonYear":2026,"format":"GROUPS_PLAYOFF","status":"REGISTRATION"}
                                 """.formatted(sportId)))
                 .andExpect(status().isCreated())
                 .andReturn();
