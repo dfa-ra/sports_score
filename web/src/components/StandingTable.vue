@@ -28,49 +28,89 @@ function rankClass(index: number) {
 </script>
 
 <template>
-  <div class="table-wrap">
-    <table class="table dense">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Команда</th>
-          <th>И</th>
-          <th v-if="!compact" class="wide">В</th>
-          <th v-if="!compact" class="wide">Н</th>
-          <th v-if="!compact" class="wide">П</th>
-          <th>Г</th>
-          <th>О</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, i) in ranked" :key="row.teamId">
-          <td>
-            <span class="rank" :class="rankClass(i)">{{ i + 1 }}</span>
-          </td>
-          <td>
-            <RouterLink class="club" :to="`/teams/${row.teamId}`">
-              <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
-              <b>{{ row.teamName }}</b>
-            </RouterLink>
-          </td>
-          <td>{{ row.played }}</td>
-          <td v-if="!compact" class="wide">{{ row.wins }}</td>
-          <td v-if="!compact" class="wide">{{ row.draws }}</td>
-          <td v-if="!compact" class="wide">{{ row.losses }}</td>
-          <td>{{ row.goalsFor }}:{{ row.goalsAgainst }}</td>
-          <td><strong>{{ row.points }}</strong></td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="board" :class="{ compact }">
+    <div class="line head">
+      <span>#</span>
+      <span class="team-label">Команда</span>
+      <span>И</span>
+      <span v-if="!compact" class="wide">В</span>
+      <span v-if="!compact" class="wide">Н</span>
+      <span v-if="!compact" class="wide">П</span>
+      <span>Г</span>
+      <span>О</span>
+    </div>
+    <RouterLink
+      v-for="(row, i) in ranked"
+      :key="row.teamId"
+      class="line"
+      :to="`/teams/${row.teamId}`"
+    >
+      <span>
+        <span class="rank" :class="rankClass(i)">{{ i + 1 }}</span>
+      </span>
+      <span class="club">
+        <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
+        <b>{{ row.teamName }}</b>
+      </span>
+      <span>{{ row.played }}</span>
+      <span v-if="!compact" class="wide">{{ row.wins }}</span>
+      <span v-if="!compact" class="wide">{{ row.draws }}</span>
+      <span v-if="!compact" class="wide">{{ row.losses }}</span>
+      <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
+      <span class="points">{{ row.points }}</span>
+    </RouterLink>
   </div>
 </template>
 
 <style scoped>
-.dense th, .dense td { padding: 0.58rem 0.35rem; }
+.board { width: 100%; }
+.line {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem;
+  align-items: center;
+  min-height: 2.65rem;
+  padding: 0 0.85rem;
+  border-bottom: 1px solid var(--line);
+  color: inherit;
+  text-decoration: none;
+}
+.compact .line {
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem;
+}
+.line > span:not(.club):not(.team-label) {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.line:not(.head):hover { background: rgba(76, 180, 229, 0.08); }
+.team-label { text-align: left; }
+.head {
+  min-height: 2.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.line:last-child { border-bottom: 0; }
+.club {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+  min-width: 0;
+  text-align: left;
+}
+.club b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.points { font-weight: 800; }
 .rank {
   width: 1.35rem;
   height: 1.35rem;
-  display: grid;
+  display: inline-grid;
   place-items: center;
   border-radius: 50%;
   font-size: 0.7rem;
@@ -79,21 +119,12 @@ function rankClass(index: number) {
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
 .rank.navy { background: var(--navy); color: #fff; }
-.club {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 0.45rem;
-  align-items: center;
-  color: inherit;
-  min-width: 0;
-}
-.club b {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 @media (max-width: 640px) {
+  .line,
+  .compact .line {
+    grid-template-columns: 2.2rem minmax(0, 1fr) 1.8rem 3.4rem 2.1rem;
+    padding: 0 0.55rem;
+  }
   .wide { display: none; }
 }
 </style>
