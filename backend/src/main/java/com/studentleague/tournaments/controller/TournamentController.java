@@ -8,9 +8,11 @@ import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.dto.CalendarImportResponse;
 import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
-import com.studentleague.tournaments.dto.StandingRow;
+import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
+import com.studentleague.tournaments.dto.TournamentStandingsResponse;
+import com.studentleague.tournaments.dto.TournamentTableResponse;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
 import com.studentleague.tournaments.service.CalendarImportService;
@@ -139,9 +141,25 @@ public class TournamentController {
         return tournamentService.listTeams(id);
     }
 
+    @GetMapping("/{id}/tables")
+    @Operation(summary = "Tournament group tables and team assignments")
+    public List<TournamentTableResponse> tables(@PathVariable UUID id) {
+        return tournamentService.listTables(id);
+    }
+
+    @PutMapping("/{id}/tables")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Replace tournament group tables (ADMIN)")
+    public List<TournamentTableResponse> replaceTables(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReplaceTournamentTablesRequest request
+    ) {
+        return tournamentService.replaceTables(id, request);
+    }
+
     @GetMapping("/{id}/standings")
-    @Operation(summary = "Tournament standings from finished matches")
-    public List<StandingRow> standings(@PathVariable UUID id) {
+    @Operation(summary = "Tournament standings from finished matches, grouped by tables")
+    public TournamentStandingsResponse standings(@PathVariable UUID id) {
         return tournamentService.standings(id);
     }
 

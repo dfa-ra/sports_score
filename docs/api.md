@@ -170,7 +170,9 @@ Auth: `Authorization: Bearer <access_token>`
 | POST | `/tournaments/{id}/teams` | CAPTAIN — заявка своей команды |
 | POST | `/tournaments/{id}/teams/{teamId}/approve` | ADMIN |
 | DELETE | `/tournaments/{id}/teams/{teamId}` | ADMIN — исключение |
-| GET | `/tournaments/{id}/standings` | Auth |
+| GET | `/tournaments/{id}/tables` | Публичный — группы турнира и команды в каждой |
+| PUT | `/tournaments/{id}/tables` | ADMIN — заменить набор таблиц: `{ tables: [{ name, teamIds }] }`. Пустой список снимает группы |
+| GET | `/tournaments/{id}/standings` | Публичный. `{ tables: [{ id, name, sortOrder, rows }] }`. Без групп — одна общая таблица |
 | GET | `/tournaments/{id}/matches` | Auth |
 
 ---

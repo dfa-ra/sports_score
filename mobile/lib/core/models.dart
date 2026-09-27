@@ -91,6 +91,59 @@ class TournamentBrief {
   }
 }
 
+class StandingTable {
+  StandingTable({this.id, this.name, required this.rows});
+
+  final String? id;
+  final String? name;
+  final List<StandingRow> rows;
+
+  factory StandingTable.fromJson(Map<String, dynamic> json) {
+    return StandingTable(
+      id: json['id']?.toString(),
+      name: json['name']?.toString(),
+      rows: ((json['rows'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => StandingRow.fromJson(Map<String, dynamic>.from(item)))
+          .toList(),
+    );
+  }
+
+  static List<StandingTable> parse(dynamic data) {
+    if (data is List) {
+      if (data.isNotEmpty && data.first is Map && (data.first as Map).containsKey('rows')) {
+        return data
+            .whereType<Map>()
+            .map((item) => StandingTable.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+      return [
+        StandingTable(
+          rows: data
+              .whereType<Map>()
+              .map((item) => StandingRow.fromJson(Map<String, dynamic>.from(item)))
+              .toList(),
+        ),
+      ];
+    }
+    if (data is Map && data['tables'] is List) {
+      return (data['tables'] as List)
+          .whereType<Map>()
+          .map((item) => StandingTable.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    }
+    return const [];
+  }
+
+  static int compareRows(StandingRow a, StandingRow b) {
+    final points = b.points - a.points;
+    if (points != 0) return points;
+    final gd = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
+    if (gd != 0) return gd;
+    return b.goalsFor - a.goalsFor;
+  }
+}
+
 class StandingRow {
   StandingRow({
     required this.teamId,

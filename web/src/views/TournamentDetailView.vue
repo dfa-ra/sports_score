@@ -9,9 +9,10 @@ import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
-import StandingTable from '../components/StandingTable.vue'
+import StandingGroups from '../components/StandingGroups.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const route = useRoute()
@@ -19,7 +20,8 @@ const auth = useAuthStore()
 const names = useTeamDirectory()
 const tournament = ref<any>(null)
 const teams = ref<any[]>([])
-const standings = ref<any[]>([])
+const standings = ref<StandingGroup[]>([])
+const tableDraft = ref<{ name: string; teamIds: string[] }[]>([])
 const matches = ref<any[]>([])
 const name = ref('')
 const description = ref('')
@@ -46,15 +48,20 @@ onMounted(load)
 async function load() {
   const id = route.params.id
   await names.load()
-  const [t, teamRes, standingRes, matchRes] = await Promise.all([
+  const [t, teamRes, standingRes, matchRes, tableRes] = await Promise.all([
     api.get(`/tournaments/${id}`),
     api.get(`/tournaments/${id}/teams`),
     api.get(`/tournaments/${id}/standings`),
     api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
+    api.get(`/tournaments/${id}/tables`),
   ])
   tournament.value = t.data
   teams.value = teamRes.data
-  standings.value = standingRes.data
+  standings.value = parseStandings(standingRes.data)
+  tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
+    name: row.name,
+    teamIds: (row.teamIds ?? []).map(String),
+  }))
   matches.value = matchRes.data.content ?? []
   name.value = t.data.name
   description.value = t.data.description || ''
@@ -114,6 +121,52 @@ async function importCalendar() {
   }
 }
 
+const LETTERS = 'ABCDEFGHIJKLMNOP'
+
+function setTableCount(count: number) {
+  const next = Math.max(0, Math.min(16, Number(count) || 0))
+  const draft = tableDraft.value.slice(0, next)
+  while (draft.length < next) {
+    draft.push({ name: `Группа ${LETTERS[draft.length] || draft.length + 1}`, teamIds: [] })
+  }
+  tableDraft.value = draft
+}
+
+function toggleTeam(tableIndex: number, teamId: string) {
+  tableDraft.value = tableDraft.value.map((table, i) => {
+    const has = table.teamIds.includes(teamId)
+    if (i === tableIndex) {
+      return { ...table, teamIds: has ? table.teamIds.filter((id) => id !== teamId) : [...table.teamIds, teamId] }
+    }
+    return has ? { ...table, teamIds: table.teamIds.filter((id) => id !== teamId) } : table
+  })
+}
+
+function teamInTable(teamId: string) {
+  return tableDraft.value.findIndex((table) => table.teamIds.includes(teamId))
+}
+
+async function saveTables() {
+  error.value = ''
+  pending.value = true
+  try {
+    await api.put(`/tournaments/${tournament.value.id}/tables`, {
+      tables: tableDraft.value.map((table) => ({
+        name: table.name.trim(),
+        teamIds: table.teamIds,
+      })),
+    })
+    ok.value = 'Таблицы турнира сохранены.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
+
 async function exclude(id: string) {
   pending.value = true
   try {
@@ -153,9 +206,9 @@ async function exclude(id: string) {
       <p style="white-space: pre-wrap">{{ tournament.regulations || 'Регламент ещё не опубликован.' }}</p>
     </div>
     <div v-if="tab === 'table'" class="panel">
-      <h2>Таблица</h2>
-      <EmptyState v-if="!standings.length" title="Ещё рано считать" text="Очки появятся после первых свистков." />
-      <StandingTable v-else :rows="standings" />
+      <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
+      <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Ещё рано считать" text="Очки появятся после первых свистков." />
+      <StandingGroups v-else :tables="standings" />
     </div>
 
     <div class="panel stack">
@@ -218,6 +271,39 @@ async function exclude(id: string) {
         <button class="btn secondary" type="submit" :disabled="pending">Сохранить</button>
       </form>
 
+      <h2>Таблицы и группы</h2>
+      <p class="muted">Сколько таблиц показать и какие команды в какой. Матчи между разными таблицами в зачёт группы не идут.</p>
+      <label class="field">Количество таблиц
+        <input
+          type="number"
+          min="0"
+          max="16"
+          :value="tableDraft.length"
+          @input="setTableCount(Number(($event.target as HTMLInputElement).value))"
+        />
+      </label>
+      <div v-for="(table, i) in tableDraft" :key="i" class="group-edit">
+        <label class="field">Название
+          <input v-model="table.name" maxlength="200" />
+        </label>
+        <div class="team-picks">
+          <label v-for="team in assignableTeams" :key="team.teamId" class="pick">
+            <input
+              type="checkbox"
+              :checked="table.teamIds.includes(team.teamId)"
+              @change="toggleTeam(i, team.teamId)"
+            />
+            <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="18" />
+            <span>{{ team.teamName }}</span>
+          </label>
+        </div>
+      </div>
+      <p v-if="assignableTeams.some((team) => teamInTable(team.teamId) < 0) && tableDraft.length" class="muted">
+        Без таблицы:
+        {{ assignableTeams.filter((team) => teamInTable(team.teamId) < 0).map((team) => team.teamName).join(', ') }}
+      </p>
+      <button class="btn secondary" type="button" :disabled="pending" @click="saveTables">Сохранить таблицы</button>
+
       <h2>Заявки</h2>
       <div v-for="team in teams" :key="`admin-${team.id}`" class="row">
         <span class="club">
@@ -268,5 +354,22 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
+}
+.group-edit {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.team-picks {
+  display: grid;
+  gap: 0.35rem;
+}
+.pick {
+  display: grid;
+  grid-template-columns: auto 18px 1fr;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--text-strong);
 }
 </style>

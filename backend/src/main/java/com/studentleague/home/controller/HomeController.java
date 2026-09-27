@@ -39,7 +39,7 @@ public class HomeController {
         TournamentResponse tournament = tournamentService.current();
         return new HomeFeedResponse(
                 tournament,
-                tournament == null ? List.of() : tournamentService.standings(tournament.id()),
+                tournament == null ? List.of() : tournamentService.standings(tournament.id()).tables(),
                 tournament == null ? statisticsService.scorers(null, 5) : statisticsService.scorers(tournament.id(), 5),
                 tournament == null ? statisticsService.assists(null, 5) : statisticsService.assists(tournament.id(), 5),
                 galleryService.enabledSlot(GallerySlot.HERO),

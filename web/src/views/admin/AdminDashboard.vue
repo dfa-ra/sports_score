@@ -472,7 +472,7 @@ h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
   border-bottom: 1px solid var(--line);
 }
 .slide-row img { width: 72px; height: 48px; object-fit: cover; border-radius: 8px; }
-.grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
 .check { display: inline-flex; align-items: center; gap: 0.4rem; }
 .roles { display: flex; flex-wrap: wrap; gap: 0.45rem 0.85rem; align-items: center; }
 .name, .pending { display: block; margin-top: 0.2rem; }

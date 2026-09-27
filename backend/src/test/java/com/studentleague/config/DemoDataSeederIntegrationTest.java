@@ -42,7 +42,8 @@ class DemoDataSeederIntegrationTest {
         mockMvc.perform(get("/api/v1/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tournament.name").value("Студенческий кубок 2026"))
-                .andExpect(jsonPath("$.standings.length()").value(8))
+                .andExpect(jsonPath("$.standings.length()").value(1))
+                .andExpect(jsonPath("$.standings[0].rows.length()").value(8))
                 .andExpect(jsonPath("$.scorers.length()").value(5))
                 .andExpect(jsonPath("$.assists.length()").value(5));
 

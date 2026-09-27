@@ -142,7 +142,8 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings")
                         .header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.tables.length()").value(1))
+                .andExpect(jsonPath("$.tables[0].rows.length()").value(2));
 
         mockMvc.perform(delete("/api/v1/tournaments/" + tournamentId + "/teams/" + teamB)
                         .header("Authorization", auth(adminToken)))

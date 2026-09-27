@@ -15,7 +15,7 @@ class LeagueStore extends ChangeNotifier {
   final Map<String, String> tournamentNames = {};
   List<TournamentBrief> tournaments = [];
   List<LeagueMatch> matches = [];
-  List<StandingRow> standings = [];
+  List<StandingTable> standingTables = [];
   List<PlayerStat> scorers = [];
   List<PlayerStat> assists = [];
   List<PlayerStat> keepers = [];
@@ -115,17 +115,15 @@ class LeagueStore extends ChangeNotifier {
       if (results[0] is Map) {
         tournamentName = (results[0] as Map)['name']?.toString();
       }
-      standings = ((results[1] as List?) ?? const [])
-          .whereType<Map>()
-          .map((item) => StandingRow.fromJson(Map<String, dynamic>.from(item)))
-          .toList()
-        ..sort((a, b) {
-          final points = b.points - a.points;
-          if (points != 0) return points;
-          final gd = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
-          if (gd != 0) return gd;
-          return b.goalsFor - a.goalsFor;
-        });
+      standingTables = StandingTable.parse(results[1])
+          .map(
+            (table) => StandingTable(
+              id: table.id,
+              name: table.name,
+              rows: [...table.rows]..sort(StandingTable.compareRows),
+            ),
+          )
+          .toList();
       scorers = ((results[2] as List?) ?? const [])
           .whereType<Map>()
           .map((item) => PlayerStat.fromJson(Map<String, dynamic>.from(item), 'goals'))

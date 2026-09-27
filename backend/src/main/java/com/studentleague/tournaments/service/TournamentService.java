@@ -16,16 +16,23 @@ import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
+import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.StandingRow;
+import com.studentleague.tournaments.dto.StandingTableResponse;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
+import com.studentleague.tournaments.dto.TournamentStandingsResponse;
+import com.studentleague.tournaments.dto.TournamentTableResponse;
+import com.studentleague.tournaments.dto.TournamentTableWriteRequest;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
 import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.format.StandingsContext;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
 import org.springframework.data.domain.Page;
@@ -34,8 +41,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +56,7 @@ public class TournamentService {
 
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
+    private final TournamentTableRepository tournamentTableRepository;
     private final SportRepository sportRepository;
     private final TeamRepository teamRepository;
     private final PlayerProfileRepository playerProfileRepository;
@@ -55,6 +67,7 @@ public class TournamentService {
     public TournamentService(
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
+            TournamentTableRepository tournamentTableRepository,
             SportRepository sportRepository,
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
@@ -64,6 +77,7 @@ public class TournamentService {
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
+        this.tournamentTableRepository = tournamentTableRepository;
         this.sportRepository = sportRepository;
         this.teamRepository = teamRepository;
         this.playerProfileRepository = playerProfileRepository;
@@ -234,7 +248,70 @@ public class TournamentService {
     }
 
     @Transactional(readOnly = true)
-    public List<StandingRow> standings(UUID tournamentId) {
+    public List<TournamentTableResponse> listTables(UUID tournamentId) {
+        requireTournament(tournamentId);
+        List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
+        return tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId).stream()
+                .map(table -> toTableResponse(table, entries))
+                .toList();
+    }
+
+    @Transactional
+    public List<TournamentTableResponse> replaceTables(UUID tournamentId, ReplaceTournamentTablesRequest request) {
+        requireTournament(tournamentId);
+        List<TournamentTableWriteRequest> specs = request.tables() == null ? List.of() : request.tables();
+        if (specs.size() > 16) {
+            throw ApiException.badRequest("Не больше 16 таблиц в турнире");
+        }
+
+        List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
+        Map<UUID, TournamentTeam> byTeamId = entries.stream()
+                .collect(Collectors.toMap(TournamentTeam::getTeamId, Function.identity()));
+        Set<UUID> seen = new HashSet<>();
+        for (TournamentTableWriteRequest spec : specs) {
+            String name = spec.name() == null ? "" : spec.name().trim();
+            if (name.isBlank()) {
+                throw ApiException.badRequest("У каждой таблицы должно быть название");
+            }
+            List<UUID> teamIds = spec.teamIds() == null ? List.of() : spec.teamIds();
+            for (UUID teamId : teamIds) {
+                if (!seen.add(teamId)) {
+                    throw ApiException.badRequest("Команда не может быть сразу в двух таблицах");
+                }
+                if (!byTeamId.containsKey(teamId)) {
+                    throw ApiException.badRequest("Команда не заявлена в этот турнир");
+                }
+            }
+        }
+
+        for (TournamentTeam entry : entries) {
+            entry.setTableId(null);
+        }
+        tournamentTeamRepository.saveAll(entries);
+        tournamentTableRepository.deleteAll(
+                tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId)
+        );
+        tournamentTableRepository.flush();
+
+        List<TournamentTable> created = new ArrayList<>();
+        for (int i = 0; i < specs.size(); i++) {
+            TournamentTableWriteRequest spec = specs.get(i);
+            TournamentTable table = new TournamentTable();
+            table.setTournamentId(tournamentId);
+            table.setName(spec.name().trim());
+            table.setSortOrder(i);
+            created.add(tournamentTableRepository.save(table));
+            List<UUID> teamIds = spec.teamIds() == null ? List.of() : spec.teamIds();
+            for (UUID teamId : teamIds) {
+                byTeamId.get(teamId).setTableId(table.getId());
+            }
+        }
+        tournamentTeamRepository.saveAll(entries);
+        return created.stream().map(table -> toTableResponse(table, entries)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TournamentStandingsResponse standings(UUID tournamentId) {
         Tournament tournament = requireTournament(tournamentId);
         List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
         List<Match> finished = matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
@@ -245,9 +322,32 @@ public class TournamentService {
             teams.computeIfAbsent(match.getHomeTeamId(), id -> teamRepository.findById(id).orElse(null));
             teams.computeIfAbsent(match.getAwayTeamId(), id -> teamRepository.findById(id).orElse(null));
         }
-        teams.values().removeIf(java.util.Objects::isNull);
-        return formatRegistry.handler(tournament.getFormat())
-                .standings(new StandingsContext(tournament, entries, finished, teams));
+        teams.values().removeIf(Objects::isNull);
+
+        List<TournamentTable> tables = tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId);
+        if (tables.isEmpty()) {
+            List<StandingRow> rows = formatRegistry.handler(tournament.getFormat())
+                    .standings(new StandingsContext(tournament, entries, finished, teams));
+            return new TournamentStandingsResponse(List.of(new StandingTableResponse(null, null, 0, rows)));
+        }
+
+        List<StandingTableResponse> result = new ArrayList<>();
+        for (TournamentTable table : tables) {
+            List<TournamentTeam> groupEntries = entries.stream()
+                    .filter(entry -> table.getId().equals(entry.getTableId()))
+                    .toList();
+            Set<UUID> groupTeamIds = groupEntries.stream()
+                    .map(TournamentTeam::getTeamId)
+                    .collect(Collectors.toSet());
+            List<Match> intra = finished.stream()
+                    .filter(match -> groupTeamIds.contains(match.getHomeTeamId())
+                            && groupTeamIds.contains(match.getAwayTeamId()))
+                    .toList();
+            List<StandingRow> rows = formatRegistry.handler(tournament.getFormat())
+                    .standings(new StandingsContext(tournament, groupEntries, intra, teams));
+            result.add(new StandingTableResponse(table.getId(), table.getName(), table.getSortOrder(), rows));
+        }
+        return new TournamentStandingsResponse(result);
     }
 
     private Tournament requireTournament(UUID id) {
@@ -266,7 +366,17 @@ public class TournamentService {
     private TournamentTeamResponse toTeamResponse(TournamentTeam entry, String teamName) {
         return new TournamentTeamResponse(
                 entry.getId(), entry.getTournamentId(), entry.getTeamId(), teamName,
-                entry.getStatus(), entry.getRegisteredAt(), entry.getApprovedAt()
+                entry.getTableId(), entry.getStatus(), entry.getRegisteredAt(), entry.getApprovedAt()
+        );
+    }
+
+    private TournamentTableResponse toTableResponse(TournamentTable table, List<TournamentTeam> entries) {
+        List<UUID> teamIds = entries.stream()
+                .filter(entry -> table.getId().equals(entry.getTableId()))
+                .map(TournamentTeam::getTeamId)
+                .toList();
+        return new TournamentTableResponse(
+                table.getId(), table.getTournamentId(), table.getName(), table.getSortOrder(), teamIds
         );
     }
 

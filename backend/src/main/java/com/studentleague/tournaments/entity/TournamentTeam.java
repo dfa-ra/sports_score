@@ -25,6 +25,9 @@ public class TournamentTeam {
     @Column(name = "team_id", nullable = false)
     private UUID teamId;
 
+    @Column(name = "table_id")
+    private UUID tableId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private TournamentTeamStatus status;
@@ -67,6 +70,14 @@ public class TournamentTeam {
 
     public void setTeamId(UUID teamId) {
         this.teamId = teamId;
+    }
+
+    public UUID getTableId() {
+        return tableId;
+    }
+
+    public void setTableId(UUID tableId) {
+        this.tableId = tableId;
     }
 
     public TournamentTeamStatus getStatus() {
