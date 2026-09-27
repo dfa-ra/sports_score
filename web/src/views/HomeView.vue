@@ -4,7 +4,8 @@ import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
-import StandingTable from '../components/StandingTable.vue'
+import StandingGroups from '../components/StandingGroups.vue'
+import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { SITE_NAME } from '../lib/brand'
 
@@ -38,6 +39,7 @@ const tape = computed(() =>
     .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
     .slice(0, 8)
 )
+const homeTables = computed(() => parseStandings(feed.value?.standings))
 
 onMounted(async () => {
   try {
@@ -198,8 +200,8 @@ function heroHeading(slide: Slide | null | undefined) {
             <p class="eyebrow">Таблица</p>
             <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
           </div>
-          <EmptyState v-if="loaded && !feed?.standings?.length" title="Нет строк" text="Когда админ запустит турнир — таблица появится здесь." />
-          <StandingTable v-else-if="feed?.standings?.length" :rows="feed.standings" compact />
+          <EmptyState v-if="loaded && !standingGroupsHaveRows(homeTables)" title="Нет строк" text="Когда админ запустит турнир — таблица появится здесь." />
+          <StandingGroups v-else-if="standingGroupsHaveRows(homeTables)" :tables="homeTables" compact />
         </div>
 
         <aside class="panel headlines">

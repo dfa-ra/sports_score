@@ -7,6 +7,7 @@ import MatchRow from '../components/MatchRow.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
+import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'players'
@@ -17,7 +18,7 @@ const router = useRouter()
 const teams = useTeamDirectory()
 const tournaments = ref<any[]>([])
 const tournamentId = ref('')
-const standings = ref<any[]>([])
+const standings = ref<StandingGroup[]>([])
 const matches = ref<any[]>([])
 const scorers = ref<any[]>([])
 const assists = ref<any[]>([])
@@ -103,7 +104,7 @@ async function load() {
       api.get('/statistics/goalkeepers', { params: { tournamentId: tournamentId.value, limit: 200 } }),
     ])
     tournament.value = t.data
-    standings.value = s.data
+    standings.value = parseStandings(s.data)
     scorers.value = g.data
     assists.value = a.data
     keepers.value = k.data
@@ -140,9 +141,12 @@ async function load() {
     <div v-if="loading" class="skeleton" />
 
     <template v-else-if="tab === 'table'">
-      <EmptyState v-if="!standings.length" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
-      <div v-else class="sheet">
-        <StandingTable :rows="standings" />
+      <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
+      <div v-else class="sheet-stack">
+        <div v-for="(table, i) in standings" :key="table.id || i" class="sheet">
+          <h2 v-if="table.name" class="group-title">{{ table.name }}</h2>
+          <StandingTable :rows="table.rows" />
+        </div>
       </div>
     </template>
 
@@ -267,11 +271,20 @@ async function load() {
 }
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .season { max-width: 360px; margin-top: 0.35rem; }
+.sheet-stack { display: grid; gap: 0.85rem; }
 .sheet {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
+}
+.group-title {
+  margin: 0;
+  padding: 0.75rem 0.85rem 0;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--navy);
 }
 h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .stat-head {

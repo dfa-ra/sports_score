@@ -10,6 +10,7 @@ public record TournamentTeamResponse(
         UUID tournamentId,
         UUID teamId,
         String teamName,
+        UUID tableId,
         TournamentTeamStatus status,
         Instant registeredAt,
         Instant approvedAt

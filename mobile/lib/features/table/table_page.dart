@@ -104,55 +104,67 @@ class _Standings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (store.standings.isEmpty) {
+    final tables = store.standingTables.where((table) => table.rows.isNotEmpty).toList();
+    if (tables.isEmpty) {
       return ListView(children: const [EmptyHint(title: 'Таблица пустая')]);
     }
     return ListView(
       children: [
-        Container(
-          margin: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
-          child: Column(
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Row(
-                  children: [
-                    SizedBox(width: 28, child: Text('#', style: _head)),
-                    Expanded(child: Text('КОМАНДА', style: _head)),
-                    SizedBox(width: 28, child: Text('И', style: _head, textAlign: TextAlign.center)),
-                    SizedBox(width: 48, child: Text('Г', style: _head, textAlign: TextAlign.center)),
-                    SizedBox(width: 28, child: Text('О', style: _head, textAlign: TextAlign.center)),
-                  ],
-                ),
-              ),
-              for (var i = 0; i < store.standings.length; i++)
-                InkWell(
-                  onTap: () => context.push('/teams/${store.standings[i].teamId}'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    child: Row(
-                      children: [
-                        _Rank(index: i),
-                        const SizedBox(width: 6),
-                        TeamMark(name: store.standings[i].teamName, logoUrl: store.teamLogo(store.standings[i].teamId), size: 18),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(store.standings[i].teamName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        ),
-                        SizedBox(width: 28, child: Text('${store.standings[i].played}', textAlign: TextAlign.center)),
-                        SizedBox(width: 48, child: Text('${store.standings[i].goalsFor}:${store.standings[i].goalsAgainst}', textAlign: TextAlign.center)),
-                        SizedBox(
-                          width: 28,
-                          child: Text('${store.standings[i].points}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
-                        ),
-                      ],
+        for (final table in tables)
+          Container(
+            margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (table.name != null && table.name!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: Text(
+                      table.name!,
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, letterSpacing: 0.4),
                     ),
                   ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 28, child: Text('#', style: _head)),
+                      Expanded(child: Text('КОМАНДА', style: _head)),
+                      SizedBox(width: 28, child: Text('И', style: _head, textAlign: TextAlign.center)),
+                      SizedBox(width: 48, child: Text('Г', style: _head, textAlign: TextAlign.center)),
+                      SizedBox(width: 28, child: Text('О', style: _head, textAlign: TextAlign.center)),
+                    ],
+                  ),
                 ),
-            ],
+                for (var i = 0; i < table.rows.length; i++)
+                  InkWell(
+                    onTap: () => context.push('/teams/${table.rows[i].teamId}'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Row(
+                        children: [
+                          _Rank(index: i),
+                          const SizedBox(width: 6),
+                          TeamMark(name: table.rows[i].teamName, logoUrl: store.teamLogo(table.rows[i].teamId), size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(table.rows[i].teamName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                          SizedBox(width: 28, child: Text('${table.rows[i].played}', textAlign: TextAlign.center)),
+                          SizedBox(width: 48, child: Text('${table.rows[i].goalsFor}:${table.rows[i].goalsAgainst}', textAlign: TextAlign.center)),
+                          SizedBox(
+                            width: 28,
+                            child: Text('${table.rows[i].points}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
+        const SizedBox(height: 8),
       ],
     );
   }
