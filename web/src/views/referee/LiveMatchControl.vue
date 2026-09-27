@@ -258,7 +258,7 @@ onUnmounted(() => {
 
     <div class="panel stack">
       <h2>Протокол</h2>
-      <p v-if="!protocol.length" class="muted">Пока тихо.</p>
+      <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
         <span class="t">{{ formatClock(ev.gameTime) }}</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>

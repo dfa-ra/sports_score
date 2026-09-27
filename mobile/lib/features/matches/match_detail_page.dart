@@ -524,7 +524,7 @@ class _LineupCard extends StatelessWidget {
           const SizedBox(height: 10),
           const Text('Основа', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: AppColors.muted)),
           if (side.starters.isEmpty)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Text('Пока все в заявке, без первых номеров.', style: TextStyle(color: AppColors.muted)))
+            const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: Text('Стартовый состав не указан.', style: TextStyle(color: AppColors.muted)))
           else
             for (final p in side.starters) _PlayerLine(player: p),
           const SizedBox(height: 8),

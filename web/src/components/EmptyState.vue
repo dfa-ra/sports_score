@@ -5,7 +5,7 @@ defineProps<{ title: string; text?: string }>()
 <template>
   <div class="empty">
     <strong>{{ title }}</strong>
-    <p>{{ text || 'Пока тихо. Как раздевалка до разминки.' }}</p>
+    <p v-if="text">{{ text }}</p>
     <slot />
   </div>
 </template>

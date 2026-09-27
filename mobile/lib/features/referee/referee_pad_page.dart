@@ -471,7 +471,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
                     const Text('Протокол', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 18)),
                     const SizedBox(height: 8),
                     if (protocol.isEmpty)
-                      const Text('Пока тихо.', style: TextStyle(color: AppColors.muted))
+                      const Text('Событий нет.', style: TextStyle(color: AppColors.muted))
                     else
                       for (final ev in protocol)
                         Opacity(
