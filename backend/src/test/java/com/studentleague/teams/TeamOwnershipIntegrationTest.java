@@ -172,6 +172,11 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(delete("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(adminToken))
+                        .param("purge", "true"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/v1/teams/" + teamId)
                         .header("Authorization", auth(adminToken)))
                 .andExpect(status().isNoContent());
 
@@ -195,6 +200,18 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                                 {"name":"Still Alive"}
                                 """))
                 .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(adminToken))
+                        .param("purge", "true"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/teams/" + teamId))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isEmpty());
     }
 
     @Test

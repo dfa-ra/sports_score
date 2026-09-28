@@ -1,6 +1,9 @@
 package com.studentleague.teams.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.notifications.NotificationEventType;
@@ -39,6 +42,9 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
+    private final MatchRepository matchRepository;
+    private final MatchEventRepository matchEventRepository;
+    private final MatchLineupPlayerRepository matchLineupPlayerRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final UserRepository userRepository;
     private final RoleService roleService;
@@ -48,6 +54,9 @@ public class TeamService {
             TeamRepository teamRepository,
             TeamMemberRepository teamMemberRepository,
             TournamentTeamRepository tournamentTeamRepository,
+            MatchRepository matchRepository,
+            MatchEventRepository matchEventRepository,
+            MatchLineupPlayerRepository matchLineupPlayerRepository,
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             RoleService roleService,
@@ -56,6 +65,9 @@ public class TeamService {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
+        this.matchRepository = matchRepository;
+        this.matchEventRepository = matchEventRepository;
+        this.matchLineupPlayerRepository = matchLineupPlayerRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
         this.roleService = roleService;
@@ -239,6 +251,25 @@ public class TeamService {
                 tournamentTeamRepository.save(entry);
             }
         }
+    }
+
+    @Transactional
+    public void deleteDisbandedTeam(UserPrincipal principal, UUID teamId) {
+        if (!principal.hasRole(Role.ADMIN)) {
+            throw ApiException.forbidden("Удалить команду может только админ");
+        }
+        Team team = requireTeam(teamId);
+        if (!team.isDisbanded()) {
+            throw ApiException.badRequest("Сначала расформируйте команду");
+        }
+        if (matchRepository.existsByHomeTeamIdOrAwayTeamId(teamId, teamId)
+                || matchEventRepository.existsByTeamId(teamId)
+                || matchLineupPlayerRepository.existsByTeamId(teamId)) {
+            throw ApiException.badRequest("Нельзя удалить: у команды есть матчи. История остаётся.");
+        }
+        teamMemberRepository.deleteByTeamId(teamId);
+        tournamentTeamRepository.deleteByTeamId(teamId);
+        teamRepository.delete(team);
     }
 
     private void bindCaptain(Team team, UUID playerId) {

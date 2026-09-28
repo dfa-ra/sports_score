@@ -1,14 +1,18 @@
 package com.studentleague.tournaments;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.support.AbstractIntegrationTest;
 import com.studentleague.users.domain.Role;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -18,6 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     @Test
     void tournamentRegistrationAndMatchScheduling() throws Exception {
@@ -148,6 +155,64 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(delete("/api/v1/tournaments/" + tournamentId + "/teams/" + teamB)
                         .header("Authorization", auth(adminToken)))
                 .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + teamB + "')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + teamA + "')]").isNotEmpty());
+        mockMvc.perform(get("/api/v1/matches/" + matchId))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows.length()").value(1));
+
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s"}
+                                """.formatted(teamB)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/teams/" + teamB + "/approve")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        MvcResult played = mockMvc.perform(post("/api/v1/matches")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tournamentId":"%s","homeTeamId":"%s","awayTeamId":"%s","scheduledAt":"%s"}
+                                """.formatted(tournamentId, teamA, teamB, kickoff)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String playedId = objectMapper.readTree(played.getResponse().getContentAsString()).get("id").asText();
+        var finished = matchRepository.findById(UUID.fromString(playedId)).orElseThrow();
+        finished.setStatus(MatchStatus.FINISHED);
+        finished.setHomeScore(2);
+        finished.setAwayScore(1);
+        matchRepository.saveAndFlush(finished);
+
+        mockMvc.perform(delete("/api/v1/tournaments/" + tournamentId + "/teams/" + teamB)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(get("/api/v1/matches/" + playedId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"));
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows.length()").value(1))
+                .andExpect(jsonPath("$.tables[0].rows[0].teamId").value(teamA))
+                .andExpect(jsonPath("$.tables[0].rows[0].played").value(0));
+
+        mockMvc.perform(delete("/api/v1/teams/" + teamB)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/v1/teams/" + teamB)
+                        .header("Authorization", auth(adminToken))
+                        .param("purge", "true"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/teams/" + teamB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disbanded").value(true));
     }
 
     private String createTeam(String adminToken, String name, String captainPlayerId) throws Exception {

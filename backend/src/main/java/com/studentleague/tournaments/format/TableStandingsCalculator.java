@@ -1,7 +1,6 @@
 package com.studentleague.tournaments.format;
 
 import com.studentleague.matches.entity.Match;
-import com.studentleague.teams.entity.Team;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.StandingRow;
 import com.studentleague.tournaments.entity.TournamentTeam;
@@ -28,10 +27,11 @@ public class TableStandingsCalculator {
             table.put(entry.getTeamId(), new Accumulator(entry.getTeamId(), name));
         }
         for (Match match : context.finishedMatches()) {
-            Accumulator home = table.computeIfAbsent(match.getHomeTeamId(),
-                    id -> new Accumulator(id, teamName(context, id)));
-            Accumulator away = table.computeIfAbsent(match.getAwayTeamId(),
-                    id -> new Accumulator(id, teamName(context, id)));
+            Accumulator home = table.get(match.getHomeTeamId());
+            Accumulator away = table.get(match.getAwayTeamId());
+            if (home == null || away == null) {
+                continue;
+            }
             home.played++;
             away.played++;
             home.goalsFor += match.getHomeScore();
@@ -64,11 +64,6 @@ public class TableStandingsCalculator {
                         s.teamId, s.teamName, s.played, s.wins, s.draws, s.losses,
                         s.goalsFor, s.goalsAgainst, s.points))
                 .toList();
-    }
-
-    private static String teamName(StandingsContext context, UUID teamId) {
-        Team team = context.teams().get(teamId);
-        return team == null ? "Unknown" : team.getName();
     }
 
     private static final class Accumulator {

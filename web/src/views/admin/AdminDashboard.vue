@@ -248,6 +248,23 @@ async function disbandTeam(team: any) {
     pending.value = false
   }
 }
+
+async function deleteTeam(team: any) {
+  if (!team.disbanded) return
+  if (!confirm(`Удалить «${team.name}»? Это можно, только если у команды нет матчей.`)) return
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.delete(`/teams/${team.id}`, { params: { purge: true } })
+    ok.value = `${team.name} удалена.`
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
 </script>
 
 <template>
@@ -363,7 +380,7 @@ async function disbandTeam(team: any) {
       <p class="muted">Название, лого, капитан и дата основания. Расформирование — только отсюда.</p>
       <div v-for="t in teams" :key="t.id" class="row">
         <RouterLink :to="`/teams/${t.id}`">{{ t.name }}</RouterLink>
-        <span v-if="t.disbanded" class="muted">расформирована</span>
+        <button v-if="t.disbanded" class="btn danger" :disabled="pending" @click="deleteTeam(t)">Удалить</button>
         <button v-else class="btn danger" :disabled="pending" @click="disbandTeam(t)">Расформировать</button>
       </div>
       </div>

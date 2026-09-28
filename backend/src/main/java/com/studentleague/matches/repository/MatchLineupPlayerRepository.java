@@ -16,4 +16,8 @@ public interface MatchLineupPlayerRepository extends JpaRepository<MatchLineupPl
     boolean existsByMatchIdAndTeamId(UUID matchId, UUID teamId);
 
     void deleteByMatchIdAndTeamId(UUID matchId, UUID teamId);
+
+    void deleteByMatchId(UUID matchId);
+
+    boolean existsByTeamId(UUID teamId);
 }

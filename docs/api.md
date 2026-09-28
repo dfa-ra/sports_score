@@ -145,7 +145,7 @@ Auth: `Authorization: Bearer <access_token>`
 |---|---|---|
 | GET/POST | `/teams` | Чтение: публичное (без расформированных; `includeDisbanded=true` — все). Создание: игрок/капитан (становится капитаном). ADMIN создавать не может |
 | GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN. Расформированную править нельзя |
-| DELETE | `/teams/{id}` | ADMIN — расформировать (состав снимается, заявки на турниры — WITHDRAWN) |
+| DELETE | `/teams/{id}` | ADMIN — расформировать (состав снимается, заявки на турниры — WITHDRAWN). `?purge=true` — удалить уже расформированную команду, если у неё нет матчей |
 | GET | `/teams/{id}/members` | Публичный |
 | POST | `/teams/{id}/members` | Капитан команды или ADMIN |
 | DELETE | `/teams/{id}/members/{playerId}` | Капитан команды или ADMIN |
@@ -169,7 +169,7 @@ Auth: `Authorization: Bearer <access_token>`
 | GET/PUT | `/tournaments/{id}` | PUT: ADMIN |
 | POST | `/tournaments/{id}/teams` | CAPTAIN — заявка своей команды |
 | POST | `/tournaments/{id}/teams/{teamId}/approve` | ADMIN |
-| DELETE | `/tournaments/{id}/teams/{teamId}` | ADMIN — исключение |
+| DELETE | `/tournaments/{id}/teams/{teamId}` | ADMIN — убрать из турнира полностью: заявка удаляется, несыгранные матчи этой команды в турнире удаляются. Сыгранные матчи остаются в календаре и в таблицу больше не идут |
 | GET | `/tournaments/{id}/tables` | Публичный — группы турнира и команды в каждой |
 | PUT | `/tournaments/{id}/tables` | ADMIN — заменить набор таблиц: `{ tables: [{ name, teamIds }] }`. Пустой список снимает группы |
 | GET | `/tournaments/{id}/standings` | Публичный. `{ tables: [{ id, name, sortOrder, rows }] }`. Без групп — одна общая таблица |

@@ -10,6 +10,8 @@ import java.util.UUID;
 
 public interface MatchEventRepository extends JpaRepository<MatchEvent, UUID> {
     List<MatchEvent> findByMatchIdOrderByTimestampAsc(UUID matchId);
+    void deleteByMatchId(UUID matchId);
+    boolean existsByTeamId(UUID teamId);
     List<MatchEvent> findByMatchIdAndVoidedFalseOrderByTimestampAsc(UUID matchId);
     List<MatchEvent> findByPlayerIdAndVoidedFalseOrderByTimestampDesc(UUID playerId);
 

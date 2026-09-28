@@ -12,4 +12,5 @@ public interface MatchRefereeRepository extends JpaRepository<MatchReferee, UUID
     List<MatchReferee> findByRefereeId(UUID refereeId);
     Optional<MatchReferee> findByMatchIdAndRefereeId(UUID matchId, UUID refereeId);
     boolean existsByMatchIdAndRefereeId(UUID matchId, UUID refereeId);
+    void deleteByMatchId(UUID matchId);
 }

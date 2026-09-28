@@ -166,11 +166,16 @@ async function saveTables() {
 }
 
 const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
+const listedTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 
-async function exclude(id: string) {
+async function exclude(team: { teamId: string; teamName?: string }) {
+  const name = team.teamName || 'команду'
+  if (!confirm(`Убрать «${name}» из турнира? Заявка пропадёт из списка и из таблиц. Несыгранные матчи этой команды в турнире удалятся. Сыгранные останутся в календаре, но из зачёта таблицы уйдут.`)) return
+  error.value = ''
   pending.value = true
   try {
-    await api.delete(`/tournaments/${tournament.value.id}/teams/${id}`)
+    await api.delete(`/tournaments/${tournament.value.id}/teams/${team.teamId}`)
+    ok.value = `${name} убрана из турнира.`
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -213,8 +218,8 @@ async function exclude(id: string) {
 
     <div class="panel stack">
       <h2>Команды</h2>
-      <EmptyState v-if="!teams.length" title="Заявок нет" />
-      <div v-for="team in teams" :key="team.id" class="row">
+      <EmptyState v-if="!listedTeams.length" title="Заявок нет" />
+      <div v-for="team in listedTeams" :key="team.id" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
           {{ team.teamName }}
@@ -313,7 +318,7 @@ async function exclude(id: string) {
         <StatusBadge :status="team.status" />
         <div class="actions">
           <button v-if="team.status !== 'APPROVED'" class="btn" :disabled="pending" @click="approve(team.teamId)">Допустить</button>
-          <button class="btn secondary" :disabled="pending" @click="exclude(team.teamId)">Убрать</button>
+          <button class="btn danger" :disabled="pending" @click="exclude(team)">Убрать из турнира</button>
         </div>
       </div>
 

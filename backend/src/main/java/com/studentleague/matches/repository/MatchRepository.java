@@ -19,6 +19,18 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     @Query("""
             select m from Match m
+            where m.tournamentId = :tournamentId
+              and (m.homeTeamId = :teamId or m.awayTeamId = :teamId)
+            """)
+    List<Match> findByTournamentIdAndTeamId(
+            @Param("tournamentId") UUID tournamentId,
+            @Param("teamId") UUID teamId
+    );
+
+    boolean existsByHomeTeamIdOrAwayTeamId(UUID homeTeamId, UUID awayTeamId);
+
+    @Query("""
+            select m from Match m
             where (m.homeTeamId = :teamId or m.awayTeamId = :teamId)
               and m.status = :status
             order by m.scheduledAt desc

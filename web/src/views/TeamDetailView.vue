@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
@@ -15,6 +15,7 @@ import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const fav = useFavorites()
 const names = useTeamDirectory()
@@ -109,6 +110,20 @@ async function disbandTeam() {
     await api.delete(`/teams/${team.value.id}`)
     ok.value = 'Команда расформирована.'
     await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
+async function deleteTeam() {
+  if (!confirm(`Удалить «${team.value.name}»? Это можно, только если у команды нет матчей.`)) return
+  error.value = ''
+  pending.value = true
+  try {
+    await api.delete(`/teams/${team.value.id}`, { params: { purge: true } })
+    await router.push('/teams')
   } catch (e: any) {
     error.value = apiError(e)
   } finally {
@@ -212,7 +227,7 @@ async function disbandTeam() {
         </div>
       </div>
       <button v-if="!team.disbanded" class="btn danger" :disabled="pending" @click="disbandTeam">Расформировать команду</button>
-      <p v-else class="muted">Уже расформирована — править состав нельзя.</p>
+      <button v-else class="btn danger" :disabled="pending" @click="deleteTeam">Удалить команду</button>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>

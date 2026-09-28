@@ -95,11 +95,16 @@ public class TeamController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Disband a team (admin only)")
+    @Operation(summary = "Disband a team (admin). purge=true deletes a disbanded team that has no matches")
     public void disband(
             @AuthenticationPrincipal UserPrincipal principal,
-            @PathVariable UUID id
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean purge
     ) {
+        if (purge) {
+            teamService.deleteDisbandedTeam(principal, id);
+            return;
+        }
         teamService.disbandTeam(principal, id);
     }
 

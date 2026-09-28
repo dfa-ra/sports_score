@@ -3,6 +3,9 @@ package com.studentleague.tournaments.service;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
+import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
@@ -61,6 +64,9 @@ public class TournamentService {
     private final TeamRepository teamRepository;
     private final PlayerProfileRepository playerProfileRepository;
     private final MatchRepository matchRepository;
+    private final MatchEventRepository matchEventRepository;
+    private final MatchLineupPlayerRepository matchLineupPlayerRepository;
+    private final MatchRefereeRepository matchRefereeRepository;
     private final NotificationService notificationService;
     private final TournamentFormatRegistry formatRegistry;
 
@@ -72,6 +78,9 @@ public class TournamentService {
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
             MatchRepository matchRepository,
+            MatchEventRepository matchEventRepository,
+            MatchLineupPlayerRepository matchLineupPlayerRepository,
+            MatchRefereeRepository matchRefereeRepository,
             NotificationService notificationService,
             TournamentFormatRegistry formatRegistry
     ) {
@@ -82,6 +91,9 @@ public class TournamentService {
         this.teamRepository = teamRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.matchRepository = matchRepository;
+        this.matchEventRepository = matchEventRepository;
+        this.matchLineupPlayerRepository = matchLineupPlayerRepository;
+        this.matchRefereeRepository = matchRefereeRepository;
         this.notificationService = notificationService;
         this.formatRegistry = formatRegistry;
     }
@@ -212,10 +224,20 @@ public class TournamentService {
 
     @Transactional
     public void excludeTeam(UUID tournamentId, UUID teamId) {
+        requireTournament(tournamentId);
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
                 .orElseThrow(() -> ApiException.notFound("Tournament registration not found"));
-        entry.setStatus(TournamentTeamStatus.WITHDRAWN);
-        tournamentTeamRepository.save(entry);
+        List<Match> fixtures = matchRepository.findByTournamentIdAndTeamId(tournamentId, teamId);
+        for (Match match : fixtures) {
+            if (match.getStatus() != MatchStatus.SCHEDULED && match.getStatus() != MatchStatus.CANCELLED) {
+                continue;
+            }
+            matchEventRepository.deleteByMatchId(match.getId());
+            matchLineupPlayerRepository.deleteByMatchId(match.getId());
+            matchRefereeRepository.deleteByMatchId(match.getId());
+            matchRepository.delete(match);
+        }
+        tournamentTeamRepository.delete(entry);
     }
 
     @Transactional(readOnly = true)

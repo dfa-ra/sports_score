@@ -130,7 +130,7 @@ public class TournamentController {
     @DeleteMapping("/{id}/teams/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Exclude team from tournament (ADMIN)")
+    @Operation(summary = "Remove team from tournament (ADMIN). Deletes the entry and unplayed fixtures.")
     public void exclude(@PathVariable UUID id, @PathVariable UUID teamId) {
         tournamentService.excludeTeam(id, teamId);
     }
