@@ -4,6 +4,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api/client'
 import { passwordHint } from '../lib/format'
+import { apiError } from '../lib/errors'
 
 type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE'
 
@@ -13,6 +14,7 @@ const roles = ref<Role[]>(['FAN'])
 const firstName = ref('')
 const lastName = ref('')
 const photoUrl = ref('')
+const uploadingPhoto = ref(false)
 const error = ref('')
 const pending = ref(false)
 const showPassword = ref(false)
@@ -39,14 +41,29 @@ async function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  const form = new FormData()
-  form.append('file', file)
-  const { data } = await api.post('/auth/photo', form)
-  photoUrl.value = data.url
+  error.value = ''
+  photoUrl.value = ''
+  uploadingPhoto.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post('/auth/photo', form)
+    photoUrl.value = data.url
+  } catch (e: any) {
+    error.value = apiError(e, 'Фото не загрузилось. Нужны JPEG, PNG, WebP или GIF, до 8 МБ.')
+  } finally {
+    uploadingPhoto.value = false
+  }
 }
 
 async function submit() {
   error.value = ''
+  if (needsPhoto.value && !photoUrl.value) {
+    error.value = uploadingPhoto.value
+      ? 'Подождите, фото ещё загружается.'
+      : 'Для игрока, капитана и судьи нужно фото.'
+    return
+  }
   pending.value = true
   try {
     await auth.register({
@@ -122,11 +139,11 @@ async function submit() {
 
         <label v-if="needsPhoto" class="field">Фото
           <input type="file" accept="image/*" @change="onPhoto" />
-          <span class="field-hint">{{ photoUrl ? 'Фото загружено' : 'Обязательно для этой роли' }}</span>
+          <span class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
         </label>
 
         <p v-if="error" class="form-error">{{ error }}</p>
-        <button class="btn success" type="submit" :disabled="pending || (needsPhoto && !photoUrl)">
+        <button class="btn success" type="submit" :disabled="pending">
           {{ pending ? 'Создаём…' : 'Создать аккаунт' }}
         </button>
       </form>
