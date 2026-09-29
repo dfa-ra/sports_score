@@ -58,7 +58,7 @@ class GoogleAuthIntegrationTest extends AbstractIntegrationTest {
         assertThat(user.getPasswordHash()).isNull();
         assertThat(user.getGoogleSub()).isEqualTo("sub-" + email);
         assertThat(user.getRole()).isEqualTo(Role.FAN);
-        assertThat(playerProfileRepository.findByUserId(user.getId())).isPresent();
+        assertThat(playerProfileRepository.findByUserId(user.getId())).isEmpty();
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
