@@ -44,6 +44,10 @@ import LegalDocument from '../components/LegalDocument.vue'
       Функции сайта, эти условия и политику конфиденциальности можно изменить. Дата этой редакции — 29 сентября 2026.
     </p>
     <p>
+      Вопросы о сервисе и персональных данных можно отправить на
+      <a href="mailto:ligaitmofutsal@gmail.com">ligaitmofutsal@gmail.com</a>.
+    </p>
+    <p>
       Политика конфиденциальности: <RouterLink to="/privacy">https://itmoliga.ru/privacy</RouterLink>.
     </p>
   </LegalDocument>
