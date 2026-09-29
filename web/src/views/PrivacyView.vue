@@ -11,8 +11,8 @@ import LegalDocument from '../components/LegalDocument.vue'
       бренд KRONBARS. Это публичный сайт студенческой лиги: турниры, команды, матчи, таблицы и учётные записи участников.
     </p>
     <p>
-      Отдельного адреса электронной почты для обращений по этой политике нет. Напишите через сайт
-      <a href="https://itmoliga.ru">https://itmoliga.ru</a>.
+      Вопросы о персональных данных и о сервисе можно отправить на
+      <a href="mailto:ligaitmofutsal@gmail.com">ligaitmofutsal@gmail.com</a>.
     </p>
 
     <h2>Какие данные мы получаем</h2>
@@ -81,8 +81,8 @@ import LegalDocument from '../components/LegalDocument.vue'
 
     <h2>Как перестать пользоваться</h2>
     <p>
-      Выйдите из аккаунта на сайте: токены этой вкладки стираются. Если нужно что-то уточнить по данным, напишите через сайт
-      <a href="https://itmoliga.ru">https://itmoliga.ru</a>.
+      Выйдите из аккаунта на сайте: токены этой вкладки стираются. Если нужно что-то уточнить по данным, напишите на
+      <a href="mailto:ligaitmofutsal@gmail.com">ligaitmofutsal@gmail.com</a>.
     </p>
     <p>
       Условия пользования: <RouterLink to="/terms">https://itmoliga.ru/terms</RouterLink>.
