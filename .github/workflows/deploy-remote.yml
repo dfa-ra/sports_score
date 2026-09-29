@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         default: "22"
+      app_public_url:
+        description: "Public site origin written to APP_PUBLIC_URL. No trailing slash."
+        required: false
+        type: string
+        default: ""
     secrets:
       SSH_HOST:
         required: false
@@ -140,6 +145,29 @@ jobs:
               exit 1
             fi
           "
+
+      - name: Set Google client id and public URL
+        if: steps.stand.outputs.configured == 'true'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ inputs.ssh_port }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          APP_PUBLIC_URL: ${{ inputs.app_public_url }}
+        run: |
+          CLIENT_ID="$(bash scripts/google_client_id.sh)"
+          if ! printf '%s' "${CLIENT_ID}" | grep -Eq '^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$'; then
+            echo "Refusing unexpected Google client id"
+            exit 1
+          fi
+          if ! printf '%s' "${APP_PUBLIC_URL}" | grep -Eq '^https?://[A-Za-z0-9._:-]+$'; then
+            echo "Refusing unexpected APP_PUBLIC_URL"
+            exit 1
+          fi
+          KEY="$HOME/.ssh/stand_deploy"
+          REMOTE="${SSH_USER}@${SSH_HOST}"
+          SSH=(ssh -i "$KEY" -p "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes -o TCPKeepAlive=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          "${SSH[@]}" "${REMOTE}" "python3 '${DEPLOY_PATH}/deploy/upsert_public_env.py' '${DEPLOY_PATH}/.env' '${CLIENT_ID}' '${APP_PUBLIC_URL}'"
 
       - name: Download release on the stand and compose up
         if: steps.stand.outputs.configured == 'true'

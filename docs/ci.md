@@ -101,7 +101,7 @@ GitHub → репозиторий → **Settings → Secrets and variables → A
 
 #### На каждом сервере (не в GitHub)
 
-Файл `/opt/studentleague/.env`. CI его **не перезаписывает**.
+Файл `/opt/studentleague/.env`. CI не заменяет файл целиком и не трогает пароли, JWT и базу. На каждом деплое в существующий файл записываются только `GOOGLE_CLIENT_ID` (публичный id из `deploy/google-client-id`) и `APP_PUBLIC_URL` (prod `https://itmoliga.ru`, dev `http://144.31.153.52:3000`).
 
 Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**другие** JWT и пароль БД).
 
@@ -117,12 +117,12 @@ Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**д�
 | `CADDY_HTTP_PORT` | Хостовый порт Caddy :80. Старый стенд: `3000`. Prod: `80` |
 | `CADDY_HTTPS_PORT` | Prod: `443`. На dev не публикуется |
 | `APP_DEMO_DATA` | Dev `true`, prod `false` |
-| `GOOGLE_CLIENT_ID` | Audience Google ID token. Пусто — Google выключен, пароль работает |
-| `APP_PUBLIC_URL` | Сайт для ссылки сброса пароля, prod `https://itmoliga.ru` |
+| `GOOGLE_CLIENT_ID` | Audience Google ID token. Деплой записывает публичный id. Пустое значение в приложении выключает Google, пароль работает |
+| `APP_PUBLIC_URL` | Сайт для ссылки сброса пароля. Деплой ставит prod `https://itmoliga.ru`, dev `http://144.31.153.52:3000` |
 | `MAIL_HOST` / `MAIL_FROM` и остальные `MAIL_*` | SMTP письма сброса. Без host/from письмо не уходит |
 | `COMPOSE_PROJECT_NAME` | `studentleague-dev` / `studentleague-prod` |
 
-Кнопка Google на сайте есть только если при сборке веба задана GitHub variable `VITE_GOOGLE_CLIENT_ID` (тот же client id, что `GOOGLE_CLIENT_ID` на сервере). Пустая переменная оставляет вход по паролю.
+Кнопка Google попадает в сборку веба из GitHub variable `VITE_GOOGLE_CLIENT_ID`. Если переменная пустая, сборка берёт тот же публичный id из `deploy/google-client-id`. Пустой id прячет кнопку, вход по паролю остаётся.
 
 Для TLS на prod: **A-запись `itmoliga.ru` и `www` должна смотреть на IP VPS**, не на shared-хостинг регистратора (парковочная страница «домен привязан к хостингу»). В файрволе открыты **80 и 443**. Caddy сам возьмёт сертификат.
 

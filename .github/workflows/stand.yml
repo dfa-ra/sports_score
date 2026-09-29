@@ -70,6 +70,9 @@ jobs:
           VITE_APP_CHANNEL: dev
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: |
+          VITE_GOOGLE_CLIENT_ID="$(bash ../scripts/google_client_id.sh)"
+          export VITE_GOOGLE_CLIENT_ID
+          echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}"
           npm ci
           npm run build
           tar -czf "../out/student-league-web-dev.tar.gz" -C dist .
@@ -126,6 +129,7 @@ jobs:
       deploy_path: ${{ vars.DEV_DEPLOY_PATH || '/opt/studentleague' }}
       compose_project: studentleague-dev
       ssh_port: ${{ vars.DEV_SSH_PORT || '22' }}
+      app_public_url: http://144.31.153.52:3000
     secrets:
       SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
       SSH_USER: ${{ secrets.DEV_SSH_USER }}

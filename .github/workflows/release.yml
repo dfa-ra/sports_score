@@ -77,7 +77,11 @@ jobs:
           VITE_APP_REVISION: ${{ github.sha }}
           VITE_APP_CHANNEL: prod
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-        run: npm run build
+        run: |
+          VITE_GOOGLE_CLIENT_ID="$(bash ../scripts/google_client_id.sh)"
+          export VITE_GOOGLE_CLIENT_ID
+          echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}"
+          npm run build
       - name: Pack dist
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
@@ -233,6 +237,7 @@ jobs:
       deploy_path: ${{ vars.PROD_DEPLOY_PATH || '/opt/studentleague' }}
       compose_project: studentleague-prod
       ssh_port: ${{ vars.PROD_SSH_PORT || '22' }}
+      app_public_url: https://itmoliga.ru
     secrets:
       SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
       SSH_USER: ${{ secrets.PROD_SSH_USER }}

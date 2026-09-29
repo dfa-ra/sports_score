@@ -1,0 +1,4 @@
+# Public Google OAuth web client id. Not a secret.
+# Web builds use this when GitHub variable VITE_GOOGLE_CLIENT_ID is empty.
+# SSH deploy writes the same value to GOOGLE_CLIENT_ID on the stand.
+777281037209-v0oblc88cohipsr71shf5shq3gpi40bb.apps.googleusercontent.com

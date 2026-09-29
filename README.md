@@ -104,7 +104,7 @@ Swagger UI, `/v3/api-docs` и Actuator закрыты (`denyAll`) — польз
 | `APP_REDIS_ENABLED` | Включить Redis auto-config / кластерные фичи |
 | `JWT_SECRET` | HMAC-секрет access-токенов |
 | `GOOGLE_CLIENT_ID` | Audience Google ID token. Пусто — вход через Google выключен, пароль работает. Несколько id через запятую |
-| `VITE_GOOGLE_CLIENT_ID` | Публичный client id кнопки на вебе, нужен **при сборке** фронта. Пусто — кнопки нет |
+| `VITE_GOOGLE_CLIENT_ID` | Публичный client id кнопки на вебе, нужен **при сборке** фронта. Пусто — кнопки нет. В CI пустая переменная GitHub заменяется id из `deploy/google-client-id` |
 | `APP_PUBLIC_URL` | Адрес сайта без слэша в конце, для ссылки сброса пароля (`https://itmoliga.ru`) |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` / `MAIL_STARTTLS` | SMTP для письма сброса. Без `MAIL_HOST` или `MAIL_FROM` письмо не отправляется |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Единственный админ (создаётся при старте) |
