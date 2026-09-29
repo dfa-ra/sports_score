@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api/client'
 import { passwordHint } from '../lib/format'
@@ -155,8 +156,19 @@ async function onGoogle(idToken: string) {
         </div>
 
         <label v-if="needsPhoto" class="field">Фото
-          <input type="file" accept="image/*" @change="onPhoto" />
-          <span class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
+          <span class="photo-row">
+            <PlayerAvatar
+              v-if="photoUrl"
+              :src="photoUrl"
+              :name="`${firstName} ${lastName}`"
+              :size="56"
+              tile
+            />
+            <span class="grow">
+              <input type="file" accept="image/*" @change="onPhoto" />
+              <span class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
+            </span>
+          </span>
         </label>
 
         <p v-if="error" class="form-error">{{ error }}</p>
@@ -197,4 +209,7 @@ async function onGoogle(idToken: string) {
   content: " ✓";
   color: var(--ice);
 }
+.photo-row { display: flex; align-items: center; gap: 0.75rem; }
+.grow { flex: 1; min-width: 0; display: grid; gap: 0.35rem; }
+.grow input { width: 100%; }
 </style>

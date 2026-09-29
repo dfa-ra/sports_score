@@ -22,6 +22,8 @@ watch(
 const showImage = computed(() => Boolean(props.src) && !broken.value)
 const label = computed(() => initials(props.name || ''))
 const radius = computed(() => (props.size < 28 ? 4 : 8))
+/** Keep the whole crest inside the rounded square; 0.3×radius clears the corner arc. */
+const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
 </script>
 
 <template>
@@ -30,7 +32,7 @@ const radius = computed(() => (props.size < 28 ? 4 : 8))
     class="team-crest"
     :src="src!"
     :alt="name || 'Эмблема'"
-    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px` }"
+    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, padding: `${inset}px` }"
     @error="broken = true"
   />
   <span
@@ -45,12 +47,15 @@ const radius = computed(() => (props.size < 28 ? 4 : 8))
 .team-crest {
   display: block;
   flex: 0 0 auto;
-  object-fit: cover;
-  background: var(--accent-soft);
+  box-sizing: border-box;
+  object-fit: contain;
+  object-position: center;
+  background: var(--surface, #fff);
 }
 .team-crest--fallback {
   display: grid;
   place-items: center;
+  background: var(--accent-soft);
   color: var(--navy);
   font-weight: 800;
   font-style: normal;

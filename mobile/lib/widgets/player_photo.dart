@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/format.dart';
@@ -20,27 +22,36 @@ class PlayerPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = tile ? BorderRadius.circular(size < 40 ? 8 : 12) : null;
-    final image = url != null && url!.isNotEmpty ? NetworkImage(url!) : null;
+    final hasImage = url != null && url!.isNotEmpty;
+    final inset = hasImage ? (tile ? (size < 40 ? 3.0 : 4.0) : math.max(2.0, (size * 0.1465).ceilToDouble())) : 0.0;
+    final fallback = Text(
+      initials(name),
+      style: TextStyle(
+        fontWeight: FontWeight.w800,
+        color: AppColors.navy,
+        fontSize: size * 0.32,
+      ),
+    );
     return Container(
       width: size,
       height: size,
+      padding: EdgeInsets.all(inset),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0x294CB4E5),
+        color: hasImage ? AppColors.surface : const Color(0x294CB4E5),
         shape: tile ? BoxShape.rectangle : BoxShape.circle,
         borderRadius: radius,
-        image: image == null ? null : DecorationImage(image: image, fit: BoxFit.cover),
       ),
-      child: image == null
-          ? Text(
-              initials(name),
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                color: AppColors.navy,
-                fontSize: size * 0.32,
-              ),
-            )
-          : null,
+      child: !hasImage
+          ? fallback
+          : Image.network(
+              url!,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (_, __, ___) => fallback,
+            ),
     );
   }
 }
