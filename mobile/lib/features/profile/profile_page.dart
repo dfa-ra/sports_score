@@ -77,6 +77,9 @@ class _ProfilePageState extends State<ProfilePage> {
         jersey.text = next.jerseyNumber?.toString() ?? '';
         position.text = next.position;
         bio.text = next.bio;
+        if (!_isPlayerAccount() && next.jerseyNumber == null && next.bio.isEmpty && position.text == 'Нападающий') {
+          position.text = '';
+        }
         setState(() => profile = next);
         await _loadCard(next.id);
       }
@@ -100,7 +103,34 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  bool _isPlayerAccount() {
+    final user = context.read<AuthController>().user;
+    if (user == null) return false;
+    const playerRoles = {'PLAYER', 'CAPTAIN', 'ADMIN'};
+    if (playerRoles.contains(user.role)) return true;
+    return user.roles.any(playerRoles.contains);
+  }
+
+  bool _uploadedPhoto(String? url) => url != null && url.contains('/media/');
+
   Future<void> _save() async {
+    if (!_isPlayerAccount()) {
+      final number = int.tryParse(jersey.text.trim());
+      String? problem;
+      if (firstName.text.trim().isEmpty || lastName.text.trim().isEmpty || displayName.text.trim().isEmpty) {
+        problem = 'Укажите имя, фамилию и как писать на майке.';
+      } else if (number == null || number < 0 || number > 99) {
+        problem = 'Укажите номер на майке.';
+      } else if (position.text.trim().isEmpty) {
+        problem = 'Выберите позицию.';
+      } else if (!_uploadedPhoto(profile?.avatarUrl)) {
+        problem = 'Для регистрации игрока нужна фотография.';
+      }
+      if (problem != null) {
+        setState(() => formError = problem);
+        return;
+      }
+    }
     setState(() {
       saving = true;
       formError = null;
@@ -125,6 +155,7 @@ class _ProfilePageState extends State<ProfilePage> {
         });
         await _loadCard(next.id);
       }
+      if (mounted) await context.read<AuthController>().restore();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) setState(() => formError = e is ApiException ? e.message : 'Профиль не сохранился.');
@@ -217,7 +248,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(profile?.id != null ? 'Изменить анкету' : 'Стать игроком', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
+                    Text(_isPlayerAccount() ? 'Изменить анкету' : 'Стать игроком', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
                     const SizedBox(height: 12),
                     TextField(controller: firstName, decoration: const InputDecoration(labelText: 'Имя')),
                     const SizedBox(height: 10),
@@ -264,7 +295,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               await _save();
                               setSheet(() {});
                             },
-                      child: Text(saving ? 'Сохраняем…' : profile?.id != null ? 'Сохранить' : 'Стать игроком'),
+                      child: Text(saving ? 'Сохраняем…' : _isPlayerAccount() ? 'Сохранить' : 'Стать игроком'),
                     ),
                   ],
                 ),
@@ -341,7 +372,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     return ListView(
       children: [
-        if (card != null)
+        if (card != null && _isPlayerAccount())
           PlayerCardSheet(card: card!, onEdit: _openEdit, resolveMedia: auth.api.resolveMedia)
         else
           Padding(
@@ -377,8 +408,17 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                 ),
-                IconButton(tooltip: 'Изменить', onPressed: _openEdit, icon: const Icon(Icons.edit_outlined, color: AppColors.navy)),
+                if (_isPlayerAccount())
+                  IconButton(tooltip: 'Изменить', onPressed: _openEdit, icon: const Icon(Icons.edit_outlined, color: AppColors.navy)),
               ],
+            ),
+          ),
+        if (!_isPlayerAccount())
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: FilledButton(
+              onPressed: _openEdit,
+              child: const Text('Стать игроком'),
             ),
           ),
         const LeagueHead(title: 'Команды'),

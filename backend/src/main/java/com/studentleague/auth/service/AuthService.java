@@ -114,7 +114,8 @@ public class AuthService {
 
     /**
      * Existing Google subject logs in. Same verified email links the subject.
-     * Otherwise a FAN account is created. PLAYER/CAPTAIN/REFEREE are not granted.
+     * Otherwise a FAN account is created. No player profile and no PLAYER role:
+     * a fan becomes a player only by completing player registration with a photo.
      */
     @Transactional
     public AuthTokens loginWithGoogle(GoogleIdentity identity) {
@@ -130,7 +131,6 @@ public class AuthService {
             fillBlankNames(bySub, identity);
             applyGooglePhotoIfMissing(bySub, identity);
             userRepository.save(bySub);
-            ensurePlayerProfile(bySub, bySub.getFirstName(), bySub.getLastName(), bySub.getPhotoUrl());
             return issueTokens(bySub);
         }
 
@@ -145,7 +145,6 @@ public class AuthService {
             fillBlankNames(byEmail, identity);
             applyGooglePhotoIfMissing(byEmail, identity);
             userRepository.save(byEmail);
-            ensurePlayerProfile(byEmail, byEmail.getFirstName(), byEmail.getLastName(), byEmail.getPhotoUrl());
             return issueTokens(byEmail);
         }
 
@@ -167,7 +166,6 @@ public class AuthService {
         user.setEnabled(true);
         userRepository.save(user);
         roleService.grantApproved(user, Role.FAN, null);
-        ensurePlayerProfile(user, firstName, lastName, photo);
         return issueTokens(user);
     }
 

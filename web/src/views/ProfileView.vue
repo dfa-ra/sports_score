@@ -21,6 +21,7 @@ const lastName = ref('')
 const displayName = ref('')
 const jerseyNumber = ref<number | null>(null)
 const position = ref('')
+const positionOptions = ['Вратарь', 'Защитник', 'Нападающий', 'Универсал']
 const bio = ref('')
 const pending = ref(false)
 const passwordPending = ref(false)
@@ -28,7 +29,6 @@ const passwordNote = ref('')
 const passwordError = ref('')
 const error = ref('')
 const ok = ref('')
-const exists = ref(false)
 const editing = ref(false)
 const avatarUrl = ref('')
 const playerId = ref('')
@@ -41,6 +41,24 @@ const roles = computed(() => {
     .map((item) => item.role)
   return from.length ? from : (auth.user?.role ? [auth.user.role] : [])
 })
+
+const isPlayer = computed(() => roles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'ADMIN'))
+
+function isUploadedPhoto(url?: string | null) {
+  return !!url && url.includes('/media/')
+}
+
+function hasJersey(value: unknown) {
+  if (value === '' || value == null) return false
+  const number = typeof value === 'number' ? value : Number(value)
+  return Number.isInteger(number) && number >= 0 && number <= 99
+}
+
+function openForm() {
+  error.value = ''
+  ok.value = ''
+  editing.value = true
+}
 
 const favTeams = computed(() => {
   const own = card.value?.team?.id
@@ -73,37 +91,60 @@ onMounted(async () => {
   }
   try {
     const { data } = await api.get('/players/me')
-    exists.value = true
     playerId.value = data.id
     firstName.value = data.firstName || ''
     lastName.value = data.lastName || ''
     displayName.value = data.displayName || ''
     jerseyNumber.value = data.jerseyNumber
     position.value = data.position || ''
+    if (!isPlayer.value && data.jerseyNumber == null && !data.bio && position.value === 'Нападающий') {
+      position.value = ''
+    }
     bio.value = data.bio || ''
     avatarUrl.value = data.avatarUrl || auth.user?.photoUrl || ''
     await loadCard()
   } catch {
-    exists.value = false
+    firstName.value = auth.user?.firstName || ''
+    lastName.value = auth.user?.lastName || ''
+    displayName.value = [firstName.value, lastName.value].filter(Boolean).join(' ')
+    position.value = ''
+    jerseyNumber.value = null
   }
 })
 
 async function submit() {
   error.value = ''
   ok.value = ''
+  if (!isPlayer.value) {
+    if (!firstName.value.trim() || !lastName.value.trim() || !displayName.value.trim()) {
+      error.value = 'Укажите имя, фамилию и как писать на майке.'
+      return
+    }
+    if (!hasJersey(jerseyNumber.value)) {
+      error.value = 'Укажите номер на майке.'
+      return
+    }
+    if (!position.value.trim()) {
+      error.value = 'Выберите позицию.'
+      return
+    }
+    if (!isUploadedPhoto(avatarUrl.value)) {
+      error.value = 'Для регистрации игрока нужна фотография.'
+      return
+    }
+  }
   pending.value = true
   try {
     const { data } = await api.put('/players/me', {
       firstName: firstName.value,
       lastName: lastName.value,
       displayName: displayName.value || undefined,
-      jerseyNumber: jerseyNumber.value || undefined,
+      jerseyNumber: hasJersey(jerseyNumber.value) ? Number(jerseyNumber.value) : undefined,
       position: position.value || undefined,
       bio: bio.value || undefined,
       avatarUrl: avatarUrl.value || undefined,
     })
     await auth.refreshMe()
-    exists.value = true
     playerId.value = data.id
     avatarUrl.value = data.avatarUrl || avatarUrl.value
     ok.value = 'Профиль сохранён.'
@@ -161,7 +202,7 @@ async function logout() {
 
 <template>
   <section class="stack page">
-    <PlayerCardPanel v-if="card" :card="card" editable @edit="editing = true" />
+    <PlayerCardPanel v-if="isPlayer && card" :card="card" editable @edit="openForm" />
 
     <div v-else class="identity">
       <PlayerAvatar
@@ -176,41 +217,51 @@ async function logout() {
           <span v-for="role in roles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
         </p>
       </div>
-      <button class="pen" type="button" aria-label="Изменить" @click="editing = true">✎</button>
+      <button v-if="isPlayer" class="pen" type="button" aria-label="Изменить" @click="openForm">✎</button>
     </div>
 
-    <div v-if="editing" class="overlay" @click.self="editing = false">
-      <div class="sheet-form" role="dialog" aria-modal="true">
-        <h2>{{ exists ? 'Изменить анкету' : 'Стать игроком' }}</h2>
-        <form class="stack" @submit.prevent="submit">
-          <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
-          <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
-          <label class="field">Как писать на майке<input v-model="displayName" maxlength="150" /></label>
-          <div class="photo-row">
-            <PlayerAvatar
-              :src="avatarUrl || auth.user?.photoUrl"
-              :name="displayName || `${firstName} ${lastName}`"
-              :size="56"
-              tile
-            />
-            <label class="field grow">
-              Фото
-              <input type="file" accept="image/*" :disabled="pending" @change="onPhoto" />
-              <span class="field-hint">PNG, JPG, WebP или GIF. Сохраняется сразу.</span>
+    <button v-if="!isPlayer" class="btn become" type="button" @click="openForm">Стать игроком</button>
+
+    <Teleport to="body">
+      <div v-if="editing" class="overlay" @click.self="editing = false" @keydown.esc="editing = false">
+        <div class="sheet-form" role="dialog" aria-modal="true" aria-labelledby="profile-form-title">
+          <h2 id="profile-form-title">{{ isPlayer ? 'Изменить анкету' : 'Стать игроком' }}</h2>
+          <form class="stack" @submit.prevent="submit">
+            <label class="field">Имя<input v-model="firstName" required maxlength="100" /></label>
+            <label class="field">Фамилия<input v-model="lastName" required maxlength="100" /></label>
+            <label class="field">Как писать на майке<input v-model="displayName" :required="!isPlayer" maxlength="150" /></label>
+            <div class="photo-row">
+              <PlayerAvatar
+                :src="avatarUrl || auth.user?.photoUrl"
+                :name="displayName || `${firstName} ${lastName}`"
+                :size="56"
+                tile
+              />
+              <label class="field grow">
+                Фото
+                <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="pending" @change="onPhoto" />
+                <span class="field-hint">{{ isPlayer ? 'PNG, JPG, WebP или GIF. Сохраняется сразу.' : 'Нужна фотография. PNG, JPG, WebP или GIF.' }}</span>
+              </label>
+            </div>
+            <label class="field">Номер<input v-model.number="jerseyNumber" type="number" min="0" max="99" :required="!isPlayer" /></label>
+            <label class="field">Позиция
+              <select v-model="position" :required="!isPlayer">
+                <option value="">Выберите позицию</option>
+                <option v-for="option in positionOptions" :key="option" :value="option">{{ option }}</option>
+                <option v-if="position && !positionOptions.includes(position)" :value="position">{{ position }}</option>
+              </select>
             </label>
-          </div>
-          <label class="field">Номер<input v-model.number="jerseyNumber" type="number" min="0" max="99" /></label>
-          <label class="field">Позиция<input v-model="position" maxlength="64" placeholder="Нападающий" /></label>
-          <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
-          <p v-if="error" class="form-error">{{ error }}</p>
-          <p v-if="ok" class="form-ok">{{ ok }}</p>
-          <button class="btn" type="submit" :disabled="pending">
-            {{ pending ? 'Сохраняем…' : exists ? 'Сохранить' : 'Стать игроком' }}
-          </button>
-          <button class="btn ghost" type="button" @click="editing = false">Закрыть</button>
-        </form>
+            <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
+            <p v-if="error" class="form-error">{{ error }}</p>
+            <p v-if="ok" class="form-ok">{{ ok }}</p>
+            <button class="btn" type="submit" :disabled="pending">
+              {{ pending ? 'Сохраняем…' : isPlayer ? 'Сохранить' : 'Стать игроком' }}
+            </button>
+            <button class="btn ghost" type="button" @click="editing = false">Закрыть</button>
+          </form>
+        </div>
       </div>
-    </div>
+    </Teleport>
 
     <div class="sheet">
       <div class="league-head">Команды</div>
@@ -297,30 +348,57 @@ async function logout() {
   font-weight: 800;
   color: var(--navy);
 }
+.become { width: 100%; }
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 80;
   display: grid;
-  place-items: end center;
-  padding: 0.75rem;
-  background: rgba(0, 32, 91, 0.42);
+  place-items: center;
+  padding:
+    max(0.75rem, env(safe-area-inset-top))
+    0.75rem
+    max(0.75rem, env(safe-area-inset-bottom));
+  background: rgba(0, 32, 91, 0.55);
 }
 .photo-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
 }
 .grow { flex: 1; min-width: 0; }
 .sheet-form {
   width: min(520px, 100%);
-  max-height: min(82vh, 680px);
+  max-height: min(90dvh, 760px);
   overflow: auto;
   background: #fff;
+  color: var(--text, #1c2430);
   border-radius: 20px;
-  padding: 1.1rem 1.15rem 1.2rem;
+  padding: 1.15rem 1.15rem 1.25rem;
+  box-shadow: 0 24px 60px rgba(0, 32, 91, 0.28);
 }
-@media (min-width: 720px) {
-  .overlay { place-items: center; }
+.sheet-form h2 {
+  margin: 0 0 0.85rem;
+  color: var(--navy, #00205b);
+}
+.sheet-form input[type="file"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+@media (max-width: 560px) {
+  .overlay {
+    place-items: end center;
+    padding: 0.5rem;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .sheet-form {
+    width: 100%;
+    max-height: calc(100dvh - 0.75rem);
+    border-radius: 18px 18px 12px 12px;
+  }
+  .photo-row { flex-direction: column; }
 }
 </style>

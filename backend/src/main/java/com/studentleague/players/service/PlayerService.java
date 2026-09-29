@@ -21,8 +21,10 @@ import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
+import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -53,6 +55,7 @@ public class PlayerService {
     private final MatchRepository matchRepository;
     private final MatchLineupPlayerRepository lineupPlayerRepository;
     private final TournamentRepository tournamentRepository;
+    private final RoleService roleService;
 
     public PlayerService(
             PlayerProfileRepository playerProfileRepository,
@@ -62,7 +65,8 @@ public class PlayerService {
             MatchEventRepository matchEventRepository,
             MatchRepository matchRepository,
             MatchLineupPlayerRepository lineupPlayerRepository,
-            TournamentRepository tournamentRepository
+            TournamentRepository tournamentRepository,
+            RoleService roleService
     ) {
         this.playerProfileRepository = playerProfileRepository;
         this.userRepository = userRepository;
@@ -72,6 +76,7 @@ public class PlayerService {
         this.matchRepository = matchRepository;
         this.lineupPlayerRepository = lineupPlayerRepository;
         this.tournamentRepository = tournamentRepository;
+        this.roleService = roleService;
     }
 
     @Transactional
@@ -79,16 +84,32 @@ public class PlayerService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> ApiException.notFound("User not found"));
 
-        PlayerProfile profile = playerProfileRepository.findByUserId(userId).orElseGet(PlayerProfile::new);
+        PlayerProfile existing = playerProfileRepository.findByUserId(userId).orElse(null);
+        boolean alreadyPlayer = roleService.hasApproved(userId, Role.PLAYER)
+                || roleService.hasApproved(userId, Role.CAPTAIN)
+                || roleService.hasApproved(userId, Role.ADMIN);
+        boolean promote = false;
+        if (!alreadyPlayer && (existing == null || completeRegistration(request))) {
+            requirePlayerRegistration(request, existing, user);
+            promote = true;
+        }
+
+        PlayerProfile profile = existing != null ? existing : new PlayerProfile();
         profile.setUserId(userId);
         apply(profile, request);
-        if (!hasText(profile.getAvatarUrl()) && hasText(user.getPhotoUrl())) {
-            profile.setAvatarUrl(user.getPhotoUrl());
+        if (!hasText(profile.getAvatarUrl())) {
+            String uploaded = uploadedPhoto(null, null, user);
+            if (uploaded != null) {
+                profile.setAvatarUrl(uploaded);
+            }
         }
         playerProfileRepository.save(profile);
         if (hasText(profile.getAvatarUrl()) && !profile.getAvatarUrl().equals(user.getPhotoUrl())) {
             user.setPhotoUrl(profile.getAvatarUrl());
             userRepository.save(user);
+        }
+        if (promote) {
+            roleService.grantApproved(user, Role.PLAYER, profile.getAvatarUrl());
         }
 
         return toResponse(profile);
@@ -428,6 +449,56 @@ public class PlayerService {
             return profile.getAvatarUrl();
         }
         return userRepository.findById(profile.getUserId()).map(User::getPhotoUrl).orElse(null);
+    }
+
+    /**
+     * Name-only or number-only edits of an existing profile stay as they are.
+     * Shirt name together with number and position is the player-registration form.
+     */
+    private static boolean completeRegistration(PlayerProfileRequest request) {
+        return hasText(request.firstName())
+                && hasText(request.lastName())
+                && hasText(request.displayName())
+                && request.jerseyNumber() != null
+                && hasText(request.position());
+    }
+
+    private static void requirePlayerRegistration(PlayerProfileRequest request, PlayerProfile existing, User user) {
+        if (!hasText(request.firstName()) || !hasText(request.lastName())) {
+            throw ApiException.badRequest("Укажите имя и фамилию");
+        }
+        if (!hasText(request.displayName())) {
+            throw ApiException.badRequest("Укажите, как писать имя на майке");
+        }
+        if (request.jerseyNumber() == null || request.jerseyNumber() < 0 || request.jerseyNumber() > 99) {
+            throw ApiException.badRequest("Укажите номер на майке");
+        }
+        if (!hasText(request.position())) {
+            throw ApiException.badRequest("Выберите позицию");
+        }
+        if (uploadedPhoto(request.avatarUrl(), existing == null ? null : existing.getAvatarUrl(), user) == null) {
+            throw ApiException.badRequest("Для регистрации игрока нужна фотография");
+        }
+    }
+
+    /**
+     * Google profile pictures are https URLs. A player photo is a file stored by the upload API under /media/.
+     */
+    private static String uploadedPhoto(String requested, String existing, User user) {
+        if (isUploadedPhoto(requested)) {
+            return requested.trim();
+        }
+        if (isUploadedPhoto(existing)) {
+            return existing.trim();
+        }
+        if (user != null && isUploadedPhoto(user.getPhotoUrl())) {
+            return user.getPhotoUrl().trim();
+        }
+        return null;
+    }
+
+    static boolean isUploadedPhoto(String url) {
+        return url != null && url.contains("/media/");
     }
 
     private static boolean hasText(String value) {
