@@ -37,11 +37,12 @@ public class HomeController {
     @Operation(summary = "Home widgets: table, top-5, photos")
     public HomeFeedResponse home() {
         TournamentResponse tournament = tournamentService.current();
+        var board = statisticsService.board(tournament == null ? null : tournament.id(), 5);
         return new HomeFeedResponse(
                 tournament,
                 tournament == null ? List.of() : tournamentService.standings(tournament.id()).tables(),
-                tournament == null ? statisticsService.scorers(null, 5) : statisticsService.scorers(tournament.id(), 5),
-                tournament == null ? statisticsService.assists(null, 5) : statisticsService.assists(tournament.id(), 5),
+                board.scorers(),
+                board.assists(),
                 galleryService.enabledSlot(GallerySlot.HERO),
                 galleryService.enabledSlot(GallerySlot.STORY),
                 galleryService.enabledSlot(GallerySlot.GALLERY),

@@ -1,6 +1,7 @@
 package com.studentleague.statistics.controller;
 
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
+import com.studentleague.statistics.dto.StatisticsBoardResponse;
 import com.studentleague.statistics.dto.TeamStatisticsResponse;
 import com.studentleague.statistics.service.StatisticsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -45,6 +46,15 @@ public class StatisticsController {
             @RequestParam(required = false) UUID teamId
     ) {
         return statisticsService.teamStatistics(tournamentId, seasonYear, teamId);
+    }
+
+    @GetMapping("/board")
+    @Operation(summary = "Scorers, assists and goalkeepers for one tournament in a single pass")
+    public StatisticsBoardResponse board(
+            @RequestParam(required = false) UUID tournamentId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        return statisticsService.board(tournamentId, limit);
     }
 
     @GetMapping("/scorers")

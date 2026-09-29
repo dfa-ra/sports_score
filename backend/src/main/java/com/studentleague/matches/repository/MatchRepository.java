@@ -13,6 +13,10 @@ import java.util.UUID;
 
 public interface MatchRepository extends JpaRepository<Match, UUID> {
     Page<Match> findByTournamentId(UUID tournamentId, Pageable pageable);
+    List<Match> findByTournamentId(UUID tournamentId);
+
+    @Query("select m from Match m where m.tournamentId in :tournamentIds")
+    List<Match> findByTournamentIdIn(@Param("tournamentIds") java.util.Collection<UUID> tournamentIds);
     Page<Match> findByStatus(MatchStatus status, Pageable pageable);
     Page<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status, Pageable pageable);
     List<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status);

@@ -66,7 +66,7 @@ class StatisticsServiceTest {
         assist.setVoided(false);
 
         when(matchRepository.findAll()).thenReturn(List.of(match));
-        when(matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(matchId))
+        when(matchEventRepository.findByMatchIdInAndVoidedFalse(any()))
                 .thenReturn(List.of(goal, assist));
         when(playerProfileRepository.findAllById(any())).thenReturn(List.of());
 

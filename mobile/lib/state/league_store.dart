@@ -19,7 +19,6 @@ class LeagueStore extends ChangeNotifier {
   List<PlayerStat> scorers = [];
   List<PlayerStat> assists = [];
   List<PlayerStat> keepers = [];
-  List<PlayerBrief> players = [];
   String? tournamentId;
   String? tournamentName;
   bool loading = false;
@@ -74,17 +73,6 @@ class LeagueStore extends ChangeNotifier {
         }
       } catch (_) {}
       tournamentId ??= tournaments.isEmpty ? null : tournaments.first.id;
-      try {
-        final playerPage = await api.get('/players', query: {'size': '100'});
-        if (playerPage is Map) {
-          players = ((playerPage['content'] as List?) ?? const [])
-              .whereType<Map>()
-              .map((item) => PlayerBrief.fromJson(Map<String, dynamic>.from(item)))
-              .toList();
-        }
-      } catch (_) {
-        players = [];
-      }
       await loadTournament();
     } on TimeoutException {
       error = 'Сервер не ответил: ${api.baseUrl}';
@@ -108,9 +96,7 @@ class LeagueStore extends ChangeNotifier {
       final results = await Future.wait([
         api.get('/tournaments/$tournamentId'),
         api.get('/tournaments/$tournamentId/standings'),
-        api.get('/statistics/scorers', query: {'tournamentId': tournamentId!, 'limit': '200'}),
-        api.get('/statistics/assists', query: {'tournamentId': tournamentId!, 'limit': '200'}),
-        api.get('/statistics/goalkeepers', query: {'tournamentId': tournamentId!, 'limit': '200'}),
+        api.get('/statistics/board', query: {'tournamentId': tournamentId!, 'limit': '50'}),
       ]);
       if (results[0] is Map) {
         tournamentName = (results[0] as Map)['name']?.toString();
@@ -124,15 +110,16 @@ class LeagueStore extends ChangeNotifier {
             ),
           )
           .toList();
-      scorers = ((results[2] as List?) ?? const [])
+      final board = results[2] is Map ? Map<String, dynamic>.from(results[2] as Map) : const <String, dynamic>{};
+      scorers = ((board['scorers'] as List?) ?? const [])
           .whereType<Map>()
           .map((item) => PlayerStat.fromJson(Map<String, dynamic>.from(item), 'goals'))
           .toList();
-      assists = ((results[3] as List?) ?? const [])
+      assists = ((board['assists'] as List?) ?? const [])
           .whereType<Map>()
           .map((item) => PlayerStat.fromJson(Map<String, dynamic>.from(item), 'assists'))
           .toList();
-      keepers = ((results[4] as List?) ?? const [])
+      keepers = ((board['goalkeepers'] as List?) ?? const [])
           .whereType<Map>()
           .map((item) => PlayerStat.fromJson(Map<String, dynamic>.from(item), 'cleanSheets'))
           .toList();

@@ -9,6 +9,8 @@ import java.util.UUID;
 public interface MatchLineupPlayerRepository extends JpaRepository<MatchLineupPlayer, UUID> {
     List<MatchLineupPlayer> findByMatchId(UUID matchId);
 
+    List<MatchLineupPlayer> findByMatchIdIn(java.util.Collection<UUID> matchIds);
+
     List<MatchLineupPlayer> findByMatchIdAndTeamId(UUID matchId, UUID teamId);
 
     List<MatchLineupPlayer> findByPlayerId(UUID playerId);

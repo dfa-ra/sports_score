@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
+import PlayerPicker from './PlayerPicker.vue'
 
 const emit = defineEmits<{ created: [team: any] }>()
 const router = useRouter()
@@ -10,16 +11,9 @@ const name = ref('')
 const shortName = ref('')
 const foundedOn = ref('')
 const captainPlayerId = ref('')
-const players = ref<any[]>([])
 const pending = ref(false)
 const error = ref('')
 const ok = ref('')
-
-onMounted(async () => {
-  const { data } = await api.get('/players', { params: { size: 100 } })
-  players.value = data.content ?? []
-  if (players.value[0]) captainPlayerId.value = players.value[0].id
-})
 
 async function submit() {
   error.value = ''
@@ -57,11 +51,9 @@ async function submit() {
       <input v-model="foundedOn" type="date" />
     </label>
     <label class="field">Капитан
-      <select v-model="captainPlayerId">
-        <option value="">Назначить позже</option>
-        <option v-for="p in players" :key="p.id" :value="p.id">{{ p.displayName || `${p.firstName} ${p.lastName}` }}</option>
-      </select>
+      <PlayerPicker v-model="captainPlayerId" />
     </label>
+    <p class="muted">Можно оставить пустым и назначить позже.</p>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
     <button class="btn" type="submit" :disabled="pending">{{ pending ? 'Создаём…' : 'Создать команду' }}</button>

@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
-import PlayerAvatar from '../components/PlayerAvatar.vue'
+import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
@@ -23,8 +23,8 @@ const matches = ref<any[]>([])
 const scorers = ref<any[]>([])
 const assists = ref<any[]>([])
 const keepers = ref<any[]>([])
-const players = ref<any[]>([])
 const tournament = ref<any>(null)
+const statsLoadedFor = ref('')
 const loading = ref(true)
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
@@ -70,12 +70,6 @@ onMounted(async () => {
     if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
   }
   if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  try {
-    const list = await api.get('/players', { params: { size: 100 } })
-    players.value = list.data.content ?? []
-  } catch {
-    players.value = []
-  }
   await load()
 })
 
@@ -87,6 +81,18 @@ function setTab(next: Tab, list?: 'all') {
   if (next !== 'table') query.tab = next
   if (list === 'all') query.list = 'all'
   router.replace({ query })
+  if (next === 'scorers' || next === 'assists') loadStats()
+}
+
+async function loadStats() {
+  if (!tournamentId.value || statsLoadedFor.value === tournamentId.value) return
+  const id = tournamentId.value
+  const { data } = await api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } })
+  if (tournamentId.value !== id) return
+  scorers.value = data.scorers ?? []
+  assists.value = data.assists ?? []
+  keepers.value = data.goalkeepers ?? []
+  statsLoadedFor.value = id
 }
 
 async function load() {
@@ -95,19 +101,18 @@ async function load() {
     return
   }
   loading.value = true
+  statsLoadedFor.value = ''
+  scorers.value = []
+  assists.value = []
+  keepers.value = []
   try {
-    const [t, s, g, a, k] = await Promise.all([
+    const [t, s] = await Promise.all([
       api.get(`/tournaments/${tournamentId.value}`),
       api.get(`/tournaments/${tournamentId.value}/standings`),
-      api.get('/statistics/scorers', { params: { tournamentId: tournamentId.value, limit: 200 } }),
-      api.get('/statistics/assists', { params: { tournamentId: tournamentId.value, limit: 200 } }),
-      api.get('/statistics/goalkeepers', { params: { tournamentId: tournamentId.value, limit: 200 } }),
     ])
     tournament.value = t.data
     standings.value = parseStandings(s.data)
-    scorers.value = g.data
-    assists.value = a.data
-    keepers.value = k.data
+    if (tab.value === 'scorers' || tab.value === 'assists') await loadStats()
   } finally {
     loading.value = false
   }
@@ -164,15 +169,8 @@ async function load() {
     </template>
 
     <template v-else-if="tab === 'players'">
-      <EmptyState v-if="!players.length" title="Игроков пока нет" />
-      <div v-else class="sheet people">
-        <RouterLink v-for="p in players" :key="p.id" class="person" :to="`/players/${p.id}`">
-          <PlayerAvatar :src="p.avatarUrl" :name="p.displayName || `${p.firstName} ${p.lastName}`" :size="36" />
-          <div>
-            <b>{{ p.displayName || `${p.firstName} ${p.lastName}` }}</b>
-            <p>{{ p.position || 'Игрок' }} · №{{ p.jerseyNumber ?? '—' }}</p>
-          </div>
-        </RouterLink>
+      <div class="panel">
+        <PlayerSearch />
       </div>
     </template>
 

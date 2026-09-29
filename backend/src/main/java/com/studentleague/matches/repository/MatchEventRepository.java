@@ -13,6 +13,7 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent, UUID> {
     void deleteByMatchId(UUID matchId);
     boolean existsByTeamId(UUID teamId);
     List<MatchEvent> findByMatchIdAndVoidedFalseOrderByTimestampAsc(UUID matchId);
+    List<MatchEvent> findByMatchIdInAndVoidedFalse(java.util.Collection<UUID> matchIds);
     List<MatchEvent> findByPlayerIdAndVoidedFalseOrderByTimestampDesc(UUID playerId);
 
     @Query("""

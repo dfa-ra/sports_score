@@ -24,7 +24,10 @@ import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,32 +108,36 @@ public class PlayerService {
 
     @Transactional(readOnly = true)
     public Page<PlayerProfileResponse> list(String query, UUID teamId, Pageable pageable) {
+        Pageable limited = PageRequest.of(
+                Math.max(pageable.getPageNumber(), 0),
+                Math.min(Math.max(pageable.getPageSize(), 1), 12),
+                pageable.getSort().isSorted() ? pageable.getSort() : Sort.by("lastName")
+        );
+        String q = query == null ? "" : query.trim();
+        if (q.length() < 2 && teamId == null) {
+            return new PageImpl<>(List.of(), limited, 0);
+        }
         if (teamId != null) {
             var memberIds = teamMemberRepository.findByTeamIdAndStatus(teamId, TeamMemberStatus.ACTIVE).stream()
                     .map(TeamMember::getPlayerId)
                     .toList();
             List<PlayerProfile> profiles = playerProfileRepository.findAllById(memberIds);
-            if (query != null && !query.isBlank()) {
-                String q = query.trim().toLowerCase();
+            if (q.length() >= 2) {
+                String needle = q.toLowerCase();
                 profiles = profiles.stream()
-                        .filter(profile -> contains(profile.getFirstName(), q)
-                                || contains(profile.getLastName(), q)
-                                || contains(profile.getDisplayName(), q))
+                        .filter(profile -> contains(profile.getFirstName(), needle)
+                                || contains(profile.getLastName(), needle)
+                                || contains(profile.getDisplayName(), needle))
                         .toList();
             }
-            List<PlayerProfileResponse> mapped = profiles.stream().map(this::toResponse).toList();
-            return new org.springframework.data.domain.PageImpl<>(mapped, pageable, mapped.size());
+            int from = Math.min(limited.getPageNumber() * limited.getPageSize(), profiles.size());
+            int to = Math.min(from + limited.getPageSize(), profiles.size());
+            return new PageImpl<>(toResponses(profiles.subList(from, to)), limited, profiles.size());
         }
-        Page<PlayerProfile> page;
-        if (query == null || query.isBlank()) {
-            page = playerProfileRepository.findAll(pageable);
-        } else {
-            String q = query.trim();
-            page = playerProfileRepository
-                    .findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-                            q, q, q, pageable);
-        }
-        return page.map(this::toResponse);
+        Page<PlayerProfile> page = playerProfileRepository
+                .findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
+                        q, q, q, limited);
+        return new PageImpl<>(toResponses(page.getContent()), limited, page.getTotalElements());
     }
 
     private static boolean contains(String value, String query) {
@@ -378,7 +385,30 @@ public class PlayerService {
         profile.setBio(request.bio());
     }
 
+    private List<PlayerProfileResponse> toResponses(List<PlayerProfile> profiles) {
+        Set<UUID> userIds = profiles.stream()
+                .filter(profile -> !hasText(profile.getAvatarUrl()))
+                .map(PlayerProfile::getUserId)
+                .collect(Collectors.toSet());
+        Map<UUID, String> photos = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .filter(user -> hasText(user.getPhotoUrl()))
+                        .collect(Collectors.toMap(User::getId, User::getPhotoUrl, (a, b) -> a));
+        return profiles.stream()
+                .map(profile -> toResponse(profile, photos.get(profile.getUserId()), true))
+                .toList();
+    }
+
     private PlayerProfileResponse toResponse(PlayerProfile profile) {
+        return toResponse(profile, null, false);
+    }
+
+    private PlayerProfileResponse toResponse(PlayerProfile profile, String fallbackPhoto, boolean photoResolved) {
+        String avatar = hasText(profile.getAvatarUrl()) ? profile.getAvatarUrl() : fallbackPhoto;
+        if (!photoResolved && !hasText(avatar)) {
+            avatar = avatarOf(profile);
+        }
         return new PlayerProfileResponse(
                 profile.getId(),
                 profile.getUserId(),
@@ -386,7 +416,7 @@ public class PlayerService {
                 profile.getLastName(),
                 profile.getDisplayName(),
                 profile.getDateOfBirth(),
-                avatarOf(profile),
+                avatar,
                 profile.getJerseyNumber(),
                 profile.getPosition(),
                 profile.getBio()

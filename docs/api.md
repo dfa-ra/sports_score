@@ -130,7 +130,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/players` | Публичный |
+| GET | `/players` | Публичный. Без `q` длиннее 1 символа список пустой (подсказки поиска). `teamId` отдаёт состав команды. Размер страницы не больше 12 |
 | GET | `/players/{id}` | Публичный |
 | GET | `/players/{id}/card` | Публичный |
 | PUT | `/players/me` | Свой профиль (создаёт/обновляет) |
@@ -213,7 +213,8 @@ Auth: `Authorization: Bearer <access_token>`
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/statistics/players` | Публичный — фильтры |
+| GET | `/statistics/players` | Публичный — фильтры. События матчей читаются одним запросом, не по матчу |
+| GET | `/statistics/board` | Публичный — `{ scorers, assists, goalkeepers }` за один проход. `tournamentId`, `limit` (до 100) |
 | GET | `/statistics/teams` | Публичный — фильтры |
 
 Считается из не-voided записей `MatchEvent`.

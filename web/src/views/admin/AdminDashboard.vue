@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import CreateMatchForm from '../../components/CreateMatchForm.vue'
+import PlayerSearch from '../../components/PlayerSearch.vue'
 import CreateTeamForm from '../../components/CreateTeamForm.vue'
 import CreateTournamentForm from '../../components/CreateTournamentForm.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -21,7 +22,6 @@ const users = ref<any[]>([])
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
 const teams = ref<any[]>([])
-const players = ref<any[]>([])
 const sports = ref<any[]>([])
 const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics' | 'gallery'>('users')
 const roleRequests = ref<any[]>([])
@@ -61,15 +61,12 @@ const tabs = [
 ] as const
 
 async function load() {
-  const [u, t, m, tm, p, s, ts, ps, rr, g] = await Promise.all([
+  const [u, t, m, tm, s, rr, g] = await Promise.all([
     api.get('/admin/users', { params: { size: 100 } }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
     api.get('/teams', { params: { size: 50, includeDisbanded: true } }),
-    api.get('/players', { params: { size: 50 } }),
     api.get('/sports'),
-    api.get('/statistics/teams'),
-    api.get('/statistics/players'),
     api.get('/admin/role-requests'),
     api.get('/gallery'),
   ])
@@ -77,15 +74,26 @@ async function load() {
   tournaments.value = t.data.content
   matches.value = m.data.content
   teams.value = tm.data.content
-  players.value = p.data.content
   sports.value = s.data
-  teamStats.value = ts.data
-  playerStats.value = ps.data
   roleRequests.value = rr.data
   gallery.value = g.data
   vkAlbumUrl.value = g.data.vkAlbumUrl || ''
+  if (tab.value === 'statistics') await loadStats()
   await names.load()
 }
+
+async function loadStats() {
+  const [ts, ps] = await Promise.all([
+    api.get('/statistics/teams'),
+    api.get('/statistics/players'),
+  ])
+  teamStats.value = ts.data
+  playerStats.value = ps.data
+}
+
+watch(tab, (value) => {
+  if (value === 'statistics' && !playerStats.value.length && !teamStats.value.length) loadStats()
+})
 
 onMounted(load)
 
@@ -388,9 +396,7 @@ async function deleteTeam(team: any) {
 
     <div v-else-if="tab === 'players'" class="panel">
       <h2>Игроки</h2>
-      <div v-for="p in players" :key="p.id" class="row">
-        <RouterLink :to="`/players/${p.id}`">{{ p.displayName || `${p.firstName} ${p.lastName}` }}</RouterLink>
-      </div>
+      <PlayerSearch />
     </div>
 
     <div v-else-if="tab === 'referees'" class="panel stack">

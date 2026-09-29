@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -224,27 +226,95 @@ class _Assists extends StatelessWidget {
   }
 }
 
-class _Players extends StatelessWidget {
+class _Players extends StatefulWidget {
   const _Players({required this.store});
   final LeagueStore store;
 
   @override
-  Widget build(BuildContext context) {
-    if (store.players.isEmpty) {
-      return ListView(children: const [EmptyHint(title: 'Игроков пока нет')]);
+  State<_Players> createState() => _PlayersState();
+}
+
+class _PlayersState extends State<_Players> {
+  final _query = TextEditingController();
+  List<PlayerBrief> _results = [];
+  Timer? _timer;
+  bool _pending = false;
+  bool _searched = false;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _query.dispose();
+    super.dispose();
+  }
+
+  void _schedule(String value) {
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 250), () => _search(value));
+  }
+
+  Future<void> _search(String value) async {
+    final q = value.trim();
+    if (q.length < 2) {
+      setState(() {
+        _results = [];
+        _searched = false;
+        _pending = false;
+      });
+      return;
     }
+    setState(() => _pending = true);
+    try {
+      final page = await widget.store.api.get('/players', query: {'q': q, 'size': '8'});
+      final items = page is Map
+          ? ((page['content'] as List?) ?? const [])
+              .whereType<Map>()
+              .map((item) => PlayerBrief.fromJson(Map<String, dynamic>.from(item)))
+              .toList()
+          : <PlayerBrief>[];
+      if (!mounted) return;
+      setState(() {
+        _results = items;
+        _searched = true;
+        _pending = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _pending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return ListView(
+      padding: const EdgeInsets.all(12),
       children: [
-        for (final player in store.players)
-          ListTile(
-            leading: PlayerPhoto(url: store.api.resolveMedia(player.avatarUrl), name: player.displayName, size: 36),
-            title: Text(player.displayName, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
-            subtitle: Text(
-              '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
-              style: const TextStyle(color: AppColors.muted),
-            ),
-            onTap: () => context.push('/players/${player.id}'),
+        TextField(
+          controller: _query,
+          decoration: const InputDecoration(
+            hintText: 'Начните вводить фамилию',
+            prefixIcon: Icon(Icons.search),
           ),
+          onChanged: _schedule,
+        ),
+        const SizedBox(height: 12),
+        if (_query.text.trim().length < 2)
+          const Text('Введите хотя бы 2 буквы', style: TextStyle(color: AppColors.muted))
+        else if (_pending)
+          const Text('Ищем…', style: TextStyle(color: AppColors.muted))
+        else if (_searched && _results.isEmpty)
+          const Text('Никого не нашли', style: TextStyle(color: AppColors.muted))
+        else
+          for (final player in _results)
+            ListTile(
+              leading: PlayerPhoto(url: widget.store.api.resolveMedia(player.avatarUrl), name: player.displayName, size: 36),
+              title: Text(player.displayName, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
+              subtitle: Text(
+                '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
+                style: const TextStyle(color: AppColors.muted),
+              ),
+              onTap: () => context.push('/players/${player.id}'),
+            ),
       ],
     );
   }

@@ -39,7 +39,7 @@ public class PlayerController {
     }
 
     @GetMapping
-    @Operation(summary = "List players")
+    @Operation(summary = "Search players. Empty without a query of at least 2 characters, unless teamId is set. Page size is capped at 12.")
     public PageResponse<PlayerProfileResponse> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) UUID teamId,
