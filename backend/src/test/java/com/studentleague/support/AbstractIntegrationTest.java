@@ -51,6 +51,10 @@ public abstract class AbstractIntegrationTest {
         registry.add("app.cors.allowed-origins", () -> "http://localhost:5173");
         registry.add("app.auth.auto-approve-roles", () -> "true");
         registry.add("app.demo-data.enabled", () -> "false");
+        registry.add("app.google.client-id", () -> "test-google-client");
+        registry.add("app.public-url", () -> "http://localhost:5173");
+        registry.add("app.mail.host", () -> "");
+        registry.add("app.mail.from", () -> "");
         registry.add("spring.autoconfigure.exclude", () ->
                 "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
                         + "org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration");

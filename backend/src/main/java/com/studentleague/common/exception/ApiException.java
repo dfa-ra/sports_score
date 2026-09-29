@@ -44,4 +44,8 @@ public class ApiException extends RuntimeException {
     public static ApiException rateLimited(String message) {
         return new ApiException("RATE_LIMITED", message, HttpStatus.TOO_MANY_REQUESTS);
     }
+
+    public static ApiException serviceUnavailable(String message) {
+        return new ApiException("SERVICE_UNAVAILABLE", message, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }

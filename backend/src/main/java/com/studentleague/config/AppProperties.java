@@ -13,7 +13,10 @@ public record AppProperties(
         LocalStorage localStorage,
         Admin admin,
         Auth auth,
-        DemoData demoData
+        DemoData demoData,
+        Google google,
+        String publicUrl,
+        Mail mail
 ) {
     public record Cors(List<String> allowedOrigins) {
     }
@@ -45,5 +48,20 @@ public record AppProperties(
 
     /** One-shot campus league when the database has no teams yet. */
     public record DemoData(boolean enabled) {
+    }
+
+    /** Comma-separated OAuth client ids. Empty disables Google sign-in. */
+    public record Google(String clientId) {
+    }
+
+    /** SMTP for password reset. Blank host means do not send mail. */
+    public record Mail(
+            String host,
+            int port,
+            String username,
+            String password,
+            String from,
+            boolean starttls
+    ) {
     }
 }

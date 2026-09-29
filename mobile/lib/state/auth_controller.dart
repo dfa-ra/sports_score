@@ -34,12 +34,28 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password) {
+    return _authenticate(
+      () => api.post('/auth/login', {'email': email.trim(), 'password': password}),
+      'Не удалось войти.',
+    );
+  }
+
+  /// Same backend session as the web «Войти через Google» button.
+  /// The caller supplies a Google ID token (audience must be GOOGLE_CLIENT_ID).
+  Future<bool> loginWithGoogle(String idToken) {
+    return _authenticate(
+      () => api.post('/auth/google', {'idToken': idToken}),
+      'Не удалось войти через Google.',
+    );
+  }
+
+  Future<bool> _authenticate(Future<dynamic> Function() request, String fallback) async {
     busy = true;
     error = null;
     notifyListeners();
     try {
-      final data = await api.post('/auth/login', {'email': email.trim(), 'password': password});
+      final data = await request();
       final map = Map<String, dynamic>.from(data as Map);
       api.accessToken = map['accessToken']?.toString();
       user = AuthUser.fromJson(Map<String, dynamic>.from(map['user'] as Map));
@@ -52,7 +68,7 @@ class AuthController extends ChangeNotifier {
       }
       return true;
     } catch (e) {
-      error = e is ApiException ? e.message : 'Не удалось войти.';
+      error = e is ApiException ? e.message : fallback;
       return false;
     } finally {
       busy = false;

@@ -68,6 +68,7 @@ jobs:
         env:
           VITE_APP_REVISION: ${{ github.sha }}
           VITE_APP_CHANNEL: dev
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: |
           npm ci
           npm run build

@@ -25,7 +25,10 @@ class JwtServiceTest {
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
                 new AppProperties.Admin("", ""),
                 new AppProperties.Auth(false),
-                new AppProperties.DemoData(false)
+                new AppProperties.DemoData(false),
+                new AppProperties.Google(""),
+                "http://localhost:5173",
+                new AppProperties.Mail("", 587, "", "", "", true)
         );
         jwtService = new JwtService(properties);
     }

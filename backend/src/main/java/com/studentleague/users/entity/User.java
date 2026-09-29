@@ -23,8 +23,11 @@ public class User {
     @Column(nullable = false, unique = true, length = 320)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
+
+    @Column(name = "google_sub", unique = true, length = 255)
+    private String googleSub;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
@@ -85,6 +88,14 @@ public class User {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getGoogleSub() {
+        return googleSub;
+    }
+
+    public void setGoogleSub(String googleSub) {
+        this.googleSub = googleSub;
     }
 
     public Role getRole() {

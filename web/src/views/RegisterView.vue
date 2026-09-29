@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api/client'
 import { passwordHint } from '../lib/format'
 import { apiError } from '../lib/errors'
+import { googleClientId } from '../lib/googleIdentity'
 
 type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE'
 
@@ -82,6 +84,19 @@ async function submit() {
     pending.value = false
   }
 }
+
+async function onGoogle(idToken: string) {
+  error.value = ''
+  pending.value = true
+  try {
+    await auth.loginWithGoogle(idToken)
+    router.push('/')
+  } catch (e: any) {
+    error.value = e.response?.data?.message || 'Не удалось войти через Google.'
+  } finally {
+    pending.value = false
+  }
+}
 </script>
 
 <template>
@@ -91,6 +106,8 @@ async function submit() {
         <h1>Регистрация</h1>
         <p>ФИО и почта обязательны. Можно выбрать несколько ролей. Игрок, капитан и судья прикладывают фото. Роли подтверждает админ.</p>
       </div>
+      <GoogleSignInButton @success="onGoogle" @error="error = $event" />
+      <p v-if="googleClientId" class="muted">Войти через Google. Новый аккаунт будет болельщиком. Игрок, капитан и судья регистрируются формой ниже — для них нужно фото.</p>
       <form class="stack" @submit.prevent="submit">
         <label class="field">Имя
           <input v-model="firstName" required maxlength="100" />

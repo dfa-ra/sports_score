@@ -31,7 +31,8 @@ User 1──* DeviceToken
 |---|---|---|
 | id | UUID PK | |
 | email | VARCHAR UNIQUE NOT NULL | |
-| password_hash | VARCHAR NOT NULL | BCrypt |
+| password_hash | VARCHAR | BCrypt. Пусто, если аккаунт только Google и пароль ещё не задавали |
+| google_sub | VARCHAR UNIQUE | subject Google ID token, nullable |
 | role | VARCHAR NOT NULL | FAN, PLAYER, CAPTAIN, REFEREE, ADMIN |
 | enabled | BOOLEAN NOT NULL | |
 | created_at / updated_at | TIMESTAMPTZ | |
@@ -157,6 +158,16 @@ User 1──* DeviceToken
 | expires_at | TIMESTAMPTZ | |
 | revoked_at | TIMESTAMPTZ | |
 | replaced_by_token_id | UUID | цепочка ротации |
+| created_at | TIMESTAMPTZ | |
+
+### password_reset_tokens
+| Колонка | Тип | Примечание |
+|---|---|---|
+| id | UUID PK | |
+| user_id | UUID FK → users | |
+| token_hash | VARCHAR(64) UNIQUE | SHA-256 ссылки, сырой токен не хранится |
+| expires_at | TIMESTAMPTZ | 1 час |
+| used_at | TIMESTAMPTZ | одноразовая ссылка |
 | created_at | TIMESTAMPTZ | |
 
 ### device_tokens

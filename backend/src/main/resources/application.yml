@@ -55,6 +55,19 @@ app:
     auto-approve-roles: ${AUTH_AUTO_APPROVE_ROLES:false}
   demo-data:
     enabled: ${APP_DEMO_DATA:true}
+  # Public site origin for password-reset links. No trailing slash required.
+  public-url: ${APP_PUBLIC_URL:http://localhost:5173}
+  google:
+    # Comma-separated. Empty keeps email/password login and hides nothing on the API
+    # except POST /auth/google, which responds that Google sign-in is not configured.
+    client-id: ${GOOGLE_CLIENT_ID:}
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    from: ${MAIL_FROM:}
+    starttls: ${MAIL_STARTTLS:true}
 
 springdoc:
   api-docs:

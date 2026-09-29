@@ -1,13 +1,18 @@
 package com.studentleague.auth.controller;
 
 import com.studentleague.auth.dto.AuthResponse;
+import com.studentleague.auth.dto.ForgotPasswordRequest;
+import com.studentleague.auth.dto.GoogleLoginRequest;
 import com.studentleague.auth.dto.LoginRequest;
 import com.studentleague.auth.dto.LogoutRequest;
 import com.studentleague.auth.dto.RefreshRequest;
 import com.studentleague.auth.dto.RegisterRequest;
+import com.studentleague.auth.dto.ResetPasswordRequest;
 import com.studentleague.auth.dto.UserResponse;
+import com.studentleague.auth.google.GoogleTokenVerifier;
 import com.studentleague.auth.service.AuthRateLimiter;
 import com.studentleague.auth.service.AuthService;
+import com.studentleague.auth.service.PasswordResetService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.storage.ImageUploads;
 import com.studentleague.storage.StorageService;
@@ -38,11 +43,21 @@ public class AuthController {
     private final AuthService authService;
     private final AuthRateLimiter authRateLimiter;
     private final StorageService storageService;
+    private final GoogleTokenVerifier googleTokenVerifier;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService, AuthRateLimiter authRateLimiter, StorageService storageService) {
+    public AuthController(
+            AuthService authService,
+            AuthRateLimiter authRateLimiter,
+            StorageService storageService,
+            GoogleTokenVerifier googleTokenVerifier,
+            PasswordResetService passwordResetService
+    ) {
         this.authService = authService;
         this.authRateLimiter = authRateLimiter;
         this.storageService = storageService;
+        this.googleTokenVerifier = googleTokenVerifier;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/register")
@@ -73,6 +88,35 @@ public class AuthController {
         authRateLimiter.check(httpRequest);
         AuthService.AuthTokens tokens = authService.login(request.email(), request.password());
         return toResponse(tokens);
+    }
+
+    @PostMapping("/google")
+    @Operation(summary = "Войти через Google ID token. Новый аккаунт создаётся как FAN")
+    public AuthResponse google(@Valid @RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
+        authRateLimiter.check(httpRequest);
+        return toResponse(authService.loginWithGoogle(googleTokenVerifier.verify(request.idToken())));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Запросить ссылку для сброса пароля. Ответ одинаковый, есть аккаунт или нет")
+    public ResponseEntity<Void> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        authRateLimiter.check(httpRequest);
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Задать новый пароль по одноразовой ссылке")
+    public ResponseEntity<Void> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        authRateLimiter.check(httpRequest);
+        passwordResetService.resetPassword(request.token(), request.password());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/refresh")

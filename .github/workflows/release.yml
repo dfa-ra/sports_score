@@ -76,6 +76,7 @@ jobs:
           VITE_APP_VERSION: ${{ needs.resolve-version.outputs.version }}
           VITE_APP_REVISION: ${{ github.sha }}
           VITE_APP_CHANNEL: prod
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: npm run build
       - name: Pack dist
         run: |

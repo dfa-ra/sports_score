@@ -52,6 +52,9 @@ Auth: `Authorization: Bearer <access_token>`
 |---|---|---|---|
 | POST | `/auth/register` | Публичный | Создать аккаунт FAN |
 | POST | `/auth/login` | Публичный | Access + refresh токены |
+| POST | `/auth/google` | Публичный | Вход по Google ID token, те же access/refresh |
+| POST | `/auth/forgot-password` | Публичный | Письмо со ссылкой сброса. Ответ одинаковый, есть аккаунт или нет |
+| POST | `/auth/reset-password` | Публичный | Новый пароль по одноразовой ссылке |
 | POST | `/auth/refresh` | Публичный (refresh в body) | Ротация refresh, новый access |
 | POST | `/auth/logout` | Bearer или refresh | Отозвать refresh |
 | GET | `/auth/me` | Bearer | Текущий пользователь |
@@ -105,7 +108,34 @@ Auth: `Authorization: Bearer <access_token>`
 
 Запрос: `{ "refreshToken": "..." }` → новый access + refresh (старый refresh отозван).
 
-На register/login/refresh действует rate limiting.
+На register/login/google/forgot-password/reset-password/refresh действует rate limiting.
+
+### Google
+
+`POST /auth/google`
+
+```json
+{ "idToken": "<Google ID token>" }
+```
+
+Ответ `200` — тот же объект, что у login.
+
+Backend проверяет подпись токена, срок, issuer Google и audience из `GOOGLE_CLIENT_ID` (несколько id через запятую, если у веба и мобильного клиента разные). Почта должна быть подтверждена Google (`email_verified`). Пустой `GOOGLE_CLIENT_ID` — `503`, вход по паролю при этом работает.
+
+- subject уже привязан — вход в этот аккаунт, email другого пользователя не забирается;
+- email уже есть, Google ещё не привязан — вход и запись `google_sub`;
+- email есть и привязан к другому subject — `409`;
+- пользователя нет — создаётся **FAN** без пароля. PLAYER / CAPTAIN / REFEREE так не выдаются (для них по-прежнему регистрация с фото).
+
+Кнопка на вебе берёт публичный client id из `VITE_GOOGLE_CLIENT_ID` на этапе сборки. Пустое значение прячет кнопку.
+
+### Восстановление пароля
+
+`POST /auth/forgot-password` — `{ "email" }` → всегда `204`, и если почты нет в базе тоже. В письме ссылка `{APP_PUBLIC_URL}/reset-password?token=...` (1 час, один раз). В базе хранится только SHA-256, сырой токен в логи не пишется.
+
+`POST /auth/reset-password` — `{ "token", "password" }`. Пароль от 8 до 100 символов, как при регистрации. Успех — `204`. Старые refresh-токены отзываются. Повтор той же ссылки — `400`.
+
+Аккаунт только с Google (`password_hash` пустой) может задать пароль этой ссылкой и дальше входить и через Google, и по почте. Пока `MAIL_HOST` или `MAIL_FROM` пустые, письмо не уходит (в лог пишется факт, без ссылки) — для локальной разработки и тестов.
 
 ---
 

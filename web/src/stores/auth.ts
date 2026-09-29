@@ -84,12 +84,29 @@ export const useAuthStore = defineStore('auth', () => {
     return login(payload.email, payload.password)
   }
 
-  async function login(email: string, password: string) {
-    const { data } = await api.post('/auth/login', { email, password })
+  function applySession(data: { accessToken: string; refreshToken: string; user: User }) {
     accessToken.value = data.accessToken
     refreshToken.value = data.refreshToken
     user.value = data.user
     persist()
+  }
+
+  async function login(email: string, password: string) {
+    const { data } = await api.post('/auth/login', { email, password })
+    applySession(data)
+  }
+
+  async function loginWithGoogle(idToken: string) {
+    const { data } = await api.post('/auth/google', { idToken })
+    applySession(data)
+  }
+
+  async function requestPasswordReset(email: string) {
+    await api.post('/auth/forgot-password', { email })
+  }
+
+  async function resetPassword(token: string, password: string) {
+    await api.post('/auth/reset-password', { token, password })
   }
 
   async function refresh() {
@@ -147,6 +164,9 @@ export const useAuthStore = defineStore('auth', () => {
     canAccessMyTeam,
     register,
     login,
+    loginWithGoogle,
+    requestPasswordReset,
+    resetPassword,
     refresh,
     refreshMe,
     logout,
