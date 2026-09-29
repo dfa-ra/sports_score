@@ -108,6 +108,18 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/change-password-email")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Ссылка для смены пароля на почту текущего аккаунта. Ответ всегда 204")
+    public ResponseEntity<Void> changePasswordEmail(
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest
+    ) {
+        authRateLimiter.check(httpRequest);
+        passwordResetService.requestResetForCurrentUser(principal == null ? null : principal.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/reset-password")
     @Operation(summary = "Задать новый пароль по одноразовой ссылке")
     public ResponseEntity<Void> resetPassword(

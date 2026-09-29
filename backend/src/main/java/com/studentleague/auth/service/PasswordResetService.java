@@ -53,6 +53,20 @@ public class PasswordResetService {
     }
 
     @Transactional
+    public void requestResetForCurrentUser(UUID userId) {
+        if (userId == null) {
+            AuthService.hashToken(randomToken());
+            return;
+        }
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            AuthService.hashToken(randomToken());
+            return;
+        }
+        requestReset(user.getEmail());
+    }
+
+    @Transactional
     public void requestReset(String email) {
         PublicResetLink.normalizeBase(appProperties.publicUrl());
         String normalized = email == null ? "" : email.trim().toLowerCase();

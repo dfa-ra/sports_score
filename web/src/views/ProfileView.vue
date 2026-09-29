@@ -23,6 +23,9 @@ const jerseyNumber = ref<number | null>(null)
 const position = ref('')
 const bio = ref('')
 const pending = ref(false)
+const passwordPending = ref(false)
+const passwordNote = ref('')
+const passwordError = ref('')
 const error = ref('')
 const ok = ref('')
 const exists = ref(false)
@@ -136,6 +139,20 @@ async function onPhoto(event: Event) {
   }
 }
 
+async function changePassword() {
+  passwordError.value = ''
+  passwordNote.value = ''
+  passwordPending.value = true
+  try {
+    await auth.requestPasswordChangeEmail()
+    passwordNote.value = 'Если почта настроена, ссылка придёт на ваш email.'
+  } catch (e: any) {
+    passwordError.value = apiError(e, 'Не удалось отправить ссылку.')
+  } finally {
+    passwordPending.value = false
+  }
+}
+
 async function logout() {
   await auth.logout()
   router.push('/')
@@ -226,6 +243,11 @@ async function logout() {
       <RouterLink v-if="auth.canManageLeague" class="tile" to="/admin">Админка</RouterLink>
     </div>
 
+    <button class="btn secondary" type="button" :disabled="passwordPending" @click="changePassword">
+      {{ passwordPending ? 'Отправляем…' : 'Сменить пароль' }}
+    </button>
+    <p v-if="passwordNote" class="form-ok">{{ passwordNote }}</p>
+    <p v-if="passwordError" class="form-error">{{ passwordError }}</p>
     <button class="btn secondary" type="button" @click="logout">Выйти</button>
   </section>
 </template>

@@ -35,8 +35,11 @@ class _ProfilePageState extends State<ProfilePage> {
   PlayerProfile? profile;
   PlayerCard? card;
   bool saving = false;
+  bool passwordPending = false;
   String? formError;
   String? formOk;
+  String? passwordNote;
+  String? passwordError;
 
   @override
   void initState() {
@@ -127,6 +130,26 @@ class _ProfilePageState extends State<ProfilePage> {
       if (mounted) setState(() => formError = e is ApiException ? e.message : 'Профиль не сохранился.');
     } finally {
       if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    setState(() {
+      passwordPending = true;
+      passwordNote = null;
+      passwordError = null;
+    });
+    try {
+      await context.read<AuthController>().api.post('/auth/change-password-email');
+      if (mounted) {
+        setState(() => passwordNote = 'Если почта настроена, ссылка придёт на ваш email.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => passwordError = e is ApiException ? e.message : 'Не удалось отправить ссылку.');
+      }
+    } finally {
+      if (mounted) setState(() => passwordPending = false);
     }
   }
 
@@ -400,7 +423,25 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          child: OutlinedButton(onPressed: auth.logout, child: const Text('Выйти')),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              OutlinedButton(
+                onPressed: passwordPending ? null : _changePassword,
+                child: Text(passwordPending ? 'Отправляем…' : 'Сменить пароль'),
+              ),
+              if (passwordNote != null) ...[
+                const SizedBox(height: 8),
+                Text(passwordNote!, style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w700)),
+              ],
+              if (passwordError != null) ...[
+                const SizedBox(height: 8),
+                Text(passwordError!, style: const TextStyle(color: AppColors.danger)),
+              ],
+              const SizedBox(height: 8),
+              OutlinedButton(onPressed: auth.logout, child: const Text('Выйти')),
+            ],
+          ),
         ),
       ],
     );

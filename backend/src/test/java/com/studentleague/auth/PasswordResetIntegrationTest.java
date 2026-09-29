@@ -24,7 +24,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.clearInvocations;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -161,6 +163,107 @@ class PasswordResetIntegrationTest extends AbstractIntegrationTest {
                                 {"token":"%s","password":"NewPass123"}
                                 """.formatted(second)))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void changePasswordEmailCreatesHashedTokenForCurrentUser() throws Exception {
+        String email = "change-" + System.nanoTime() + "@example.com";
+        String access = registerAndLogin(email, "Str0ngPass!");
+        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        clearInvocations(mailer);
+
+        mockMvc.perform(post("/api/v1/auth/change-password-email")
+                        .header("Authorization", auth(access)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        org.mockito.ArgumentCaptor<String> link = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(mailer).sendResetLink(eq(email), link.capture());
+        URI uri = URI.create(link.getValue());
+        assertThat(uri.getPath()).isEqualTo("/reset-password");
+        String rawToken = URLDecoder.decode(uri.getRawQuery().substring("token=".length()), StandardCharsets.UTF_8);
+        PasswordResetToken stored = passwordResetTokenRepository.findByTokenHash(sha256(rawToken)).orElseThrow();
+        assertThat(stored.getUserId()).isEqualTo(user.getId());
+        assertThat(stored.getTokenHash()).isNotEqualTo(rawToken);
+        assertThat(stored.getTokenHash()).matches("[0-9a-f]{64}");
+        assertThat(stored.getUsedAt()).isNull();
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s","password":"NewPass123"}
+                                """.formatted(rawToken)))
+                .andExpect(status().isNoContent());
+        assertThat(passwordEncoder.matches("NewPass123", userRepository.findByEmailIgnoreCase(email).orElseThrow().getPasswordHash())).isTrue();
+    }
+
+    @Test
+    void changePasswordEmailAnonymousIsUnauthorized() throws Exception {
+        long before = passwordResetTokenRepository.count();
+        clearInvocations(mailer);
+
+        mockMvc.perform(post("/api/v1/auth/change-password-email"))
+                .andExpect(status().isUnauthorized());
+
+        assertThat(passwordResetTokenRepository.count()).isEqualTo(before);
+        verify(mailer, never()).sendResetLink(anyString(), anyString());
+    }
+
+    @Test
+    void changePasswordEmailIgnoresSuppliedAddress() throws Exception {
+        String email = "owner-" + System.nanoTime() + "@example.com";
+        String other = "other-" + System.nanoTime() + "@example.com";
+        String access = registerAndLogin(email, "Str0ngPass!");
+        registerAndLogin(other, "Str0ngPass!");
+        clearInvocations(mailer);
+
+        mockMvc.perform(post("/api/v1/auth/change-password-email")
+                        .header("Authorization", auth(access))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"%s"}
+                                """.formatted(other)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        verify(mailer).sendResetLink(eq(email), anyString());
+        verify(mailer, never()).sendResetLink(eq(other), anyString());
+    }
+
+    @Test
+    void changePasswordEmailWithoutEmailStoresNothing() throws Exception {
+        String email = "blank-" + System.nanoTime() + "@example.com";
+        String access = registerAndLogin(email, "Str0ngPass!");
+        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        user.setEmail(" ".repeat(8));
+        userRepository.saveAndFlush(user);
+        long before = passwordResetTokenRepository.count();
+        clearInvocations(mailer);
+
+        mockMvc.perform(post("/api/v1/auth/change-password-email")
+                        .header("Authorization", auth(access)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        assertThat(passwordResetTokenRepository.count()).isEqualTo(before);
+        verify(mailer, never()).sendResetLink(anyString(), anyString());
+        assertThat(passwordResetTokenRepository.findByUserIdAndUsedAtIsNull(user.getId())).isEmpty();
+    }
+
+    @Test
+    void changePasswordEmailStillNoContentWhenMailerFails() throws Exception {
+        String email = "mailfail-" + System.nanoTime() + "@example.com";
+        String access = registerAndLogin(email, "Str0ngPass!");
+        org.mockito.Mockito.doThrow(new IllegalStateException("smtp down"))
+                .when(mailer).sendResetLink(eq(email), anyString());
+
+        mockMvc.perform(post("/api/v1/auth/change-password-email")
+                        .header("Authorization", auth(access)))
+                .andExpect(status().isNoContent())
+                .andExpect(content().string(""));
+
+        User user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        assertThat(passwordResetTokenRepository.findByUserIdAndUsedAtIsNull(user.getId())).hasSize(1);
     }
 
     @Test

@@ -54,6 +54,7 @@ Auth: `Authorization: Bearer <access_token>`
 | POST | `/auth/login` | Публичный | Access + refresh токены |
 | POST | `/auth/google` | Публичный | Вход по Google ID token, те же access/refresh |
 | POST | `/auth/forgot-password` | Публичный | Письмо со ссылкой сброса. Ответ одинаковый, есть аккаунт или нет |
+| POST | `/auth/change-password-email` | Bearer | Та же ссылка на почту текущего аккаунта. Тело не нужно. Всегда `204` |
 | POST | `/auth/reset-password` | Публичный | Новый пароль по одноразовой ссылке |
 | POST | `/auth/refresh` | Публичный (refresh в body) | Ротация refresh, новый access |
 | POST | `/auth/logout` | Bearer или refresh | Отозвать refresh |
@@ -108,7 +109,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 Запрос: `{ "refreshToken": "..." }` → новый access + refresh (старый refresh отозван).
 
-На register/login/google/forgot-password/reset-password/refresh действует rate limiting.
+На register/login/google/forgot-password/change-password-email/reset-password/refresh действует rate limiting.
 
 ### Google
 
@@ -132,6 +133,8 @@ Backend проверяет подпись токена, срок, issuer Google 
 ### Восстановление пароля
 
 `POST /auth/forgot-password` — `{ "email" }` → всегда `204`, и если почты нет в базе тоже. В письме ссылка `{APP_PUBLIC_URL}/reset-password?token=...` (1 час, один раз). В базе хранится только SHA-256, сырой токен в логи не пишется.
+
+`POST /auth/change-password-email` — без тела, только Bearer текущего пользователя. Почта берётся из аккаунта, в теле её передавать не нужно. Та же таблица токенов и та же страница сброса. Всегда `204`: и если у аккаунта нет почты, и если SMTP не настроен. Чужой email в теле игнорируется.
 
 `POST /auth/reset-password` — `{ "token", "password" }`. Пароль от 8 до 100 символов, как при регистрации. Успех — `204`. Старые refresh-токены отзываются. Повтор той же ссылки — `400`.
 

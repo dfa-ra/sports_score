@@ -105,6 +105,10 @@ export const useAuthStore = defineStore('auth', () => {
     await api.post('/auth/forgot-password', { email })
   }
 
+  async function requestPasswordChangeEmail() {
+    await api.post('/auth/change-password-email')
+  }
+
   async function resetPassword(token: string, password: string) {
     await api.post('/auth/reset-password', { token, password })
   }
@@ -166,6 +170,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     loginWithGoogle,
     requestPasswordReset,
+    requestPasswordChangeEmail,
     resetPassword,
     refresh,
     refreshMe,
