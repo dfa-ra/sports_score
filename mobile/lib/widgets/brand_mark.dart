@@ -16,7 +16,7 @@ class BrandMark extends StatelessWidget {
         brandMarkAsset,
         width: size,
         height: size,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         gaplessPlayback: true,
       ),
     );
