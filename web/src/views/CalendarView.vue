@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import { useFavorites } from '../stores/favorites'
 import { ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
@@ -13,18 +14,25 @@ const tournaments = ref<Record<string, string>>({})
 const error = ref('')
 const loading = ref(true)
 const day = ref('')
+const mineOnly = ref(false)
 const teams = useTeamDirectory()
+const fav = useFavorites()
+let refreshTimer = 0
 
 const liveOnly = computed(() => route.name === 'live')
+
+async function loadMatches() {
+  const { data } = await api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } })
+  items.value = data.content ?? []
+}
 
 onMounted(async () => {
   try {
     await teams.load()
-    const [m, t] = await Promise.all([
-      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+    const [, t] = await Promise.all([
+      loadMatches(),
       api.get('/tournaments', { params: { size: 50 } }),
     ])
-    items.value = m.data.content ?? []
     const names: Record<string, string> = {}
     for (const item of t.data.content ?? []) names[item.id] = item.name
     tournaments.value = names
@@ -32,7 +40,14 @@ onMounted(async () => {
     error.value = e.response?.data?.message || 'Календарь не загрузился.'
   } finally {
     loading.value = false
+    refreshTimer = window.setInterval(() => {
+      loadMatches().catch(() => {})
+    }, 12_000)
   }
+})
+
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
 })
 
 function pad(n: number) {
@@ -61,20 +76,26 @@ const strip = computed(() => {
   return days
 })
 
+function isMine(match: any) {
+  return fav.hasMatch(match.id) || fav.hasTeam(match.homeTeamId) || fav.hasTeam(match.awayTeamId)
+}
+
 const visible = computed(() => {
+  let rows: any[]
   if (liveOnly.value) {
-    return items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
-  }
-  if (day.value) {
-    return items.value
+    rows = items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
+  } else if (day.value) {
+    rows = items.value
       .filter((m) => ymd(m.scheduledAt) === day.value)
       .slice()
       .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+  } else {
+    rows = items.value
+      .filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
+      .slice()
+      .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
   }
-  return items.value
-    .filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
-    .slice()
-    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+  return mineOnly.value ? rows.filter(isMine) : rows
 })
 
 const grouped = computed(() => {
@@ -98,21 +119,24 @@ const grouped = computed(() => {
     <div v-if="liveOnly" class="live-head">
       <h1>Live</h1>
     </div>
-    <div v-else class="date-strip">
-      <button type="button" :class="{ on: !day }" @click="day = ''">Все</button>
-      <button
-        v-for="item in strip"
-        :key="item.key"
-        type="button"
-        :class="{ on: day === item.key }"
-        @click="day = item.key"
-      >{{ item.label }}</button>
+    <div class="date-strip">
+      <button type="button" :class="{ on: mineOnly }" @click="mineOnly = !mineOnly">Мои</button>
+      <template v-if="!liveOnly">
+        <button type="button" :class="{ on: !day }" @click="day = ''">Все</button>
+        <button
+          v-for="item in strip"
+          :key="item.key"
+          type="button"
+          :class="{ on: day === item.key }"
+          @click="day = item.key"
+        >{{ item.label }}</button>
+      </template>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="skeleton" />
     <EmptyState
       v-else-if="!visible.length"
-      :title="liveOnly ? 'Сейчас никто не играет' : day ? 'В этот день матчей нет' : 'Пока нет ближайших матчей'"
+      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : day ? 'В этот день матчей нет' : 'Пока нет ближайших матчей'"
     />
     <div v-else class="sheet">
       <section v-for="group in grouped" :key="group.id">

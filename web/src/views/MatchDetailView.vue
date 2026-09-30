@@ -14,6 +14,7 @@ import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
+import MatchShareButton from '../components/MatchShareButton.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
@@ -248,6 +249,12 @@ onUnmounted(() => client?.deactivate())
         <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
           {{ match.periodCount }} × {{ formatClock(cap) }}
         </p>
+        <MatchShareButton
+          :home-name="teams.fullName(match.homeTeamId)"
+          :away-name="teams.fullName(match.awayTeamId)"
+          :home-score="match.homeScore"
+          :away-score="match.awayScore"
+        />
       </div>
       <div class="club away">
         <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">

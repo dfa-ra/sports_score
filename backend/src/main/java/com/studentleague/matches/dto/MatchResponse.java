@@ -22,6 +22,8 @@ public record MatchResponse(
         int periodCount,
         int periodLengthSeconds,
         Instant clockRunningSince,
-        String sportCode
+        String sportCode,
+        String lastGoalScorer,
+        Integer minute
 ) {
 }

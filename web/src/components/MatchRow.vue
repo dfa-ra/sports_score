@@ -17,7 +17,12 @@ const props = defineProps<{
 const fav = useFavorites()
 const teams = useTeamDirectory()
 const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
-const when = computed(() => shortKickoff(props.match.scheduledAt, props.match.status))
+const isLive = computed(() => props.match.status === 'LIVE' || props.match.status === 'PAUSED')
+const when = computed(() => {
+  if (!isLive.value) return shortKickoff(props.match.scheduledAt, props.match.status)
+  if (props.match.minute == null) return props.match.status === 'PAUSED' ? 'Пауза' : 'LIVE'
+  return `${props.match.minute}'`
+})
 const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
 const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
 </script>
@@ -32,7 +37,7 @@ const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
       @click.stop="fav.toggleMatch(match.id)"
     >★</button>
     <RouterLink class="body" :to="`/matches/${match.id}`">
-      <span class="when" :class="{ live: match.status === 'LIVE' || match.status === 'PAUSED' }">{{ when }}</span>
+      <span class="when" :class="{ live: isLive, paused: match.status === 'PAUSED' }" :title="match.status === 'PAUSED' ? 'Пауза' : undefined">{{ when }}</span>
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
           <TeamCrest :src="homeLogo" :name="homeName" :size="18" />
@@ -42,6 +47,7 @@ const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
           <TeamCrest :src="awayLogo" :name="awayName" :size="18" />
           <b>{{ awayName }}</b>
         </span>
+        <span v-if="isLive && match.lastGoalScorer" class="scorer">{{ match.lastGoalScorer }}</span>
       </span>
       <span class="nums">
         <strong>{{ match.homeScore }}</strong>
@@ -86,6 +92,15 @@ const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
   font-variant-numeric: tabular-nums;
 }
 .when.live { color: var(--ice); font-weight: 800; }
+.when.paused { color: var(--muted); }
+.scorer {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .sides { display: grid; gap: 0.18rem; min-width: 0; }
 .side {
   display: grid;
