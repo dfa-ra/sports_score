@@ -65,6 +65,9 @@ public class Match {
     @Column(name = "clock_running_since")
     private Instant clockRunningSince;
 
+    @Column(length = 120)
+    private String venue;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -198,5 +201,13 @@ public class Match {
 
     public void setClockRunningSince(Instant clockRunningSince) {
         this.clockRunningSince = clockRunningSince;
+    }
+
+    public String getVenue() {
+        return venue;
+    }
+
+    public void setVenue(String venue) {
+        this.venue = venue;
     }
 }
