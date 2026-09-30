@@ -1,24 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
-const props = defineProps<{
+defineProps<{
   rows: any[]
   compact?: boolean
 }>()
 
 const teams = useTeamDirectory()
-
-const ranked = computed(() =>
-  [...props.rows].sort((a, b) =>
-    (Number(b.points) - Number(a.points))
-    || ((Number(b.goalsFor) - Number(b.goalsAgainst)) - (Number(a.goalsFor) - Number(a.goalsAgainst)))
-    || (Number(b.goalsFor) - Number(a.goalsFor))
-    || String(a.teamName || '').localeCompare(String(b.teamName || ''), 'ru')
-  )
-)
 
 function rankClass(index: number) {
   if (index < 2) return 'ice'
@@ -40,7 +30,7 @@ function rankClass(index: number) {
       <span>О</span>
     </div>
     <RouterLink
-      v-for="(row, i) in ranked"
+      v-for="(row, i) in rows"
       :key="row.teamId"
       class="line"
       :to="`/teams/${row.teamId}`"

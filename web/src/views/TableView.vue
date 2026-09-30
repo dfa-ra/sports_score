@@ -152,6 +152,7 @@ async function load() {
           <h2 v-if="table.name" class="group-title">{{ table.name }}</h2>
           <StandingTable :rows="table.rows" />
         </div>
+        <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
       </div>
     </template>
 
@@ -270,6 +271,11 @@ async function load() {
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
+.tie-note {
+  margin: 0.1rem 0.2rem 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
 .sheet {
   background: #fff;
   border: 1px solid var(--line);

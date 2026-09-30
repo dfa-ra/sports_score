@@ -101,15 +101,7 @@ class LeagueStore extends ChangeNotifier {
       if (results[0] is Map) {
         tournamentName = (results[0] as Map)['name']?.toString();
       }
-      standingTables = StandingTable.parse(results[1])
-          .map(
-            (table) => StandingTable(
-              id: table.id,
-              name: table.name,
-              rows: [...table.rows]..sort(StandingTable.compareRows),
-            ),
-          )
-          .toList();
+      standingTables = StandingTable.parse(results[1]);
       final board = results[2] is Map ? Map<String, dynamic>.from(results[2] as Map) : const <String, dynamic>{};
       scorers = ((board['scorers'] as List?) ?? const [])
           .whereType<Map>()

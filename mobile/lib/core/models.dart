@@ -137,14 +137,6 @@ class StandingTable {
     }
     return const [];
   }
-
-  static int compareRows(StandingRow a, StandingRow b) {
-    final points = b.points - a.points;
-    if (points != 0) return points;
-    final gd = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
-    if (gd != 0) return gd;
-    return b.goalsFor - a.goalsFor;
-  }
 }
 
 class StandingRow {
