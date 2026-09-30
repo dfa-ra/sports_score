@@ -16,10 +16,11 @@ public record PlayerCardResponse(
         String position,
         LocalDate dateOfBirth,
         TeamSummary team,
+        List<TeamSummary> captainTeams,
         Map<String, Object> statistics,
         List<MatchHistoryItem> matchHistory
 ) {
-    public record TeamSummary(UUID id, String name, String shortName, String logoUrl) {
+    public record TeamSummary(UUID id, String name, String shortName, String logoUrl, boolean captain) {
     }
 
     public record MatchHistoryItem(

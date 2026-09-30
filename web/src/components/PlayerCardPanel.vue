@@ -46,6 +46,11 @@ defineEmits<{
 const tab = ref<'games' | 'stats'>('games')
 const name = computed(() => props.card.displayName || `${props.card.firstName || ''} ${props.card.lastName || ''}`.trim())
 const age = computed(() => ageLine(props.card.dateOfBirth))
+const captainTeams = computed(() => {
+  const raw = props.card?.captainTeams
+  if (!Array.isArray(raw)) return []
+  return raw.filter((team) => team?.id && team?.name)
+})
 const history = computed<MatchRow[]>(() => props.card.matchHistory ?? [])
 const stats = computed(() => {
   const raw = props.card.statistics
@@ -79,6 +84,10 @@ function marks(row: MatchRow) {
             <span v-if="card.jerseyNumber != null"> · </span>
             {{ card.position || 'Игрок' }}
           </template>
+        </p>
+        <p v-for="team in captainTeams" :key="team.id" class="captain-line">
+          <span class="captain-label">Капитан</span>
+          <RouterLink :to="`/teams/${team.id}`">{{ team.name }}</RouterLink>
         </p>
       </div>
       <button v-if="editable" class="pen" type="button" aria-label="Изменить" @click="$emit('edit')">✎</button>
@@ -144,6 +153,16 @@ function marks(row: MatchRow) {
   line-height: 1.1;
 }
 .meta { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.86rem; }
+.captain-line {
+  margin: 0.2rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: baseline;
+  font-size: 0.9rem;
+}
+.captain-label { font-weight: 800; color: var(--navy); }
+.captain-line a { color: var(--ice); font-weight: 700; }
 .pen {
   width: 40px;
   height: 40px;
