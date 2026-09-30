@@ -9,7 +9,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,18 +65,10 @@ class MatchVenueIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.venue").value("Кронверкский манеж"));
 
-        MvcResult list = mockMvc.perform(get("/api/v1/matches").param("tournamentId", tournamentId))
+        mockMvc.perform(get("/api/v1/matches").param("tournamentId", tournamentId))
                 .andExpect(status().isOk())
-                .andReturn();
-        JsonNode content = objectMapper.readTree(list.getResponse().getContentAsString()).get("content");
-        JsonNode listed = null;
-        for (JsonNode row : content) {
-            if (matchId.equals(row.get("id").asText())) {
-                listed = row;
-            }
-        }
-        assertThat(listed).isNotNull();
-        assertThat(listed.get("venue").asText()).isEqualTo("Кронверкский манеж");
+                .andExpect(jsonPath("$.content[0].id").value(matchId))
+                .andExpect(jsonPath("$.content[0].venue").value("Кронверкский манеж"));
 
         mockMvc.perform(put("/api/v1/matches/" + matchId)
                         .header("Authorization", auth(adminToken))
