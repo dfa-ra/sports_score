@@ -23,6 +23,8 @@ public record MatchResponse(
         int periodLengthSeconds,
         Instant clockRunningSince,
         String sportCode,
-        String venue
+        String venue,
+        String lastGoalScorer,
+        Integer minute
 ) {
 }

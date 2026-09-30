@@ -125,7 +125,7 @@ public class MatchService {
         } else {
             page = matchRepository.findAll(pageable);
         }
-        return page.map(this::toResponse);
+        return matchMapper.toPage(page);
     }
 
     @Transactional
@@ -159,16 +159,14 @@ public class MatchService {
     @Transactional(readOnly = true)
     public List<MatchResponse> recentForm(UUID teamId, int limit) {
         int size = Math.max(1, Math.min(limit, 10));
-        return matchRepository.findRecentByTeamAndStatus(
-                        teamId, MatchStatus.FINISHED, Pageable.ofSize(size)
-                ).stream()
-                .map(this::toResponse)
-                .toList();
+        return matchMapper.toList(matchRepository.findRecentByTeamAndStatus(
+                teamId, MatchStatus.FINISHED, Pageable.ofSize(size)
+        ));
     }
 
     @Transactional(readOnly = true)
     public Page<MatchResponse> listForTeam(UUID teamId, Pageable pageable) {
-        return matchRepository.findByTeamId(teamId, pageable).map(this::toResponse);
+        return matchMapper.toPage(matchRepository.findByTeamId(teamId, pageable));
     }
 
     @Transactional(readOnly = true)
