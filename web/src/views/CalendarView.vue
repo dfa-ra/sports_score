@@ -6,6 +6,7 @@ import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import { ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
+import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchRow from '../components/MatchRow.vue'
 
 const route = useRoute()
@@ -118,6 +119,7 @@ const grouped = computed(() => {
   <section class="stack page">
     <div v-if="liveOnly" class="live-head">
       <h1>Live</h1>
+      <MatchGoalAlerts />
     </div>
     <div class="date-strip">
       <button type="button" :class="{ on: mineOnly }" @click="mineOnly = !mineOnly">Мои</button>
@@ -161,7 +163,14 @@ const grouped = computed(() => {
 <style scoped>
 .page { gap: 0; }
 .date-strip { margin: 0 -0.2rem 0.15rem; }
-.live-head { padding: 0.35rem 0 0.15rem; }
+.live-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding: 0.35rem 0 0.15rem;
+}
 .live-head h1 { font-size: 1.35rem; }
 .sheet {
   background: #fff;
