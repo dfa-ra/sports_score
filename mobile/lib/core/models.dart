@@ -408,6 +408,7 @@ class PlayerCard {
     this.teamId,
     this.teamName,
     this.teamLogoUrl,
+    this.captainTeams = const [],
     this.statistics = const {},
     this.history = const [],
   });
@@ -421,6 +422,7 @@ class PlayerCard {
   final String? teamId;
   final String? teamName;
   final String? teamLogoUrl;
+  final List<({String id, String name})> captainTeams;
   final Map<String, dynamic> statistics;
   final List<PlayerMatchHistory> history;
 
@@ -437,6 +439,11 @@ class PlayerCard {
       teamId: team is Map ? team['id']?.toString() : null,
       teamName: team is Map ? team['name']?.toString() : null,
       teamLogoUrl: team is Map ? team['logoUrl']?.toString() : null,
+      captainTeams: ((json['captainTeams'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => (id: item['id']?.toString() ?? '', name: item['name']?.toString() ?? ''))
+          .where((item) => item.id.isNotEmpty && item.name.isNotEmpty)
+          .toList(),
       statistics: json['statistics'] is Map ? Map<String, dynamic>.from(json['statistics'] as Map) : const {},
       history: ((json['matchHistory'] as List?) ?? const [])
           .whereType<Map>()

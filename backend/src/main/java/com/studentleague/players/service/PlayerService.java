@@ -169,12 +169,19 @@ public class PlayerService {
     public PlayerCardResponse getPublicCard(UUID playerId) {
         PlayerProfile profile = requireProfile(playerId);
         List<TeamMember> memberships = teamMemberRepository.findByPlayerIdAndStatus(playerId, TeamMemberStatus.ACTIVE);
+        List<PlayerCardResponse.TeamSummary> captainTeams = teamRepository
+                .findByCaptainIdAndDisbandedFalseOrderByNameAsc(playerId)
+                .stream()
+                .map(team -> toTeamSummary(team, true))
+                .toList();
+        Set<UUID> captainTeamIds = captainTeams.stream()
+                .map(PlayerCardResponse.TeamSummary::id)
+                .collect(Collectors.toSet());
         PlayerCardResponse.TeamSummary teamSummary = null;
         if (!memberships.isEmpty()) {
             Team team = teamRepository.findById(memberships.getFirst().getTeamId()).orElse(null);
             if (team != null) {
-                teamSummary = new PlayerCardResponse.TeamSummary(
-                        team.getId(), team.getName(), team.getShortName(), team.getLogoUrl());
+                teamSummary = toTeamSummary(team, captainTeamIds.contains(team.getId()));
             }
         }
         List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(playerId, memberships);
@@ -190,9 +197,15 @@ public class PlayerService {
                 profile.getPosition(),
                 profile.getDateOfBirth(),
                 teamSummary,
+                captainTeams,
                 statistics,
                 history
         );
+    }
+
+    private static PlayerCardResponse.TeamSummary toTeamSummary(Team team, boolean captain) {
+        return new PlayerCardResponse.TeamSummary(
+                team.getId(), team.getName(), team.getShortName(), team.getLogoUrl(), captain);
     }
 
     private Map<String, Object> seasonTotals(List<PlayerCardResponse.MatchHistoryItem> history, String position) {

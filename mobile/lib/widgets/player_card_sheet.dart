@@ -76,6 +76,27 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
                       ].join(' · '),
                       style: const TextStyle(color: AppColors.muted, fontSize: 13),
                     ),
+                    for (final team in card.captainTeams)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: InkWell(
+                          onTap: () => context.push('/teams/${team.id}'),
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Капитан ',
+                                  style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 14),
+                                ),
+                                TextSpan(
+                                  text: team.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.ice, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),

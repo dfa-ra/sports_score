@@ -10,6 +10,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface TeamRepository extends JpaRepository<Team, UUID> {
+    List<Team> findByCaptainIdAndDisbandedFalseOrderByNameAsc(UUID captainId);
+
     Optional<Team> findFirstByDisbandedFalseAndNameIgnoreCase(String name);
 
     List<Team> findByDisbandedFalseAndNameContainingIgnoreCase(String name);

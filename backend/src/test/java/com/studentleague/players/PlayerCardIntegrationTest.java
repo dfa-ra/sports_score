@@ -70,6 +70,38 @@ class PlayerCardIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void publicCardMarksTeamsThePlayerCaptains() throws Exception {
+        String adminToken = createAdminAndLogin("pcap-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String captainToken = registerAndLogin(
+                "pcap-cap-" + System.nanoTime() + "@example.com", "Str0ngPass!", "CAPTAIN", "https://example.com/c.jpg");
+        String memberToken = registerAndLogin(
+                "pcap-mem-" + System.nanoTime() + "@example.com", "Str0ngPass!", "PLAYER", "https://example.com/m.jpg");
+
+        String captainId = upsertPlayer(captainToken, "Cap", "Tain", 7, "FW");
+        String memberId = upsertPlayer(memberToken, "Reg", "Ular", 11, "MF");
+        String alphaId = createTeam(adminToken, "Alpha FC", captainId);
+        String betaId = createTeam(adminToken, "Beta FC", captainId);
+        addMember(adminToken, alphaId, memberId);
+
+        mockMvc.perform(get("/api/v1/players/" + captainId + "/card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.team.captain").value(true))
+                .andExpect(jsonPath("$.captainTeams.length()").value(2))
+                .andExpect(jsonPath("$.captainTeams[0].id").value(alphaId))
+                .andExpect(jsonPath("$.captainTeams[0].name").value("Alpha FC"))
+                .andExpect(jsonPath("$.captainTeams[0].captain").value(true))
+                .andExpect(jsonPath("$.captainTeams[1].id").value(betaId))
+                .andExpect(jsonPath("$.captainTeams[1].name").value("Beta FC"))
+                .andExpect(jsonPath("$.captainTeams[1].captain").value(true));
+
+        mockMvc.perform(get("/api/v1/players/" + memberId + "/card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.team.id").value(alphaId))
+                .andExpect(jsonPath("$.team.captain").value(false))
+                .andExpect(jsonPath("$.captainTeams").isEmpty());
+    }
+
     private Fixture setupFinishedMatch(String adminToken) throws Exception {
         String homeCapEmail = "pcard-hcap-" + System.nanoTime() + "@example.com";
         String awayCapEmail = "pcard-acap-" + System.nanoTime() + "@example.com";
