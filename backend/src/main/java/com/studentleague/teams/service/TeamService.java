@@ -24,7 +24,9 @@ import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.domain.Role;
+import com.studentleague.users.domain.RoleStatus;
 import com.studentleague.users.entity.User;
+import com.studentleague.users.entity.UserRoleAssignment;
 import com.studentleague.users.repository.UserRepository;
 import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
@@ -225,10 +227,10 @@ public class TeamService {
 
     @Transactional
     public TeamResponse assignCaptain(UserPrincipal principal, UUID teamId, AssignCaptainRequest request) {
-        if (!principal.hasRole(Role.ADMIN)) {
-            throw ApiException.forbidden("Капитана назначает только админ");
-        }
         Team team = requireActiveTeam(teamId);
+        if (!canAssignCaptain(principal, team)) {
+            throw ApiException.forbidden("Капитана меняет капитан этой команды или админ");
+        }
         bindCaptain(team, request.playerId());
         return toTeamResponse(teamRepository.save(team));
     }
@@ -277,10 +279,52 @@ public class TeamService {
         if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(team.getId(), captain.getId(), TeamMemberStatus.ACTIVE)) {
             ensureActiveMembership(team.getId(), captain.getId());
         }
+        UUID previousCaptainId = team.getCaptainId();
         team.setCaptainId(captain.getId());
+        teamRepository.saveAndFlush(team);
         User user = userRepository.findById(captain.getUserId())
                 .orElseThrow(() -> ApiException.notFound("User not found"));
         roleService.grantApproved(user, Role.CAPTAIN, user.getPhotoUrl());
+        if (previousCaptainId != null && !previousCaptainId.equals(captain.getId())) {
+            releaseCaptainRoleIfUnused(previousCaptainId);
+        }
+    }
+
+    private boolean canAssignCaptain(UserPrincipal principal, Team team) {
+        if (principal.hasRole(Role.ADMIN)) {
+            return true;
+        }
+        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId()).orElse(null);
+        return profile != null && profile.getId().equals(team.getCaptainId());
+    }
+
+    private void releaseCaptainRoleIfUnused(UUID previousPlayerId) {
+        if (!teamRepository.findByCaptainIdAndDisbandedFalseOrderByNameAsc(previousPlayerId).isEmpty()) {
+            return;
+        }
+        PlayerProfile profile = playerProfileRepository.findById(previousPlayerId).orElse(null);
+        if (profile == null) {
+            return;
+        }
+        User previous = userRepository.findById(profile.getUserId()).orElse(null);
+        if (previous == null) {
+            return;
+        }
+        boolean approved = false;
+        for (UserRoleAssignment assignment : roleService.assignmentsOf(previous.getId())) {
+            if (assignment.getRole() == Role.CAPTAIN && assignment.getStatus() == RoleStatus.APPROVED) {
+                approved = true;
+                break;
+            }
+        }
+        if (approved) {
+            roleService.reject(previous.getId(), Role.CAPTAIN, "капитанство передано");
+            return;
+        }
+        if (previous.getRole() == Role.CAPTAIN) {
+            previous.setRole(Role.FAN);
+            userRepository.save(previous);
+        }
     }
 
     private PlayerProfile requireCaptainCandidate(UUID playerId) {

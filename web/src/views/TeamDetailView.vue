@@ -89,16 +89,26 @@ async function removeMember(id: string) {
 }
 
 async function makeCaptain(id: string) {
+  if (!team.value || id === team.value.captainId) return
   error.value = ''
+  const previous = team.value.captainId
+  const teamId = team.value.id
+  team.value = { ...team.value, captainId: id }
   pending.value = true
   try {
-    await api.put(`/teams/${team.value.id}/captain`, { playerId: id })
-    await auth.refreshMe()
-    await load()
+    await api.put(`/teams/${teamId}/captain`, { playerId: id })
   } catch (e: any) {
+    if (team.value) team.value = { ...team.value, captainId: previous }
     error.value = apiError(e)
+    return
   } finally {
     pending.value = false
+  }
+  try {
+    await auth.refreshMe()
+    await load()
+  } catch {
+    // The captain already moved. A later refresh hiccup should not restore the old badge.
   }
 }
 
@@ -188,12 +198,21 @@ async function deleteTeam() {
       <h2>Состав</h2>
       <EmptyState v-if="!members.length" title="В составе никого нет" />
       <div v-for="m in members" :key="m.id" class="member">
-        <RouterLink :to="`/players/${m.playerId}`">
-          <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>
-        </RouterLink>
-        <span class="muted">№{{ m.jerseyNumber ?? '—' }}</span>
+        <div class="who">
+          <RouterLink :to="`/players/${m.playerId}`">
+            <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>
+          </RouterLink>
+          <span v-if="m.playerId === team.captainId" class="captain-badge">Капитан</span>
+        </div>
+        <span class="muted jersey">№{{ m.jerseyNumber ?? '—' }}</span>
         <div v-if="canManage && isCaptain" class="actions">
-          <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="makeCaptain(m.playerId)">Капитан</button>
+          <button
+            v-if="m.playerId !== team.captainId"
+            type="button"
+            class="make-captain"
+            :disabled="pending"
+            @click="makeCaptain(m.playerId)"
+          >Сделать капитаном</button>
           <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="removeMember(m.playerId)">Убрать</button>
         </div>
       </div>
@@ -219,9 +238,18 @@ async function deleteTeam() {
       </form>
       <div v-if="!team.disbanded && members.length" class="stack">
         <div v-for="m in members" :key="`admin-${m.id}`" class="member">
-          <span>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</span>
+          <div class="who">
+            <span>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</span>
+            <span v-if="m.playerId === team.captainId" class="captain-badge">Капитан</span>
+          </div>
           <div class="actions">
-            <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="makeCaptain(m.playerId)">Капитан</button>
+            <button
+              v-if="m.playerId !== team.captainId"
+              type="button"
+              class="make-captain"
+              :disabled="pending"
+              @click="makeCaptain(m.playerId)"
+            >Сделать капитаном</button>
             <button class="btn ghost" :disabled="pending || m.playerId === team.captainId" @click="removeMember(m.playerId)">Убрать</button>
           </div>
         </div>
@@ -257,14 +285,68 @@ async function deleteTeam() {
 }
 h2 { font-size: 1.2rem; }
 .member {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 0.4rem 0.75rem;
   padding: 0.75rem 0.1rem;
   border-bottom: 1px solid var(--line);
 }
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: 1 1 9rem;
+  min-width: 0;
+}
 .member a { color: var(--text-strong); text-decoration: none; }
 .member a:hover { color: var(--accent); }
-.actions { display: flex; gap: 0.3rem; }
+.jersey { font-variant-numeric: tabular-nums; }
+.captain-badge {
+  flex: 0 0 auto;
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ice) 18%, #fff);
+  color: var(--navy);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem 0.8rem;
+  margin-left: auto;
+}
+.make-captain {
+  border: 0;
+  background: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--muted) 58%, #fff);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.make-captain:hover,
+.make-captain:focus-visible { color: var(--navy); }
+.make-captain:disabled { cursor: wait; opacity: 0.45; }
+@media (hover: hover) and (pointer: fine) and (min-width: 721px) {
+  .make-captain {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+  }
+  .member:hover .make-captain,
+  .member:focus-within .make-captain {
+    max-width: 11rem;
+    opacity: 1;
+  }
+}
 </style>

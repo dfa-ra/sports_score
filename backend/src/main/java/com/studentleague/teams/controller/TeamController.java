@@ -155,8 +155,7 @@ public class TeamController {
     }
 
     @PutMapping("/{id}/captain")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Assign team captain (ADMIN)")
+    @Operation(summary = "Assign the sole team captain (current captain or admin)")
     public TeamResponse assignCaptain(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id,
