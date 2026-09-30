@@ -216,7 +216,8 @@ Backend проверяет подпись токена, срок, issuer Google 
 |---|---|---|
 | GET | `/matches` | Публичный — фильтры |
 | GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode` |
-| POST | `/matches` | ADMIN. Опционально `periodCount` (1–8) и `periodLengthMinutes` (1–90), иначе 2×20 |
+| POST | `/matches` | ADMIN. Опционально `periodCount` (1–8), `periodLengthMinutes` (1–90, иначе 2×20) и `venue` (зал, до 120 символов) |
+| PUT | `/matches/{id}` | ADMIN. Опционально `venue` (зал, до 120 символов); пустая строка очищает |
 | POST | `/matches/{id}/referees` | ADMIN |
 | GET | `/matches/{id}/events` | Публичный. Имена игроков, `period`, `secondaryPlayer*` = пас / кто вышел |
 | GET | `/matches/{id}/referees` | Публичный |

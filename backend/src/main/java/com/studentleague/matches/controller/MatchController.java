@@ -9,6 +9,7 @@ import com.studentleague.matches.dto.MatchLineupsResponse;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.SetMatchLineupRequest;
+import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.service.MatchLineupService;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.matches.service.RefereeMatchService;
@@ -78,6 +79,13 @@ public class MatchController {
     @Operation(summary = "Get match details")
     public MatchResponse get(@PathVariable UUID id) {
         return matchService.get(id);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update match venue (ADMIN)")
+    public MatchResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateMatchRequest request) {
+        return matchService.update(id, request);
     }
 
     @PostMapping("/{id}/referees")

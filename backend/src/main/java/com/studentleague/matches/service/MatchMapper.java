@@ -42,7 +42,8 @@ public class MatchMapper {
                 match.getPeriodCount(),
                 match.getPeriodLengthSeconds(),
                 match.getClockRunningSince(),
-                sportCode
+                sportCode,
+                match.getVenue()
         );
     }
 

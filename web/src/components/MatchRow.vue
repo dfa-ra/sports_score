@@ -20,6 +20,10 @@ const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
 const when = computed(() => shortKickoff(props.match.scheduledAt, props.match.status))
 const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
 const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
+const venue = computed(() => {
+  const raw = props.match?.venue
+  return typeof raw === 'string' ? raw.trim() : ''
+})
 </script>
 
 <template>
@@ -42,6 +46,7 @@ const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
           <TeamCrest :src="awayLogo" :name="awayName" :size="18" />
           <b>{{ awayName }}</b>
         </span>
+        <span v-if="venue" class="venue">{{ venue }}</span>
       </span>
       <span class="nums">
         <strong>{{ match.homeScore }}</strong>
@@ -87,6 +92,13 @@ const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
 }
 .when.live { color: var(--ice); font-weight: 800; }
 .sides { display: grid; gap: 0.18rem; min-width: 0; }
+.venue {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .side {
   display: grid;
   grid-template-columns: 18px 1fr;

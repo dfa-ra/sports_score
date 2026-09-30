@@ -263,6 +263,8 @@ onUnmounted(() => client?.deactivate())
       </div>
     </div>
 
+    <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
+
     <div class="fs-tabs">
       <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
       <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
@@ -401,6 +403,11 @@ onUnmounted(() => client?.deactivate())
   text-transform: uppercase;
   letter-spacing: 0.04em;
   border-radius: 10px;
+}
+.venue-line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 .board {
   display: grid;

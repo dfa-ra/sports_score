@@ -7,6 +7,7 @@ import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchReferee;
 import com.studentleague.matches.repository.MatchRefereeRepository;
@@ -85,6 +86,7 @@ public class MatchService {
         match.setPeriodCount(request.periodCount() == null ? MatchClock.DEFAULT_PERIOD_COUNT : request.periodCount());
         int minutes = request.periodLengthMinutes() == null ? 20 : request.periodLengthMinutes();
         match.setPeriodLengthSeconds(minutes * 60);
+        match.setVenue(blankToNull(request.venue()));
         Match saved = matchRepository.save(match);
         notificationService.publishToUser(
                 null,
@@ -102,6 +104,13 @@ public class MatchService {
     @Transactional(readOnly = true)
     public MatchResponse get(UUID id) {
         return toResponse(requireMatch(id));
+    }
+
+    @Transactional
+    public MatchResponse update(UUID id, UpdateMatchRequest request) {
+        Match match = requireMatch(id);
+        match.setVenue(blankToNull(request.venue()));
+        return toResponse(matchRepository.save(match));
     }
 
     @Transactional(readOnly = true)
@@ -185,5 +194,13 @@ public class MatchService {
 
     private MatchResponse toResponse(Match match) {
         return matchMapper.toResponse(match);
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

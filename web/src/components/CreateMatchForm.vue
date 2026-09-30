@@ -14,6 +14,7 @@ const tournamentId = ref(props.tournamentId || '')
 const homeTeamId = ref('')
 const awayTeamId = ref('')
 const scheduledAt = ref('')
+const venue = ref('')
 const preset = ref('campus')
 const periodCount = ref(2)
 const periodLengthMinutes = ref(20)
@@ -69,6 +70,7 @@ async function submit() {
   }
   pending.value = true
   try {
+    const hall = venue.value.trim()
     const { data } = await api.post('/matches', {
       tournamentId: tournamentId.value,
       homeTeamId: homeTeamId.value,
@@ -76,6 +78,7 @@ async function submit() {
       scheduledAt: fromLocalInput(scheduledAt.value),
       periodCount: Number(periodCount.value),
       periodLengthMinutes: Number(periodLengthMinutes.value),
+      ...(hall ? { venue: hall } : {}),
     })
     emit('created', data)
     router.push(`/matches/${data.id}`)
@@ -106,6 +109,9 @@ async function submit() {
     </label>
     <label class="field">Когда
       <input v-model="scheduledAt" type="datetime-local" required />
+    </label>
+    <label class="field">Зал
+      <input v-model="venue" type="text" maxlength="120" placeholder="Необязательно" />
     </label>
     <label class="field">Формат времени
       <select :value="preset" @change="applyPreset(($event.target as HTMLSelectElement).value)">
