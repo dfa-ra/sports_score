@@ -69,6 +69,7 @@ jobs:
           VITE_APP_REVISION: ${{ github.sha }}
           VITE_APP_CHANNEL: dev
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
         run: |
           VITE_GOOGLE_CLIENT_ID="$(bash ../scripts/google_client_id.sh)"
           export VITE_GOOGLE_CLIENT_ID

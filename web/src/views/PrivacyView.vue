@@ -4,7 +4,7 @@ import LegalDocument from '../components/LegalDocument.vue'
 </script>
 
 <template>
-  <LegalDocument title="Политика конфиденциальности" updated="Редакция от 29 сентября 2026">
+  <LegalDocument title="Политика конфиденциальности" updated="Редакция от 30 сентября 2026">
     <h2>Кто ведёт сервис</h2>
     <p>
       Сайт <a href="https://itmoliga.ru">https://itmoliga.ru</a> и его API ведёт Лига ИТМО по футзалу,
@@ -64,6 +64,13 @@ import LegalDocument from '../components/LegalDocument.vue'
     <p>
       Мы не продаём персональные данные и не отдаём их рекламным сетям. Публичные таблицы, составы и статистика матчей
       видны на сайте, потому что это ход лиги.
+    </p>
+
+    <h2>Google Analytics</h2>
+    <p>
+      Сайт использует Google Analytics: измеряются визиты, страницы, устройство и источник перехода.
+      Эти данные может обрабатывать Google:
+      <a href="https://policies.google.com/privacy">https://policies.google.com/privacy</a>.
     </p>
 
     <h2>Сколько храним</h2>
