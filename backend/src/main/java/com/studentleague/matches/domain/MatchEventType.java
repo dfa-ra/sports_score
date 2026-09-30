@@ -6,6 +6,7 @@ public enum MatchEventType {
     YELLOW_CARD,
     RED_CARD,
     FOUL,
+    TIMEOUT,
     SUBSTITUTION,
     POINT,
     PERIOD_START,

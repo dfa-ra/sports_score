@@ -6,6 +6,7 @@ import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag }
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
+import FutsalBoard from '../../components/FutsalBoard.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import TeamCrest from '../../components/TeamCrest.vue'
 
@@ -236,6 +237,18 @@ onUnmounted(() => {
         </strong>
       </div>
     </div>
+
+    <FutsalBoard
+      :match="match"
+      :events="events"
+      :home-label="homeLabel"
+      :away-label="awayLabel"
+      interactive
+      :pending="pending"
+      :live="live"
+      @foul="(teamId) => addEvent({ eventType: 'FOUL', teamId })"
+      @timeout="(teamId) => addEvent({ eventType: 'TIMEOUT', teamId })"
+    />
 
     <div class="grid controls">
       <button class="btn large success" :disabled="pending || match.status !== 'SCHEDULED'" @click="action('start')">Старт</button>

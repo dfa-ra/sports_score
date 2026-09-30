@@ -70,6 +70,7 @@ export const eventLabel: Record<string, string> = {
   SUBSTITUTION: 'Замена',
   POINT: 'Очко',
   FOUL: 'Фол',
+  TIMEOUT: 'Тайм-аут',
   PERIOD_START: 'Начало тайма',
   PERIOD_END: 'Конец тайма',
   OTHER: 'Событие',
