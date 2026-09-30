@@ -13,6 +13,7 @@ import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
+import FutsalBoard from '../components/FutsalBoard.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
 import TeamCrest from '../components/TeamCrest.vue'
@@ -279,6 +280,12 @@ onUnmounted(() => client?.deactivate())
     </div>
 
     <div v-if="tab === 'overview'" class="stack">
+      <FutsalBoard
+        :match="match"
+        :events="events"
+        :home-label="teams.fullName(match.homeTeamId)"
+        :away-label="teams.fullName(match.awayTeamId)"
+      />
       <div class="sheet">
         <template v-if="periodBlocks.length">
           <section v-for="block in periodBlocks" :key="block.period">

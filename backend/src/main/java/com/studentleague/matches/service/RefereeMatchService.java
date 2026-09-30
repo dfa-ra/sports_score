@@ -9,6 +9,7 @@ import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.futsal.FutsalBoardCalculator;
 import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -204,7 +206,7 @@ public class RefereeMatchService {
         event.setTeamId(request.teamId());
         event.setPlayerId(request.playerId());
         event.setSecondaryPlayerId(request.secondaryPlayerId());
-        event.setMetadata(request.metadata());
+        event.setMetadata(stampMetadata(match, request));
         event.setVoided(false);
         matchEventRepository.save(event);
 
@@ -277,11 +279,14 @@ public class RefereeMatchService {
                 && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("teamId must be home or away team of the match");
         }
+        if ((request.eventType() == MatchEventType.FOUL || request.eventType() == MatchEventType.TIMEOUT)
+                && request.teamId() == null) {
+            throw ApiException.badRequest("Укажите команду");
+        }
         boolean needsPlayer = request.eventType() == MatchEventType.GOAL
                 || request.eventType() == MatchEventType.ASSIST
                 || request.eventType() == MatchEventType.YELLOW_CARD
                 || request.eventType() == MatchEventType.RED_CARD
-                || request.eventType() == MatchEventType.FOUL
                 || request.eventType() == MatchEventType.SUBSTITUTION
                 || request.eventType() == MatchEventType.POINT;
         if (needsPlayer && request.playerId() == null) {
@@ -311,6 +316,20 @@ public class RefereeMatchService {
                 throw ApiException.badRequest("Это должен быть другой человек");
             }
         }
+    }
+
+    private Map<String, Object> stampMetadata(Match match, CreateMatchEventRequest request) {
+        if (request.eventType() != MatchEventType.FOUL && request.eventType() != MatchEventType.TIMEOUT) {
+            return request.metadata();
+        }
+        List<MatchEvent> active = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(match.getId());
+        if (request.eventType() == MatchEventType.TIMEOUT) {
+            if (FutsalBoardCalculator.timeoutUsed(active, request.teamId(), match)) {
+                throw ApiException.conflict(FutsalBoardCalculator.timeoutRejectedMessage(match));
+            }
+            return request.metadata();
+        }
+        return FutsalBoardCalculator.foulMetadata(request.metadata(), active, request.teamId(), match);
     }
 
     private void recordPeriodEvent(Match match, MatchEventType type, Instant now) {

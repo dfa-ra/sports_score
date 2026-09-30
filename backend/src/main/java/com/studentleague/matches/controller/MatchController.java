@@ -4,12 +4,14 @@ import com.studentleague.common.dto.PageResponse;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
+import com.studentleague.matches.dto.FutsalBoardResponse;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchLineupsResponse;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.SetMatchLineupRequest;
 import com.studentleague.matches.dto.UpdateMatchRequest;
+import com.studentleague.matches.futsal.FutsalBoardService;
 import com.studentleague.matches.service.MatchLineupService;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.matches.service.RefereeMatchService;
@@ -46,15 +48,18 @@ public class MatchController {
     private final MatchService matchService;
     private final RefereeMatchService refereeMatchService;
     private final MatchLineupService matchLineupService;
+    private final FutsalBoardService futsalBoardService;
 
     public MatchController(
             MatchService matchService,
             RefereeMatchService refereeMatchService,
-            MatchLineupService matchLineupService
+            MatchLineupService matchLineupService,
+            FutsalBoardService futsalBoardService
     ) {
         this.matchService = matchService;
         this.refereeMatchService = refereeMatchService;
         this.matchLineupService = matchLineupService;
+        this.futsalBoardService = futsalBoardService;
     }
 
     @GetMapping
@@ -109,6 +114,12 @@ public class MatchController {
     @Operation(summary = "List match events")
     public List<MatchEventResponse> listEvents(@PathVariable UUID id) {
         return refereeMatchService.listEvents(id);
+    }
+
+    @GetMapping("/{id}/futsal")
+    @Operation(summary = "Futsal board: team fouls, timeout and short-handed state")
+    public FutsalBoardResponse futsal(@PathVariable UUID id) {
+        return futsalBoardService.forMatch(id);
     }
 
     @GetMapping("/{id}/lineups")
