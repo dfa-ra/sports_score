@@ -13,6 +13,7 @@ import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
+import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
@@ -218,6 +219,7 @@ onUnmounted(() => client?.deactivate())
 </script>
 
 <template>
+  <MatchGoalAlerts headless />
   <section v-if="match" class="stack">
     <RouterLink class="league-bar" to="/table">
       {{ tournament?.name || 'Матч' }}
