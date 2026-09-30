@@ -83,6 +83,7 @@ public class SecurityConfig {
                                 "/media/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
+                        .requestMatchers("/api/v1/matches/*/availability").authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/tournaments",
                                 "/api/v1/tournaments/**",
