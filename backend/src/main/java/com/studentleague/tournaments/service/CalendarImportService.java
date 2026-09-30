@@ -103,7 +103,7 @@ public class CalendarImportService {
                 ensureApproved(tournament, awayTeam);
                 Instant kickoff = parseKickoff(date, time);
                 MatchResponse match = matchService.create(new CreateMatchRequest(
-                        tournament.getId(), homeTeam.getId(), awayTeam.getId(), kickoff, null, null
+                        tournament.getId(), homeTeam.getId(), awayTeam.getId(), kickoff, null, null, null
                 ));
                 created.add(match.id());
             } catch (RuntimeException ex) {
