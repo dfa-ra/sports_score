@@ -56,7 +56,7 @@ async function load() {
     const [m, cal, upcoming, st, me] = await Promise.all([
       api.get(`/teams/${data.id}/members`),
       api.get(`/teams/${data.id}/matches`, { params: { size: 30 } }),
-      api.get(`/teams/${data.id}/matches`, { params: { size: 100, sort: 'scheduledAt,asc' } }),
+      api.get(`/teams/${data.id}/matches`, { params: { size: 100, sort: 'scheduledAt,desc' } }),
       api.get('/statistics/teams', { params: { teamId: data.id } }),
       api.get('/players/me').catch(() => null),
     ])
