@@ -60,18 +60,21 @@ class LeagueMatch {
 }
 
 class TeamBrief {
-  TeamBrief({required this.id, required this.name, this.shortName, this.logoUrl});
+  TeamBrief({required this.id, required this.name, this.shortName, this.logoUrl, this.captainId});
   final String id;
   final String name;
   final String? shortName;
   final String? logoUrl;
+  final String? captainId;
 
   factory TeamBrief.fromJson(Map<String, dynamic> json) {
+    final captain = json['captainId']?.toString();
     return TeamBrief(
       id: json['id'].toString(),
       name: json['name']?.toString() ?? 'Команда',
       shortName: json['shortName']?.toString(),
       logoUrl: json['logoUrl']?.toString(),
+      captainId: captain == null || captain.isEmpty ? null : captain,
     );
   }
 }

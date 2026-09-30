@@ -196,6 +196,19 @@ class LeagueStore extends ChangeNotifier {
         .toList();
   }
 
+  Future<String?> captainOf(String teamId) async {
+    if (teams.containsKey(teamId)) return teams[teamId]?.captainId;
+    try {
+      final data = await api.get('/teams/$teamId');
+      if (data is Map) {
+        final brief = TeamBrief.fromJson(Map<String, dynamic>.from(data));
+        teams[teamId] = brief;
+        return brief.captainId;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<List<TeamMember>> teamMembers(String teamId) async {
     final data = await api.get('/teams/$teamId/members');
     return ((data as List?) ?? const [])

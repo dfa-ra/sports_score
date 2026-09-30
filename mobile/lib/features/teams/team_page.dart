@@ -21,6 +21,7 @@ class TeamPage extends StatefulWidget {
 class _TeamPageState extends State<TeamPage> with SingleTickerProviderStateMixin {
   late final TabController _tabs;
   List<TeamMember> members = [];
+  String? captainId;
   bool loading = true;
 
   @override
@@ -37,9 +38,16 @@ class _TeamPageState extends State<TeamPage> with SingleTickerProviderStateMixin
   }
 
   Future<void> _load() async {
+    final store = context.read<LeagueStore>();
     try {
-      final data = await context.read<LeagueStore>().teamMembers(widget.teamId);
-      if (mounted) setState(() => members = data);
+      final data = await store.teamMembers(widget.teamId);
+      final captain = await store.captainOf(widget.teamId);
+      if (mounted) {
+        setState(() {
+          members = data;
+          captainId = captain;
+        });
+      }
     } catch (_) {
     } finally {
       if (mounted) setState(() => loading = false);
@@ -97,7 +105,7 @@ class _TeamPageState extends State<TeamPage> with SingleTickerProviderStateMixin
               children: [
                 _MatchList(rows: played, store: store, teamId: widget.teamId, empty: 'Сыгранных матчей ещё нет'),
                 _MatchList(rows: upcoming, store: store, teamId: widget.teamId, empty: 'Ближайших игр нет'),
-                _Squad(members: members),
+                _Squad(members: members, captainId: captainId),
               ],
             ),
           ),
@@ -132,8 +140,9 @@ class _MatchList extends StatelessWidget {
 }
 
 class _Squad extends StatelessWidget {
-  const _Squad({required this.members});
+  const _Squad({required this.members, this.captainId});
   final List<TeamMember> members;
+  final String? captainId;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +160,19 @@ class _Squad extends StatelessWidget {
             ),
             title: Text(member.displayName, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text([if (member.jerseyNumber != null) '#${member.jerseyNumber}', member.position].whereType<String>().where((s) => s.isNotEmpty).join(' · ')),
+            trailing: member.playerId == captainId
+                ? Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2E4CB4E5),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      'Капитан',
+                      style: TextStyle(color: AppColors.navy, fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                  )
+                : null,
           ),
       ],
     );
