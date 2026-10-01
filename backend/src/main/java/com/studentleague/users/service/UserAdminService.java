@@ -44,8 +44,12 @@ public class UserAdminService {
     }
 
     @Transactional(readOnly = true)
-    public Page<UserResponse> listUsers(Pageable pageable) {
-        return userRepository.findAll(pageable).map(roleService::toUserResponse);
+    public Page<UserResponse> listUsers(String query, Pageable pageable) {
+        String q = query == null ? "" : query.trim();
+        Page<User> page = q.isEmpty()
+                ? userRepository.findAll(pageable)
+                : userRepository.search(q, pageable);
+        return page.map(roleService::toUserResponse);
     }
 
     @Transactional(readOnly = true)

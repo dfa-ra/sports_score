@@ -19,6 +19,8 @@ const ASSIGNABLE_ROLES = [
 ] as const
 
 const users = ref<any[]>([])
+const userQuery = ref('')
+let userSearchTimer = 0
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
 const teams = ref<any[]>([])
@@ -60,9 +62,30 @@ const tabs = [
   { id: 'gallery', label: 'Фото' },
 ] as const
 
+function userListParams() {
+  const params: Record<string, string | number> = { size: 100 }
+  const q = userQuery.value.trim()
+  if (q) params.q = q
+  return params
+}
+
+async function loadUsers() {
+  const { data } = await api.get('/admin/users', { params: userListParams() })
+  users.value = hydrateUsers(data.content ?? [])
+}
+
+function onUserQueryInput() {
+  window.clearTimeout(userSearchTimer)
+  userSearchTimer = window.setTimeout(() => {
+    loadUsers().catch((e: any) => {
+      error.value = apiError(e, 'Поиск не сработал.')
+    })
+  }, 250)
+}
+
 async function load() {
   const [u, t, m, tm, s, rr, g] = await Promise.all([
-    api.get('/admin/users', { params: { size: 100 } }),
+    api.get('/admin/users', { params: userListParams() }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
     api.get('/teams', { params: { size: 50, includeDisbanded: true } }),
@@ -240,6 +263,24 @@ async function saveVkAlbum() {
   }
 }
 
+async function deleteMatch(match: any) {
+  const home = names.name(match.homeTeamId)
+  const away = names.name(match.awayTeamId)
+  if (!confirm(`Удалить матч ${home} — ${away}? Протокол, составы и назначения тоже сотрутся.`)) return
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.delete(`/matches/${match.id}`)
+    ok.value = 'Матч удалён.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Матч не удалился.')
+  } finally {
+    pending.value = false
+  }
+}
+
 async function disbandTeam(team: any) {
   if (team.disbanded) return
   if (!confirm(`Расформировать «${team.name}»? Состав снимут, заявки на турниры снимут.`)) return
@@ -307,6 +348,15 @@ async function deleteTeam(team: any) {
       <div class="panel">
       <h2>Пользователи</h2>
       <p class="muted">Несколько ролей сразу можно: игрок и судья, капитан и зритель. Админа через форму не назначают — он из .env.</p>
+      <label class="field search">Поиск
+        <input
+          v-model="userQuery"
+          type="search"
+          placeholder="Почта, имя или фамилия"
+          @input="onUserQueryInput"
+        />
+      </label>
+      <p v-if="userQuery.trim() && !users.length" class="muted">Никого не нашли.</p>
       <table class="table">
         <thead><tr><th>Email</th><th>Роли</th><th>Активен</th><th></th></tr></thead>
         <tbody>
@@ -369,11 +419,15 @@ async function deleteTeam(team: any) {
       </div>
       <div class="panel">
         <h2>Сетка</h2>
+        <p class="muted">Протокол правится в карточке матча, в блоке «Для админа».</p>
         <div v-for="m in matches" :key="m.id" class="row">
           <RouterLink :to="`/matches/${m.id}`">
             {{ names.name(m.homeTeamId) }} {{ m.homeScore }}:{{ m.awayScore }} {{ names.name(m.awayTeamId) }}
           </RouterLink>
-          <StatusBadge :status="m.status" />
+          <span class="match-actions">
+            <StatusBadge :status="m.status" />
+            <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch(m)">Удалить</button>
+          </span>
         </div>
       </div>
     </div>
@@ -495,6 +549,8 @@ h2 { font-size: 1.15rem; margin-bottom: 0.55rem; }
 }
 .slide-row img { width: 72px; height: 48px; object-fit: cover; border-radius: 8px; }
 .grid.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.search { max-width: 28rem; margin: 0.6rem 0 0.8rem; }
+.match-actions { display: flex; align-items: center; gap: 0.55rem; }
 .check { display: inline-flex; align-items: center; gap: 0.4rem; }
 .roles { display: flex; flex-wrap: wrap; gap: 0.45rem 0.85rem; align-items: center; }
 .name, .pending { display: block; margin-top: 0.2rem; }

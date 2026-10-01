@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
@@ -20,6 +20,7 @@ import MatchShareButton from '../components/MatchShareButton.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const match = ref<any>(null)
 const events = ref<any[]>([])
@@ -32,6 +33,12 @@ const tournament = ref<any>(null)
 const me = ref<any>(null)
 const users = ref<any[]>([])
 const refereeId = ref('')
+const protocolType = ref<'GOAL' | 'YELLOW_CARD' | 'RED_CARD'>('GOAL')
+const protocolTeamId = ref('')
+const protocolPlayerId = ref('')
+const protocolMinute = ref(1)
+const minuteDrafts = ref<Record<string, number>>({})
+const crestSize = ref(46)
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
 const error = ref('')
@@ -96,6 +103,40 @@ const periodBlocks = computed(() => {
   }))
 })
 
+const protocolPlayers = computed(() => {
+  if (!lineups.value || !match.value || !protocolTeamId.value) return []
+  const side = protocolTeamId.value === match.value.homeTeamId ? lineups.value.home : lineups.value.away
+  const rows = [...(side?.starters ?? []), ...(side?.bench ?? [])]
+  const seen = new Set<string>()
+  return rows.filter((player) => {
+    if (!player?.playerId || seen.has(player.playerId)) return false
+    seen.add(player.playerId)
+    return true
+  })
+})
+
+const editableEvents = computed(() =>
+  [...events.value]
+    .filter((event) => !event.voided && event.eventType !== 'PERIOD_START' && event.eventType !== 'PERIOD_END')
+    .sort((a, b) => (a.gameTime ?? 0) - (b.gameTime ?? 0) || String(a.id).localeCompare(String(b.id))),
+)
+
+function syncMinutes() {
+  const next: Record<string, number> = {}
+  for (const event of events.value) next[event.id] = eventMinute(event.gameTime)
+  minuteDrafts.value = next
+}
+
+function applyCrest() {
+  crestSize.value = window.matchMedia('(max-width: 719px)').matches ? 40 : 46
+}
+
+watch(protocolPlayers, (players) => {
+  if (!players.some((player) => player.playerId === protocolPlayerId.value)) {
+    protocolPlayerId.value = players[0]?.playerId || ''
+  }
+})
+
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
   const side = teamId === match.value?.homeTeamId ? lineups.value?.home : lineups.value?.away
@@ -113,8 +154,10 @@ async function load() {
   ])
   match.value = m.data
   events.value = e.data
+  syncMinutes()
   referees.value = r.data
   lineups.value = l.data
+  if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
   try {
     const [hf, af, games] = await Promise.all([
       api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
@@ -165,6 +208,7 @@ function mergeLive(live: any) {
   }
   if (live.lastEvent) {
     events.value = [...events.value.filter((x: any) => x.id !== live.lastEvent.id), live.lastEvent]
+    syncMinutes()
   }
 }
 
@@ -179,6 +223,80 @@ async function assignReferee() {
   } catch (e: any) {
     error.value = apiError(e)
   } finally {
+    pending.value = false
+  }
+}
+
+async function addProtocolEvent() {
+  error.value = ''
+  ok.value = ''
+  if (!protocolTeamId.value || !protocolPlayerId.value) {
+    error.value = 'Выберите команду и игрока.'
+    return
+  }
+  pending.value = true
+  try {
+    await api.post(`/admin/matches/${match.value.id}/events`, {
+      eventType: protocolType.value,
+      teamId: protocolTeamId.value,
+      playerId: protocolPlayerId.value,
+      minute: Number(protocolMinute.value),
+    })
+    ok.value = 'Событие записано в протокол.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Событие не записалось.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function saveMinute(event: any) {
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
+      minute: Number(minuteDrafts.value[event.id] ?? 0),
+    })
+    ok.value = 'Минута обновлена.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Минута не сохранилась.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function voidProtocolEvent(event: any) {
+  const label = labelOf(eventLabel, event.eventType)
+  if (!confirm(`Убрать «${label}» из протокола? Счёт пересчитается по оставшимся голам.`)) return
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.post(`/admin/matches/${match.value.id}/events/${event.id}/void`)
+    ok.value = 'Событие убрано из протокола.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Событие не убралось.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function deleteMatch() {
+  const home = teams.fullName(match.value.homeTeamId)
+  const away = teams.fullName(match.value.awayTeamId)
+  if (!confirm(`Удалить матч ${home} — ${away}? Протокол, составы и назначения тоже сотрутся.`)) return
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.delete(`/matches/${match.value.id}`)
+    await router.push('/admin')
+  } catch (e: any) {
+    error.value = apiError(e, 'Матч не удалился.')
     pending.value = false
   }
 }
@@ -198,6 +316,8 @@ async function saveLineup(payload: { teamId: string; starterPlayerIds: string[];
 }
 
 onMounted(async () => {
+  applyCrest()
+  window.addEventListener('resize', applyCrest)
   await load()
   client = new Client({
     webSocketFactory: () => new SockJS('/ws') as any,
@@ -217,7 +337,10 @@ onMounted(async () => {
   client.activate()
 })
 
-onUnmounted(() => client?.deactivate())
+onUnmounted(() => {
+  window.removeEventListener('resize', applyCrest)
+  client?.deactivate()
+})
 </script>
 
 <template>
@@ -238,7 +361,7 @@ onUnmounted(() => client?.deactivate())
           @click="fav.toggleTeam(match.homeTeamId)"
         >★</button>
         <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
-          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="36" />
+          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="crestSize" />
           <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
         </RouterLink>
       </div>
@@ -261,7 +384,7 @@ onUnmounted(() => client?.deactivate())
       </div>
       <div class="club away">
         <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
-          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="36" />
+          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="crestSize" />
           <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
         </RouterLink>
         <button
@@ -393,6 +516,48 @@ onUnmounted(() => client?.deactivate())
 
     <AdminOnly v-if="auth.canManageLeague" title="Для админа">
       <CopyChip :value="String(match.id)" label="Скопировать id матча" />
+      <h2>Протокол</h2>
+      <p class="muted">Гол, жёлтая или красная. Минута пишется в тот же протокол, что и пульт судьи. Зрители видят счёт без убранных голов.</p>
+      <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
+        <label class="field">Событие
+          <select v-model="protocolType">
+            <option value="GOAL">Гол</option>
+            <option value="YELLOW_CARD">Жёлтая</option>
+            <option value="RED_CARD">Красная</option>
+          </select>
+        </label>
+        <label class="field">Команда
+          <select v-model="protocolTeamId">
+            <option :value="match.homeTeamId">{{ teams.fullName(match.homeTeamId) }}</option>
+            <option :value="match.awayTeamId">{{ teams.fullName(match.awayTeamId) }}</option>
+          </select>
+        </label>
+        <label class="field">Игрок
+          <select v-model="protocolPlayerId" required>
+            <option v-if="!protocolPlayers.length" value="" disabled>В заявке никого нет</option>
+            <option v-for="player in protocolPlayers" :key="player.playerId" :value="player.playerId">
+              {{ playerTag(player.name, player.jerseyNumber) }}
+            </option>
+          </select>
+        </label>
+        <label class="field">Минута
+          <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
+        </label>
+        <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
+      </form>
+      <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
+        <span>
+          <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
+          <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
+        </span>
+        <label class="field minute">Минута
+          <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
+        </label>
+        <button class="btn secondary" type="button" :disabled="pending" @click="saveMinute(ev)">Сохранить минуту</button>
+        <button class="btn danger" type="button" :disabled="pending" @click="voidProtocolEvent(ev)">Убрать</button>
+      </div>
+      <p v-if="!editableEvents.length" class="muted">В протоколе пока нет событий.</p>
+      <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch">Удалить матч</button>
       <form class="stack" @submit.prevent="assignReferee">
         <label class="field">Назначить судью
           <select v-model="refereeId" required>
@@ -427,7 +592,7 @@ onUnmounted(() => client?.deactivate())
 }
 .board {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 0.6rem;
   align-items: center;
   background: #fff;
@@ -451,7 +616,7 @@ onUnmounted(() => client?.deactivate())
 }
 .club.away .who { flex-direction: row-reverse; }
 .who strong {
-  font-size: 0.88rem;
+  font-size: 1.02rem;
   line-height: 1.2;
   overflow: hidden;
   display: -webkit-box;
@@ -534,6 +699,17 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   gap: 0.35rem;
   margin: 0.25rem 0;
 }
+.protocol-form { margin: 0.4rem 0 0.8rem; }
+.proto-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.7rem;
+  align-items: end;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.proto-row small { display: block; }
+.minute { min-width: 5.5rem; max-width: 7rem; }
 .timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
 .timeline li {
   display: grid;
@@ -547,7 +723,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
-  .who strong { font-size: 0.78rem; }
+  .who strong { font-size: 0.86rem; }
   .lineups { grid-template-columns: 1fr; }
   .board { padding: 0.75rem 0.5rem 0.85rem; gap: 0.35rem; }
 }

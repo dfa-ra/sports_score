@@ -26,6 +26,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -91,6 +92,14 @@ public class MatchController {
     @Operation(summary = "Update match venue (ADMIN)")
     public MatchResponse update(@PathVariable UUID id, @Valid @RequestBody UpdateMatchRequest request) {
         return matchService.update(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a match and its protocol, lineups, referees and availability (ADMIN)")
+    public void delete(@PathVariable UUID id) {
+        matchService.delete(id);
     }
 
     @PostMapping("/{id}/referees")

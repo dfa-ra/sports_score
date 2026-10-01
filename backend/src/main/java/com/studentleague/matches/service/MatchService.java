@@ -10,6 +10,9 @@ import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchReferee;
+import com.studentleague.matches.repository.MatchAvailabilityRepository;
+import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
@@ -36,6 +39,9 @@ public class MatchService {
 
     private final MatchRepository matchRepository;
     private final MatchRefereeRepository matchRefereeRepository;
+    private final MatchEventRepository matchEventRepository;
+    private final MatchLineupPlayerRepository matchLineupPlayerRepository;
+    private final MatchAvailabilityRepository matchAvailabilityRepository;
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
     private final UserRepository userRepository;
@@ -46,6 +52,9 @@ public class MatchService {
     public MatchService(
             MatchRepository matchRepository,
             MatchRefereeRepository matchRefereeRepository,
+            MatchEventRepository matchEventRepository,
+            MatchLineupPlayerRepository matchLineupPlayerRepository,
+            MatchAvailabilityRepository matchAvailabilityRepository,
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             UserRepository userRepository,
@@ -55,6 +64,9 @@ public class MatchService {
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
+        this.matchEventRepository = matchEventRepository;
+        this.matchLineupPlayerRepository = matchLineupPlayerRepository;
+        this.matchAvailabilityRepository = matchAvailabilityRepository;
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.userRepository = userRepository;
@@ -104,6 +116,17 @@ public class MatchService {
     @Transactional(readOnly = true)
     public MatchResponse get(UUID id) {
         return toResponse(requireMatch(id));
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        Match match = requireMatch(id);
+        matchEventRepository.deleteByMatchId(id);
+        matchLineupPlayerRepository.deleteByMatchId(id);
+        matchRefereeRepository.deleteByMatchId(id);
+        matchAvailabilityRepository.deleteByMatchId(id);
+        matchRepository.flush();
+        matchRepository.delete(match);
     }
 
     @Transactional

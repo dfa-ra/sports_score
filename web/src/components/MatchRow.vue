@@ -44,11 +44,11 @@ const venue = computed(() => {
       <span class="when" :class="{ live: isLive, paused: match.status === 'PAUSED' }" :title="match.status === 'PAUSED' ? 'Пауза' : undefined">{{ when }}</span>
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
-          <TeamCrest :src="homeLogo" :name="homeName" :size="18" />
+          <TeamCrest :src="homeLogo" :name="homeName" :size="22" />
           <b>{{ homeName }}</b>
         </span>
         <span class="side" :class="{ own: highlightTeamId === match.awayTeamId }">
-          <TeamCrest :src="awayLogo" :name="awayName" :size="18" />
+          <TeamCrest :src="awayLogo" :name="awayName" :size="22" />
           <b>{{ awayName }}</b>
         </span>
         <span v-if="venue" class="venue">{{ venue }}</span>
@@ -116,14 +116,14 @@ const venue = computed(() => {
 }
 .side {
   display: grid;
-  grid-template-columns: 18px 1fr;
+  grid-template-columns: 22px 1fr;
   gap: 0.4rem;
   align-items: center;
   min-width: 0;
 }
 .side b {
   font-weight: 500;
-  font-size: 0.92rem;
+  font-size: 1rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
