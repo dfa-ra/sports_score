@@ -14,13 +14,9 @@ import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
-import com.studentleague.matches.scoring.ScorePolicyRegistry;
-import com.studentleague.matches.scoring.ScoreSnapshot;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
-import com.studentleague.sports.entity.Sport;
-import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.users.domain.Role;
@@ -42,10 +38,9 @@ public class RefereeMatchService {
     private final MatchRepository matchRepository;
     private final MatchRefereeRepository matchRefereeRepository;
     private final MatchEventRepository matchEventRepository;
-    private final SportRepository sportRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final PlayerProfileRepository playerProfileRepository;
-    private final ScorePolicyRegistry scorePolicyRegistry;
+    private final MatchScoreService matchScoreService;
     private final MatchService matchService;
     private final LiveMatchPublisher liveMatchPublisher;
     private final NotificationService notificationService;
@@ -55,10 +50,9 @@ public class RefereeMatchService {
             MatchRepository matchRepository,
             MatchRefereeRepository matchRefereeRepository,
             MatchEventRepository matchEventRepository,
-            SportRepository sportRepository,
             TeamMemberRepository teamMemberRepository,
             PlayerProfileRepository playerProfileRepository,
-            ScorePolicyRegistry scorePolicyRegistry,
+            MatchScoreService matchScoreService,
             MatchService matchService,
             LiveMatchPublisher liveMatchPublisher,
             NotificationService notificationService,
@@ -67,10 +61,9 @@ public class RefereeMatchService {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
         this.matchEventRepository = matchEventRepository;
-        this.sportRepository = sportRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.playerProfileRepository = playerProfileRepository;
-        this.scorePolicyRegistry = scorePolicyRegistry;
+        this.matchScoreService = matchScoreService;
         this.matchService = matchService;
         this.liveMatchPublisher = liveMatchPublisher;
         this.notificationService = notificationService;
@@ -264,13 +257,7 @@ public class RefereeMatchService {
     }
 
     private void recalculateScore(Match match) {
-        Sport sport = sportRepository.findById(match.getSportId())
-                .orElseThrow(() -> ApiException.notFound("Sport not found"));
-        List<MatchEvent> active = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(match.getId());
-        ScoreSnapshot snapshot = scorePolicyRegistry.forSportCode(sport.getCode())
-                .calculate(match.getHomeTeamId(), match.getAwayTeamId(), active);
-        match.setHomeScore(snapshot.homeScore());
-        match.setAwayScore(snapshot.awayScore());
+        matchScoreService.apply(match);
     }
 
     private void validateEventPayload(Match match, CreateMatchEventRequest request) {

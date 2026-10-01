@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ageLine, formatMatchDay, outcomeMark } from '../lib/format'
+import { playerHeader } from '../lib/playerTitle'
 import PlayerAvatar from './PlayerAvatar.vue'
 import TeamCrest from './TeamCrest.vue'
 
@@ -44,7 +45,8 @@ defineEmits<{
 }>()
 
 const tab = ref<'games' | 'stats'>('games')
-const name = computed(() => props.card.displayName || `${props.card.firstName || ''} ${props.card.lastName || ''}`.trim())
+const header = computed(() => playerHeader(props.card))
+const name = computed(() => header.value.title)
 const age = computed(() => ageLine(props.card.dateOfBirth))
 const captainTeams = computed(() => {
   const raw = props.card?.captainTeams
@@ -77,6 +79,7 @@ function marks(row: MatchRow) {
       <PlayerAvatar :src="card.avatarUrl" :name="name" :size="76" tile />
       <div class="who">
         <h1>{{ name }}</h1>
+        <p v-if="header.shirt" class="shirt"><span>На майке</span> {{ header.shirt }}</p>
         <p v-if="age" class="meta">{{ age }}</p>
         <p v-if="card.jerseyNumber != null || !card.team" class="meta">
           <span v-if="card.jerseyNumber != null">№{{ card.jerseyNumber }}</span>
@@ -152,6 +155,13 @@ function marks(row: MatchRow) {
   font-size: clamp(1.25rem, 5vw, 1.7rem);
   line-height: 1.1;
 }
+.shirt {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.shirt span { font-weight: 700; }
 .meta { margin: 0.15rem 0 0; color: var(--muted); font-size: 0.86rem; }
 .captain-line {
   margin: 0.2rem 0 0;

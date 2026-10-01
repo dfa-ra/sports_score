@@ -43,9 +43,10 @@ public class AdminUserController {
     @GetMapping("/users")
     @Operation(summary = "List users")
     public PageResponse<UserResponse> list(
+            @RequestParam(required = false) String q,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return PageResponse.from(userAdminService.listUsers(pageable));
+        return PageResponse.from(userAdminService.listUsers(q, pageable));
     }
 
     @GetMapping("/role-requests")

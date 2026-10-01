@@ -11,4 +11,6 @@ public interface MatchAvailabilityRepository extends JpaRepository<MatchAvailabi
     Optional<MatchAvailability> findByMatchIdAndPlayerId(UUID matchId, UUID playerId);
 
     List<MatchAvailability> findByMatchId(UUID matchId);
+
+    void deleteByMatchId(UUID matchId);
 }
