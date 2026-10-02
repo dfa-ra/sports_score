@@ -307,10 +307,13 @@ class _PlayersState extends State<_Players> {
         else
           for (final player in _results)
             ListTile(
-              leading: PlayerPhoto(url: widget.store.api.resolveMedia(player.avatarUrl), name: player.displayName, size: 36),
-              title: Text(player.displayName, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
+              leading: PlayerPhoto(url: widget.store.api.resolveMedia(player.avatarUrl), name: player.title, size: 36),
+              title: Text(player.title, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
               subtitle: Text(
-                '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
+                [
+                  if (player.shirtHint.isNotEmpty) 'На майке ${player.shirtHint}',
+                  '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
+                ].join(' · '),
                 style: const TextStyle(color: AppColors.muted),
               ),
               onTap: () => context.push('/players/${player.id}'),

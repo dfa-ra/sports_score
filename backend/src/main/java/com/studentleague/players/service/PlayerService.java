@@ -147,8 +147,7 @@ public class PlayerService {
                 String needle = q.toLowerCase();
                 profiles = profiles.stream()
                         .filter(profile -> contains(profile.getFirstName(), needle)
-                                || contains(profile.getLastName(), needle)
-                                || contains(profile.getDisplayName(), needle))
+                                || contains(profile.getLastName(), needle))
                         .toList();
             }
             int from = Math.min(limited.getPageNumber() * limited.getPageSize(), profiles.size());
@@ -156,8 +155,7 @@ public class PlayerService {
             return new PageImpl<>(toResponses(profiles.subList(from, to)), limited, profiles.size());
         }
         Page<PlayerProfile> page = playerProfileRepository
-                .findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrDisplayNameContainingIgnoreCase(
-                        q, q, q, limited);
+                .findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCase(q, q, limited);
         return new PageImpl<>(toResponses(page.getContent()), limited, page.getTotalElements());
     }
 
