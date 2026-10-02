@@ -311,7 +311,7 @@ class _PlayersState extends State<_Players> {
               title: Text(player.title, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
               subtitle: Text(
                 [
-                  if (player.shirtHint.isNotEmpty) 'На майке ${player.shirtHint}',
+                  if (player.shirtHint.isNotEmpty) player.shirtHint,
                   '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
                 ].join(' · '),
                 style: const TextStyle(color: AppColors.muted),

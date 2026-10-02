@@ -82,7 +82,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
         @click="pick(player)"
       >
         <strong>{{ labelOf(player).title }}</strong>
-        <small v-if="labelOf(player).shirt">На майке {{ labelOf(player).shirt }}</small>
+        <small v-if="labelOf(player).shirt">{{ labelOf(player).shirt }}</small>
       </button>
     </div>
   </div>
