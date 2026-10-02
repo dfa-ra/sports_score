@@ -60,14 +60,32 @@ class MatchRow extends StatelessWidget {
                 child: Row(
                   children: [
                     SizedBox(
-                      width: 48,
-                      child: Text(
-                        shortKickoff(match.scheduledAt, match.status),
-                        style: TextStyle(
-                          color: match.isLive ? AppColors.ice : AppColors.muted,
-                          fontWeight: match.isLive ? FontWeight.w800 : FontWeight.w500,
-                          fontSize: 12,
-                        ),
+                      width: 46,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (kickoffDayMonth(match.scheduledAt).isNotEmpty)
+                            Text(
+                              kickoffDayMonth(match.scheduledAt),
+                              style: const TextStyle(
+                                color: AppColors.muted,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                                height: 1.15,
+                              ),
+                            ),
+                          Text(
+                            match.isLive
+                                ? 'LIVE'
+                                : (kickoffClock(match.scheduledAt).isEmpty ? '—' : kickoffClock(match.scheduledAt)),
+                            style: TextStyle(
+                              color: match.isLive ? AppColors.ice : AppColors.muted,
+                              fontWeight: match.isLive ? FontWeight.w800 : FontWeight.w500,
+                              fontSize: 12,
+                              height: 1.15,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Expanded(

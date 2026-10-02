@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { formatWhen } from '../lib/format'
+import KickoffWhen from '../components/KickoffWhen.vue'
 import { apiError } from '../lib/errors'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -172,7 +172,9 @@ async function removeMember(id: string) {
       <div v-if="nextMatch" class="panel">
         <h2>Ближайший матч</h2>
         <p>
-          <RouterLink :to="`/matches/${nextMatch.id}`">{{ formatWhen(nextMatch.scheduledAt) }}</RouterLink>
+          <RouterLink :to="`/matches/${nextMatch.id}`">
+            <KickoffWhen :at="nextMatch.scheduledAt" :status="nextMatch.status" align="start" />
+          </RouterLink>
           <span v-if="opponentName"> · против {{ opponentName }}</span>
         </p>
         <p v-if="rsvpError" class="form-error">{{ rsvpError }}</p>
@@ -218,7 +220,8 @@ async function removeMember(id: string) {
         <EmptyState v-if="!matches.length" title="Матчей нет" />
         <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
           <StatusBadge :status="m.status" />
-          <span>{{ formatWhen(m.scheduledAt) }} · {{ m.homeScore }}:{{ m.awayScore }}</span>
+          <KickoffWhen :at="m.scheduledAt" :status="m.status" align="start" />
+          <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         </RouterLink>
       </div>
     </template>

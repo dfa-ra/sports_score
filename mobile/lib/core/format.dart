@@ -18,16 +18,29 @@ String ymd(DateTime date) {
   return '${date.year}-$m-$d';
 }
 
-String shortKickoff(DateTime? at, String status) {
-  if (status == 'LIVE' || status == 'PAUSED') return 'LIVE';
-  if (at == null) return '—';
+String kickoffDayMonth(DateTime? at) {
+  if (at == null) return '';
   final d = at.toLocal();
   final day = d.day.toString().padLeft(2, '0');
   final month = d.month.toString().padLeft(2, '0');
-  if (status == 'FINISHED' || status == 'CANCELLED') return '$day.$month.';
+  return '$day/$month';
+}
+
+String kickoffClock(DateTime? at) {
+  if (at == null) return '';
+  final d = at.toLocal();
   final h = d.hour.toString().padLeft(2, '0');
   final min = d.minute.toString().padLeft(2, '0');
   return '$h:$min';
+}
+
+String shortKickoff(DateTime? at, String status) {
+  if (status == 'LIVE' || status == 'PAUSED') return 'LIVE';
+  if (at == null) return '—';
+  final date = kickoffDayMonth(at);
+  if (date.isEmpty) return '—';
+  if (status == 'FINISHED' || status == 'CANCELLED') return '${date.replaceAll('/', '.')}.';
+  return kickoffClock(at).isEmpty ? '—' : kickoffClock(at);
 }
 
 String longKickoff(DateTime? at) {
@@ -128,7 +141,7 @@ int matchElapsedSeconds({
   required String status,
   int gameTimeSeconds = 0,
   DateTime? clockRunningSince,
-  int cap = 1200,
+  int cap = 900,
   DateTime? now,
 }) {
   var base = gameTimeSeconds;
@@ -143,7 +156,7 @@ int matchRemainingSeconds({
   required String status,
   int gameTimeSeconds = 0,
   DateTime? clockRunningSince,
-  int cap = 1200,
+  int cap = 900,
   DateTime? now,
 }) {
   return cap -

@@ -118,7 +118,14 @@ class _RefereeMatchesPageState extends State<RefereeMatchesPage> {
                             ),
                             const SizedBox(height: 6),
                             Text('${match.homeScore} : ${match.awayScore}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 20)),
-                            Text(formatWhen(match.scheduledAt), style: const TextStyle(color: AppColors.muted, fontSize: 13)),
+                            Text(
+                              kickoffDayMonth(match.scheduledAt).isEmpty ? '—' : kickoffDayMonth(match.scheduledAt),
+                              style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w700, height: 1.15),
+                            ),
+                            Text(
+                              kickoffClock(match.scheduledAt).isEmpty ? '—' : kickoffClock(match.scheduledAt),
+                              style: const TextStyle(color: AppColors.muted, fontSize: 13, height: 1.15),
+                            ),
                           ],
                         ),
                       ),

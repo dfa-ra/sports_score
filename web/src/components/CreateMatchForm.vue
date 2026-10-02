@@ -17,16 +17,16 @@ const scheduledAt = ref('')
 const venue = ref('')
 const preset = ref('campus')
 const periodCount = ref(2)
-const periodLengthMinutes = ref(20)
+const periodLengthMinutes = ref(15)
 const pending = ref(false)
 const error = ref('')
 
 const presets = [
-  { id: 'campus', label: 'Студенческий: 2 тайма по 20 мин', count: 2, minutes: 20 },
+  { id: 'campus', label: 'Студенческий: 2 тайма по 15 мин', count: 2, minutes: 15 },
   { id: 'classic', label: 'Классика: 2 тайма по 45 мин', count: 2, minutes: 45 },
   { id: 'quarters', label: 'Четверти: 4 по 10 мин', count: 4, minutes: 10 },
   { id: 'hockey', label: 'Три периода по 20 мин', count: 3, minutes: 20 },
-  { id: 'custom', label: 'Свой формат', count: 2, minutes: 20 },
+  { id: 'custom', label: 'Свой формат', count: 2, minutes: 15 },
 ] as const
 
 function applyPreset(id: string) {
@@ -126,7 +126,7 @@ async function submit() {
         <input v-model.number="periodLengthMinutes" type="number" min="1" max="90" required />
       </label>
     </div>
-    <p class="muted">По умолчанию — два тайма по 20 минут.</p>
+    <p class="muted">По умолчанию — два тайма по 15 минут.</p>
     <p v-if="!approved.length" class="muted">Сначала допустите хотя бы две команды в турнир.</p>
     <p v-if="error" class="form-error">{{ error }}</p>
     <button class="btn" type="submit" :disabled="pending || approved.length < 2">

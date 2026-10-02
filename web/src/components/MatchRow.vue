@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { outcomeMark } from '../lib/format'
-import { matchOutcome, shortKickoff } from '../lib/match'
+import { matchOutcome } from '../lib/match'
+import KickoffWhen from './KickoffWhen.vue'
 import { useFavorites } from '../stores/favorites'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -18,11 +19,6 @@ const fav = useFavorites()
 const teams = useTeamDirectory()
 const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
 const isLive = computed(() => props.match.status === 'LIVE' || props.match.status === 'PAUSED')
-const when = computed(() => {
-  if (!isLive.value) return shortKickoff(props.match.scheduledAt, props.match.status)
-  if (props.match.minute == null) return props.match.status === 'PAUSED' ? 'Пауза' : 'LIVE'
-  return `${props.match.minute}'`
-})
 const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
 const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
 const venue = computed(() => {
@@ -41,7 +37,7 @@ const venue = computed(() => {
       @click.stop="fav.toggleMatch(match.id)"
     >★</button>
     <RouterLink class="body" :to="`/matches/${match.id}`">
-      <span class="when" :class="{ live: isLive, paused: match.status === 'PAUSED' }" :title="match.status === 'PAUSED' ? 'Пауза' : undefined">{{ when }}</span>
+      <KickoffWhen :at="match.scheduledAt" :status="match.status" :minute="match.minute" />
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
           <TeamCrest :src="homeLogo" :name="homeName" :size="22" />
@@ -82,7 +78,7 @@ const venue = computed(() => {
 .star.on { color: var(--ice); }
 .body {
   display: grid;
-  grid-template-columns: 52px 1fr auto auto;
+  grid-template-columns: 46px 1fr auto auto;
   gap: 0.55rem;
   align-items: center;
   padding: 0.55rem 0.7rem 0.55rem 0;
@@ -91,13 +87,6 @@ const venue = computed(() => {
   min-height: 56px;
 }
 .body:hover { color: inherit; background: rgba(76, 180, 229, 0.06); }
-.when {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.when.live { color: var(--ice); font-weight: 800; }
-.when.paused { color: var(--muted); }
 .scorer {
   font-size: 0.68rem;
   color: var(--muted);

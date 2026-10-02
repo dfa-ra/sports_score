@@ -17,7 +17,7 @@ class LeagueMatch {
     this.periodCount = 2,
     this.sportCode,
     this.gameTimeSeconds,
-    this.periodLengthSeconds = 1200,
+    this.periodLengthSeconds = 900,
     this.clockRunningSince,
   });
 
@@ -50,7 +50,7 @@ class LeagueMatch {
       periodCount: (json['periodCount'] as num?)?.toInt() ?? 2,
       sportCode: json['sportCode']?.toString(),
       gameTimeSeconds: (json['gameTimeSeconds'] as num?)?.toInt(),
-      periodLengthSeconds: (json['periodLengthSeconds'] as num?)?.toInt() ?? 1200,
+      periodLengthSeconds: (json['periodLengthSeconds'] as num?)?.toInt() ?? 900,
       clockRunningSince: parseTime(json['clockRunningSince']),
     );
   }

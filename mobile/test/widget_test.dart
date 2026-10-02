@@ -123,6 +123,14 @@ void main() {
     expect(formatWhen(null), '—');
   });
 
+  test('schedule kickoff shows day/month above the clock', () {
+    final at = DateTime(2026, 10, 3, 9, 0);
+    expect(kickoffDayMonth(at), '03/10');
+    expect(kickoffClock(at), '09:00');
+    expect(kickoffDayMonth(null), '');
+    expect(kickoffClock(null), '');
+  });
+
   test('recent game line names the opponent', () {
     expect(
       recentGameLine(

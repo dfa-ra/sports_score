@@ -15,15 +15,35 @@ export function matchOutcome(match: {
   return 'DRAW'
 }
 
+export function kickoffDayMonth(value?: string | number | Date | null) {
+  const date = kickoffDate(value)
+  if (!date) return ''
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${day}/${month}`
+}
+
+export function kickoffClock(value?: string | number | Date | null) {
+  const date = kickoffDate(value)
+  if (!date) return ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+function kickoffDate(value?: string | number | Date | null) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export function shortKickoff(value?: string | number | Date | null, status?: string) {
   if (status === 'LIVE' || status === 'PAUSED') return 'LIVE'
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  if (status === 'FINISHED' || status === 'CANCELLED') return `${day}.${month}.`
-  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const date = kickoffDayMonth(value)
+  if (!date) return '—'
+  if (status === 'FINISHED' || status === 'CANCELLED') return date.replace('/', '.') + '.'
+  return kickoffClock(value) || '—'
 }
 
 export function longKickoff(value?: string | number | Date | null) {
