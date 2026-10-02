@@ -63,7 +63,7 @@ onUnmounted(() => {
         <span>
           <strong>{{ labelOf(player).title }}</strong>
           <small>
-            <template v-if="labelOf(player).shirt">На майке {{ labelOf(player).shirt }} · </template>{{ player.position || 'Игрок' }} · №{{ player.jerseyNumber ?? '—' }}
+            <template v-if="labelOf(player).shirt">{{ labelOf(player).shirt }} · </template>{{ player.position || 'Игрок' }} · №{{ player.jerseyNumber ?? '—' }}
           </small>
         </span>
       </RouterLink>
