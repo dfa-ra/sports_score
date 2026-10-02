@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import api from '../api/client'
+import { playerHeader } from '../lib/playerTitle'
 
 const playerId = defineModel<string>({ default: '' })
 const props = defineProps<{
@@ -13,8 +14,8 @@ const pending = ref(false)
 const open = ref(false)
 let timer: number | undefined
 
-function nameOf(player: any) {
-  return (player.displayName || `${player.firstName || ''} ${player.lastName || ''}`).trim() || 'Игрок'
+function labelOf(player: any) {
+  return playerHeader(player)
 }
 
 async function search() {
@@ -44,7 +45,7 @@ function schedule() {
 
 function pick(player: any) {
   playerId.value = player.id
-  query.value = nameOf(player)
+  query.value = labelOf(player).title
   open.value = false
 }
 
@@ -64,7 +65,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
     <input
       v-model="query"
       type="search"
-      placeholder="Начните вводить имя"
+      placeholder="Фамилия или имя"
       autocomplete="off"
       @input="schedule"
       @focus="open = players.length > 0"
@@ -80,7 +81,8 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
         :class="{ on: player.id === playerId }"
         @click="pick(player)"
       >
-        {{ nameOf(player) }}
+        <strong>{{ labelOf(player).title }}</strong>
+        <small v-if="labelOf(player).shirt">На майке {{ labelOf(player).shirt }}</small>
       </button>
     </div>
   </div>
@@ -90,6 +92,8 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
 .picker { display: grid; gap: 0.35rem; min-width: min(100%, 260px); flex: 1 1 240px; }
 .hints { display: grid; gap: 0.25rem; }
 .hint {
+  display: grid;
+  gap: 0.1rem;
   text-align: left;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--line);
@@ -97,5 +101,6 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
   background: #fff;
   cursor: pointer;
 }
+.hint small { color: var(--muted); font-weight: 600; }
 .hint.on { border-color: var(--ice); background: #f3fbff; }
 </style>

@@ -321,6 +321,8 @@ class PlayerBrief {
   PlayerBrief({
     required this.id,
     required this.displayName,
+    this.firstName = '',
+    this.lastName = '',
     this.avatarUrl,
     this.jerseyNumber,
     this.position,
@@ -328,15 +330,38 @@ class PlayerBrief {
 
   final String id;
   final String displayName;
+  final String firstName;
+  final String lastName;
   final String? avatarUrl;
   final int? jerseyNumber;
   final String? position;
 
+  /// Registration surname and given name. Shirt nickname is not the title.
+  String get title {
+    final legal = '${lastName.trim()} ${firstName.trim()}'.trim();
+    if (legal.isNotEmpty) return legal;
+    final shirt = displayName.trim();
+    return shirt.isEmpty ? 'Игрок' : shirt;
+  }
+
+  /// Shirt nickname only when it differs from the registration name.
+  String get shirtHint {
+    final shirt = displayName.trim();
+    final legal = '${lastName.trim()} ${firstName.trim()}'.trim();
+    final givenFamily = '${firstName.trim()} ${lastName.trim()}'.trim();
+    if (shirt.isEmpty || legal.isEmpty) return '';
+    if (_sameName(shirt, legal) || _sameName(shirt, givenFamily)) return '';
+    return shirt;
+  }
+
+  static bool _sameName(String left, String right) => left.toLowerCase() == right.toLowerCase();
+
   factory PlayerBrief.fromJson(Map<String, dynamic> json) {
     return PlayerBrief(
       id: json['id'].toString(),
-      displayName: json['displayName']?.toString() ??
-          '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim(),
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
       avatarUrl: json['avatarUrl']?.toString(),
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),

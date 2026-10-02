@@ -363,7 +363,7 @@ async function deleteTeam(team: any) {
           <tr v-for="u in users" :key="u.id">
             <td>
               {{ u.email }}
-              <small v-if="u.firstName || u.lastName" class="muted name">{{ [u.firstName, u.lastName].filter(Boolean).join(' ') }}</small>
+              <small v-if="u.firstName || u.lastName" class="muted name">{{ [u.lastName, u.firstName].filter(Boolean).join(' ') }}</small>
             </td>
             <td>
               <div v-if="isAdminUser(u)" class="roles">
