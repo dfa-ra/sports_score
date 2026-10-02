@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth'
 import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
 import { eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
+import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
@@ -187,8 +188,7 @@ async function load() {
     }
   }
   if (auth.canManageLeague) {
-    const { data } = await api.get('/admin/users', { params: { size: 100 } })
-    users.value = (data.content ?? []).filter((u: any) => u.role === 'REFEREE')
+    users.value = await loadAllReferees()
     if (!refereeId.value && users.value[0]) refereeId.value = users.value[0].id
   }
 }
@@ -561,7 +561,7 @@ onUnmounted(() => {
       <form class="stack" @submit.prevent="assignReferee">
         <label class="field">Назначить судью
           <select v-model="refereeId" required>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.email }}</option>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ refereeTitle(u) }}</option>
           </select>
         </label>
         <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>

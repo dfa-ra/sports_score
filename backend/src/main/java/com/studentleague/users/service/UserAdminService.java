@@ -53,6 +53,15 @@ public class UserAdminService {
     }
 
     @Transactional(readOnly = true)
+    public Page<UserResponse> listReferees(String query, Pageable pageable) {
+        String q = query == null ? "" : query.trim();
+        Page<User> page = q.isEmpty()
+                ? userRepository.findReferees(Role.REFEREE, RoleStatus.APPROVED, pageable)
+                : userRepository.searchReferees(q, Role.REFEREE, RoleStatus.APPROVED, pageable);
+        return page.map(roleService::toUserResponse);
+    }
+
+    @Transactional(readOnly = true)
     public List<RoleAssignmentResponse> pendingRoles() {
         return roleService.pendingRequests();
     }

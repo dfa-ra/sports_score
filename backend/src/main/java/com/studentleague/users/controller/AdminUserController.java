@@ -49,6 +49,15 @@ public class AdminUserController {
         return PageResponse.from(userAdminService.listUsers(q, pageable));
     }
 
+    @GetMapping("/referees")
+    @Operation(summary = "List every user with the referee role")
+    public PageResponse<UserResponse> referees(
+            @RequestParam(required = false) String q,
+            @PageableDefault(size = 500, sort = {"lastName", "firstName", "email"}, direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        return PageResponse.from(userAdminService.listReferees(q, pageable));
+    }
+
     @GetMapping("/role-requests")
     @Operation(summary = "Pending role requests")
     public List<RoleAssignmentResponse> pendingRoles() {

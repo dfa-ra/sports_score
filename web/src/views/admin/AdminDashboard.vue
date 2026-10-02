@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
+import { loadAllReferees, refereeTitle } from '../../lib/referees'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import CreateMatchForm from '../../components/CreateMatchForm.vue'
 import PlayerSearch from '../../components/PlayerSearch.vue'
@@ -21,6 +22,9 @@ const ASSIGNABLE_ROLES = [
 const users = ref<any[]>([])
 const userQuery = ref('')
 let userSearchTimer = 0
+const refereeUsers = ref<any[]>([])
+const refereeQuery = ref('')
+let refereeSearchTimer = 0
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
 const teams = ref<any[]>([])
@@ -74,6 +78,19 @@ async function loadUsers() {
   users.value = hydrateUsers(data.content ?? [])
 }
 
+async function loadReferees() {
+  refereeUsers.value = await loadAllReferees(refereeQuery.value)
+}
+
+function onRefereeQueryInput() {
+  window.clearTimeout(refereeSearchTimer)
+  refereeSearchTimer = window.setTimeout(() => {
+    loadReferees().catch((e: any) => {
+      error.value = apiError(e, 'Поиск судей не сработал.')
+    })
+  }, 250)
+}
+
 function onUserQueryInput() {
   window.clearTimeout(userSearchTimer)
   userSearchTimer = window.setTimeout(() => {
@@ -84,7 +101,7 @@ function onUserQueryInput() {
 }
 
 async function load() {
-  const [u, t, m, tm, s, rr, g] = await Promise.all([
+  const [u, t, m, tm, s, rr, g, refs] = await Promise.all([
     api.get('/admin/users', { params: userListParams() }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
@@ -92,8 +109,10 @@ async function load() {
     api.get('/sports'),
     api.get('/admin/role-requests'),
     api.get('/gallery'),
+    loadAllReferees(refereeQuery.value),
   ])
   users.value = hydrateUsers(u.data.content)
+  refereeUsers.value = refs
   tournaments.value = t.data.content
   matches.value = m.data.content
   teams.value = tm.data.content
@@ -455,8 +474,22 @@ async function deleteTeam(team: any) {
 
     <div v-else-if="tab === 'referees'" class="panel stack">
       <h2>Судьи</h2>
-      <p class="muted">Роль ставится во вкладке «Пользователи». Потом судью назначают в карточке матча.</p>
-      <div v-for="u in users.filter(x => approvedRolesOf(x).includes('REFEREE'))" :key="u.id" class="row">{{ u.email }}</div>
+      <p class="muted">Все, кому отмечена роль «Судья», а не только первая страница пользователей. Назначение — в карточке матча.</p>
+      <label class="field search">Поиск
+        <input
+          v-model="refereeQuery"
+          type="search"
+          placeholder="Почта, имя или фамилия"
+          @input="onRefereeQueryInput"
+        />
+      </label>
+      <p v-if="refereeQuery.trim() && !refereeUsers.length" class="muted">Никого не нашли.</p>
+      <p v-else-if="!refereeUsers.length" class="muted">Судей пока нет. Роль ставится во вкладке «Пользователи».</p>
+      <div v-for="u in refereeUsers" :key="u.id" class="row">
+        <span>
+          {{ refereeTitle(u) }}
+        </span>
+      </div>
       <p class="muted">Виды спорта: {{ sports.map(s => labelOfSport(s.code, s.name)).join(', ') || 'пока не заданы' }}</p>
     </div>
 
