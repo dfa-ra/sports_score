@@ -12,7 +12,7 @@ export function useMatchClock(match: Ref<any>) {
 
   onUnmounted(() => window.clearInterval(timer))
 
-  const cap = computed(() => match.value?.periodLengthSeconds ?? 1200)
+  const cap = computed(() => match.value?.periodLengthSeconds ?? 900)
 
   const elapsed = computed(() => {
     const current = match.value

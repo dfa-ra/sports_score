@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
-import { formatWhen } from '../lib/format'
+import KickoffWhen from '../components/KickoffWhen.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import EmptyState from '../components/EmptyState.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -59,7 +59,7 @@ const visible = computed(() => {
         <StatusBadge :status="m.status" />
         <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
         <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
-        <p class="muted">{{ formatWhen(m.scheduledAt) }}</p>
+        <KickoffWhen :at="m.scheduledAt" :status="m.status" :minute="m.minute" align="start" />
       </RouterLink>
     </div>
   </section>

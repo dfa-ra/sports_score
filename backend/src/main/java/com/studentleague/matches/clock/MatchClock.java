@@ -9,7 +9,7 @@ import java.time.Instant;
 public final class MatchClock {
 
     public static final int DEFAULT_PERIOD_COUNT = 2;
-    public static final int DEFAULT_PERIOD_LENGTH_SECONDS = 20 * 60;
+    public static final int DEFAULT_PERIOD_LENGTH_SECONDS = 15 * 60;
 
     private MatchClock() {
     }

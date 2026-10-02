@@ -60,7 +60,7 @@ public class Match {
     private int periodCount = 2;
 
     @Column(name = "period_length_seconds", nullable = false)
-    private int periodLengthSeconds = 1200;
+    private int periodLengthSeconds = 15 * 60;
 
     @Column(name = "clock_running_since")
     private Instant clockRunningSince;

@@ -41,7 +41,7 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("LIVE"))
                 .andExpect(jsonPath("$.period").value(1))
                 .andExpect(jsonPath("$.periodCount").value(2))
-                .andExpect(jsonPath("$.periodLengthSeconds").value(1200))
+                .andExpect(jsonPath("$.periodLengthSeconds").value(900))
                 .andExpect(jsonPath("$.clockRunningSince").isNotEmpty());
 
         mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")

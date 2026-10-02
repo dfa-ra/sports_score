@@ -96,7 +96,9 @@ public class MatchService {
         match.setHomeScore(0);
         match.setAwayScore(0);
         match.setPeriodCount(request.periodCount() == null ? MatchClock.DEFAULT_PERIOD_COUNT : request.periodCount());
-        int minutes = request.periodLengthMinutes() == null ? 20 : request.periodLengthMinutes();
+        int minutes = request.periodLengthMinutes() == null
+                ? MatchClock.DEFAULT_PERIOD_LENGTH_SECONDS / 60
+                : request.periodLengthMinutes();
         match.setPeriodLengthSeconds(minutes * 60);
         match.setVenue(blankToNull(request.venue()));
         Match saved = matchRepository.save(match);
