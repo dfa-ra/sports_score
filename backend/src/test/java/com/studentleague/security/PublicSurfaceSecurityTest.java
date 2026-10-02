@@ -67,6 +67,7 @@ class PublicSurfaceSecurityTest extends AbstractIntegrationTest {
             "/api/v1/teams/mine",
             "/api/v1/auth/me",
             "/api/v1/admin/users",
+            "/api/v1/admin/referees",
             "/api/v1/referee/matches"
     })
     void privateSurfacesStillNeedALogin(String path) throws Exception {
