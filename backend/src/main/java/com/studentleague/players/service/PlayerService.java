@@ -382,7 +382,12 @@ public class PlayerService {
         if (lineup != null && lineup.isStarter()) {
             return 40;
         }
-        return lastEventMinute;
+        if (lastEventMinute == null) {
+            return null;
+        }
+        // Stored game time is seconds from kickoff once it reaches two minutes.
+        // Smaller legacy values were sometimes a bare minute and stay as typed.
+        return lastEventMinute >= 120 ? lastEventMinute / 60 : lastEventMinute;
     }
 
     private static boolean looksLikeGoalkeeper(String position) {

@@ -31,24 +31,26 @@ export function buildFutsalBoard(match: {
   awayTeamId: string
   period?: number | null
   periodCount?: number | null
+  periodLengthSeconds?: number | null
 }, events: FutsalEvent[], elapsedSeconds: number): FutsalBoard {
   const periodScoped = (match.periodCount ?? 0) > 0
   const period = periodScoped ? (match.period ?? null) : null
+  const periodLength = match.periodLengthSeconds && match.periodLengthSeconds > 0 ? match.periodLengthSeconds : 900
   const active = (events ?? []).filter((event) => inScope(event, periodScoped, period))
   return {
     foulScope: periodScoped ? 'PERIOD' : 'MATCH',
     period: match.period ?? null,
     teams: [
-      side(active, match.homeTeamId, match.awayTeamId, elapsedSeconds),
-      side(active, match.awayTeamId, match.homeTeamId, elapsedSeconds),
+      side(active, match.homeTeamId, match.awayTeamId, elapsedSeconds, periodLength),
+      side(active, match.awayTeamId, match.homeTeamId, elapsedSeconds, periodLength),
     ],
   }
 }
 
-function side(events: FutsalEvent[], teamId: string, opponentId: string, elapsed: number): FutsalSide {
+function side(events: FutsalEvent[], teamId: string, opponentId: string, elapsed: number, periodLength: number): FutsalSide {
   const fouls = events.filter((event) => event.eventType === 'FOUL' && event.teamId === teamId).length
   const timeoutAvailable = !events.some((event) => event.eventType === 'TIMEOUT' && event.teamId === teamId)
-  const penalty = shortHanded(events, teamId, opponentId, elapsed)
+  const penalty = shortHanded(events, teamId, opponentId, elapsed, periodLength)
   return {
     teamId,
     fouls,
@@ -58,13 +60,22 @@ function side(events: FutsalEvent[], teamId: string, opponentId: string, elapsed
   }
 }
 
-function shortHanded(events: FutsalEvent[], teamId: string, opponentId: string, elapsed: number) {
+function periodClock(event: FutsalEvent, periodLength: number) {
+  const time = Math.max(0, event.gameTime ?? 0)
+  const period = event.period != null && event.period > 0 ? event.period : 1
+  const length = periodLength > 0 ? periodLength : 900
+  const offset = (period - 1) * length
+  if (period > 1 && time >= offset) return time - offset
+  return time
+}
+
+function shortHanded(events: FutsalEvent[], teamId: string, opponentId: string, elapsed: number, periodLength: number) {
   let bestEnd = -1
   for (const red of events) {
     if (red.eventType !== 'RED_CARD' || red.teamId !== teamId) continue
-    const start = red.gameTime ?? 0
+    const start = periodClock(red, periodLength)
     let end = start + SHORT_HANDED_SECONDS
-    const concedeAt = earliestConcede(events, teamId, opponentId, start, end)
+    const concedeAt = earliestConcede(events, teamId, opponentId, start, end, periodLength)
     if (concedeAt != null) end = concedeAt
     if (elapsed < end && end > bestEnd) bestEnd = end
   }
@@ -82,11 +93,11 @@ function shortHanded(events: FutsalEvent[], teamId: string, opponentId: string, 
   }
 }
 
-function earliestConcede(events: FutsalEvent[], teamId: string, opponentId: string, start: number, end: number) {
+function earliestConcede(events: FutsalEvent[], teamId: string, opponentId: string, start: number, end: number, periodLength: number) {
   let found: number | null = null
   for (const event of events) {
     if (event.eventType !== 'GOAL' || event.gameTime == null) continue
-    const at = event.gameTime
+    const at = periodClock(event, periodLength)
     if (at <= start || at >= end || !benefitsOpponent(event, teamId, opponentId)) continue
     if (found == null || at < found) found = at
   }

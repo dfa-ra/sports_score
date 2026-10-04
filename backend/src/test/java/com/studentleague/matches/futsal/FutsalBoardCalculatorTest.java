@@ -106,6 +106,17 @@ class FutsalBoardCalculatorTest {
     }
 
     @Test
+    void redCardStoredFromKickoffStillCountsInsideTheSecondHalf() {
+        Match match = periodMatch(2);
+        match.setPeriodLengthSeconds(15 * 60);
+        // 0:30 into the second half is 15:30 from kickoff, not 30 seconds remaining.
+        MatchEvent red = event(MatchEventType.RED_CARD, home, 2, 15 * 60 + 30, null);
+        TeamFutsalState running = board(match, List.of(red), 40).teams().get(0);
+        assertThat(running.shortHanded()).isTrue();
+        assertThat(running.shortHandedRemainingSeconds()).isEqualTo(110);
+    }
+
+    @Test
     void ownGoalByTheShortHandedTeamEndsThePenalty() {
         Match match = periodMatch(1);
         List<MatchEvent> events = List.of(

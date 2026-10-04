@@ -6,7 +6,7 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
-import { eventMinute, longKickoff, matchStateLabel } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -55,12 +55,7 @@ let client: Client | null = null
 const timeline = computed(() =>
   [...events.value]
     .filter((event) => !event.voided)
-    .sort((a, b) =>
-      (a.period ?? 0) - (b.period ?? 0)
-      || (a.gameTime ?? 0) - (b.gameTime ?? 0)
-      || String(a.timestamp || '').localeCompare(String(b.timestamp || ''))
-      || String(a.id).localeCompare(String(b.id)),
-    ),
+    .sort(compareMatchEvents),
 )
 const headToHead = computed(() => {
   if (!match.value) return []
@@ -85,33 +80,9 @@ function recentLine(row: any, teamId: string) {
 }
 const periodBlocks = computed(() => {
   if (!match.value) return []
-  const visibleTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'OWN_GOAL'])
-  const chrono = [...events.value]
-    .filter((e) => !e.voided && visibleTypes.has(e.eventType))
-    .sort((a, b) => (a.gameTime ?? 0) - (b.gameTime ?? 0) || String(a.id).localeCompare(String(b.id)))
-  let home = 0
-  let away = 0
-  const byPeriod = new Map<number, { items: any[]; score: string }>()
-  for (const ev of chrono) {
-    if (ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL') {
-      if (ev.teamId === match.value.homeTeamId) home += 1
-      else away += 1
-    }
-    const period = ev.period || 1
-    const block = byPeriod.get(period) ?? { items: [], score: '0-0' }
-    block.items.push({
-      ...ev,
-      home: ev.teamId === match.value.homeTeamId,
-      scoreline: ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL' ? `${home}-${away}` : null,
-    })
-    block.score = `${home}-${away}`
-    byPeriod.set(period, block)
-  }
-  return [...byPeriod.entries()].map(([period, block]) => ({
-    period,
-    label: periodLabel(period, match.value.sportCode, match.value.periodCount),
-    score: block.score,
-    items: block.items,
+  return buildPeriodBlocks(events.value, match.value).map((block) => ({
+    ...block,
+    label: periodLabel(block.period, match.value.sportCode, match.value.periodCount),
   }))
 })
 
@@ -139,7 +110,7 @@ function protocolPlayerLabel(player: any) {
 const editableEvents = computed(() =>
   [...events.value]
     .filter((event) => !event.voided && event.eventType !== 'PERIOD_START' && event.eventType !== 'PERIOD_END')
-    .sort((a, b) => (a.gameTime ?? 0) - (b.gameTime ?? 0) || String(a.id).localeCompare(String(b.id))),
+    .sort(compareMatchEvents),
 )
 
 function syncMinutes() {
@@ -439,7 +410,7 @@ onUnmounted(() => {
     <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED'">
       <CopyChip :value="String(match.id)" label="Скопировать id матча" />
       <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. Минута пишется в тот же протокол, что и пульт судьи. Зрители видят счёт без убранных голов.</p>
+      <p class="muted">Гол, жёлтая или красная. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
         <label class="field">Событие
           <select v-model="protocolType">
@@ -462,7 +433,7 @@ onUnmounted(() => {
             </option>
           </select>
         </label>
-        <label class="field">Минута
+        <label class="field">Минута от начала
           <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
         </label>
         <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
@@ -472,7 +443,7 @@ onUnmounted(() => {
           <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
           <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
         </span>
-        <label class="field minute">Минута
+        <label class="field minute">Минута от начала
           <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
         </label>
         <button class="btn secondary" type="button" :disabled="pending" @click="saveMinute(ev)">Сохранить минуту</button>
@@ -596,7 +567,7 @@ onUnmounted(() => {
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id">
-          <span class="t">{{ formatClock(ev.gameTime) }}</span>
+          <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
             <p class="muted">{{ eventDetail(ev) }} · {{ periodLabel(ev.period, match.sportCode, match.periodCount) }}</p>

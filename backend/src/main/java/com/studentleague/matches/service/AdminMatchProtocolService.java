@@ -127,13 +127,19 @@ public class AdminMatchProtocolService {
     }
 
     private void applyMinute(Match match, MatchEvent event, int minute) {
-        event.setGameTime(minute * 60);
+        // The admin types the match minute from kickoff — the same number the
+        // public overview prints. 18 on a 2×15 match is 18:00, not 3:00 left.
+        event.setGameTime(Math.max(0, minute) * 60);
         event.setPeriod(periodFor(match, minute));
     }
 
     private int periodFor(Match match, int minute) {
         int lengthMinutes = Math.max(1, match.getPeriodLengthSeconds() / 60);
-        int period = minute / lengthMinutes + 1;
+        if (minute <= 0) {
+            return 1;
+        }
+        // 15' is still the first half of a 2×15; 16' is the first minute of the second.
+        int period = (minute - 1) / lengthMinutes + 1;
         int count = Math.max(1, match.getPeriodCount() > 0 ? match.getPeriodCount() : MatchClock.DEFAULT_PERIOD_COUNT);
         return Math.min(period, count);
     }

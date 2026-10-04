@@ -66,10 +66,7 @@ export function matchStateLabel(status?: string | null) {
   return status || ''
 }
 
-export function eventMinute(gameTime?: number | null) {
-  const raw = Math.max(0, gameTime ?? 0)
-  return raw >= 120 ? Math.floor(raw / 60) : raw
-}
+export { buildPeriodBlocks, compareMatchEvents, eventMinute } from './matchMinute'
 
 export function ymd(value?: string | number | Date | null) {
   if (!value) return ''

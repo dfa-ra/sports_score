@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
+import { eventMinute } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
@@ -273,7 +274,7 @@ onUnmounted(() => {
       <h2>Протокол</h2>
       <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
-        <span class="t">{{ formatClock(ev.gameTime) }}</span>
+        <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
         <span>{{ eventDetail(ev) || '—' }}</span>
       </div>
