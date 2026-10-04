@@ -171,7 +171,12 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
     void adminCorrectsFinishedMatchAndPublicScoreFollows() throws Exception {
         String adminToken = createAdminAndLogin("fin-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String fanToken = registerAndLogin("fin-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");
-        String playerToken = registerAndLogin("fin-player-" + System.nanoTime() + "@example.com", "Str0ngPass!", "PLAYER", null);
+        String playerToken = registerAndLogin(
+                "fin-player-" + System.nanoTime() + "@example.com",
+                "Str0ngPass!",
+                "PLAYER",
+                "https://example.com/player.jpg"
+        );
         Fixture fx = setupMatch(adminToken);
 
         mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
@@ -270,7 +275,7 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/statistics/scorers").param("tournamentId", tournamentId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.playerId == '%s')].goals".formatted(fx.homePlayerId)).isEmpty());
+                .andExpect(jsonPath("$[?(@.playerId == '%s')].goals".formatted(fx.homePlayerId)).value(0));
     }
 
     private Fixture setupMatch(String adminToken) throws Exception {
