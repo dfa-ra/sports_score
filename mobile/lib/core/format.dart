@@ -75,7 +75,7 @@ String matchStateLabel(String status) {
 int eventMinute(int? gameTime) {
   final raw = gameTime ?? 0;
   if (raw < 0) return 0;
-  return raw >= 120 ? raw ~/ 60 : raw;
+  return raw ~/ 60;
 }
 
 String weekdayShort(DateTime date) {

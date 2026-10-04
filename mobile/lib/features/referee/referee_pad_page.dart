@@ -482,7 +482,7 @@ class _RefereePadPageState extends State<RefereePadPage> {
                               children: [
                                 SizedBox(
                                   width: 48,
-                                  child: Text(formatClock(ev.gameTime), style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w700)),
+                                  child: Text("${eventMinute(ev.gameTime)}'", style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w700)),
                                 ),
                                 SizedBox(
                                   width: 90,

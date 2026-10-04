@@ -189,12 +189,19 @@ public class RefereeMatchService {
         validateEventPayload(match, request);
 
         Instant now = Instant.now();
-        int elapsed = MatchClock.elapsedSeconds(match, now);
+        int period = MatchClock.periodIndex(match);
+        int length = MatchClock.periodLength(match);
+        // The pad may omit gameTime. The hall clock counts down, but we store
+        // seconds from kickoff. An explicit gameTime is the old within-period
+        // count-up (or already kickoff seconds when it is past one period).
+        int kickoff = request.gameTime() != null
+                ? MatchClock.toKickoffSeconds(request.gameTime(), period, length)
+                : MatchClock.kickoffSeconds(match, now);
         MatchEvent event = new MatchEvent();
         event.setMatchId(matchId);
         event.setEventType(request.eventType());
         event.setTimestamp(now);
-        event.setGameTime(request.gameTime() != null ? request.gameTime() : elapsed);
+        event.setGameTime(kickoff);
         event.setPeriod(match.getPeriod());
         event.setTeamId(request.teamId());
         event.setPlayerId(request.playerId());
@@ -324,7 +331,7 @@ public class RefereeMatchService {
         event.setMatchId(match.getId());
         event.setEventType(type);
         event.setTimestamp(now);
-        event.setGameTime(match.getGameTimeSeconds());
+        event.setGameTime(MatchClock.kickoffSeconds(match, now));
         event.setPeriod(match.getPeriod());
         event.setVoided(false);
         matchEventRepository.save(event);

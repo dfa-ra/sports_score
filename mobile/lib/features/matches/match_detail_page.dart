@@ -81,7 +81,11 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
     if (current == null) return const [];
     const visible = {'GOAL', 'OWN_GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION'};
     final chrono = events.where((e) => visible.contains(e.eventType)).toList()
-      ..sort((a, b) => (a.gameTime ?? 0).compareTo(b.gameTime ?? 0));
+      ..sort((a, b) {
+        final byTime = (a.gameTime ?? 0).compareTo(b.gameTime ?? 0);
+        if (byTime != 0) return byTime;
+        return a.id.compareTo(b.id);
+      });
     var home = 0;
     var away = 0;
     final map = <int, _PeriodBlock>{};
@@ -582,7 +586,7 @@ class _Protocol extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 56,
-                  child: Text(formatClock(ev.gameTime), style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800)),
+                  child: Text("${eventMinute(ev.gameTime)}'", style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800)),
                 ),
                 Expanded(
                   child: Column(

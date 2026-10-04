@@ -1,5 +1,6 @@
 package com.studentleague.matches.futsal;
 
+import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.dto.FutsalBoardResponse;
 import com.studentleague.matches.dto.FutsalBoardResponse.TeamFutsalState;
@@ -35,13 +36,14 @@ public final class FutsalBoardCalculator {
         List<MatchEvent> active = events.stream()
                 .filter(event -> inScope(event, scoped, match.getPeriod()))
                 .toList();
+        int periodLength = MatchClock.periodLength(match);
         return new FutsalBoardResponse(
                 scoped ? PERIOD_SCOPE : MATCH_SCOPE,
                 match.getPeriod(),
                 scoped ? PERIOD_NOTE : MATCH_NOTE,
                 List.of(
-                        teamState(active, match.getHomeTeamId(), match.getAwayTeamId(), elapsedSeconds),
-                        teamState(active, match.getAwayTeamId(), match.getHomeTeamId(), elapsedSeconds)
+                        teamState(active, match.getHomeTeamId(), match.getAwayTeamId(), elapsedSeconds, periodLength),
+                        teamState(active, match.getAwayTeamId(), match.getHomeTeamId(), elapsedSeconds, periodLength)
                 )
         );
     }
@@ -90,7 +92,8 @@ public final class FutsalBoardCalculator {
             List<MatchEvent> active,
             UUID teamId,
             UUID opponentId,
-            int elapsedSeconds
+            int elapsedSeconds,
+            int periodLength
     ) {
         int fouls = 0;
         boolean timeoutUsed = false;
@@ -104,7 +107,7 @@ public final class FutsalBoardCalculator {
                 timeoutUsed = true;
             }
         }
-        ShortHanded shortHanded = shortHanded(active, teamId, opponentId, elapsedSeconds);
+        ShortHanded shortHanded = shortHanded(active, teamId, opponentId, elapsedSeconds, periodLength);
         return new TeamFutsalState(
                 teamId,
                 fouls,
@@ -120,16 +123,17 @@ public final class FutsalBoardCalculator {
             List<MatchEvent> active,
             UUID teamId,
             UUID opponentId,
-            int elapsedSeconds
+            int elapsedSeconds,
+            int periodLength
     ) {
         int bestEnd = -1;
         for (MatchEvent red : active) {
             if (red.getEventType() != MatchEventType.RED_CARD || !teamId.equals(red.getTeamId())) {
                 continue;
             }
-            int start = red.getGameTime() == null ? 0 : red.getGameTime();
+            int start = onPeriodClock(red, periodLength);
             int end = start + SHORT_HANDED_SECONDS;
-            Integer concedeAt = earliestConcede(active, teamId, opponentId, start, end);
+            Integer concedeAt = earliestConcede(active, teamId, opponentId, start, end, periodLength);
             if (concedeAt != null) {
                 end = concedeAt;
             }
@@ -143,19 +147,26 @@ public final class FutsalBoardCalculator {
         return new ShortHanded(true, bestEnd - elapsedSeconds, bestEnd);
     }
 
+    private static int onPeriodClock(MatchEvent event, int periodLength) {
+        int time = event.getGameTime() == null ? 0 : event.getGameTime();
+        int period = event.getPeriod() == null ? 1 : event.getPeriod();
+        return MatchClock.periodClockSeconds(time, period, periodLength);
+    }
+
     private static Integer earliestConcede(
             List<MatchEvent> active,
             UUID teamId,
             UUID opponentId,
             int start,
-            int end
+            int end,
+            int periodLength
     ) {
         Integer found = null;
         for (MatchEvent event : active) {
             if (event.getEventType() != MatchEventType.GOAL || event.getGameTime() == null) {
                 continue;
             }
-            int at = event.getGameTime();
+            int at = onPeriodClock(event, periodLength);
             if (at <= start || at >= end || !benefitsOpponent(event, teamId, opponentId)) {
                 continue;
             }
