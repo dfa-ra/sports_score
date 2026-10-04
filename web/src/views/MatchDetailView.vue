@@ -38,6 +38,8 @@ const protocolType = ref<'GOAL' | 'YELLOW_CARD' | 'RED_CARD'>('GOAL')
 const protocolTeamId = ref('')
 const protocolPlayerId = ref('')
 const protocolMinute = ref(1)
+const homeRoster = ref<any[]>([])
+const awayRoster = ref<any[]>([])
 const minuteDrafts = ref<Record<string, number>>({})
 const crestSize = ref(46)
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
@@ -50,7 +52,16 @@ const fav = useFavorites()
 const { remaining, expired, cap } = useMatchClock(match)
 let client: Client | null = null
 
-const timeline = computed(() => [...events.value].filter((e) => !e.voided).reverse())
+const timeline = computed(() =>
+  [...events.value]
+    .filter((event) => !event.voided)
+    .sort((a, b) =>
+      (a.period ?? 0) - (b.period ?? 0)
+      || (a.gameTime ?? 0) - (b.gameTime ?? 0)
+      || String(a.timestamp || '').localeCompare(String(b.timestamp || ''))
+      || String(a.id).localeCompare(String(b.id)),
+    ),
+)
 const headToHead = computed(() => {
   if (!match.value) return []
   const a = match.value.homeTeamId
@@ -105,9 +116,11 @@ const periodBlocks = computed(() => {
 })
 
 const protocolPlayers = computed(() => {
-  if (!lineups.value || !match.value || !protocolTeamId.value) return []
-  const side = protocolTeamId.value === match.value.homeTeamId ? lineups.value.home : lineups.value.away
-  const rows = [...(side?.starters ?? []), ...(side?.bench ?? [])]
+  if (!match.value || !protocolTeamId.value) return []
+  const home = protocolTeamId.value === match.value.homeTeamId
+  const roster = home ? homeRoster.value : awayRoster.value
+  const side = home ? lineups.value?.home : lineups.value?.away
+  const rows = [...roster, ...(side?.starters ?? []), ...(side?.bench ?? [])]
   const seen = new Set<string>()
   return rows.filter((player) => {
     if (!player?.playerId || seen.has(player.playerId)) return false
@@ -115,6 +128,13 @@ const protocolPlayers = computed(() => {
     return true
   })
 })
+
+function protocolPlayerLabel(player: any) {
+  const name = player.name
+    || player.displayName
+    || `${player.playerFirstName || ''} ${player.playerLastName || ''}`.trim()
+  return playerTag(name, player.jerseyNumber)
+}
 
 const editableEvents = computed(() =>
   [...events.value]
@@ -159,6 +179,21 @@ async function load() {
   referees.value = r.data
   lineups.value = l.data
   if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
+  homeRoster.value = []
+  awayRoster.value = []
+  if (auth.canManageLeague) {
+    try {
+      const [homeMembers, awayMembers] = await Promise.all([
+        api.get(`/teams/${m.data.homeTeamId}/members`),
+        api.get(`/teams/${m.data.awayTeamId}/members`),
+      ])
+      homeRoster.value = homeMembers.data ?? []
+      awayRoster.value = awayMembers.data ?? []
+    } catch {
+      homeRoster.value = []
+      awayRoster.value = []
+    }
+  }
   try {
     const [hf, af, games] = await Promise.all([
       api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
@@ -398,6 +433,64 @@ onUnmounted(() => {
 
     <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
 
+    <p v-if="error" class="form-error">{{ error }}</p>
+    <p v-if="ok" class="form-ok">{{ ok }}</p>
+
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED'">
+      <CopyChip :value="String(match.id)" label="Скопировать id матча" />
+      <h2>Протокол</h2>
+      <p class="muted">Гол, жёлтая или красная. Минута пишется в тот же протокол, что и пульт судьи. Зрители видят счёт без убранных голов.</p>
+      <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
+        <label class="field">Событие
+          <select v-model="protocolType">
+            <option value="GOAL">Гол</option>
+            <option value="YELLOW_CARD">Жёлтая</option>
+            <option value="RED_CARD">Красная</option>
+          </select>
+        </label>
+        <label class="field">Команда
+          <select v-model="protocolTeamId">
+            <option :value="match.homeTeamId">{{ teams.fullName(match.homeTeamId) }}</option>
+            <option :value="match.awayTeamId">{{ teams.fullName(match.awayTeamId) }}</option>
+          </select>
+        </label>
+        <label class="field">Игрок
+          <select v-model="protocolPlayerId" required>
+            <option v-if="!protocolPlayers.length" value="" disabled>В заявке никого нет</option>
+            <option v-for="player in protocolPlayers" :key="player.playerId" :value="player.playerId">
+              {{ protocolPlayerLabel(player) }}
+            </option>
+          </select>
+        </label>
+        <label class="field">Минута
+          <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
+        </label>
+        <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
+      </form>
+      <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
+        <span>
+          <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
+          <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
+        </span>
+        <label class="field minute">Минута
+          <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
+        </label>
+        <button class="btn secondary" type="button" :disabled="pending" @click="saveMinute(ev)">Сохранить минуту</button>
+        <button class="btn danger" type="button" :disabled="pending" @click="voidProtocolEvent(ev)">Убрать</button>
+      </div>
+      <p v-if="!editableEvents.length" class="muted">В протоколе пока нет событий.</p>
+      <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch">Удалить матч</button>
+      <form class="stack" @submit.prevent="assignReferee">
+        <label class="field">Назначить судью
+          <select v-model="refereeId" required>
+            <option v-for="u in users" :key="u.id" :value="u.id">{{ refereeTitle(u) }}</option>
+          </select>
+        </label>
+        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
+      </form>
+      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
+    </AdminOnly>
+
     <div class="fs-tabs">
       <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
       <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
@@ -500,6 +593,7 @@ onUnmounted(() => {
 
     <div v-else class="panel">
       <h2>Протокол</h2>
+      <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id">
           <span class="t">{{ formatClock(ev.gameTime) }}</span>
@@ -511,63 +605,6 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <p v-if="error" class="form-error">{{ error }}</p>
-    <p v-if="ok" class="form-ok">{{ ok }}</p>
-
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
-      <CopyChip :value="String(match.id)" label="Скопировать id матча" />
-      <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. Минута пишется в тот же протокол, что и пульт судьи. Зрители видят счёт без убранных голов.</p>
-      <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
-        <label class="field">Событие
-          <select v-model="protocolType">
-            <option value="GOAL">Гол</option>
-            <option value="YELLOW_CARD">Жёлтая</option>
-            <option value="RED_CARD">Красная</option>
-          </select>
-        </label>
-        <label class="field">Команда
-          <select v-model="protocolTeamId">
-            <option :value="match.homeTeamId">{{ teams.fullName(match.homeTeamId) }}</option>
-            <option :value="match.awayTeamId">{{ teams.fullName(match.awayTeamId) }}</option>
-          </select>
-        </label>
-        <label class="field">Игрок
-          <select v-model="protocolPlayerId" required>
-            <option v-if="!protocolPlayers.length" value="" disabled>В заявке никого нет</option>
-            <option v-for="player in protocolPlayers" :key="player.playerId" :value="player.playerId">
-              {{ playerTag(player.name, player.jerseyNumber) }}
-            </option>
-          </select>
-        </label>
-        <label class="field">Минута
-          <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
-        </label>
-        <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
-      </form>
-      <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
-        <span>
-          <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
-          <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
-        </span>
-        <label class="field minute">Минута
-          <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
-        </label>
-        <button class="btn secondary" type="button" :disabled="pending" @click="saveMinute(ev)">Сохранить минуту</button>
-        <button class="btn danger" type="button" :disabled="pending" @click="voidProtocolEvent(ev)">Убрать</button>
-      </div>
-      <p v-if="!editableEvents.length" class="muted">В протоколе пока нет событий.</p>
-      <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch">Удалить матч</button>
-      <form class="stack" @submit.prevent="assignReferee">
-        <label class="field">Назначить судью
-          <select v-model="refereeId" required>
-            <option v-for="u in users" :key="u.id" :value="u.id">{{ refereeTitle(u) }}</option>
-          </select>
-        </label>
-        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
-      </form>
-      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
-    </AdminOnly>
   </section>
 </template>
 

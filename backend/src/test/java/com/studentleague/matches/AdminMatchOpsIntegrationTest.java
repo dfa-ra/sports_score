@@ -167,6 +167,117 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[?(@.eventType == 'YELLOW_CARD')].voided").value(false));
     }
 
+    @Test
+    void adminCorrectsFinishedMatchAndPublicScoreFollows() throws Exception {
+        String adminToken = createAdminAndLogin("fin-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String fanToken = registerAndLogin("fin-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String playerToken = registerAndLogin(
+                "fin-player-" + System.nanoTime() + "@example.com",
+                "Str0ngPass!",
+                "PLAYER",
+                "https://example.com/player.jpg"
+        );
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.homeScore").value(0))
+                .andExpect(jsonPath("$.awayScore").value(0));
+
+        String goalBody = """
+                {"eventType":"GOAL","teamId":"%s","playerId":"%s","minute":11}
+                """.formatted(fx.homeTeamId, fx.homePlayerId);
+        for (String token : new String[] {fanToken, playerToken, fx.homeToken}) {
+            mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events")
+                            .header("Authorization", auth(token))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(goalBody))
+                    .andExpect(status().isForbidden());
+        }
+
+        MvcResult goal = mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goalBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.eventType").value("GOAL"))
+                .andExpect(jsonPath("$.gameTime").value(660))
+                .andExpect(jsonPath("$.voided").value(false))
+                .andReturn();
+        String eventId = objectMapper.readTree(goal.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"YELLOW_CARD","teamId":"%s","playerId":"%s","minute":12}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isCreated());
+
+        MvcResult pub = mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.homeScore").value(1))
+                .andExpect(jsonPath("$.awayScore").value(0))
+                .andReturn();
+        String tournamentId = objectMapper.readTree(pub.getResponse().getContentAsString()).get("tournamentId").asText();
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')].eventType".formatted(eventId)).value("GOAL"))
+                .andExpect(jsonPath("$[?(@.id == '%s')].voided".formatted(eventId)).value(false))
+                .andExpect(jsonPath("$[?(@.id == '%s')].playerId".formatted(eventId)).value(fx.homePlayerId));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(fx.homeTeamId)).value(1))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].points".formatted(fx.homeTeamId)).value(3));
+
+        mockMvc.perform(get("/api/v1/statistics/scorers").param("tournamentId", tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.playerId == '%s')].goals".formatted(fx.homePlayerId)).value(1));
+
+        mockMvc.perform(patch("/api/v1/admin/matches/" + fx.matchId + "/events/" + eventId)
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"minute\":14}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gameTime").value(840));
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(fanToken)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.voided").value(true));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.homeScore").value(0))
+                .andExpect(jsonPath("$.awayScore").value(0));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')].voided".formatted(eventId)).value(true));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(fx.homeTeamId)).value(0))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].points".formatted(fx.homeTeamId)).value(1));
+
+        mockMvc.perform(get("/api/v1/statistics/scorers").param("tournamentId", tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.playerId == '%s')].goals".formatted(fx.homePlayerId)).value(0));
+    }
+
     private Fixture setupMatch(String adminToken) throws Exception {
         String homeEmail = "ops-home-" + System.nanoTime() + "@example.com";
         String awayEmail = "ops-away-" + System.nanoTime() + "@example.com";

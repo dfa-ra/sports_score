@@ -3,6 +3,7 @@ package com.studentleague.matches.service;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchEventType;
+import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.AdminCreateMatchEventRequest;
 import com.studentleague.matches.dto.AdminUpdateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
@@ -29,6 +30,14 @@ public class AdminMatchProtocolService {
             MatchEventType.GOAL,
             MatchEventType.YELLOW_CARD,
             MatchEventType.RED_CARD
+    );
+
+    /** Finished matches stay editable: an admin corrects the same event rows the referee pad wrote. */
+    private static final EnumSet<MatchStatus> EDITABLE_STATUS = EnumSet.of(
+            MatchStatus.SCHEDULED,
+            MatchStatus.LIVE,
+            MatchStatus.PAUSED,
+            MatchStatus.FINISHED
     );
 
     private final MatchRepository matchRepository;
@@ -62,7 +71,7 @@ public class AdminMatchProtocolService {
         if (!EDITABLE.contains(request.eventType())) {
             throw ApiException.badRequest("В протокол можно добавить гол, жёлтую или красную карточку");
         }
-        Match match = requireMatch(matchId);
+        Match match = requireEditableMatch(matchId);
         if (!request.teamId().equals(match.getHomeTeamId()) && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("Укажите команду этого матча");
         }
@@ -88,7 +97,7 @@ public class AdminMatchProtocolService {
 
     @Transactional
     public MatchEventResponse updateMinute(UUID matchId, UUID eventId, AdminUpdateMatchEventRequest request) {
-        Match match = requireMatch(matchId);
+        Match match = requireEditableMatch(matchId);
         MatchEvent event = requireEvent(matchId, eventId);
         applyMinute(match, event, request.minute());
         matchEventRepository.save(event);
@@ -97,7 +106,7 @@ public class AdminMatchProtocolService {
 
     @Transactional
     public MatchEventResponse voidEvent(UUID matchId, UUID eventId) {
-        Match match = requireMatch(matchId);
+        Match match = requireEditableMatch(matchId);
         MatchEvent event = requireEvent(matchId, eventId);
         if (event.isVoided()) {
             throw ApiException.conflict("Event already voided");
@@ -109,8 +118,9 @@ public class AdminMatchProtocolService {
     }
 
     private MatchEventResponse publish(Match match, MatchEvent event, String type) {
+        matchEventRepository.flush();
         matchScoreService.apply(match);
-        MatchResponse matchResponse = matchMapper.toResponse(matchRepository.save(match));
+        MatchResponse matchResponse = matchMapper.toResponse(matchRepository.saveAndFlush(match));
         MatchEventResponse eventResponse = matchMapper.toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, type);
         return eventResponse;
@@ -128,9 +138,13 @@ public class AdminMatchProtocolService {
         return Math.min(period, count);
     }
 
-    private Match requireMatch(UUID matchId) {
-        return matchRepository.findById(matchId)
+    private Match requireEditableMatch(UUID matchId) {
+        Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> ApiException.notFound("Match not found"));
+        if (!EDITABLE_STATUS.contains(match.getStatus())) {
+            throw ApiException.conflict("Протокол этого матча закрыт");
+        }
+        return match;
     }
 
     private MatchEvent requireEvent(UUID matchId, UUID eventId) {
