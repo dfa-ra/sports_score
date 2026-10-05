@@ -76,10 +76,20 @@ public class MatchAvailabilityService {
                 .filter(row -> row.getStatus() == status)
                 .map(row -> toResponse(row, playerProfileRepository.findById(row.getPlayerId()).orElse(null)))
                 .sorted(Comparator.comparing(
-                        MatchAvailabilityResponse::displayName,
+                        MatchAvailabilityService::listedName,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
                 ))
                 .toList();
+    }
+
+    private static String listedName(MatchAvailabilityResponse row) {
+        String last = row.lastName() == null ? "" : row.lastName().trim();
+        String first = row.firstName() == null ? "" : row.firstName().trim();
+        String legal = (last + " " + first).trim();
+        if (!legal.isEmpty()) {
+            return legal;
+        }
+        return row.displayName();
     }
 
     private MatchAvailabilityResponse toResponse(MatchAvailability row, PlayerProfile profile) {
@@ -89,7 +99,9 @@ public class MatchAvailabilityService {
                 row.getPlayerId(),
                 MatchMapper.displayName(profile),
                 row.getStatus(),
-                row.getUpdatedAt()
+                row.getUpdatedAt(),
+                profile == null ? null : profile.getFirstName(),
+                profile == null ? null : profile.getLastName()
         );
     }
 

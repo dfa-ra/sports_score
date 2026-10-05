@@ -5,6 +5,7 @@ import api from '../../api/client'
 import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { loadAllReferees, refereeTitle } from '../../lib/referees'
+import { registeredName } from '../../lib/playerTitle'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import CreateMatchForm from '../../components/CreateMatchForm.vue'
 import PlayerSearch from '../../components/PlayerSearch.vue'
@@ -358,7 +359,7 @@ async function deleteTeam(team: any) {
         <h2>Заявки на роли</h2>
         <div v-for="req in roleRequests" :key="req.id" class="row">
           <span>
-            {{ userById(req.userId)?.email || req.userId }}
+            {{ registeredName(userById(req.userId)) || userById(req.userId)?.email || req.userId }}
             · {{ labelOf(roleLabel, req.role) }}
           </span>
           <button class="btn" :disabled="pending" @click="approveRole(req)">Подтвердить</button>
@@ -551,7 +552,7 @@ async function deleteTeam(team: any) {
       <h2>Статистика</h2>
       <p>Топ игроков по голам:</p>
       <div v-for="p in playerStats.slice(0, 10)" :key="p.playerId" class="row">
-        {{ p.displayName }} · G{{ p.goals }} A{{ p.assists }}
+        {{ registeredName(p) || 'Игрок' }} · G{{ p.goals }} A{{ p.assists }}
       </div>
       <p>Команды:</p>
       <div v-for="t in teamStats.slice(0, 10)" :key="t.teamId" class="row">

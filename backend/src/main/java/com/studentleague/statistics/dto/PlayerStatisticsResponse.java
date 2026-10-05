@@ -11,6 +11,8 @@ public record PlayerStatisticsResponse(
         long redCards,
         long appearances,
         UUID teamId,
-        long cleanSheets
+        long cleanSheets,
+        String firstName,
+        String lastName
 ) {
 }

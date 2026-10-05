@@ -326,10 +326,7 @@ class _PlayersState extends State<_Players> {
               leading: PlayerPhoto(url: widget.store.api.resolveMedia(player.avatarUrl), name: player.title, size: 36),
               title: Text(player.title, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.navy)),
               subtitle: Text(
-                [
-                  if (player.shirtHint.isNotEmpty) player.shirtHint,
-                  '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
-                ].join(' · '),
+                '${player.position?.isNotEmpty == true ? player.position : 'Игрок'} · №${player.jerseyNumber ?? '—'}',
                 style: const TextStyle(color: AppColors.muted),
               ),
               onTap: () => context.push('/players/${player.id}'),
@@ -394,7 +391,7 @@ class _StatCardState extends State<_StatCard> {
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Row(
                     children: [
-                      Expanded(child: Text(row.displayName)),
+                      Expanded(child: Text(row.title)),
                       if (widget.showGames) ...[
                         SizedBox(width: 56, child: Text('${row.value}', textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w800))),
                         SizedBox(width: 48, child: Text('${row.appearances}', textAlign: TextAlign.end)),

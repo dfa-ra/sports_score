@@ -58,13 +58,18 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
           padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
           child: Row(
             children: [
-              PlayerPhoto(url: media(card.avatarUrl), name: card.displayName, size: 76, tile: true),
+              PlayerPhoto(url: media(card.avatarUrl), name: card.title, size: 76, tile: true),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(card.displayName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.navy, height: 1.1)),
+                    Text(card.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.navy, height: 1.1)),
+                    if (card.shirtHint.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(card.shirtHint, style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
                     if (age.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(age, style: const TextStyle(color: AppColors.muted, fontSize: 13)),

@@ -7,6 +7,9 @@ public record MatchRefereeResponse(
         UUID id,
         UUID matchId,
         UUID refereeId,
-        Instant assignedAt
+        Instant assignedAt,
+        String firstName,
+        String lastName,
+        String email
 ) {
 }

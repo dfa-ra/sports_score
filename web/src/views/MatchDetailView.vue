@@ -6,6 +6,7 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
+import { registeredName } from '../lib/playerTitle'
 import { buildPeriodBlocks, compareMatchEvents, eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -101,10 +102,7 @@ const protocolPlayers = computed(() => {
 })
 
 function protocolPlayerLabel(player: any) {
-  const name = player.name
-    || player.displayName
-    || `${player.playerFirstName || ''} ${player.playerLastName || ''}`.trim()
-  return playerTag(name, player.jerseyNumber)
+  return playerTag(registeredName(player), player.jerseyNumber)
 }
 
 const editableEvents = computed(() =>
@@ -441,7 +439,7 @@ onUnmounted(() => {
       <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
         <span>
           <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
-          <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
+          <small class="muted">{{ registeredName(ev) || 'без игрока' }}</small>
         </span>
         <label class="field minute">Минута от начала
           <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
@@ -489,7 +487,7 @@ onUnmounted(() => {
               :class="ev.home ? 'home' : 'away'"
             >
               <span class="who-ev">
-                <b>{{ playerTag(ev.playerName, ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
+                <b>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
               <i class="mark" :class="ev.eventType.toLowerCase()" />
@@ -537,7 +535,7 @@ onUnmounted(() => {
       </div>
       <div v-if="referees.length || auth.canOfficiate" class="panel stack">
         <h2>Бригада</h2>
-        <p v-for="r in referees" :key="r.id" class="muted">Судья {{ r.refereeEmail || r.refereeId }}</p>
+        <p v-for="r in referees" :key="r.id" class="muted">Судья {{ registeredName(r) || r.email || r.refereeId }}</p>
         <p v-if="!referees.length" class="muted">Судья не назначен.</p>
         <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
       </div>

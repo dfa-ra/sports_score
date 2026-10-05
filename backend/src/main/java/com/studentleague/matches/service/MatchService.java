@@ -177,8 +177,7 @@ public class MatchService {
                 "You were assigned to a match",
                 Map.of("matchId", matchId.toString(), "refereeId", referee.getId().toString())
         );
-        return new MatchRefereeResponse(
-                assignment.getId(), assignment.getMatchId(), assignment.getRefereeId(), assignment.getAssignedAt());
+        return toRefereeResponse(assignment);
     }
 
     @Transactional(readOnly = true)
@@ -198,8 +197,23 @@ public class MatchService {
     public List<MatchRefereeResponse> listReferees(UUID matchId) {
         requireMatch(matchId);
         return matchRefereeRepository.findByMatchId(matchId).stream()
-                .map(a -> new MatchRefereeResponse(a.getId(), a.getMatchId(), a.getRefereeId(), a.getAssignedAt()))
+                .map(this::toRefereeResponse)
                 .toList();
+    }
+
+    private MatchRefereeResponse toRefereeResponse(MatchReferee assignment) {
+        User referee = assignment.getRefereeId() == null
+                ? null
+                : userRepository.findById(assignment.getRefereeId()).orElse(null);
+        return new MatchRefereeResponse(
+                assignment.getId(),
+                assignment.getMatchId(),
+                assignment.getRefereeId(),
+                assignment.getAssignedAt(),
+                referee == null ? null : referee.getFirstName(),
+                referee == null ? null : referee.getLastName(),
+                referee == null ? null : referee.getEmail()
+        );
     }
 
     private void requireApproved(UUID tournamentId, UUID teamId) {

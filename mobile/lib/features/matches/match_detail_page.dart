@@ -554,7 +554,7 @@ class _PlayerLine extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(width: 28, child: Text('${player.jerseyNumber ?? '—'}', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.muted))),
-          Expanded(child: Text(player.name, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(child: Text(player.title, style: const TextStyle(fontWeight: FontWeight.w600))),
           Text(player.position ?? '', style: const TextStyle(color: AppColors.muted, fontSize: 12)),
         ],
       ),
@@ -595,8 +595,8 @@ class _Protocol extends StatelessWidget {
                       Text(eventLabel(ev.eventType), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
                       Text(
                         [
-                          if (playerTag(ev.playerName, ev.playerJersey).isNotEmpty) playerTag(ev.playerName, ev.playerJersey),
-                          if (ev.eventType == 'GOAL' && ev.secondaryPlayerName != null) 'пас ${playerTag(ev.secondaryPlayerName, ev.secondaryPlayerJersey)}',
+                          if (playerTag(ev.visiblePlayerName, ev.playerJersey).isNotEmpty) playerTag(ev.visiblePlayerName, ev.playerJersey),
+                          if (ev.eventType == 'GOAL' && ev.visibleSecondaryName.isNotEmpty) 'пас ${playerTag(ev.visibleSecondaryName, ev.secondaryPlayerJersey)}',
                           periodLabel(ev.period, sportCode: match.sportCode, periodCount: match.periodCount),
                         ].join(' · '),
                         style: const TextStyle(color: AppColors.muted, fontSize: 12),

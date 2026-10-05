@@ -8,6 +8,7 @@ import StandingGroups from '../components/StandingGroups.vue'
 import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { SITE_NAME } from '../lib/brand'
+import { registeredName } from '../lib/playerTitle'
 
 type Slide = {
   id: string
@@ -208,12 +209,12 @@ function heroHeading(slide: Slide | null | undefined) {
           <h2>Бомбардиры</h2>
           <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
           <RouterLink v-for="p in feed?.scorers" :key="p.playerId" class="headline" :to="`/players/${p.playerId}`">
-            <strong>{{ p.displayName || 'Игрок' }}</strong>
+            <strong>{{ registeredName(p) || 'Игрок' }}</strong>
             <span>{{ p.goals }} гол.</span>
           </RouterLink>
           <h2>Ассистенты</h2>
           <RouterLink v-for="p in feed?.assists" :key="'a-' + p.playerId" class="headline" :to="`/players/${p.playerId}`">
-            <strong>{{ p.displayName || 'Игрок' }}</strong>
+            <strong>{{ registeredName(p) || 'Игрок' }}</strong>
             <span>{{ p.assists }}</span>
           </RouterLink>
         </aside>

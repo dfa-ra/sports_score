@@ -8,6 +8,8 @@ public record MatchLineupPlayerResponse(
         Integer jerseyNumber,
         String position,
         boolean starter,
-        int sortOrder
+        int sortOrder,
+        String firstName,
+        String lastName
 ) {
 }

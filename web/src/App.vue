@@ -66,7 +66,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
           <div class="auth">
             <template v-if="auth.isAuthenticated">
               <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
-                <PlayerAvatar :src="auth.user?.photoUrl" :name="auth.user?.firstName || auth.user?.email" :size="32" />
+                <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="32" />
               </RouterLink>
               <button class="login-pill ghost wide-only" type="button" @click="logout">Выйти</button>
             </template>

@@ -42,7 +42,7 @@ public final class MatchListFields {
             PlayerProfile player = goal.getPlayerId() == null || players == null
                     ? null
                     : players.get(goal.getPlayerId());
-            names.put(goal.getMatchId(), MatchMapper.displayName(player));
+            names.put(goal.getMatchId(), MatchMapper.registeredName(player));
         }
         return names;
     }

@@ -103,6 +103,13 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+  String _accountTitle(AuthUser user) {
+    final last = lastName.text.trim().isNotEmpty ? lastName.text.trim() : (user.lastName ?? '');
+    final first = firstName.text.trim().isNotEmpty ? firstName.text.trim() : (user.firstName ?? '');
+    final legal = registeredPersonName(last, first, null);
+    return legal.isEmpty ? user.email : legal;
+  }
+
   bool _isPlayerAccount() {
     final user = context.read<AuthController>().user;
     if (user == null) return false;
@@ -260,7 +267,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         PlayerPhoto(
                           url: context.read<AuthController>().api.resolveMedia(profile?.avatarUrl ?? context.read<AuthController>().user?.photoUrl),
-                          name: displayName.text.isNotEmpty ? displayName.text : (profile?.displayName ?? ''),
+                          name: registeredPersonName(lastName.text, firstName.text, null).isEmpty
+                              ? 'Игрок'
+                              : registeredPersonName(lastName.text, firstName.text, null),
                           size: 56,
                           tile: true,
                         ),
@@ -381,7 +390,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 PlayerPhoto(
                   url: auth.api.resolveMedia(user.photoUrl ?? profile?.avatarUrl),
-                  name: displayName.text.isNotEmpty ? displayName.text : user.displayName,
+                  name: _accountTitle(user),
                   size: 76,
                   tile: true,
                 ),
@@ -391,7 +400,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        displayName.text.isNotEmpty ? displayName.text : user.displayName,
+                        _accountTitle(user),
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.navy),
                       ),
                       Wrap(

@@ -4,6 +4,7 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { useFavorites } from '../stores/favorites'
+import { registeredName } from './playerTitle'
 import { useTeamDirectory } from './useTeamDirectory'
 
 const STORAGE_KEY = 'kb_goal_alerts'
@@ -21,6 +22,10 @@ export interface LiveMatchFrame {
     eventType?: string
     voided?: boolean
     playerName?: string | null
+    playerFirstName?: string | null
+    playerLastName?: string | null
+    firstName?: string | null
+    lastName?: string | null
     timestamp?: string | null
   } | null
 }
@@ -144,7 +149,7 @@ export function useMatchAlerts() {
     const pair = await namesFor(matchId)
     const homeScore = live.homeScore ?? 0
     const awayScore = live.awayScore ?? 0
-    show(alertTitle(kind, live.lastEvent?.playerName), scoreLine(pair.home, pair.away, homeScore, awayScore), key)
+    show(alertTitle(kind, registeredName(live.lastEvent)), scoreLine(pair.home, pair.away, homeScore, awayScore), key)
   }
 
   function handleFrame(matchId: string, message: IMessage) {

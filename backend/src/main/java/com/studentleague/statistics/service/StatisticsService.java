@@ -130,7 +130,9 @@ public class StatisticsService {
                             acc.redCards,
                             acc.appearances,
                             acc.teamId,
-                            0
+                            0,
+                            profile == null ? null : profile.getFirstName(),
+                            profile == null ? null : profile.getLastName()
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.goals(), a.goals()))
@@ -185,13 +187,17 @@ public class StatisticsService {
                         return new PlayerStatisticsResponse(
                                 existing.playerId(), existing.displayName(), existing.goals(), existing.assists(),
                                 existing.yellowCards(), existing.redCards(), games,
-                                existing.teamId(), entry.getValue()
+                                existing.teamId(), entry.getValue(),
+                                existing.firstName() != null ? existing.firstName() : profile == null ? null : profile.getFirstName(),
+                                existing.lastName() != null ? existing.lastName() : profile == null ? null : profile.getLastName()
                         );
                     }
                     return new PlayerStatisticsResponse(
                             entry.getKey(),
                             profile == null ? null : profile.getDisplayName(),
-                            0, 0, 0, 0, games, null, entry.getValue()
+                            0, 0, 0, 0, games, null, entry.getValue(),
+                            profile == null ? null : profile.getFirstName(),
+                            profile == null ? null : profile.getLastName()
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.cleanSheets(), a.cleanSheets()))

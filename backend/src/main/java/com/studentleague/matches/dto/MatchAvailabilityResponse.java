@@ -11,6 +11,8 @@ public record MatchAvailabilityResponse(
         UUID playerId,
         String displayName,
         AvailabilityStatus status,
-        Instant updatedAt
+        Instant updatedAt,
+        String firstName,
+        String lastName
 ) {
 }

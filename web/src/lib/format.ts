@@ -1,3 +1,5 @@
+import { registeredName } from './playerTitle'
+
 export const statusLabel: Record<string, string> = {
   SCHEDULED: 'Скоро',
   LIVE: 'Live',
@@ -153,12 +155,18 @@ export function playerTag(name?: string | null, jersey?: number | null) {
 export function eventDetail(ev: {
   eventType?: string
   playerName?: string | null
+  playerFirstName?: string | null
+  playerLastName?: string | null
+  firstName?: string | null
+  lastName?: string | null
   playerJersey?: number | null
   secondaryPlayerName?: string | null
+  secondaryPlayerFirstName?: string | null
+  secondaryPlayerLastName?: string | null
   secondaryPlayerJersey?: number | null
 }) {
-  const main = playerTag(ev.playerName, ev.playerJersey)
-  const second = playerTag(ev.secondaryPlayerName, ev.secondaryPlayerJersey)
+  const main = playerTag(registeredName(ev), ev.playerJersey)
+  const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
   if (ev.eventType === 'GOAL' && second) return `${main} · пас ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `${main} → ${second}`
   return main

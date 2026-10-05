@@ -156,9 +156,9 @@ class _Squad extends StatelessWidget {
             onTap: () => context.push('/players/${member.playerId}'),
             leading: CircleAvatar(
               backgroundColor: const Color(0x294CB4E5),
-              child: Text(initials(member.displayName), style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 12)),
+              child: Text(initials(member.title), style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 12)),
             ),
-            title: Text(member.displayName, style: const TextStyle(fontWeight: FontWeight.w700)),
+            title: Text(member.title, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text([if (member.jerseyNumber != null) '#${member.jerseyNumber}', member.position].whereType<String>().where((s) => s.isNotEmpty).join(' · ')),
             trailing: member.playerId == captainId
                 ? Container(

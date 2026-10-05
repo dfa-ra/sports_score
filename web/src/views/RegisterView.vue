@@ -160,7 +160,7 @@ async function onGoogle(idToken: string) {
             <PlayerAvatar
               v-if="photoUrl"
               :src="photoUrl"
-              :name="`${firstName} ${lastName}`"
+              :name="`${lastName} ${firstName}`.trim()"
               :size="56"
               tile
             />

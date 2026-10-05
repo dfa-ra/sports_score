@@ -3,6 +3,13 @@ DateTime? parseTime(dynamic value) {
   return DateTime.tryParse(value.toString());
 }
 
+/// «Фамилия Имя». Shirt nickname is only used when registration names are blank.
+String registeredPersonName(String? lastName, String? firstName, String? fallback) {
+  final legal = '${(lastName ?? '').trim()} ${(firstName ?? '').trim()}'.trim();
+  if (legal.isNotEmpty) return legal;
+  return (fallback ?? '').trim();
+}
+
 class LeagueMatch {
   LeagueMatch({
     required this.id,
@@ -178,16 +185,32 @@ class StandingRow {
 }
 
 class PlayerStat {
-  PlayerStat({required this.playerId, required this.displayName, required this.value, this.appearances = 0});
+  PlayerStat({
+    required this.playerId,
+    required this.displayName,
+    required this.value,
+    this.appearances = 0,
+    this.firstName = '',
+    this.lastName = '',
+  });
   final String playerId;
   final String displayName;
   final int value;
   final int appearances;
+  final String firstName;
+  final String lastName;
+
+  String get title {
+    final name = registeredPersonName(lastName, firstName, displayName);
+    return name.isEmpty ? 'Игрок' : name;
+  }
 
   factory PlayerStat.fromJson(Map<String, dynamic> json, String valueKey) {
     return PlayerStat(
       playerId: json['playerId'].toString(),
-      displayName: json['displayName']?.toString() ?? 'Игрок',
+      displayName: json['displayName']?.toString() ?? '',
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
       value: (json[valueKey] as num?)?.toInt() ?? 0,
       appearances: (json['appearances'] as num?)?.toInt() ?? 0,
     );
@@ -200,8 +223,12 @@ class MatchEvent {
     required this.eventType,
     required this.teamId,
     this.playerName,
+    this.playerFirstName = '',
+    this.playerLastName = '',
     this.playerJersey,
     this.secondaryPlayerName,
+    this.secondaryPlayerFirstName = '',
+    this.secondaryPlayerLastName = '',
     this.secondaryPlayerJersey,
     this.gameTime,
     this.period,
@@ -212,8 +239,12 @@ class MatchEvent {
   final String eventType;
   final String teamId;
   final String? playerName;
+  final String playerFirstName;
+  final String playerLastName;
   final int? playerJersey;
   final String? secondaryPlayerName;
+  final String secondaryPlayerFirstName;
+  final String secondaryPlayerLastName;
   final int? secondaryPlayerJersey;
   final int? gameTime;
   final int? period;
@@ -225,8 +256,12 @@ class MatchEvent {
       eventType: json['eventType']?.toString() ?? 'OTHER',
       teamId: json['teamId']?.toString() ?? '',
       playerName: json['playerName']?.toString(),
+      playerFirstName: json['playerFirstName']?.toString() ?? '',
+      playerLastName: json['playerLastName']?.toString() ?? '',
       playerJersey: (json['playerJersey'] as num?)?.toInt(),
       secondaryPlayerName: json['secondaryPlayerName']?.toString(),
+      secondaryPlayerFirstName: json['secondaryPlayerFirstName']?.toString() ?? '',
+      secondaryPlayerLastName: json['secondaryPlayerLastName']?.toString() ?? '',
       secondaryPlayerJersey: (json['secondaryPlayerJersey'] as num?)?.toInt(),
       gameTime: (json['gameTime'] as num?)?.toInt() ?? (json['gameTimeSeconds'] as num?)?.toInt(),
       period: (json['period'] as num?)?.toInt(),
@@ -234,24 +269,45 @@ class MatchEvent {
     );
   }
 
+  String get visiblePlayerName => registeredPersonName(playerLastName, playerFirstName, playerName);
+
+  String get visibleSecondaryName =>
+      registeredPersonName(secondaryPlayerLastName, secondaryPlayerFirstName, secondaryPlayerName);
+
   String get label {
-    final name = playerName ?? eventType;
+    final name = visiblePlayerName.isEmpty ? eventType : visiblePlayerName;
     if (playerJersey != null) return '#$playerJersey $name';
     return name;
   }
 }
 
 class LineupPlayer {
-  LineupPlayer({required this.playerId, required this.name, this.jerseyNumber, this.position});
+  LineupPlayer({
+    required this.playerId,
+    required this.name,
+    this.jerseyNumber,
+    this.position,
+    this.firstName = '',
+    this.lastName = '',
+  });
   final String playerId;
   final String name;
   final int? jerseyNumber;
   final String? position;
+  final String firstName;
+  final String lastName;
+
+  String get title {
+    final legal = registeredPersonName(lastName, firstName, name);
+    return legal.isEmpty ? 'Игрок' : legal;
+  }
 
   factory LineupPlayer.fromJson(Map<String, dynamic> json) {
     return LineupPlayer(
       playerId: json['playerId'].toString(),
-      name: json['name']?.toString() ?? 'Игрок',
+      name: json['name']?.toString() ?? '',
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),
     );
@@ -298,19 +354,32 @@ class MatchLineups {
 }
 
 class TeamMember {
-  TeamMember({required this.playerId, required this.displayName, this.jerseyNumber, this.position});
+  TeamMember({
+    required this.playerId,
+    required this.displayName,
+    this.firstName = '',
+    this.lastName = '',
+    this.jerseyNumber,
+    this.position,
+  });
   final String playerId;
   final String displayName;
+  final String firstName;
+  final String lastName;
   final int? jerseyNumber;
   final String? position;
 
+  String get title {
+    final name = registeredPersonName(lastName, firstName, displayName);
+    return name.isEmpty ? 'Игрок' : name;
+  }
+
   factory TeamMember.fromJson(Map<String, dynamic> json) {
-    final first = json['playerFirstName']?.toString() ?? '';
-    final last = json['playerLastName']?.toString() ?? '';
-    final display = json['displayName']?.toString();
     return TeamMember(
       playerId: json['playerId'].toString(),
-      displayName: (display != null && display.isNotEmpty) ? display : '$first $last'.trim(),
+      firstName: json['playerFirstName']?.toString() ?? json['firstName']?.toString() ?? '',
+      lastName: json['playerLastName']?.toString() ?? json['lastName']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),
     );
@@ -421,6 +490,8 @@ class PlayerCard {
   PlayerCard({
     required this.id,
     required this.displayName,
+    this.firstName = '',
+    this.lastName = '',
     this.avatarUrl,
     this.jerseyNumber,
     this.position,
@@ -435,6 +506,23 @@ class PlayerCard {
 
   final String id;
   final String displayName;
+  final String firstName;
+  final String lastName;
+
+  String get title {
+    final name = registeredPersonName(lastName, firstName, displayName);
+    return name.isEmpty ? 'Игрок' : name;
+  }
+
+  /// Shirt nickname only when it differs from the registration name.
+  String get shirtHint {
+    final shirt = displayName.trim();
+    final legal = '${lastName.trim()} ${firstName.trim()}'.trim();
+    final givenFamily = '${firstName.trim()} ${lastName.trim()}'.trim();
+    if (shirt.isEmpty || legal.isEmpty) return '';
+    if (shirt.toLowerCase() == legal.toLowerCase() || shirt.toLowerCase() == givenFamily.toLowerCase()) return '';
+    return shirt;
+  }
   final String? avatarUrl;
   final int? jerseyNumber;
   final String? position;
@@ -450,8 +538,9 @@ class PlayerCard {
     final team = json['team'];
     return PlayerCard(
       id: json['id'].toString(),
-      displayName: json['displayName']?.toString() ??
-          '${json['firstName'] ?? ''} ${json['lastName'] ?? ''}'.trim(),
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
       avatarUrl: json['avatarUrl']?.toString(),
       jerseyNumber: (json['jerseyNumber'] as num?)?.toInt(),
       position: json['position']?.toString(),
@@ -552,7 +641,7 @@ class AuthUser {
   final List<String> roles;
 
   String get displayName {
-    final full = '${firstName ?? ''} ${lastName ?? ''}'.trim();
+    final full = registeredPersonName(lastName, firstName, null);
     return full.isEmpty ? email : full;
   }
 

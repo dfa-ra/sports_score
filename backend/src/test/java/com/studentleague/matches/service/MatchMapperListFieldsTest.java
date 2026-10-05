@@ -44,7 +44,7 @@ class MatchMapperListFieldsTest {
         player.setId(playerId);
         player.setFirstName("Анна");
         player.setLastName("Соколова");
-        player.setDisplayName("Анна Соколова");
+        player.setDisplayName("Anya");
 
         MatchEvent goal = new MatchEvent();
         goal.setId(UUID.randomUUID());
@@ -77,7 +77,7 @@ class MatchMapperListFieldsTest {
         MatchMapper mapper = new MatchMapper(sportRepository, playerProfileRepository, matchEventRepository);
         MatchResponse response = mapper.toResponse(match);
 
-        assertThat(response.lastGoalScorer()).isEqualTo("Анна Соколова");
+        assertThat(response.lastGoalScorer()).isEqualTo("Соколова Анна");
         assertThat(response.minute()).isEqualTo(3);
         assertThat(response.homeScore()).isEqualTo(1);
     }

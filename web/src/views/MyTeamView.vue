@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import { registeredName } from '../lib/playerTitle'
 
 const auth = useAuthStore()
 const team = ref<any>(null)
@@ -160,7 +161,7 @@ async function removeMember(id: string) {
         <h2>Состав</h2>
         <ul class="stack">
           <li v-for="m in members" :key="m.id">
-            <RouterLink :to="`/players/${m.playerId}`">{{ m.displayName || `${m.firstName} ${m.lastName}` }}</RouterLink>
+            <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>
             <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" @click="removeMember(m.playerId)">Убрать</button>
           </li>
         </ul>
@@ -183,7 +184,7 @@ async function removeMember(id: string) {
             <h3>Будут · {{ going.length }}</h3>
             <ul v-if="going.length">
               <li v-for="item in going" :key="item.playerId">
-                <RouterLink :to="`/players/${item.playerId}`">{{ item.displayName || 'Игрок' }}</RouterLink>
+                <RouterLink :to="`/players/${item.playerId}`">{{ registeredName(item) || 'Игрок' }}</RouterLink>
               </li>
             </ul>
             <p v-else class="muted">Пока никого</p>
@@ -192,7 +193,7 @@ async function removeMember(id: string) {
             <h3>Не будут · {{ notGoing.length }}</h3>
             <ul v-if="notGoing.length">
               <li v-for="item in notGoing" :key="item.playerId">
-                <RouterLink :to="`/players/${item.playerId}`">{{ item.displayName || 'Игрок' }}</RouterLink>
+                <RouterLink :to="`/players/${item.playerId}`">{{ registeredName(item) || 'Игрок' }}</RouterLink>
               </li>
             </ul>
             <p v-else class="muted">Пока никого</p>

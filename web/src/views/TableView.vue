@@ -8,6 +8,7 @@ import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
+import { registeredName } from '../lib/playerTitle'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
@@ -188,7 +189,7 @@ async function load() {
             <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(scorers, 'scorers')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
                 <td>{{ p.goals }}</td>
                 <td>{{ p.appearances }}</td>
               </tr>
@@ -217,7 +218,7 @@ async function load() {
             <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(keepers, 'keepers')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
                 <td>{{ p.cleanSheets }}</td>
                 <td>{{ p.appearances }}</td>
               </tr>
@@ -246,7 +247,7 @@ async function load() {
             <thead><tr><th>Игрок</th><th>Ассисты</th><th>Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(assists, 'assists')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ p.displayName }}</RouterLink></td>
+                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
                 <td>{{ p.assists }}</td>
                 <td>{{ p.appearances }}</td>
               </tr>

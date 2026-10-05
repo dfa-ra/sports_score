@@ -493,9 +493,9 @@ class _RefereePadPageState extends State<RefereePadPage> {
                                     () {
                                       final detail = eventDetail(
                                         eventType: ev.eventType,
-                                        playerName: ev.playerName,
+                                        playerName: ev.visiblePlayerName,
                                         playerJersey: ev.playerJersey,
-                                        secondaryPlayerName: ev.secondaryPlayerName,
+                                        secondaryPlayerName: ev.visibleSecondaryName,
                                         secondaryPlayerJersey: ev.secondaryPlayerJersey,
                                       );
                                       return detail.isEmpty ? '—' : detail;
@@ -567,7 +567,7 @@ class _EventOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final others = roster.where((p) => p.playerId != sheet.player?.playerId).toList();
-    final scorer = sheet.player == null ? '' : playerTag(sheet.player!.displayName, sheet.player!.jerseyNumber);
+    final scorer = sheet.player == null ? '' : playerTag(sheet.player!.title, sheet.player!.jerseyNumber);
     return Material(
       color: const Color(0x6B00205B),
       child: Stack(
@@ -607,7 +607,7 @@ class _EventOverlay extends StatelessWidget {
                         else
                           for (final player in roster) ...[
                             _PadButton(
-                              label: playerTag(player.displayName, player.jerseyNumber),
+                              label: playerTag(player.title, player.jerseyNumber),
                               alignStart: true,
                               onTap: pending ? null : () => onPickPlayer(player),
                             ),
@@ -623,7 +623,7 @@ class _EventOverlay extends StatelessWidget {
                         const SizedBox(height: 8),
                         for (final player in others) ...[
                           _PadButton(
-                            label: playerTag(player.displayName, player.jerseyNumber),
+                            label: playerTag(player.title, player.jerseyNumber),
                             alignStart: true,
                             onTap: pending ? null : () => onConfirmGoal(player.playerId),
                           ),

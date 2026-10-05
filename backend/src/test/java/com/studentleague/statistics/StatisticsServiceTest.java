@@ -127,6 +127,8 @@ class StatisticsServiceTest {
 
         assertThat(rows).extracting(PlayerStatisticsResponse::playerId).containsExactly(keeperId);
         assertThat(rows.getFirst().displayName()).isEqualTo("Иван Вратарёв");
+        assertThat(rows.getFirst().firstName()).isEqualTo("Иван");
+        assertThat(rows.getFirst().lastName()).isEqualTo("Вратарёв");
         assertThat(rows.getFirst().cleanSheets()).isEqualTo(1);
         assertThat(rows.getFirst().appearances()).isEqualTo(2);
     }
@@ -156,6 +158,8 @@ class StatisticsServiceTest {
         PlayerProfile profile = new PlayerProfile();
         profile.setId(id);
         profile.setDisplayName(name);
+        profile.setFirstName("Иван");
+        profile.setLastName("Вратарёв");
         profile.setPosition(position);
         return profile;
     }

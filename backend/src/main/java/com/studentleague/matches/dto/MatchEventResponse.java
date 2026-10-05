@@ -23,6 +23,10 @@ public record MatchEventResponse(
         Map<String, Object> metadata,
         boolean voided,
         Instant voidedAt,
-        Instant createdAt
+        Instant createdAt,
+        String playerFirstName,
+        String playerLastName,
+        String secondaryPlayerFirstName,
+        String secondaryPlayerLastName
 ) {
 }

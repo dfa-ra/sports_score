@@ -164,7 +164,9 @@ public class MatchLineupService {
                 profile == null ? null : profile.getJerseyNumber(),
                 profile == null ? null : profile.getPosition(),
                 starter,
-                sortOrder
+                sortOrder,
+                profile == null ? null : profile.getFirstName(),
+                profile == null ? null : profile.getLastName()
         );
     }
 

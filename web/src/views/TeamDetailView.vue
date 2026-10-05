@@ -13,6 +13,7 @@ import MatchRow from '../components/MatchRow.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import { registeredName } from '../lib/playerTitle'
 
 const route = useRoute()
 const router = useRouter()
@@ -200,7 +201,7 @@ async function deleteTeam() {
       <div v-for="m in members" :key="m.id" class="member">
         <div class="who">
           <RouterLink :to="`/players/${m.playerId}`">
-            <strong>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</strong>
+            <strong>{{ registeredName(m) }}</strong>
           </RouterLink>
           <span v-if="m.playerId === team.captainId" class="captain-badge">Капитан</span>
         </div>
@@ -239,7 +240,7 @@ async function deleteTeam() {
       <div v-if="!team.disbanded && members.length" class="stack">
         <div v-for="m in members" :key="`admin-${m.id}`" class="member">
           <div class="who">
-            <span>{{ m.displayName || `${m.playerFirstName} ${m.playerLastName}` }}</span>
+            <span>{{ registeredName(m) }}</span>
             <span v-if="m.playerId === team.captainId" class="captain-badge">Капитан</span>
           </div>
           <div class="actions">

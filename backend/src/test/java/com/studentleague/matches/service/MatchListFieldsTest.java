@@ -54,8 +54,8 @@ class MatchListFieldsTest {
         PlayerProfile newest = new PlayerProfile();
         newest.setId(newestPlayer);
         newest.setFirstName("Иван");
-        newest.setLastName("Петров");
-        newest.setDisplayName("Иван Петров");
+        newest.setLastName("Иванов");
+        newest.setDisplayName("Vanya");
 
         PlayerProfile older = new PlayerProfile();
         older.setId(olderPlayer);
@@ -70,7 +70,7 @@ class MatchListFieldsTest {
                 Map.of(newestPlayer, newest, olderPlayer, older)
         );
 
-        assertThat(names).containsEntry(matchId, "Иван Петров");
+        assertThat(names).containsEntry(matchId, "Иванов Иван");
     }
 
     private static MatchEvent goal(UUID matchId, UUID playerId, Instant timestamp) {

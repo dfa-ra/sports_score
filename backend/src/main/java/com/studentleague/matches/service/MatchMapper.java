@@ -125,10 +125,15 @@ public class MatchMapper {
                 event.getMetadata(),
                 event.isVoided(),
                 event.getVoidedAt(),
-                event.getCreatedAt()
+                event.getCreatedAt(),
+                player == null ? null : player.getFirstName(),
+                player == null ? null : player.getLastName(),
+                secondary == null ? null : secondary.getFirstName(),
+                secondary == null ? null : secondary.getLastName()
         );
     }
 
+    /** Shirt nickname, kept for clients that still read it. Not the name shown in lineups. */
     public static String displayName(PlayerProfile player) {
         if (player == null) {
             return null;
@@ -137,5 +142,19 @@ public class MatchMapper {
             return player.getDisplayName();
         }
         return (player.getFirstName() + " " + player.getLastName()).trim();
+    }
+
+    /** Registration surname and given name. Shirt nickname is only a fallback when both are blank. */
+    public static String registeredName(PlayerProfile player) {
+        if (player == null) {
+            return null;
+        }
+        String last = player.getLastName() == null ? "" : player.getLastName().trim();
+        String first = player.getFirstName() == null ? "" : player.getFirstName().trim();
+        String legal = (last + " " + first).trim();
+        if (!legal.isEmpty()) {
+            return legal;
+        }
+        return displayName(player);
     }
 }

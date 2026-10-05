@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { registeredName } from '../lib/playerTitle'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
@@ -67,7 +68,7 @@ function save() {
       <label v-for="p in (editable ? roster : side.starters)" :key="p.playerId" class="player" :class="{ starter: !editable || selected.includes(p.playerId) }">
         <input v-if="editable" type="checkbox" :checked="selected.includes(p.playerId)" @change="toggle(p.playerId)" />
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span>{{ p.name }}</span>
+        <span>{{ registeredName(p) }}</span>
         <span v-if="p.position" class="muted">{{ p.position }}</span>
       </label>
     </section>
@@ -77,7 +78,7 @@ function save() {
       <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span>{{ p.name }}</span>
+        <span>{{ registeredName(p) }}</span>
         <span class="muted">{{ p.position || 'запас' }}</span>
       </div>
     </section>

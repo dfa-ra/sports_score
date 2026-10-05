@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
+import { registeredName } from '../../lib/playerTitle'
 import { eventMinute } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
@@ -40,7 +41,7 @@ const live = computed(() => match.value?.status === 'LIVE' || match.value?.statu
 const protocol = computed(() => [...events.value].reverse())
 
 function nameOf(player: any) {
-  return playerTag(player.displayName || `${player.playerFirstName || ''} ${player.playerLastName || ''}`.trim(), player.jerseyNumber)
+  return playerTag(registeredName(player), player.jerseyNumber)
 }
 
 function rosterOf(teamId?: string) {

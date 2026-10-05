@@ -2,7 +2,7 @@
 import { onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
-import { playerHeader } from '../lib/playerTitle'
+import { registeredName } from '../lib/playerTitle'
 import PlayerAvatar from './PlayerAvatar.vue'
 
 const query = ref('')
@@ -12,7 +12,7 @@ const searched = ref(false)
 let timer: number | undefined
 
 function labelOf(player: any) {
-  return playerHeader(player)
+  return registeredName(player) || 'Игрок'
 }
 
 async function search() {
@@ -59,12 +59,10 @@ onUnmounted(() => {
     <p v-else-if="searched && !items.length" class="muted">Никого не нашли</p>
     <div v-else-if="items.length" class="hints">
       <RouterLink v-for="player in items" :key="player.id" class="hint" :to="`/players/${player.id}`">
-        <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player).title" :size="32" />
+        <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :size="32" />
         <span>
-          <strong>{{ labelOf(player).title }}</strong>
-          <small>
-            <template v-if="labelOf(player).shirt">{{ labelOf(player).shirt }} · </template>{{ player.position || 'Игрок' }} · №{{ player.jerseyNumber ?? '—' }}
-          </small>
+          <strong>{{ labelOf(player) }}</strong>
+          <small>{{ player.position || 'Игрок' }} · №{{ player.jerseyNumber ?? '—' }}</small>
         </span>
       </RouterLink>
     </div>

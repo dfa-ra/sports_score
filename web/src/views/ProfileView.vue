@@ -19,6 +19,10 @@ const teams = useTeamDirectory()
 const firstName = ref('')
 const lastName = ref('')
 const displayName = ref('')
+const accountName = computed(() => {
+  const legal = [lastName.value, firstName.value].map((part) => part.trim()).filter(Boolean).join(' ')
+  return legal || auth.user?.email || ''
+})
 const jerseyNumber = ref<number | null>(null)
 const position = ref('')
 const positionOptions = ['Вратарь', 'Защитник', 'Нападающий', 'Универсал']
@@ -207,12 +211,12 @@ async function logout() {
     <div v-else class="identity">
       <PlayerAvatar
         :src="avatarUrl || auth.user?.photoUrl"
-        :name="displayName || `${firstName} ${lastName}` || auth.user?.email"
+        :name="accountName"
         :size="76"
         tile
       />
       <div>
-        <h1>{{ displayName || `${firstName} ${lastName}`.trim() || auth.user?.email }}</h1>
+        <h1>{{ accountName }}</h1>
         <p class="chips">
           <span v-for="role in roles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
         </p>
@@ -233,7 +237,7 @@ async function logout() {
             <div class="photo-row">
               <PlayerAvatar
                 :src="avatarUrl || auth.user?.photoUrl"
-                :name="displayName || `${firstName} ${lastName}`"
+                :name="accountName"
                 :size="56"
                 tile
               />

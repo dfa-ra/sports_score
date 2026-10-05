@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch } from 'vue'
 import api from '../api/client'
-import { playerHeader } from '../lib/playerTitle'
+import { registeredName } from '../lib/playerTitle'
 
 const playerId = defineModel<string>({ default: '' })
 const props = defineProps<{
@@ -15,7 +15,7 @@ const open = ref(false)
 let timer: number | undefined
 
 function labelOf(player: any) {
-  return playerHeader(player)
+  return registeredName(player) || 'Игрок'
 }
 
 async function search() {
@@ -45,7 +45,7 @@ function schedule() {
 
 function pick(player: any) {
   playerId.value = player.id
-  query.value = labelOf(player).title
+  query.value = labelOf(player)
   open.value = false
 }
 
@@ -81,8 +81,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
         :class="{ on: player.id === playerId }"
         @click="pick(player)"
       >
-        <strong>{{ labelOf(player).title }}</strong>
-        <small v-if="labelOf(player).shirt">{{ labelOf(player).shirt }}</small>
+        <strong>{{ labelOf(player) }}</strong>
       </button>
     </div>
   </div>

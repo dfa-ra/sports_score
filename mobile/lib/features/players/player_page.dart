@@ -52,7 +52,7 @@ class _PlayerPageState extends State<PlayerPage> {
     }
     final api = context.read<LeagueStore>().api;
     return Scaffold(
-      appBar: AppBar(title: Text(current.displayName)),
+      appBar: AppBar(title: Text(current.title)),
       body: ListView(
         children: [
           PlayerCardSheet(card: current, resolveMedia: api.resolveMedia),
