@@ -10,7 +10,7 @@ import BrandMark from '../components/BrandMark.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'players'
+type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
 const TOP = 10
 
 const route = useRoute()
@@ -30,7 +30,7 @@ const expanded = ref({ scorers: false, assists: false, keepers: false })
 
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
-  if (value === 'results' || value === 'scorers' || value === 'assists' || value === 'players') return value
+  if (value === 'results' || value === 'scorers' || value === 'assists' || value === 'keepers' || value === 'players') return value
   return 'table'
 })
 
@@ -81,7 +81,7 @@ function setTab(next: Tab, list?: 'all') {
   if (next !== 'table') query.tab = next
   if (list === 'all') query.list = 'all'
   router.replace({ query })
-  if (next === 'scorers' || next === 'assists') loadStats()
+  if (next === 'scorers' || next === 'assists' || next === 'keepers') loadStats()
 }
 
 async function loadStats() {
@@ -112,7 +112,7 @@ async function load() {
     ])
     tournament.value = t.data
     standings.value = parseStandings(s.data)
-    if (tab.value === 'scorers' || tab.value === 'assists') await loadStats()
+    if (tab.value === 'scorers' || tab.value === 'assists' || tab.value === 'keepers') await loadStats()
   } finally {
     loading.value = false
   }
@@ -140,6 +140,7 @@ async function load() {
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
       <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
+      <button type="button" :class="{ on: tab === 'keepers' }" @click="setTab('keepers')">Вратари</button>
       <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
     </div>
 
@@ -202,10 +203,13 @@ async function load() {
           <button v-else class="btn ghost" type="button" @click="setTab('scorers')">← К топ-10</button>
         </div>
       </div>
-      <div v-if="!fullList" class="panel">
+    </template>
+
+    <template v-else-if="tab === 'keepers'">
+      <div class="panel">
         <div class="stat-head">
-          <h2>Сухие</h2>
-          <p v-if="keepers.length > TOP" class="muted">Топ-{{ TOP }} из {{ keepers.length }}</p>
+          <h2>Вратари</h2>
+          <p v-if="!fullList && keepers.length > TOP" class="muted">Топ-{{ TOP }} из {{ keepers.length }}</p>
         </div>
         <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
@@ -221,9 +225,11 @@ async function load() {
           </table>
         </div>
         <div v-if="keepers.length > TOP" class="stat-more">
-          <button class="btn ghost" type="button" @click="expanded.keepers = !expanded.keepers">
+          <button v-if="!fullList" class="btn ghost" type="button" @click="expanded.keepers = !expanded.keepers">
             {{ expanded.keepers ? 'Свернуть' : 'Показать всех' }}
           </button>
+          <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('keepers', 'all')">Полный список</button>
+          <button v-else class="btn ghost" type="button" @click="setTab('keepers')">← К топ-10</button>
         </div>
       </div>
     </template>

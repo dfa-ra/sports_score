@@ -153,24 +153,25 @@ public class StatisticsService {
         return new StatisticsBoardResponse(
                 top(stats, Comparator.comparingLong(PlayerStatisticsResponse::goals), limit),
                 top(stats, Comparator.comparingLong(PlayerStatisticsResponse::assists), limit),
-                rankKeepers(cleanSheetsByPlayer(tournamentId), stats, limit)
+                rankKeepers(keeperCounts(tournamentId), stats, limit)
         );
     }
 
     @Transactional(readOnly = true)
     public List<PlayerStatisticsResponse> goalkeepers(UUID tournamentId, int limit) {
         return rankKeepers(
-                cleanSheetsByPlayer(tournamentId),
+                keeperCounts(tournamentId),
                 playerStatistics(tournamentId, null, null, null),
                 limit
         );
     }
 
     private List<PlayerStatisticsResponse> rankKeepers(
-            Map<UUID, Long> sheets,
+            KeeperCounts counts,
             List<PlayerStatisticsResponse> base,
             int limit
     ) {
+        Map<UUID, Long> sheets = counts.cleanSheets;
         Map<UUID, PlayerProfile> profiles = playerProfileRepository.findAllById(sheets.keySet()).stream()
                 .collect(Collectors.toMap(PlayerProfile::getId, p -> p, (a, b) -> a));
         Map<UUID, PlayerStatisticsResponse> byId = base.stream()
@@ -179,17 +180,18 @@ public class StatisticsService {
                 .map(entry -> {
                     PlayerStatisticsResponse existing = byId.get(entry.getKey());
                     PlayerProfile profile = profiles.get(entry.getKey());
+                    long games = counts.appearances.getOrDefault(entry.getKey(), entry.getValue());
                     if (existing != null) {
                         return new PlayerStatisticsResponse(
                                 existing.playerId(), existing.displayName(), existing.goals(), existing.assists(),
-                                existing.yellowCards(), existing.redCards(), existing.appearances(),
+                                existing.yellowCards(), existing.redCards(), games,
                                 existing.teamId(), entry.getValue()
                         );
                     }
                     return new PlayerStatisticsResponse(
                             entry.getKey(),
                             profile == null ? null : profile.getDisplayName(),
-                            0, 0, 0, 0, entry.getValue(), null, entry.getValue()
+                            0, 0, 0, 0, games, null, entry.getValue()
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.cleanSheets(), a.cleanSheets()))
@@ -212,12 +214,13 @@ public class StatisticsService {
         return Math.min(limit, 100);
     }
 
-    private Map<UUID, Long> cleanSheetsByPlayer(UUID tournamentId) {
+    private KeeperCounts keeperCounts(UUID tournamentId) {
+        KeeperCounts counts = new KeeperCounts();
         List<Match> matches = resolveMatches(tournamentId, null, null).stream()
                 .filter(match -> match.getStatus() == MatchStatus.FINISHED)
                 .toList();
         if (matches.isEmpty()) {
-            return Map.of();
+            return counts;
         }
         List<UUID> matchIds = matches.stream().map(Match::getId).toList();
         Map<String, List<MatchLineupPlayer>> lineups = lineupPlayerRepository.findByMatchIdIn(matchIds).stream()
@@ -233,13 +236,12 @@ public class StatisticsService {
 
         List<UUID> eventMatchIds = new ArrayList<>();
         Set<String> eventSides = new HashSet<>();
-        Map<UUID, Long> sheets = new HashMap<>();
         for (Match match : matches) {
-            if (!countCleanSheet(sheets, lineups, profiles, match, match.getHomeTeamId(), match.getAwayScore() == 0)) {
+            if (!countCleanSheet(counts, lineups, profiles, match, match.getHomeTeamId(), match.getAwayScore() == 0)) {
                 eventMatchIds.add(match.getId());
                 eventSides.add(match.getId() + ":" + match.getHomeTeamId());
             }
-            if (!countCleanSheet(sheets, lineups, profiles, match, match.getAwayTeamId(), match.getHomeScore() == 0)) {
+            if (!countCleanSheet(counts, lineups, profiles, match, match.getAwayTeamId(), match.getHomeScore() == 0)) {
                 eventMatchIds.add(match.getId());
                 eventSides.add(match.getId() + ":" + match.getAwayTeamId());
             }
@@ -258,43 +260,43 @@ public class StatisticsService {
             for (Match match : matches) {
                 List<MatchEvent> events = eventsByMatch.getOrDefault(match.getId(), List.of());
                 if (eventSides.contains(match.getId() + ":" + match.getHomeTeamId())) {
-                    countCleanSheetFromEvents(sheets, events, profiles, match.getHomeTeamId(), match.getAwayScore() == 0);
+                    countCleanSheetFromEvents(counts, events, profiles, match.getHomeTeamId(), match.getAwayScore() == 0);
                 }
                 if (eventSides.contains(match.getId() + ":" + match.getAwayTeamId())) {
-                    countCleanSheetFromEvents(sheets, events, profiles, match.getAwayTeamId(), match.getHomeScore() == 0);
+                    countCleanSheetFromEvents(counts, events, profiles, match.getAwayTeamId(), match.getHomeScore() == 0);
                 }
             }
         }
-        return sheets;
+        return counts;
     }
 
     private boolean countCleanSheet(
-            Map<UUID, Long> sheets,
+            KeeperCounts counts,
             Map<String, List<MatchLineupPlayer>> lineups,
             Map<UUID, PlayerProfile> profiles,
             Match match,
             UUID teamId,
             boolean clean
     ) {
-        if (!clean) {
-            return true;
-        }
         List<UUID> keepers = lineups.getOrDefault(match.getId() + ":" + teamId, List.of()).stream()
                 .map(MatchLineupPlayer::getPlayerId)
                 .filter(playerId -> looksLikeGoalkeeper(positionOf(profiles, playerId)))
                 .distinct()
                 .toList();
         if (keepers.isEmpty()) {
-            return false;
+            return !clean;
         }
         for (UUID keeperId : keepers) {
-            sheets.merge(keeperId, 1L, Long::sum);
+            counts.appearances.merge(keeperId, 1L, Long::sum);
+            if (clean) {
+                counts.cleanSheets.merge(keeperId, 1L, Long::sum);
+            }
         }
         return true;
     }
 
     private void countCleanSheetFromEvents(
-            Map<UUID, Long> sheets,
+            KeeperCounts counts,
             List<MatchEvent> events,
             Map<UUID, PlayerProfile> profiles,
             UUID teamId,
@@ -308,7 +310,10 @@ public class StatisticsService {
                 .map(MatchEvent::getPlayerId)
                 .distinct()
                 .filter(playerId -> looksLikeGoalkeeper(positionOf(profiles, playerId)))
-                .forEach(keeperId -> sheets.merge(keeperId, 1L, Long::sum));
+                .forEach(keeperId -> {
+                    counts.cleanSheets.merge(keeperId, 1L, Long::sum);
+                    counts.appearances.merge(keeperId, 1L, Long::sum);
+                });
     }
 
     private static String positionOf(Map<UUID, PlayerProfile> profiles, UUID playerId) {
@@ -410,6 +415,11 @@ public class StatisticsService {
         List<UUID> matchIds = matches.stream().map(Match::getId).toList();
         return matchEventRepository.findByMatchIdInAndVoidedFalse(matchIds).stream()
                 .collect(Collectors.groupingBy(MatchEvent::getMatchId));
+    }
+
+    private static final class KeeperCounts {
+        private final Map<UUID, Long> cleanSheets = new HashMap<>();
+        private final Map<UUID, Long> appearances = new HashMap<>();
     }
 
     private static final class PlayerAccumulator {

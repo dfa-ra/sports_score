@@ -25,7 +25,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -79,6 +79,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
             Tab(text: 'РЕЗУЛЬТАТЫ'),
             Tab(text: 'БОМБАРДИРЫ'),
             Tab(text: 'АССИСТЕНТЫ'),
+            Tab(text: 'ВРАТАРИ'),
             Tab(text: 'ИГРОКИ'),
           ],
         ),
@@ -91,6 +92,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
               _Results(store: store),
               _Scorers(store: store),
               _Assists(store: store),
+              _Keepers(store: store),
               _Players(store: store),
             ],
           ),
@@ -205,7 +207,21 @@ class _Scorers extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       children: [
         _StatCard(title: 'Бомбардиры', rows: store.scorers),
-        _StatCard(title: 'Сухие', rows: store.keepers),
+      ],
+    );
+  }
+}
+
+class _Keepers extends StatelessWidget {
+  const _Keepers({required this.store});
+  final LeagueStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        _StatCard(title: 'Вратари', rows: store.keepers, empty: 'Сухих матчей ещё нет', showGames: true),
       ],
     );
   }
@@ -324,9 +340,11 @@ class _PlayersState extends State<_Players> {
 }
 
 class _StatCard extends StatefulWidget {
-  const _StatCard({required this.title, required this.rows});
+  const _StatCard({required this.title, required this.rows, this.empty = 'Пока пусто', this.showGames = false});
   final String title;
   final List<PlayerStat> rows;
+  final String empty;
+  final bool showGames;
 
   @override
   State<_StatCard> createState() => _StatCardState();
@@ -356,8 +374,19 @@ class _StatCardState extends State<_StatCard> {
           ),
           const SizedBox(height: 8),
           if (rows.isEmpty)
-            const Text('Пока пусто', style: TextStyle(color: AppColors.muted))
-          else
+            Text(widget.empty, style: const TextStyle(color: AppColors.muted))
+          else ...[
+            if (widget.showGames)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    Expanded(child: Text('Игрок', style: _head)),
+                    SizedBox(width: 56, child: Text('Сухие', textAlign: TextAlign.end, style: _head)),
+                    SizedBox(width: 48, child: Text('Игры', textAlign: TextAlign.end, style: _head)),
+                  ],
+                ),
+              ),
             for (final row in visible)
               InkWell(
                 onTap: () => context.push('/players/${row.playerId}'),
@@ -366,11 +395,16 @@ class _StatCardState extends State<_StatCard> {
                   child: Row(
                     children: [
                       Expanded(child: Text(row.displayName)),
-                      Text('${row.value}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                      if (widget.showGames) ...[
+                        SizedBox(width: 56, child: Text('${row.value}', textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w800))),
+                        SizedBox(width: 48, child: Text('${row.appearances}', textAlign: TextAlign.end)),
+                      ] else
+                        Text('${row.value}', style: const TextStyle(fontWeight: FontWeight.w800)),
                     ],
                   ),
                 ),
               ),
+          ],
           if (rows.length > top)
             TextButton(
               onPressed: () => setState(() => expanded = !expanded),
