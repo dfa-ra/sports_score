@@ -44,13 +44,13 @@ public class AdminMatchController {
     }
 
     @PatchMapping("/{id}/events/{eventId}")
-    @Operation(summary = "Change the minute of a protocol event (ADMIN)")
-    public MatchEventResponse updateMinute(
+    @Operation(summary = "Change the minute of a protocol event, and for a goal the scorer and assist (ADMIN)")
+    public MatchEventResponse updateEvent(
             @PathVariable UUID id,
             @PathVariable UUID eventId,
             @Valid @RequestBody AdminUpdateMatchEventRequest request
     ) {
-        return protocolService.updateMinute(id, eventId, request);
+        return protocolService.update(id, eventId, request);
     }
 
     @PostMapping("/{id}/events/{eventId}/void")
