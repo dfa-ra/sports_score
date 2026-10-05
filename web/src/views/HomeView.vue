@@ -205,18 +205,32 @@ function heroHeading(slide: Slide | null | undefined) {
           <StandingGroups v-else-if="standingGroupsHaveRows(homeTables)" :tables="homeTables" compact />
         </div>
 
-        <aside class="panel headlines">
-          <h2>Бомбардиры</h2>
-          <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
-          <RouterLink v-for="p in feed?.scorers" :key="p.playerId" class="headline" :to="`/players/${p.playerId}`">
-            <strong>{{ registeredName(p) || 'Игрок' }}</strong>
-            <span>{{ p.goals }} гол.</span>
-          </RouterLink>
-          <h2>Ассистенты</h2>
-          <RouterLink v-for="p in feed?.assists" :key="'a-' + p.playerId" class="headline" :to="`/players/${p.playerId}`">
-            <strong>{{ registeredName(p) || 'Игрок' }}</strong>
-            <span>{{ p.assists }}</span>
-          </RouterLink>
+        <aside class="panel leaders" aria-label="Бомбардиры и ассистенты">
+          <section class="leaders-section">
+            <h2>Бомбардиры</h2>
+            <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
+            <ol v-else class="leaders-list">
+              <li v-for="(p, index) in feed?.scorers" :key="p.playerId">
+                <RouterLink class="leader" :to="`/players/${p.playerId}`">
+                  <span class="place">{{ Number(index) + 1 }}</span>
+                  <span class="who">{{ registeredName(p) || 'Игрок' }}</span>
+                  <span class="tally">{{ p.goals }}</span>
+                </RouterLink>
+              </li>
+            </ol>
+          </section>
+          <section class="leaders-section">
+            <h2>Ассистенты</h2>
+            <ol v-if="feed?.assists?.length" class="leaders-list">
+              <li v-for="(p, index) in feed.assists" :key="'a-' + p.playerId">
+                <RouterLink class="leader" :to="`/players/${p.playerId}`">
+                  <span class="place">{{ Number(index) + 1 }}</span>
+                  <span class="who">{{ registeredName(p) || 'Игрок' }}</span>
+                  <span class="tally">{{ p.assists }}</span>
+                </RouterLink>
+              </li>
+            </ol>
+          </section>
         </aside>
       </div>
 
@@ -412,31 +426,90 @@ function heroHeading(slide: Slide | null | undefined) {
 .league-head { justify-content: space-between; }
 .more { color: var(--navy); font-size: 0.75rem; font-weight: 800; }
 .hero-grid { display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 1rem; align-items: start; }
+.hero-grid > * { min-width: 0; }
 .table-block { padding: 1.4rem 1.5rem; }
-.headlines {
+.leaders {
   display: grid;
-  gap: 0.35rem;
-  background: var(--navy);
-  color: #fff;
-  border: 0;
+  gap: 1.25rem;
+  align-content: start;
+  background: #fff;
+  color: var(--text);
+  padding: 1.15rem 1.05rem 0.8rem;
 }
-.headlines h2 { color: #fff; font-size: 1.15rem; margin: 0.35rem 0 0.2rem; }
-.headlines :deep(.empty) {
-  background: transparent;
-  color: rgba(255,255,255,0.7);
-  border-color: rgba(255,255,255,0.2);
+.leaders-section { display: grid; min-width: 0; }
+.leaders h2 {
+  position: relative;
+  width: fit-content;
+  margin: 0 0 0.55rem;
+  padding: 0 0 0.42rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  color: var(--navy);
 }
-.headlines :deep(.empty strong) { color: #fff; }
-.headline {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.8rem;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid rgba(255,255,255,0.12);
+.leaders h2::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1.65rem;
+  height: 2px;
+  border-radius: 99px;
+  background: var(--ice);
+}
+.leaders-list {
+  list-style: none;
+  margin: 0.1rem -0.45rem 0;
+  padding: 0;
+  min-width: 0;
+}
+.leader {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr) auto;
+  column-gap: 0.55rem;
+  align-items: center;
+  min-height: 2.85rem;
+  padding: 0.48rem 0.45rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--navy);
   text-decoration: none;
-  color: #fff;
 }
-.headline:hover { color: var(--ice); }
+.leaders-list li:last-child .leader { border-bottom: 0; }
+.leader:hover {
+  background: rgba(76, 180, 229, 0.08);
+  text-decoration: none;
+}
+.leader:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: -2px;
+}
+.place {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.who {
+  min-width: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+.tally {
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.35rem;
+}
 .moments-head {
   display: flex;
   justify-content: space-between;
@@ -541,5 +614,8 @@ function heroHeading(slide: Slide | null | undefined) {
   .hero-cta { display: none; }
   .blocks { padding-top: 0.75rem; gap: 0.7rem; }
   .table-block { padding: 0.85rem; }
+  .leaders { padding: 0.95rem 0.8rem 0.7rem; gap: 1.05rem; }
+  .who, .tally { font-size: 1rem; }
+  .leader { min-height: 2.95rem; }
 }
 </style>
