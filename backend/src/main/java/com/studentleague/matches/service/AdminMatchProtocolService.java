@@ -96,10 +96,15 @@ public class AdminMatchProtocolService {
     }
 
     @Transactional
-    public MatchEventResponse updateMinute(UUID matchId, UUID eventId, AdminUpdateMatchEventRequest request) {
+    public MatchEventResponse update(UUID matchId, UUID eventId, AdminUpdateMatchEventRequest request) {
         Match match = requireEditableMatch(matchId);
         MatchEvent event = requireEvent(matchId, eventId);
         applyMinute(match, event, request.minute());
+        // A minute-only patch omits the scorer. Sending playerId rewrites the same goal row:
+        // playerId is who scored, secondaryPlayerId is the assist (null clears it).
+        if (Boolean.TRUE.equals(request.updatePlayers()) || request.playerId() != null) {
+            applyPlayers(match, event, request);
+        }
         matchEventRepository.save(event);
         return publish(match, event, "MATCH_EVENT");
     }
@@ -124,6 +129,50 @@ public class AdminMatchProtocolService {
         MatchEventResponse eventResponse = matchMapper.toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, type);
         return eventResponse;
+    }
+
+    private void applyPlayers(Match match, MatchEvent event, AdminUpdateMatchEventRequest request) {
+        if (event.isVoided()) {
+            throw ApiException.conflict("Событие уже убрано из протокола");
+        }
+        if (event.getEventType() != MatchEventType.GOAL) {
+            throw ApiException.badRequest("Забившего и ассистента можно менять только у гола");
+        }
+        if (request.playerId() == null) {
+            throw ApiException.badRequest("Укажите забившего");
+        }
+        UUID scorerTeam = teamOf(match, request.playerId(), event.getTeamId());
+        event.setPlayerId(request.playerId());
+        event.setTeamId(scorerTeam);
+        UUID assistId = request.secondaryPlayerId();
+        if (assistId == null) {
+            event.setSecondaryPlayerId(null);
+            return;
+        }
+        if (assistId.equals(request.playerId())) {
+            throw ApiException.badRequest("Ассистент и забивший — разные игроки");
+        }
+        teamOf(match, assistId, scorerTeam);
+        event.setSecondaryPlayerId(assistId);
+    }
+
+    /** Scorer or assist must already play for one of the two clubs. The goal's team follows the scorer. */
+    private UUID teamOf(Match match, UUID playerId, UUID preferredTeamId) {
+        playerProfileRepository.findById(playerId)
+                .orElseThrow(() -> ApiException.notFound("Player not found"));
+        boolean home = teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
+                match.getHomeTeamId(), playerId, TeamMemberStatus.ACTIVE);
+        boolean away = teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
+                match.getAwayTeamId(), playerId, TeamMemberStatus.ACTIVE);
+        if (!home && !away) {
+            throw ApiException.badRequest("Игрок не в заявке команд этого матча");
+        }
+        if (home && away
+                && preferredTeamId != null
+                && (preferredTeamId.equals(match.getHomeTeamId()) || preferredTeamId.equals(match.getAwayTeamId()))) {
+            return preferredTeamId;
+        }
+        return home ? match.getHomeTeamId() : match.getAwayTeamId();
     }
 
     private void applyMinute(Match match, MatchEvent event, int minute) {

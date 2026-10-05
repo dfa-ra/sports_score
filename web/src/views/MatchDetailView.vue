@@ -15,6 +15,7 @@ import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
+import SquadPlayerSelect from '../components/SquadPlayerSelect.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
@@ -41,6 +42,8 @@ const protocolMinute = ref(1)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
 const minuteDrafts = ref<Record<string, number>>({})
+const playerDrafts = ref<Record<string, string>>({})
+const assistDrafts = ref<Record<string, string>>({})
 const crestSize = ref(46)
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
@@ -86,19 +89,43 @@ const periodBlocks = computed(() => {
   }))
 })
 
-const protocolPlayers = computed(() => {
-  if (!match.value || !protocolTeamId.value) return []
-  const home = protocolTeamId.value === match.value.homeTeamId
+function playersOf(teamId: string) {
+  if (!match.value || !teamId) return []
+  const home = teamId === match.value.homeTeamId
   const roster = home ? homeRoster.value : awayRoster.value
   const side = home ? lineups.value?.home : lineups.value?.away
-  const rows = [...roster, ...(side?.starters ?? []), ...(side?.bench ?? [])]
+  const squad = [...(side?.starters ?? []), ...(side?.bench ?? [])]
+  const rows = squad.length ? squad : roster
   const seen = new Set<string>()
   return rows.filter((player) => {
     if (!player?.playerId || seen.has(player.playerId)) return false
     seen.add(player.playerId)
     return true
-  })
+  }).map((player) => ({ ...player, teamId }))
+}
+
+const protocolPlayers = computed(() => playersOf(protocolTeamId.value))
+
+const goalPlayerOptions = computed(() => {
+  if (!match.value) return []
+  const rows = [...playersOf(match.value.homeTeamId), ...playersOf(match.value.awayTeamId)]
+  const seen = new Set<string>()
+  return rows.filter((player) => {
+    if (seen.has(player.playerId)) return false
+    seen.add(player.playerId)
+    return true
+  }).map((player) => ({
+    playerId: player.playerId,
+    teamId: player.teamId,
+    teamName: teams.fullName(player.teamId),
+    label: protocolPlayerLabel(player),
+  }))
 })
+
+function assistOptions(eventId: string) {
+  const scorer = playerDrafts.value[eventId]
+  return goalPlayerOptions.value.filter((player) => player.playerId !== scorer)
+}
 
 function protocolPlayerLabel(player: any) {
   const name = player.name
@@ -113,10 +140,24 @@ const editableEvents = computed(() =>
     .sort(compareMatchEvents),
 )
 
-function syncMinutes() {
-  const next: Record<string, number> = {}
-  for (const event of events.value) next[event.id] = eventMinute(event.gameTime)
-  minuteDrafts.value = next
+function syncDrafts() {
+  const minutes: Record<string, number> = {}
+  const players: Record<string, string> = {}
+  const assists: Record<string, string> = {}
+  for (const event of events.value) {
+    minutes[event.id] = eventMinute(event.gameTime)
+    players[event.id] = event.playerId || ''
+    assists[event.id] = event.secondaryPlayerId && event.secondaryPlayerId !== event.playerId
+      ? event.secondaryPlayerId
+      : ''
+  }
+  minuteDrafts.value = minutes
+  playerDrafts.value = players
+  assistDrafts.value = assists
+}
+
+function onScorerChange(eventId: string, playerId: string) {
+  if (assistDrafts.value[eventId] === playerId) assistDrafts.value[eventId] = ''
 }
 
 function applyCrest() {
@@ -146,7 +187,7 @@ async function load() {
   ])
   match.value = m.data
   events.value = e.data
-  syncMinutes()
+  syncDrafts()
   referees.value = r.data
   lineups.value = l.data
   if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
@@ -214,7 +255,7 @@ function mergeLive(live: any) {
   }
   if (live.lastEvent) {
     events.value = [...events.value.filter((x: any) => x.id !== live.lastEvent.id), live.lastEvent]
-    syncMinutes()
+    syncDrafts()
   }
 }
 
@@ -252,6 +293,31 @@ async function addProtocolEvent() {
     await load()
   } catch (e: any) {
     error.value = apiError(e, 'Событие не записалось.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function saveGoal(event: any) {
+  error.value = ''
+  ok.value = ''
+  const playerId = playerDrafts.value[event.id]
+  if (!playerId) {
+    error.value = 'Выберите забившего.'
+    return
+  }
+  pending.value = true
+  try {
+    await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
+      minute: Number(minuteDrafts.value[event.id] ?? 0),
+      playerId,
+      secondaryPlayerId: assistDrafts.value[event.id] || null,
+      updatePlayers: true,
+    })
+    ok.value = 'Гол обновлён.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Гол не сохранился.')
   } finally {
     pending.value = false
   }
@@ -410,7 +476,7 @@ onUnmounted(() => {
     <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED'">
       <CopyChip :value="String(match.id)" label="Скопировать id матча" />
       <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
+      <p class="muted">Гол, жёлтая или красная. У гола можно сменить забившего и ассистента: пас не обязателен, его можно убрать. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
         <label class="field">Событие
           <select v-model="protocolType">
@@ -439,14 +505,47 @@ onUnmounted(() => {
         <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
       </form>
       <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
-        <span>
+        <span class="proto-kind">
           <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
-          <small class="muted">{{ ev.playerName || 'без игрока' }}</small>
+          <small v-if="ev.eventType !== 'GOAL'" class="muted">{{ ev.playerName || 'без игрока' }}</small>
         </span>
+        <template v-if="ev.eventType === 'GOAL'">
+          <span class="field player">Забивший
+            <SquadPlayerSelect
+              v-model="playerDrafts[ev.id]"
+              :options="goalPlayerOptions"
+              :fallback="ev.playerName || 'Игрок'"
+              :disabled="pending"
+              @update:model-value="onScorerChange(ev.id, $event)"
+            />
+          </span>
+          <span class="field player">Ассистент
+            <SquadPlayerSelect
+              v-model="assistDrafts[ev.id]"
+              :options="assistOptions(ev.id)"
+              empty-label="без ассистента"
+              :fallback="ev.secondaryPlayerName || ''"
+              :disabled="pending"
+            />
+          </span>
+        </template>
         <label class="field minute">Минута от начала
           <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
         </label>
-        <button class="btn secondary" type="button" :disabled="pending" @click="saveMinute(ev)">Сохранить минуту</button>
+        <button
+          v-if="ev.eventType === 'GOAL'"
+          class="btn secondary"
+          type="button"
+          :disabled="pending"
+          @click="saveGoal(ev)"
+        >Сохранить</button>
+        <button
+          v-else
+          class="btn secondary"
+          type="button"
+          :disabled="pending"
+          @click="saveMinute(ev)"
+        >Сохранить минуту</button>
         <button class="btn danger" type="button" :disabled="pending" @click="voidProtocolEvent(ev)">Убрать</button>
       </div>
       <p v-if="!editableEvents.length" class="muted">В протоколе пока нет событий.</p>
@@ -490,6 +589,9 @@ onUnmounted(() => {
             >
               <span class="who-ev">
                 <b>{{ playerTag(ev.playerName, ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
+                <span v-if="ev.eventType === 'GOAL' && ev.secondaryPlayerName" class="line">
+                  пас {{ playerTag(ev.secondaryPlayerName, ev.secondaryPlayerJersey) }}
+                </span>
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
               <i class="mark" :class="ev.eventType.toLowerCase()" />
@@ -717,6 +819,8 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   border-bottom: 1px solid var(--line);
 }
 .proto-row small { display: block; }
+.proto-kind { min-width: 4.5rem; }
+.player { min-width: 12rem; flex: 1 1 14rem; max-width: 20rem; }
 .minute { min-width: 5.5rem; max-width: 7rem; }
 .timeline { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.5rem; }
 .timeline li {
