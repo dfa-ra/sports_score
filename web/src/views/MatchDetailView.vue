@@ -46,7 +46,14 @@ const minuteDrafts = ref<Record<string, number>>({})
 const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
 const motmPlayerId = ref('')
-const crestSize = ref(46)
+function crestForViewport() {
+  const width = window.innerWidth
+  if (width <= 370) return 44
+  if (width <= 719) return 48
+  return 60
+}
+
+const crestSize = ref(crestForViewport())
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
 const error = ref('')
@@ -162,7 +169,7 @@ function onScorerChange(eventId: string, playerId: string) {
 }
 
 function applyCrest() {
-  crestSize.value = window.matchMedia('(max-width: 719px)').matches ? 40 : 46
+  crestSize.value = crestForViewport()
 }
 
 watch(protocolPlayers, (players) => {
@@ -449,6 +456,7 @@ onUnmounted(() => {
     </RouterLink>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
+      <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
       <div class="club">
         <button
           class="star"
@@ -463,25 +471,17 @@ onUnmounted(() => {
         </RouterLink>
       </div>
       <div class="center">
-        <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
         <p class="score">{{ match.homeScore }} - {{ match.awayScore }}</p>
         <p v-if="playerOfTheMatchName" class="motm">
           <span>Игрок матча</span>
           <RouterLink :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
         </p>
-        <p class="state">{{ matchStateLabel(match.status) }}</p>
         <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
           {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
         </p>
         <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
           {{ match.periodCount }} × {{ formatClock(cap) }}
         </p>
-        <MatchShareButton
-          :home-name="teams.fullName(match.homeTeamId)"
-          :away-name="teams.fullName(match.awayTeamId)"
-          :home-score="match.homeScore"
-          :away-score="match.awayScore"
-        />
       </div>
       <div class="club away">
         <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
@@ -494,6 +494,15 @@ onUnmounted(() => {
           :class="{ on: fav.hasTeam(match.awayTeamId) }"
           @click="fav.toggleTeam(match.awayTeamId)"
         >★</button>
+      </div>
+      <div class="under">
+        <p class="state">{{ matchStateLabel(match.status) }}</p>
+        <MatchShareButton
+          :home-name="teams.fullName(match.homeTeamId)"
+          :away-name="teams.fullName(match.awayTeamId)"
+          :home-score="match.homeScore"
+          :away-score="match.awayScore"
+        />
       </div>
     </div>
 
@@ -752,39 +761,77 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 .board {
+  --crest: 60px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 0.6rem;
+  grid-template-areas:
+    "when when when"
+    "home score away"
+    "under under under";
+  gap: 0.35rem 0.85rem;
   align-items: center;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 0.9rem 0.7rem 1rem;
+  padding: 0.85rem 0.85rem 0.95rem;
+}
+.when { grid-area: when; text-align: center; }
+.under {
+  grid-area: under;
+  display: grid;
+  justify-items: center;
+  gap: 0.28rem;
 }
 .club {
+  grid-area: home;
   display: flex;
   align-items: center;
   gap: 0.4rem;
   min-width: 0;
+  max-width: 100%;
 }
-.club.away { flex-direction: row-reverse; }
+.club.away {
+  grid-area: away;
+  justify-content: flex-end;
+}
 .who {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.65rem;
   min-width: 0;
+  max-width: 100%;
   color: inherit;
+  text-decoration: none;
 }
 .club.away .who { flex-direction: row-reverse; }
+.who :deep(.team-crest) {
+  flex: 0 0 var(--crest);
+  width: var(--crest) !important;
+  height: var(--crest) !important;
+  min-width: var(--crest);
+  min-height: var(--crest);
+  max-width: var(--crest);
+  max-height: var(--crest);
+  object-fit: contain;
+  object-position: center;
+}
 .who strong {
-  font-size: 1.02rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--navy);
+  font-size: 1.2rem;
+  font-weight: 600;
   line-height: 1.2;
-  overflow: hidden;
+  text-align: start;
+  overflow-wrap: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+.club.away .who strong { text-align: end; }
 .star {
+  flex: 0 0 auto;
   border: 0;
   background: transparent;
   color: #c5ced8;
@@ -793,12 +840,21 @@ onUnmounted(() => {
   padding: 0;
 }
 .star.on { color: var(--ice); }
-.center { text-align: center; }
+.center {
+  grid-area: score;
+  text-align: center;
+  justify-self: center;
+  min-width: 4.5rem;
+  padding: 0 0.2rem;
+}
 .when, .state, .clock-note { margin: 0; font-size: 0.78rem; color: var(--muted); }
 .state { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; }
 .score {
   margin: 0.15rem 0;
-  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-size: clamp(2rem, 5.4vw, 2.75rem);
+  font-weight: 800;
+  line-height: 0.95;
+  color: var(--navy);
 }
 .clock {
   margin: 0.2rem 0 0;
@@ -910,8 +966,36 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
-  .who strong { font-size: 0.86rem; }
+  .board {
+    --crest: 48px;
+    padding: 0.55rem 0.45rem 0.75rem;
+    gap: 0.25rem 0.4rem;
+  }
+  .club {
+    position: relative;
+    gap: 0;
+    padding-top: 0.85rem;
+  }
+  .star {
+    position: absolute;
+    top: 0;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  .club .star { left: 0; }
+  .club.away .star { left: auto; right: 0; }
+  .who { width: 100%; gap: 0.4rem; }
+  .who strong { font-size: 0.92rem; }
   .lineups { grid-template-columns: 1fr; }
-  .board { padding: 0.75rem 0.5rem 0.85rem; gap: 0.35rem; }
+}
+@media (max-width: 370px) {
+  .board {
+    --crest: 44px;
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+    gap: 0.2rem 0.25rem;
+  }
+  .center { min-width: 0; padding: 0; }
+  .score { font-size: 1.75rem; }
 }
 </style>

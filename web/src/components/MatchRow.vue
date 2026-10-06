@@ -40,11 +40,11 @@ const venue = computed(() => {
       <KickoffWhen :at="match.scheduledAt" :status="match.status" :minute="match.minute" />
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
-          <TeamCrest :src="homeLogo" :name="homeName" :size="22" />
+          <TeamCrest :src="homeLogo" :name="homeName" :size="28" />
           <b>{{ homeName }}</b>
         </span>
         <span class="side" :class="{ own: highlightTeamId === match.awayTeamId }">
-          <TeamCrest :src="awayLogo" :name="awayName" :size="22" />
+          <TeamCrest :src="awayLogo" :name="awayName" :size="28" />
           <b>{{ awayName }}</b>
         </span>
         <span v-if="venue" class="venue">{{ venue }}</span>
@@ -105,10 +105,18 @@ const venue = computed(() => {
 }
 .side {
   display: grid;
-  grid-template-columns: 22px 1fr;
+  grid-template-columns: 28px 1fr;
   gap: 0.4rem;
   align-items: center;
   min-width: 0;
+}
+.side :deep(.team-crest) {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  object-fit: contain;
+  object-position: center;
 }
 .side b {
   font-weight: 500;
