@@ -1,5 +1,6 @@
 package com.studentleague.matches.service;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
@@ -18,15 +19,18 @@ public class MatchScoreService {
     private final MatchEventRepository matchEventRepository;
     private final SportRepository sportRepository;
     private final ScorePolicyRegistry scorePolicyRegistry;
+    private final StandingsBoardCache standingsBoardCache;
 
     public MatchScoreService(
             MatchEventRepository matchEventRepository,
             SportRepository sportRepository,
-            ScorePolicyRegistry scorePolicyRegistry
+            ScorePolicyRegistry scorePolicyRegistry,
+            StandingsBoardCache standingsBoardCache
     ) {
         this.matchEventRepository = matchEventRepository;
         this.sportRepository = sportRepository;
         this.scorePolicyRegistry = scorePolicyRegistry;
+        this.standingsBoardCache = standingsBoardCache;
     }
 
     public void apply(Match match) {
@@ -37,5 +41,6 @@ public class MatchScoreService {
                 .calculate(match.getHomeTeamId(), match.getAwayTeamId(), active);
         match.setHomeScore(snapshot.homeScore());
         match.setAwayScore(snapshot.awayScore());
+        standingsBoardCache.invalidateTournament(match.getTournamentId());
     }
 }

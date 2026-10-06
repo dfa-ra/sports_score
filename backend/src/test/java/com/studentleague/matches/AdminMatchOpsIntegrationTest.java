@@ -40,6 +40,69 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
     private MatchAvailabilityRepository matchAvailabilityRepository;
 
     @Test
+    void standingsAndBoardRefreshOnTheNextRequestAfterGoalAndVoid() throws Exception {
+        String adminToken = createAdminAndLogin("cache-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+
+        String tournamentId = objectMapper.readTree(mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString())
+                .get("tournamentId")
+                .asText();
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(fx.homeTeamId)).value(0));
+        mockMvc.perform(get("/api/v1/statistics/board").param("tournamentId", tournamentId).param("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scorers[?(@.playerId == '%s')]".formatted(fx.homePlayerId)).isEmpty());
+
+        MvcResult goal = mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s","playerId":"%s","minute":8}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String eventId = objectMapper.readTree(goal.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(fx.homeTeamId)).value(1));
+        mockMvc.perform(get("/api/v1/statistics/board").param("tournamentId", tournamentId).param("limit", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scorers[?(@.playerId == '%s')].goals".formatted(fx.homePlayerId)).value(1));
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + fx.matchId + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(fx.homeTeamId)).value(0));
+        MvcResult board = mockMvc.perform(get("/api/v1/statistics/board").param("tournamentId", tournamentId).param("limit", "20"))
+                .andExpect(status().isOk())
+                .andReturn();
+        int goals = 0;
+        for (JsonNode row : objectMapper.readTree(board.getResponse().getContentAsString()).get("scorers")) {
+            if (fx.homePlayerId.equals(row.get("playerId").asText())) {
+                goals = row.get("goals").asInt();
+            }
+        }
+        assertEquals(0, goals);
+    }
+
+    @Test
     void adminDeletesMatchWithEventsLineupRefereeAndAvailability() throws Exception {
         String adminToken = createAdminAndLogin("del-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String strangerToken = registerAndLogin("del-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");

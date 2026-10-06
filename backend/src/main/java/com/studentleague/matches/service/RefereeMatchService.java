@@ -1,5 +1,6 @@
 package com.studentleague.matches.service;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchEventType;
@@ -45,6 +46,7 @@ public class RefereeMatchService {
     private final LiveMatchPublisher liveMatchPublisher;
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
+    private final StandingsBoardCache standingsBoardCache;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -56,7 +58,8 @@ public class RefereeMatchService {
             MatchService matchService,
             LiveMatchPublisher liveMatchPublisher,
             NotificationService notificationService,
-            MatchMapper matchMapper
+            MatchMapper matchMapper,
+            StandingsBoardCache standingsBoardCache
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -68,6 +71,7 @@ public class RefereeMatchService {
         this.liveMatchPublisher = liveMatchPublisher;
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
+        this.standingsBoardCache = standingsBoardCache;
     }
 
     @Transactional(readOnly = true)
@@ -335,6 +339,7 @@ public class RefereeMatchService {
         event.setPeriod(match.getPeriod());
         event.setVoided(false);
         matchEventRepository.save(event);
+        standingsBoardCache.invalidateTournament(match.getTournamentId());
     }
 
     private Match requireAssignedMatch(UserPrincipal principal, UUID matchId) {

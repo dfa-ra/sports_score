@@ -1,5 +1,6 @@
 package com.studentleague.tournaments.service;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
@@ -69,6 +70,7 @@ public class TournamentService {
     private final MatchRefereeRepository matchRefereeRepository;
     private final NotificationService notificationService;
     private final TournamentFormatRegistry formatRegistry;
+    private final StandingsBoardCache standingsBoardCache;
 
     public TournamentService(
             TournamentRepository tournamentRepository,
@@ -82,7 +84,8 @@ public class TournamentService {
             MatchLineupPlayerRepository matchLineupPlayerRepository,
             MatchRefereeRepository matchRefereeRepository,
             NotificationService notificationService,
-            TournamentFormatRegistry formatRegistry
+            TournamentFormatRegistry formatRegistry,
+            StandingsBoardCache standingsBoardCache
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
@@ -96,6 +99,7 @@ public class TournamentService {
         this.matchRefereeRepository = matchRefereeRepository;
         this.notificationService = notificationService;
         this.formatRegistry = formatRegistry;
+        this.standingsBoardCache = standingsBoardCache;
     }
 
     @Transactional
@@ -218,6 +222,7 @@ public class TournamentService {
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
+        standingsBoardCache.invalidateTournament(tournamentId);
         String name = teamRepository.findById(teamId).map(Team::getName).orElse(null);
         return toTeamResponse(entry, name);
     }
@@ -238,6 +243,7 @@ public class TournamentService {
             matchRepository.delete(match);
         }
         tournamentTeamRepository.delete(entry);
+        standingsBoardCache.invalidateTournament(tournamentId);
     }
 
     @Transactional(readOnly = true)
@@ -329,11 +335,16 @@ public class TournamentService {
             }
         }
         tournamentTeamRepository.saveAll(entries);
+        standingsBoardCache.invalidateTournament(tournamentId);
         return created.stream().map(table -> toTableResponse(table, entries)).toList();
     }
 
     @Transactional(readOnly = true)
     public TournamentStandingsResponse standings(UUID tournamentId) {
+        return standingsBoardCache.standings(tournamentId, () -> loadStandings(tournamentId));
+    }
+
+    private TournamentStandingsResponse loadStandings(UUID tournamentId) {
         Tournament tournament = requireTournament(tournamentId);
         List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
         List<Match> finished = matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
