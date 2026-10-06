@@ -48,6 +48,14 @@ function save() {
     benchPlayerIds: bench,
   })
 }
+
+function rowNote(player: any, onBench: boolean) {
+  const position = String(player?.position || '').replace(/\s+/g, ' ').trim()
+  const benchLabel = 'запас'
+  if (!onBench) return position
+  if (!position || position.toLocaleLowerCase('ru') === benchLabel) return benchLabel
+  return `${position} · ${benchLabel}`
+}
 </script>
 
 <template>
@@ -65,12 +73,20 @@ function save() {
     <section>
       <h4>Основа</h4>
       <p v-if="!side.starters?.length && !editable" class="muted">Стартовый состав не указан.</p>
-      <label v-for="p in (editable ? roster : side.starters)" :key="p.playerId" class="player" :class="{ starter: !editable || selected.includes(p.playerId) }">
+      <component
+        :is="editable ? 'label' : 'div'"
+        v-for="p in (editable ? roster : side.starters)"
+        :key="p.playerId"
+        class="player"
+        :class="{ starter: !editable || selected.includes(p.playerId), picking: editable }"
+      >
         <input v-if="editable" type="checkbox" :checked="selected.includes(p.playerId)" @change="toggle(p.playerId)" />
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span>{{ registeredName(p) }}</span>
-        <span v-if="p.position" class="muted">{{ p.position }}</span>
-      </label>
+        <span class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
+        <span class="meta" :title="rowNote(p, editable && !selected.includes(p.playerId))">
+          {{ rowNote(p, editable && !selected.includes(p.playerId)) }}
+        </span>
+      </component>
     </section>
 
     <section v-if="!editable">
@@ -78,8 +94,8 @@ function save() {
       <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span>{{ registeredName(p) }}</span>
-        <span class="muted">{{ p.position || 'запас' }}</span>
+        <span class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
+        <span class="meta" :title="rowNote(p, true)">{{ rowNote(p, true) }}</span>
       </div>
     </section>
 
@@ -90,7 +106,7 @@ function save() {
 </template>
 
 <style scoped>
-.lineup { display: grid; gap: 0.85rem; }
+.lineup { display: grid; gap: 0.85rem; min-width: 0; }
 h3 {
   display: flex;
   align-items: center;
@@ -107,16 +123,43 @@ h4 {
 }
 .player {
   display: grid;
-  grid-template-columns: auto 36px 1fr auto;
-  gap: 0.55rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) minmax(0, max-content);
+  column-gap: 0.7rem;
   align-items: center;
-  padding: 0.55rem 0.15rem;
+  min-height: 2.35rem;
+  padding: 0.28rem 0;
   border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
-.player.starter .num { color: var(--accent); }
+.player.picking {
+  grid-template-columns: 1.15rem 2.5rem minmax(0, 1fr) minmax(0, max-content);
+}
+.player input { margin: 0; }
+.player.starter .num { color: var(--ice); }
 .num {
   font-variant-numeric: tabular-nums;
   font-weight: 800;
-  color: var(--text-strong);
+  text-align: right;
+  color: var(--navy);
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--navy);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.meta {
+  max-width: 9.5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.25;
 }
 </style>

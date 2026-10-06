@@ -68,6 +68,9 @@ public class Match {
     @Column(length = 120)
     private String venue;
 
+    @Column(name = "player_of_the_match_id")
+    private UUID playerOfTheMatchId;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -209,5 +212,13 @@ public class Match {
 
     public void setVenue(String venue) {
         this.venue = venue;
+    }
+
+    public UUID getPlayerOfTheMatchId() {
+        return playerOfTheMatchId;
+    }
+
+    public void setPlayerOfTheMatchId(UUID playerOfTheMatchId) {
+        this.playerOfTheMatchId = playerOfTheMatchId;
     }
 }
