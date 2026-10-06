@@ -13,6 +13,7 @@ import MatchRow from '../components/MatchRow.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { registeredName } from '../lib/playerTitle'
 
 const route = useRoute()
@@ -22,8 +23,9 @@ const fav = useFavorites()
 const names = useTeamDirectory()
 const team = ref<any>(null)
 const members = ref<any[]>([])
+const stats = ref<any[]>([])
 const matches = ref<any[]>([])
-const tab = ref<'results' | 'calendar' | 'squad'>('results')
+const tab = ref<'results' | 'calendar' | 'squad' | 'stats'>('results')
 const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED'))
 const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
 const me = ref<any>(null)
@@ -41,13 +43,15 @@ onMounted(load)
 async function load() {
   const id = route.params.id
   await names.load()
-  const [t, m, games] = await Promise.all([
+  const [t, m, games, squadStats] = await Promise.all([
     api.get(`/teams/${id}`),
     api.get(`/teams/${id}/members`),
     api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+    api.get(`/teams/${id}/player-stats`),
   ])
   team.value = t.data
   members.value = m.data
+  stats.value = squadStats.data ?? []
   matches.value = (games.data.content ?? []).filter((row: any) =>
     row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
   )
@@ -164,6 +168,7 @@ async function deleteTeam() {
       <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
       <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
       <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
@@ -195,7 +200,7 @@ async function deleteTeam() {
       />
     </div>
 
-    <div v-else class="panel stack">
+    <div v-else-if="tab === 'squad'" class="panel stack">
       <h2>Состав</h2>
       <EmptyState v-if="!members.length" title="В составе никого нет" />
       <div v-for="m in members" :key="m.id" class="member">
@@ -225,6 +230,39 @@ async function deleteTeam() {
       </form>
       <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
       <p v-if="ok && !auth.canManageLeague" class="form-ok">{{ ok }}</p>
+    </div>
+
+    <div v-else class="panel stack stats-card">
+      <h2>Статистика</h2>
+      <p v-if="!stats.length" class="empty-line">В составе никого нет</p>
+      <div v-else class="table-wrap">
+        <table class="stat-table">
+          <thead>
+            <tr>
+              <th class="who-h" scope="col">Фамилия Имя</th>
+              <th scope="col">Голы</th>
+              <th scope="col">Пасы</th>
+              <th scope="col">Игры</th>
+              <th scope="col">ЖК</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in stats" :key="row.playerId">
+              <td>
+                <div class="who">
+                  <PlayerAvatar :src="row.photoUrl" :name="registeredName(row)" :size="36" />
+                  <RouterLink :to="`/players/${row.playerId}`">{{ registeredName(row) }}</RouterLink>
+                  <span v-if="row.playerId === team.captainId" class="captain-badge">Капитан</span>
+                </div>
+              </td>
+              <td class="num">{{ row.goals }}</td>
+              <td class="num">{{ row.assists }}</td>
+              <td class="num">{{ row.appearances }}</td>
+              <td class="num">{{ row.yellowCards }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <AdminOnly v-if="auth.canManageLeague" title="Для админа">
@@ -300,8 +338,43 @@ h2 { font-size: 1.2rem; }
   flex: 1 1 9rem;
   min-width: 0;
 }
-.member a { color: var(--text-strong); text-decoration: none; }
-.member a:hover { color: var(--accent); }
+.member a, .stat-table a { color: var(--text-strong); text-decoration: none; font-weight: 700; }
+.member a:hover, .stat-table a:hover { color: var(--accent); }
+.empty-line { color: var(--navy); font-weight: 700; margin: 0.2rem 0 0.4rem; }
+.stats-card { gap: 0.35rem; }
+.stat-table { width: 100%; border-collapse: collapse; }
+.stat-table th {
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  text-align: right;
+  color: var(--muted);
+  padding: 0.15rem 0.35rem 0.45rem;
+  white-space: nowrap;
+}
+.stat-table th.who-h { text-align: left; }
+.stat-table td {
+  padding: 0.65rem 0.35rem;
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+.stat-table .who { flex-wrap: nowrap; }
+.stat-table .who a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat-table .num {
+  width: 3.1rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
 .jersey { font-variant-numeric: tabular-nums; }
 .captain-badge {
   flex: 0 0 auto;

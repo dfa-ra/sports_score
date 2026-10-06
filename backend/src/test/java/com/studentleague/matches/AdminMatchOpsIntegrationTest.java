@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -416,6 +417,120 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
         assertGoalsFor(tournamentId, awayTeamId, 1);
         assertScorerGoals(tournamentId, awayPlayerId, 1);
         assertScorerAbsent(tournamentId, newScorerId);
+    }
+
+    @Test
+    void adminSetsReplacesAndClearsPlayerOfTheMatch() throws Exception {
+        String adminToken = createAdminAndLogin("motm-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String fanToken = registerAndLogin("motm-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        MvcResult listed = mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch").value(nullValue()))
+                .andReturn();
+        JsonNode matchNode = objectMapper.readTree(listed.getResponse().getContentAsString());
+        String awayTeamId = matchNode.get("awayTeamId").asText();
+        String awayPlayerId = teamMemberId(awayTeamId);
+        String extraId = addTeammate(fx.homeToken(), fx.homeTeamId(), "Extra", "Squad", 8);
+
+        String homeBody = "{\"playerId\":\"%s\"}".formatted(fx.homePlayerId);
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(homeBody))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"));
+
+        for (String token : new String[] {fanToken, fx.homeToken()}) {
+            mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                            .header("Authorization", auth(token))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(homeBody))
+                    .andExpect(status().isForbidden());
+        }
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(homeBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(fx.homePlayerId))
+                .andExpect(jsonPath("$.playerOfTheMatch.firstName").value("Home"))
+                .andExpect(jsonPath("$.playerOfTheMatch.lastName").value("Player"));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(fx.homePlayerId))
+                .andExpect(jsonPath("$.playerOfTheMatch.firstName").value("Home"))
+                .andExpect(jsonPath("$.playerOfTheMatch.lastName").value("Player"));
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":\"%s\"}".formatted(awayPlayerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(awayPlayerId))
+                .andExpect(jsonPath("$.playerOfTheMatch.firstName").value("Away"))
+                .andExpect(jsonPath("$.playerOfTheMatch.lastName").value("Player"));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(awayPlayerId))
+                .andExpect(jsonPath("$.playerOfTheMatch.firstName").value("Away"));
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch").value(nullValue()));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch").value(nullValue()));
+
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s","starterPlayerIds":["%s"],"benchPlayerIds":[]}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":\"%s\"}".formatted(extraId)))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(homeBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(fx.homePlayerId));
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":\"%s\"}".formatted(awayPlayerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playerOfTheMatch.playerId").value(awayPlayerId));
+
+        mockMvc.perform(put("/api/v1/admin/matches/" + fx.matchId + "/player-of-the-match")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"playerId\":\"%s\"}".formatted(UUID.randomUUID())))
+                .andExpect(status().isBadRequest());
     }
 
     private String addTeammate(String captainToken, String teamId, String first, String last, int number) throws Exception {

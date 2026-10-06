@@ -45,6 +45,7 @@ const awayRoster = ref<any[]>([])
 const minuteDrafts = ref<Record<string, number>>({})
 const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
+const motmPlayerId = ref('')
 const crestSize = ref(46)
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
@@ -106,6 +107,8 @@ function playersOf(teamId: string) {
 }
 
 const protocolPlayers = computed(() => playersOf(protocolTeamId.value))
+
+const playerOfTheMatchName = computed(() => registeredName(match.value?.playerOfTheMatch))
 
 const goalPlayerOptions = computed(() => {
   if (!match.value) return []
@@ -184,6 +187,7 @@ async function load() {
     api.get(`/matches/${id}/lineups`),
   ])
   match.value = m.data
+  motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
   events.value = e.data
   syncDrafts()
   referees.value = r.data
@@ -371,6 +375,29 @@ async function deleteMatch() {
   }
 }
 
+async function savePlayerOfTheMatch(playerId = motmPlayerId.value) {
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    const { data } = await api.put(`/admin/matches/${match.value.id}/player-of-the-match`, {
+      playerId: playerId || null,
+    })
+    match.value = data
+    motmPlayerId.value = data.playerOfTheMatch?.playerId || ''
+    ok.value = data.playerOfTheMatch?.playerId ? 'Игрок матча выбран.' : 'Игрок матча снят.'
+  } catch (e: any) {
+    error.value = apiError(e, 'Игрок матча не сохранился.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function clearPlayerOfTheMatch() {
+  motmPlayerId.value = ''
+  await savePlayerOfTheMatch('')
+}
+
 async function saveLineup(payload: { teamId: string; starterPlayerIds: string[]; benchPlayerIds: string[] }) {
   error.value = ''
   pending.value = true
@@ -438,6 +465,10 @@ onUnmounted(() => {
       <div class="center">
         <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
         <p class="score">{{ match.homeScore }} - {{ match.awayScore }}</p>
+        <p v-if="playerOfTheMatchName" class="motm">
+          <span>Игрок матча</span>
+          <RouterLink :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
+        </p>
         <p class="state">{{ matchStateLabel(match.status) }}</p>
         <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
           {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
@@ -473,6 +504,28 @@ onUnmounted(() => {
 
     <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED'">
       <CopyChip :value="String(match.id)" label="Скопировать id матча" />
+      <form v-if="match.status === 'FINISHED'" class="stack motm-form" @submit.prevent="savePlayerOfTheMatch()">
+        <h2>Игрок матча</h2>
+        <p class="muted">Один на матч. Новый выбор заменяет предыдущего. Список — из составов, а если состав не подан, из заявки команды.</p>
+        <label class="field">Игрок
+          <select v-model="motmPlayerId">
+            <option value="">Не выбран</option>
+            <option v-for="player in goalPlayerOptions" :key="player.playerId" :value="player.playerId">
+              {{ player.label }} · {{ player.teamName }}
+            </option>
+          </select>
+        </label>
+        <div class="motm-actions">
+          <button class="btn" type="submit" :disabled="pending">Сохранить</button>
+          <button
+            v-if="match.playerOfTheMatch?.playerId"
+            class="btn secondary"
+            type="button"
+            :disabled="pending"
+            @click="clearPlayerOfTheMatch"
+          >Снять</button>
+        </div>
+      </form>
       <h2>Протокол</h2>
       <p class="muted">Гол, жёлтая или красная. У гола можно сменить забившего и ассистента: пас не обязателен, его можно убрать. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
@@ -798,7 +851,31 @@ onUnmounted(() => {
 .mark.red_card { border-radius: 3px; background: var(--danger); }
 .mark.substitution { border-radius: 2px; background: var(--ice); }
 .empty-line { padding: 0.9rem; margin: 0; }
-.lineups { grid-template-columns: 1fr 1fr; gap: 1rem; }
+.lineups { grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.lineups > .panel { min-width: 0; }
+.motm {
+  margin: 0.15rem 0 0.1rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+}
+.motm span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.motm a {
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--navy);
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.motm-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .recent-line {
   display: flex;

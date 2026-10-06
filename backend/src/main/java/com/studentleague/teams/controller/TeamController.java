@@ -8,6 +8,7 @@ import com.studentleague.teams.dto.AddTeamMemberRequest;
 import com.studentleague.teams.dto.AssignCaptainRequest;
 import com.studentleague.teams.dto.CreateTeamRequest;
 import com.studentleague.teams.dto.TeamMemberResponse;
+import com.studentleague.teams.dto.TeamPlayerStatResponse;
 import com.studentleague.teams.dto.TeamResponse;
 import com.studentleague.teams.dto.UpdateTeamRequest;
 import com.studentleague.teams.service.TeamService;
@@ -130,6 +131,12 @@ public class TeamController {
     @Operation(summary = "List active team members")
     public List<TeamMemberResponse> members(@PathVariable UUID id) {
         return teamService.listMembers(id);
+    }
+
+    @GetMapping("/{id}/player-stats")
+    @Operation(summary = "Current squad statistics for matches of this team")
+    public List<TeamPlayerStatResponse> playerStats(@PathVariable UUID id) {
+        return teamService.squadStats(id);
     }
 
     @PostMapping("/{id}/members")

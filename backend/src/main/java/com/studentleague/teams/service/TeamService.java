@@ -1,6 +1,10 @@
 package com.studentleague.teams.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.entity.MatchEvent;
+import com.studentleague.matches.entity.MatchLineupPlayer;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
@@ -14,6 +18,7 @@ import com.studentleague.teams.dto.AddTeamMemberRequest;
 import com.studentleague.teams.dto.AssignCaptainRequest;
 import com.studentleague.teams.dto.CreateTeamRequest;
 import com.studentleague.teams.dto.TeamMemberResponse;
+import com.studentleague.teams.dto.TeamPlayerStatResponse;
 import com.studentleague.teams.dto.TeamResponse;
 import com.studentleague.teams.dto.UpdateTeamRequest;
 import com.studentleague.teams.entity.Team;
@@ -34,9 +39,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TeamService {
@@ -174,6 +183,53 @@ public class TeamService {
         return teamMemberRepository.findByTeamIdAndStatus(teamId, TeamMemberStatus.ACTIVE).stream()
                 .map(this::toMemberResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TeamPlayerStatResponse> squadStats(UUID teamId) {
+        requireTeam(teamId);
+        List<TeamMember> members = teamMemberRepository.findByTeamIdAndStatus(teamId, TeamMemberStatus.ACTIVE);
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> playerIds = members.stream().map(TeamMember::getPlayerId).distinct().toList();
+        Map<UUID, PlayerProfile> profiles = playerProfileRepository.findAllById(playerIds).stream()
+                .collect(Collectors.toMap(PlayerProfile::getId, profile -> profile, (left, right) -> left));
+        Set<UUID> userIds = profiles.values().stream()
+                .filter(profile -> !hasText(profile.getAvatarUrl()))
+                .map(PlayerProfile::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<UUID, String> userPhotos = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .filter(user -> hasText(user.getPhotoUrl()))
+                        .collect(Collectors.toMap(User::getId, User::getPhotoUrl, (left, right) -> left));
+
+        List<Match> matches = matchRepository.findByTeamIdAndStatus(teamId, MatchStatus.FINISHED);
+        List<UUID> matchIds = matches.stream().map(Match::getId).toList();
+        List<MatchEvent> events = matchIds.isEmpty()
+                ? List.of()
+                : matchEventRepository.findByMatchIdInAndVoidedFalse(matchIds);
+        List<MatchLineupPlayer> lineups = matchIds.isEmpty()
+                ? List.of()
+                : matchLineupPlayerRepository.findByMatchIdIn(matchIds);
+
+        List<TeamSquadStats.Player> squad = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        for (TeamMember member : members) {
+            if (!seen.add(member.getPlayerId())) {
+                continue;
+            }
+            PlayerProfile profile = profiles.get(member.getPlayerId());
+            squad.add(new TeamSquadStats.Player(
+                    member.getPlayerId(),
+                    profile == null ? null : profile.getFirstName(),
+                    profile == null ? null : profile.getLastName(),
+                    photoOf(profile, userPhotos)
+            ));
+        }
+        return TeamSquadStats.aggregate(teamId, squad, matches, events, lineups);
     }
 
     @Transactional
@@ -365,6 +421,20 @@ public class TeamService {
             throw ApiException.badRequest("Команда уже расформирована");
         }
         return team;
+    }
+
+    private static String photoOf(PlayerProfile profile, Map<UUID, String> userPhotos) {
+        if (profile == null) {
+            return null;
+        }
+        if (hasText(profile.getAvatarUrl())) {
+            return profile.getAvatarUrl().trim();
+        }
+        return userPhotos.get(profile.getUserId());
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private TeamResponse toTeamResponse(Team team) {
