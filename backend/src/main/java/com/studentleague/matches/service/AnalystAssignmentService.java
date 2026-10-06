@@ -22,12 +22,14 @@ import com.studentleague.users.domain.RoleStatus;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import com.studentleague.users.service.RoleService;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -105,17 +107,35 @@ public class AnalystAssignmentService {
         assignmentRepository.findById(matchId).ifPresent(assignmentRepository::delete);
     }
 
+    /**
+     * Approved analysts only. An empty query is the full directory for the assignment dropdown.
+     * A query still narrows that same role, the way the admin referee list does.
+     */
     @Transactional(readOnly = true)
     public List<AnalystPersonResponse> search(String query) {
         String q = query == null ? "" : query.trim();
+        Sort sort = Sort.by("lastName", "firstName", "email");
         if (q.isEmpty()) {
-            return List.of();
+            List<AnalystPersonResponse> all = new ArrayList<>();
+            int page = 0;
+            boolean more = true;
+            while (more && page < 20) {
+                Page<User> slice = userRepository.findReferees(
+                        Role.ANALYST,
+                        RoleStatus.APPROVED,
+                        PageRequest.of(page, 500, sort)
+                );
+                slice.map(this::toPerson).forEach(all::add);
+                more = slice.hasNext();
+                page++;
+            }
+            return all;
         }
         return userRepository.searchReferees(
                         q,
                         Role.ANALYST,
                         RoleStatus.APPROVED,
-                        PageRequest.of(0, 15, Sort.by("lastName", "firstName", "email"))
+                        PageRequest.of(0, 500, sort)
                 )
                 .map(this::toPerson)
                 .getContent();

@@ -49,7 +49,7 @@ public class RefereeController {
     }
 
     @GetMapping("/analysts")
-    @Operation(summary = "Search users who already have the analyst role")
+    @Operation(summary = "List users who already have the analyst role")
     public List<AnalystPersonResponse> analysts(@RequestParam(defaultValue = "") String q) {
         return analystAssignmentService.search(q);
     }

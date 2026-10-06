@@ -19,6 +19,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -34,6 +36,36 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MatchRepository matchRepository;
+
+    @Test
+    void analystDirectoryListsOnlyApprovedAnalysts() throws Exception {
+        String token = Long.toString(System.nanoTime(), 36);
+        String adminToken = createAdminAndLogin("dir-admin-" + token + "@example.com", "Str0ngPass!");
+        String fanEmail = "dir-fan-" + token + "@example.com";
+        String fanToken = registerAndLogin(fanEmail, "Str0ngPass!");
+        String fanId = userRepository.findByEmailIgnoreCase(fanEmail).orElseThrow().getId().toString();
+        String[] analyst = analystUser("dir-an-" + token);
+        String analystId = analyst[0];
+
+        String body = mockMvc.perform(get("/api/v1/referee/analysts")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertTrue(body.contains(analystId), "approved analyst must be listed");
+        assertFalse(body.contains(fanId), "a fan must not appear in the analyst list");
+
+        mockMvc.perform(get("/api/v1/referee/analysts")
+                        .param("q", "dir-an-" + token)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=='%s')]".formatted(analystId)).exists())
+                .andExpect(jsonPath("$[?(@.id=='%s')]".formatted(fanId)).doesNotExist());
+
+        mockMvc.perform(get("/api/v1/referee/analysts").header("Authorization", auth(fanToken)))
+                .andExpect(status().isForbidden());
+    }
 
     @Test
     void analystRoleIsOptInAndPadStatsStayOffTheRefereeFoulCount() throws Exception {

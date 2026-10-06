@@ -286,7 +286,13 @@ async function load() {
   }
   if (auth.canManageLeague) {
     users.value = await loadAllReferees()
-    if (!refereeId.value && users.value[0]) refereeId.value = users.value[0].id
+    const stillListed = users.value.some((user) => user.id === refereeId.value)
+    if (!refereeId.value || !stillListed) {
+      const assignedId = referees.value.find((row) =>
+        users.value.some((user) => user.id === row.refereeId),
+      )?.refereeId
+      refereeId.value = assignedId || users.value[0]?.id || ''
+    }
   }
 }
 
@@ -308,6 +314,19 @@ function mergeLive(live: any) {
     syncDrafts()
   }
 }
+
+const refereeNow = computed(() => {
+  if (!referees.value.length) return 'Сейчас никто не назначен.'
+  const lines = referees.value
+    .map((row) => refereeTitle({
+      id: row.refereeId,
+      email: row.email || '',
+      firstName: row.firstName,
+      lastName: row.lastName,
+    }))
+    .filter(Boolean)
+  return lines.length ? `Сейчас: ${lines.join('; ')}` : 'Сейчас никто не назначен.'
+})
 
 async function assignReferee() {
   error.value = ''
@@ -660,15 +679,17 @@ onUnmounted(() => {
         :home-label="teams.fullName(match.homeTeamId, 'Хозяева')"
         :away-label="teams.fullName(match.awayTeamId, 'Гости')"
       />
-      <form class="stack" @submit.prevent="assignReferee">
+      <form class="panel stack assign-card" @submit.prevent="assignReferee">
+        <h2>Судья</h2>
+        <p class="muted">{{ refereeNow }}</p>
         <label class="field">Назначить судью
           <select v-model="refereeId" required>
             <option v-for="u in users" :key="u.id" :value="u.id">{{ refereeTitle(u) }}</option>
           </select>
         </label>
-        <button class="btn" type="submit" :disabled="pending || !users.length">Назначить</button>
+        <button class="btn assign-btn" type="submit" :disabled="pending || !users.length">Назначить</button>
+        <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
       </form>
-      <p v-if="!users.length" class="muted">Сначала поставьте кому-то роль судьи в админке.</p>
     </AdminOnly>
 
     <div class="fs-tabs">
@@ -1000,6 +1021,8 @@ onUnmounted(() => {
 }
 .motm-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
+.assign-card h2 { margin: 0; font-size: 1.5rem; }
+.assign-btn { width: 100%; }
 .recent-line {
   display: flex;
   align-items: center;
