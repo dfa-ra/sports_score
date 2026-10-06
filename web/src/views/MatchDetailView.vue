@@ -587,6 +587,7 @@ onUnmounted(() => {
           v-if="ev.eventType === 'GOAL'"
           class="btn secondary"
           type="button"
+          title="Сохранить забившего, ассистента и минуту"
           :disabled="pending"
           @click="saveGoal(ev)"
         >Сохранить</button>
