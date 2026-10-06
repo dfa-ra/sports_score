@@ -353,6 +353,46 @@ class MatchLineups {
   }
 }
 
+class SquadPlayerStat {
+  SquadPlayerStat({
+    required this.playerId,
+    this.firstName = '',
+    this.lastName = '',
+    this.photoUrl,
+    this.goals = 0,
+    this.assists = 0,
+    this.appearances = 0,
+    this.yellowCards = 0,
+  });
+
+  final String playerId;
+  final String firstName;
+  final String lastName;
+  final String? photoUrl;
+  final int goals;
+  final int assists;
+  final int appearances;
+  final int yellowCards;
+
+  String get title {
+    final name = registeredPersonName(lastName, firstName, null);
+    return name.isEmpty ? 'Игрок' : name;
+  }
+
+  factory SquadPlayerStat.fromJson(Map<String, dynamic> json) {
+    return SquadPlayerStat(
+      playerId: json['playerId'].toString(),
+      firstName: json['firstName']?.toString() ?? '',
+      lastName: json['lastName']?.toString() ?? '',
+      photoUrl: json['photoUrl']?.toString(),
+      goals: (json['goals'] as num?)?.toInt() ?? 0,
+      assists: (json['assists'] as num?)?.toInt() ?? 0,
+      appearances: (json['appearances'] as num?)?.toInt() ?? 0,
+      yellowCards: (json['yellowCards'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class TeamMember {
   TeamMember({
     required this.playerId,
