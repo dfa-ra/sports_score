@@ -58,7 +58,7 @@ function crestForViewport() {
 const crestSize = ref(crestForViewport())
 const homeStarTap = ref(0)
 const awayStarTap = ref(0)
-const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
+const tab = ref<'overview' | 'stats' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
 const error = ref('')
 const ok = ref('')
@@ -551,8 +551,6 @@ onUnmounted(() => {
 
     <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
 
-    <MatchAnalystStats :match-id="String(match.id)" />
-
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
 
@@ -669,6 +667,7 @@ onUnmounted(() => {
 
     <div class="fs-tabs">
       <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
       <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
       <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
     </div>
@@ -751,6 +750,10 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <div v-else-if="tab === 'stats'">
+      <MatchAnalystStats :match-id="String(match.id)" />
+    </div>
+
     <div v-else-if="tab === 'lineups'" class="grid lineups">
       <div class="panel">
         <MatchLineupBoard
@@ -770,7 +773,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-else class="panel">
+    <div v-else-if="tab === 'protocol'" class="panel">
       <h2>Протокол</h2>
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">

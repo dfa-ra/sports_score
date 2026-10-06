@@ -4,6 +4,7 @@ import api from '../api/client'
 
 const props = defineProps<{ matchId: string }>()
 const stats = ref<any>(null)
+const ready = ref(false)
 let timer = 0
 
 const visible = computed(() => {
@@ -50,12 +51,18 @@ const awayWidth = computed(() => {
 })
 
 async function load() {
-  if (!props.matchId) return
+  if (!props.matchId) {
+    stats.value = null
+    ready.value = true
+    return
+  }
   try {
     const { data } = await api.get(`/matches/${props.matchId}/analyst-stats`)
     stats.value = data
   } catch {
     stats.value = null
+  } finally {
+    ready.value = true
   }
 }
 
@@ -64,7 +71,10 @@ onMounted(() => {
   timer = window.setInterval(load, 4000)
 })
 onUnmounted(() => window.clearInterval(timer))
-watch(() => props.matchId, load)
+watch(() => props.matchId, () => {
+  ready.value = false
+  load()
+})
 </script>
 
 <template>
@@ -90,10 +100,14 @@ watch(() => props.matchId, load)
       </div>
     </div>
   </section>
+  <section v-else-if="ready" class="panel">
+    <p class="muted quiet">Статистики пока нет.</p>
+  </section>
 </template>
 
 <style scoped>
 .analyst { display: grid; gap: 0.15rem; }
+.quiet { margin: 0; font-size: 0.9rem; }
 h2 { font-size: 1.05rem; margin: 0 0 0.35rem; }
 .line {
   display: grid;
