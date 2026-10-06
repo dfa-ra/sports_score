@@ -77,6 +77,13 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.roles[?(@.role=='ANALYST' && @.status=='APPROVED')]").exists());
 
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"BOTH\",\"userId\":\"%s\"}".formatted(fanId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("BOTH"));
+
         postStat(fanToken, fx.matchId, fx.homeTeamId, "SHOT_ON_TARGET")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.home.shots").value(1))
@@ -158,6 +165,11 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         Fixture fx = setupMatch(adminToken);
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"BOTH\",\"userId\":\"%s\"}".formatted(fanId)))
+                .andExpect(status().isOk());
         postStat(fanToken, fx.matchId, fx.homeTeamId, "SHOT_ON_TARGET")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.home.shots").value(1));
@@ -227,6 +239,95 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"side\":\"PAUSED\"}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void assignmentGatesThePadAndAFinishedMatchRejectsWrites() throws Exception {
+        String adminToken = createAdminAndLogin("assign-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        String playerEmail = "assign-player-" + System.nanoTime() + "@example.com";
+        registerAndLogin(playerEmail, "Str0ngPass!");
+        var player = userRepository.findByEmailIgnoreCase(playerEmail).orElseThrow();
+        roleService.grantApproved(player, Role.PLAYER, "https://example.com/player.jpg");
+        String playerToken = loginOnly(playerEmail, "Str0ngPass!");
+
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(playerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"BOTH\",\"userId\":\"%s\"}".formatted(player.getId())))
+                .andExpect(status().isForbidden());
+
+        String[] home = analystUser("home-an");
+        String[] away = analystUser("away-an");
+
+        postStat(home[1], fx.matchId, fx.homeTeamId, "SHOT_OFF").andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"BOTH\",\"userId\":\"%s\"}".formatted(player.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Сначала отметьте роль Аналитик"));
+
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mode\":\"BOTH\",\"userId\":\"%s\"}".formatted(home[0])))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("BOTH"));
+
+        postStat(home[1], fx.matchId, fx.homeTeamId, "SHOT_OFF")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(1));
+        postStat(home[1], fx.matchId, fx.awayTeamId, "SHOT_ON_TARGET")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.away.shots").value(1))
+                .andExpect(jsonPath("$.away.shotsOnTarget").value(1));
+
+        mockMvc.perform(put("/api/v1/referee/matches/" + fx.matchId + "/analysts")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"SPLIT","homeUserId":"%s","awayUserId":"%s"}
+                                """.formatted(home[0], away[0])))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mode").value("SPLIT"));
+
+        postStat(home[1], fx.matchId, fx.homeTeamId, "SHOT_OFF")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(2));
+        postStat(home[1], fx.matchId, fx.awayTeamId, "SHOT_OFF").andExpect(status().isForbidden());
+
+        Match match = matchRepository.findById(UUID.fromString(fx.matchId)).orElseThrow();
+        match.setStatus(MatchStatus.FINISHED);
+        match.setFinishedAt(Instant.now());
+        matchRepository.saveAndFlush(match);
+
+        postStat(home[1], fx.matchId, fx.homeTeamId, "SHOT_OFF")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Матч уже завершён"));
+
+        mockMvc.perform(post("/api/v1/analyst/matches/" + fx.matchId + "/possession")
+                        .header("Authorization", auth(home[1]))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"side\":\"HOME\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Матч уже завершён"));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/analyst-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(2))
+                .andExpect(jsonPath("$.away.shots").value(1))
+                .andExpect(jsonPath("$.away.shotsOnTarget").value(1));
+    }
+
+    private String[] analystUser(String label) throws Exception {
+        String email = label + "-" + System.nanoTime() + "@example.com";
+        registerAndLogin(email, "Str0ngPass!");
+        var user = userRepository.findByEmailIgnoreCase(email).orElseThrow();
+        roleService.grantApproved(user, Role.ANALYST, null);
+        return new String[]{user.getId().toString(), loginOnly(email, "Str0ngPass!")};
     }
 
     private org.springframework.test.web.servlet.ResultActions postStat(
@@ -315,6 +416,11 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
         var referee = userRepository.findByEmailIgnoreCase(refereeEmail).orElseThrow();
         roleService.grantApproved(referee, Role.REFEREE, "https://example.com/ref.jpg");
         String refereeToken = loginOnly(refereeEmail, "Str0ngPass!");
+        mockMvc.perform(post("/api/v1/matches/" + matchId + "/referees")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refereeId\":\"%s\"}".formatted(referee.getId())))
+                .andExpect(status().isCreated());
 
         return new Fixture(matchId, homeTeamId, awayTeamId, homeToken, awayToken, refereeToken);
     }

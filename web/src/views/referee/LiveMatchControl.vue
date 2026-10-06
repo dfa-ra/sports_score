@@ -8,6 +8,7 @@ import { eventMinute } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
+import AnalystAssignForm from '../../components/AnalystAssignForm.vue'
 import FutsalBoard from '../../components/FutsalBoard.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import TeamCrest from '../../components/TeamCrest.vue'
@@ -239,6 +240,12 @@ onUnmounted(() => {
         </strong>
       </div>
     </div>
+
+    <AnalystAssignForm
+      :match-id="String(match.id)"
+      :home-label="homeLabel"
+      :away-label="awayLabel"
+    />
 
     <FutsalBoard
       :match="match"

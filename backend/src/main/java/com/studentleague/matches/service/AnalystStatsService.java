@@ -1,6 +1,7 @@
 package com.studentleague.matches.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.AnalystCoverage;
 import com.studentleague.matches.domain.AnalystStat;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.domain.PossessionSide;
@@ -12,7 +13,6 @@ import com.studentleague.matches.entity.MatchAnalystStats;
 import com.studentleague.matches.repository.MatchAnalystStatsRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.security.UserPrincipal;
-import com.studentleague.users.domain.Role;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,10 +26,16 @@ public class AnalystStatsService {
 
     private final MatchRepository matchRepository;
     private final MatchAnalystStatsRepository statsRepository;
+    private final AnalystAssignmentService assignmentService;
 
-    public AnalystStatsService(MatchRepository matchRepository, MatchAnalystStatsRepository statsRepository) {
+    public AnalystStatsService(
+            MatchRepository matchRepository,
+            MatchAnalystStatsRepository statsRepository,
+            AnalystAssignmentService assignmentService
+    ) {
         this.matchRepository = matchRepository;
         this.statsRepository = statsRepository;
+        this.assignmentService = assignmentService;
     }
 
     /**
@@ -46,13 +52,13 @@ public class AnalystStatsService {
 
     @Transactional
     public AnalystStatsResponse adjust(UserPrincipal principal, UUID matchId, UUID teamId, AnalystStat stat, int delta) {
-        assertCanWrite(principal);
         if (delta != 1 && delta != -1) {
             throw ApiException.badRequest("Можно только прибавить или убрать единицу");
         }
         Match match = requireMatch(matchId);
         assertOpen(match);
         boolean home = teamIsHome(match, teamId);
+        assertTeam(principal, match, home);
         MatchAnalystStats row = loadForUpdate(matchId);
         row.apply(home, stat, delta);
         return toResponse(statsRepository.save(row), Instant.now());
@@ -60,9 +66,9 @@ public class AnalystStatsService {
 
     @Transactional
     public AnalystStatsResponse setPossession(UserPrincipal principal, UUID matchId, PossessionSide side) {
-        assertCanWrite(principal);
         Match match = requireMatch(matchId);
         assertOpen(match);
+        assertPossession(principal, match, side);
         MatchAnalystStats row = loadForUpdate(matchId);
         if (side == PossessionSide.PAUSED && !row.isPossessionTracked()) {
             return toResponse(row, Instant.now());
@@ -121,15 +127,33 @@ public class AnalystStatsService {
                 .orElseThrow(() -> ApiException.notFound("Матч не найден"));
     }
 
-    private void assertCanWrite(UserPrincipal principal) {
-        if (principal == null || !principal.hasAnyRole(Role.ANALYST, Role.ADMIN)) {
-            throw ApiException.forbidden("Нужна роль аналитика");
-        }
-    }
-
     private void assertOpen(Match match) {
         if (match.getStatus() == MatchStatus.FINISHED || match.getStatus() == MatchStatus.CANCELLED) {
             throw ApiException.conflict("Матч уже завершён");
+        }
+    }
+
+    private void assertTeam(UserPrincipal principal, Match match, boolean homeTeam) {
+        AnalystCoverage coverage = assignmentService.coverage(principal, match.getId());
+        if (coverage == null) {
+            throw ApiException.forbidden("Вы не назначены на этот матч");
+        }
+        if ((homeTeam && coverage == AnalystCoverage.AWAY) || (!homeTeam && coverage == AnalystCoverage.HOME)) {
+            throw ApiException.forbidden("Вы ведёте только свою команду");
+        }
+    }
+
+    private void assertPossession(UserPrincipal principal, Match match, PossessionSide side) {
+        AnalystCoverage coverage = assignmentService.coverage(principal, match.getId());
+        if (coverage == null) {
+            throw ApiException.forbidden("Вы не назначены на этот матч");
+        }
+        if (coverage == AnalystCoverage.BOTH || side == PossessionSide.PAUSED) {
+            return;
+        }
+        if ((side == PossessionSide.HOME && coverage != AnalystCoverage.HOME)
+                || (side == PossessionSide.AWAY && coverage != AnalystCoverage.AWAY)) {
+            throw ApiException.forbidden("Вы ведёте только свою команду");
         }
     }
 

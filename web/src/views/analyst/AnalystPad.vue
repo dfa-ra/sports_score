@@ -31,6 +31,7 @@ const auth = useAuthStore()
 const teams = useTeamDirectory()
 const match = ref<any>(null)
 const stats = ref<any>(null)
+const assignment = ref<any>(null)
 const error = ref('')
 const pending = ref(false)
 const { remaining, cap } = useMatchClock(match)
@@ -58,6 +59,19 @@ let clockStamp = 0
 
 const homeLabel = computed(() => teams.fullName(match.value?.homeTeamId, 'Хозяева'))
 const awayLabel = computed(() => teams.fullName(match.value?.awayTeamId, 'Гости'))
+const coverage = computed<'BOTH' | 'HOME' | 'AWAY' | null>(() => {
+  if (auth.canManageLeague) return 'BOTH'
+  const me = auth.user?.id
+  const row = assignment.value
+  if (!me || !row?.mode) return null
+  if (row.mode === 'BOTH' && row.analyst?.id === me) return 'BOTH'
+  if (row.mode === 'SPLIT' && row.homeAnalyst?.id === me) return 'HOME'
+  if (row.mode === 'SPLIT' && row.awayAnalyst?.id === me) return 'AWAY'
+  return null
+})
+const showHome = computed(() => coverage.value === 'BOTH' || coverage.value === 'HOME')
+const showAway = computed(() => coverage.value === 'BOTH' || coverage.value === 'AWAY')
+const canWrite = computed(() => !closed.value && coverage.value != null)
 const possessionSide = computed(() => stats.value?.possessionSide as Side | null)
 const tracked = computed(() => !!stats.value?.possessionTracked)
 
@@ -81,12 +95,14 @@ function teamId(side: 'home' | 'away') {
 async function reload() {
   await teams.load()
   const id = route.params.id
-  const [m, s] = await Promise.all([
+  const [m, s, a] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/analyst-stats`),
+    api.get(`/matches/${id}/analyst-assignment`),
   ])
   match.value = m.data
   stats.value = s.data
+  assignment.value = a.data
 }
 
 async function pullStats() {
@@ -149,7 +165,7 @@ function connectClock() {
 }
 
 async function bump(side: 'home' | 'away', stat: StatId, undo = false) {
-  if (closed.value) return
+  if (!canWrite.value) return
   const id = teamId(side)
   if (!id) return
   error.value = ''
@@ -166,7 +182,7 @@ async function bump(side: 'home' | 'away', stat: StatId, undo = false) {
 }
 
 async function hold(side: Side) {
-  if (closed.value) return
+  if (!canWrite.value) return
   error.value = ''
   pending.value = true
   try {
@@ -212,6 +228,7 @@ onUnmounted(() => {
       <div class="clock">{{ clockText }}</div>
       <p v-if="clockCaption" class="clock-caption">{{ clockCaption }}</p>
       <StatusBadge :status="match.status" />
+      <p v-if="!closed && !coverage" class="closed">Вы не назначены на этот матч</p>
       <div class="sides">
         <strong class="club">
           <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="28" />
@@ -225,21 +242,23 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="panel stack possession">
-      <div class="poss-actions">
+    <div v-if="coverage" class="panel stack possession">
+      <div class="poss-actions" :class="{ single: coverage !== 'BOTH' }">
         <button
+          v-if="showHome"
           class="btn large"
           :class="possessionSide === 'HOME' ? 'on' : 'secondary'"
           type="button"
-          :disabled="pending || closed"
+          :disabled="pending || !canWrite"
           :aria-pressed="possessionSide === 'HOME'"
           @click="hold('HOME')"
         >Мяч у хозяев</button>
         <button
+          v-if="showAway"
           class="btn large"
           :class="possessionSide === 'AWAY' ? 'on' : 'secondary'"
           type="button"
-          :disabled="pending || closed"
+          :disabled="pending || !canWrite"
           :aria-pressed="possessionSide === 'AWAY'"
           @click="hold('AWAY')"
         >Мяч у гостей</button>
@@ -248,7 +267,7 @@ onUnmounted(() => {
         class="btn large pause"
         :class="possessionSide === 'PAUSED' ? 'on' : 'secondary'"
         type="button"
-        :disabled="pending || closed"
+        :disabled="pending || !canWrite"
         :aria-pressed="possessionSide === 'PAUSED'"
         @click="hold('PAUSED')"
       >Пауза владения</button>
@@ -260,42 +279,42 @@ onUnmounted(() => {
       <p v-else class="muted">Владение пока не ведётся — на странице матча полоски не будет.</p>
     </div>
 
-    <div class="columns">
-      <div class="panel team">
+    <div v-if="coverage" class="columns" :class="{ single: coverage !== 'BOTH' }">
+      <div v-if="showHome" class="panel team">
         <div class="head">
           <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="36" />
           <strong>{{ homeLabel }}</strong>
         </div>
         <p class="summary">{{ stats?.home?.shots ?? 0 }} / {{ stats?.home?.shotsOnTarget ?? 0 }} в створ</p>
         <div v-for="stat in STATS" :key="stat.id" class="cell">
-          <button class="btn large hit" type="button" :disabled="pending || closed" @click="bump('home', stat.id)">
+          <button class="btn large hit" type="button" :disabled="pending || !canWrite" @click="bump('home', stat.id)">
             <b>{{ countOf('home', stat.id) }}</b>
             <span>{{ stat.label }}</span>
           </button>
           <button
             class="undo"
             type="button"
-            :disabled="pending || closed || countOf('home', stat.id) === 0"
+            :disabled="pending || !canWrite || countOf('home', stat.id) === 0"
             :aria-label="`Убрать: ${stat.label}`"
             @click="bump('home', stat.id, true)"
           >−</button>
         </div>
       </div>
-      <div class="panel team">
+      <div v-if="showAway" class="panel team">
         <div class="head">
           <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="36" />
           <strong>{{ awayLabel }}</strong>
         </div>
         <p class="summary">{{ stats?.away?.shots ?? 0 }} / {{ stats?.away?.shotsOnTarget ?? 0 }} в створ</p>
         <div v-for="stat in STATS" :key="stat.id" class="cell">
-          <button class="btn large hit" type="button" :disabled="pending || closed" @click="bump('away', stat.id)">
+          <button class="btn large hit" type="button" :disabled="pending || !canWrite" @click="bump('away', stat.id)">
             <b>{{ countOf('away', stat.id) }}</b>
             <span>{{ stat.label }}</span>
           </button>
           <button
             class="undo"
             type="button"
-            :disabled="pending || closed || countOf('away', stat.id) === 0"
+            :disabled="pending || !canWrite || countOf('away', stat.id) === 0"
             :aria-label="`Убрать: ${stat.label}`"
             @click="bump('away', stat.id, true)"
           >−</button>
@@ -354,7 +373,9 @@ onUnmounted(() => {
 }
 .club.away { justify-content: flex-end; text-align: right; }
 .score { font-size: clamp(1.6rem, 5vw, 2.2rem); font-weight: 800; color: var(--navy); }
+.closed { margin: 0; font-weight: 800; color: var(--navy); }
 .poss-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.poss-actions.single { grid-template-columns: 1fr; }
 .btn.on { background: var(--navy); color: #fff; border-color: transparent; }
 .btn.pause { width: 100%; }
 .percent {
@@ -368,6 +389,7 @@ onUnmounted(() => {
 .percent span { color: var(--muted); font-weight: 700; text-align: center; }
 .percent b:last-child { text-align: right; }
 .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.columns.single { grid-template-columns: 1fr; }
 .team { display: grid; gap: 0.45rem; align-content: start; }
 .head { display: flex; align-items: center; gap: 0.45rem; }
 .head strong { font-family: var(--font-display); }

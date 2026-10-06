@@ -14,6 +14,7 @@ import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
+import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
 import SquadPlayerSelect from '../components/SquadPlayerSelect.vue'
@@ -654,6 +655,11 @@ onUnmounted(() => {
       </div>
       <p v-if="!editableEvents.length" class="muted">В протоколе пока нет событий.</p>
       <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch">Удалить матч</button>
+      <AnalystAssignForm
+        :match-id="String(match.id)"
+        :home-label="teams.fullName(match.homeTeamId, 'Хозяева')"
+        :away-label="teams.fullName(match.awayTeamId, 'Гости')"
+      />
       <form class="stack" @submit.prevent="assignReferee">
         <label class="field">Назначить судью
           <select v-model="refereeId" required>
