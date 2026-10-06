@@ -12,10 +12,15 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
 import com.studentleague.statistics.dto.StatisticsBoardResponse;
 import com.studentleague.statistics.dto.TeamStatisticsResponse;
+import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.entity.Team;
+import com.studentleague.teams.entity.TeamMember;
+import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.users.entity.User;
+import com.studentleague.users.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,8 @@ public class StatisticsService {
     private final PlayerProfileRepository playerProfileRepository;
     private final TeamRepository teamRepository;
     private final MatchLineupPlayerRepository lineupPlayerRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final UserRepository userRepository;
 
     public StatisticsService(
             MatchEventRepository matchEventRepository,
@@ -45,7 +52,9 @@ public class StatisticsService {
             TournamentRepository tournamentRepository,
             PlayerProfileRepository playerProfileRepository,
             TeamRepository teamRepository,
-            MatchLineupPlayerRepository lineupPlayerRepository
+            MatchLineupPlayerRepository lineupPlayerRepository,
+            TeamMemberRepository teamMemberRepository,
+            UserRepository userRepository
     ) {
         this.matchEventRepository = matchEventRepository;
         this.matchRepository = matchRepository;
@@ -53,6 +62,8 @@ public class StatisticsService {
         this.playerProfileRepository = playerProfileRepository;
         this.teamRepository = teamRepository;
         this.lineupPlayerRepository = lineupPlayerRepository;
+        this.teamMemberRepository = teamMemberRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -116,14 +127,22 @@ public class StatisticsService {
         }
 
         Map<UUID, PlayerProfile> profiles = playerProfileRepository.findAllById(stats.keySet()).stream()
-                .collect(Collectors.toMap(PlayerProfile::getId, p -> p));
+                .collect(Collectors.toMap(PlayerProfile::getId, p -> p, (a, b) -> a));
+        Set<UUID> eventTeamIds = stats.values().stream()
+                .map(acc -> acc.teamId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        RosterMedia media = loadRoster(stats.keySet(), profiles, eventTeamIds);
 
         return stats.values().stream()
                 .map(acc -> {
                     PlayerProfile profile = profiles.get(acc.playerId);
-                    return new PlayerStatisticsResponse(
+                    return toStat(
                             acc.playerId,
                             profile == null ? null : profile.getDisplayName(),
+                            profile == null ? null : profile.getFirstName(),
+                            profile == null ? null : profile.getLastName(),
+                            profile,
                             acc.goals,
                             acc.assists,
                             acc.yellowCards,
@@ -131,8 +150,7 @@ public class StatisticsService {
                             acc.appearances,
                             acc.teamId,
                             0,
-                            profile == null ? null : profile.getFirstName(),
-                            profile == null ? null : profile.getLastName()
+                            media
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.goals(), a.goals()))
@@ -178,26 +196,49 @@ public class StatisticsService {
                 .collect(Collectors.toMap(PlayerProfile::getId, p -> p, (a, b) -> a));
         Map<UUID, PlayerStatisticsResponse> byId = base.stream()
                 .collect(Collectors.toMap(PlayerStatisticsResponse::playerId, p -> p, (a, b) -> a));
+        Set<UUID> eventTeamIds = new HashSet<>(counts.teamIds.values());
+        for (PlayerStatisticsResponse row : byId.values()) {
+            if (row.teamId() != null) {
+                eventTeamIds.add(row.teamId());
+            }
+        }
+        RosterMedia media = loadRoster(sheets.keySet(), profiles, eventTeamIds);
         return sheets.entrySet().stream()
                 .map(entry -> {
                     PlayerStatisticsResponse existing = byId.get(entry.getKey());
                     PlayerProfile profile = profiles.get(entry.getKey());
                     long games = counts.appearances.getOrDefault(entry.getKey(), entry.getValue());
+                    UUID eventTeam = existing != null && existing.teamId() != null
+                            ? existing.teamId()
+                            : counts.teamIds.get(entry.getKey());
                     if (existing != null) {
-                        return new PlayerStatisticsResponse(
-                                existing.playerId(), existing.displayName(), existing.goals(), existing.assists(),
-                                existing.yellowCards(), existing.redCards(), games,
-                                existing.teamId(), entry.getValue(),
-                                existing.firstName() != null ? existing.firstName() : profile == null ? null : profile.getFirstName(),
-                                existing.lastName() != null ? existing.lastName() : profile == null ? null : profile.getLastName()
+                        return toStat(
+                                existing.playerId(),
+                                existing.displayName(),
+                                existing.firstName(),
+                                existing.lastName(),
+                                profile,
+                                existing.goals(),
+                                existing.assists(),
+                                existing.yellowCards(),
+                                existing.redCards(),
+                                games,
+                                eventTeam,
+                                entry.getValue(),
+                                media
                         );
                     }
-                    return new PlayerStatisticsResponse(
+                    return toStat(
                             entry.getKey(),
-                            profile == null ? null : profile.getDisplayName(),
-                            0, 0, 0, 0, games, null, entry.getValue(),
-                            profile == null ? null : profile.getFirstName(),
-                            profile == null ? null : profile.getLastName()
+                            null,
+                            null,
+                            null,
+                            profile,
+                            0, 0, 0, 0,
+                            games,
+                            eventTeam,
+                            entry.getValue(),
+                            media
                     );
                 })
                 .sorted((a, b) -> Long.compare(b.cleanSheets(), a.cleanSheets()))
@@ -294,6 +335,7 @@ public class StatisticsService {
         }
         for (UUID keeperId : keepers) {
             counts.appearances.merge(keeperId, 1L, Long::sum);
+            counts.noteTeam(keeperId, teamId);
             if (clean) {
                 counts.cleanSheets.merge(keeperId, 1L, Long::sum);
             }
@@ -319,6 +361,7 @@ public class StatisticsService {
                 .forEach(keeperId -> {
                     counts.cleanSheets.merge(keeperId, 1L, Long::sum);
                     counts.appearances.merge(keeperId, 1L, Long::sum);
+                    counts.noteTeam(keeperId, teamId);
                 });
     }
 
@@ -423,9 +466,156 @@ public class StatisticsService {
                 .collect(Collectors.groupingBy(MatchEvent::getMatchId));
     }
 
+    private RosterMedia loadRoster(Set<UUID> playerIds, Map<UUID, PlayerProfile> profiles, Set<UUID> eventTeamIds) {
+        Map<UUID, List<UUID>> memberships = new HashMap<>();
+        if (!playerIds.isEmpty()) {
+            for (TeamMember member : teamMemberRepository.findByPlayerIdInAndStatus(playerIds, TeamMemberStatus.ACTIVE)) {
+                if (member.getPlayerId() == null || member.getTeamId() == null) {
+                    continue;
+                }
+                memberships.computeIfAbsent(member.getPlayerId(), id -> new ArrayList<>()).add(member.getTeamId());
+            }
+        }
+        Set<UUID> teamIds = new HashSet<>();
+        if (eventTeamIds != null) {
+            for (UUID teamId : eventTeamIds) {
+                if (teamId != null) {
+                    teamIds.add(teamId);
+                }
+            }
+        }
+        for (List<UUID> joined : memberships.values()) {
+            teamIds.addAll(joined);
+        }
+        Map<UUID, Team> teams = teamIds.isEmpty()
+                ? Map.of()
+                : teamRepository.findAllById(teamIds).stream()
+                        .collect(Collectors.toMap(Team::getId, team -> team, (a, b) -> a));
+        Set<UUID> userIds = profiles.values().stream()
+                .filter(profile -> profile.getUserId() != null && !hasText(profile.getAvatarUrl()))
+                .map(PlayerProfile::getUserId)
+                .collect(Collectors.toSet());
+        Map<UUID, String> photos = userIds.isEmpty()
+                ? Map.of()
+                : userRepository.findAllById(userIds).stream()
+                        .filter(user -> hasText(user.getPhotoUrl()))
+                        .collect(Collectors.toMap(User::getId, User::getPhotoUrl, (a, b) -> a));
+        return new RosterMedia(memberships, teams, photos);
+    }
+
+    private static PlayerStatisticsResponse toStat(
+            UUID playerId,
+            String displayName,
+            String firstName,
+            String lastName,
+            PlayerProfile profile,
+            long goals,
+            long assists,
+            long yellowCards,
+            long redCards,
+            long appearances,
+            UUID eventTeamId,
+            long cleanSheets,
+            RosterMedia media
+    ) {
+        UUID teamId = media.resolveTeamId(playerId, eventTeamId);
+        return new PlayerStatisticsResponse(
+                playerId,
+                displayName != null ? displayName : profile == null ? null : profile.getDisplayName(),
+                goals,
+                assists,
+                yellowCards,
+                redCards,
+                appearances,
+                teamId,
+                cleanSheets,
+                firstName != null ? firstName : profile == null ? null : profile.getFirstName(),
+                lastName != null ? lastName : profile == null ? null : profile.getLastName(),
+                media.avatar(profile),
+                media.logo(teamId)
+        );
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private static final class KeeperCounts {
         private final Map<UUID, Long> cleanSheets = new HashMap<>();
         private final Map<UUID, Long> appearances = new HashMap<>();
+        private final Map<UUID, UUID> teamIds = new HashMap<>();
+
+        private void noteTeam(UUID playerId, UUID teamId) {
+            if (playerId != null && teamId != null) {
+                teamIds.putIfAbsent(playerId, teamId);
+            }
+        }
+    }
+
+    /**
+     * Photos and crests for a whole board, loaded once: memberships, teams, and account photos
+     * for players who have no avatar of their own.
+     */
+    private static final class RosterMedia {
+        private final Map<UUID, List<UUID>> memberships;
+        private final Map<UUID, Team> teams;
+        private final Map<UUID, String> userPhotos;
+
+        private RosterMedia(
+                Map<UUID, List<UUID>> memberships,
+                Map<UUID, Team> teams,
+                Map<UUID, String> userPhotos
+        ) {
+            this.memberships = memberships;
+            this.teams = teams;
+            this.userPhotos = userPhotos;
+        }
+
+        private UUID resolveTeamId(UUID playerId, UUID eventTeamId) {
+            List<UUID> joined = memberships.getOrDefault(playerId, List.of());
+            if (eventTeamId != null && joined.contains(eventTeamId) && playsFor(eventTeamId)) {
+                return eventTeamId;
+            }
+            for (UUID joinedId : joined) {
+                if (playsFor(joinedId)) {
+                    return joinedId;
+                }
+            }
+            if (eventTeamId != null && playsFor(eventTeamId)) {
+                return eventTeamId;
+            }
+            if (eventTeamId != null && !teams.containsKey(eventTeamId)) {
+                return eventTeamId;
+            }
+            return null;
+        }
+
+        private boolean playsFor(UUID teamId) {
+            Team team = teams.get(teamId);
+            return team != null && !team.isDisbanded();
+        }
+
+        private String logo(UUID teamId) {
+            if (!playsFor(teamId)) {
+                return null;
+            }
+            Team team = teams.get(teamId);
+            return team != null && hasText(team.getLogoUrl()) ? team.getLogoUrl().trim() : null;
+        }
+
+        private String avatar(PlayerProfile profile) {
+            if (profile == null) {
+                return null;
+            }
+            if (hasText(profile.getAvatarUrl())) {
+                return profile.getAvatarUrl().trim();
+            }
+            if (profile.getUserId() == null) {
+                return null;
+            }
+            String photo = userPhotos.get(profile.getUserId());
+            return hasText(photo) ? photo.trim() : null;
+        }
     }
 
     private static final class PlayerAccumulator {

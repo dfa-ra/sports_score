@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
+import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
-import { registeredName } from '../lib/playerTitle'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
@@ -185,13 +185,13 @@ async function load() {
         </div>
         <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
         <div v-else class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Игрок</th><th>Голы</th><th>Игры</th></tr></thead>
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(scorers, 'scorers')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
-                <td>{{ p.goals }}</td>
-                <td>{{ p.appearances }}</td>
+                <td class="who"><StatPlayerCell :player="p" /></td>
+                <td class="num">{{ p.goals }}</td>
+                <td class="num">{{ p.appearances }}</td>
               </tr>
             </tbody>
           </table>
@@ -214,13 +214,13 @@ async function load() {
         </div>
         <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Игрок</th><th>Сухие</th><th>Игры</th></tr></thead>
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(keepers, 'keepers')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
-                <td>{{ p.cleanSheets }}</td>
-                <td>{{ p.appearances }}</td>
+                <td class="who"><StatPlayerCell :player="p" /></td>
+                <td class="num">{{ p.cleanSheets }}</td>
+                <td class="num">{{ p.appearances }}</td>
               </tr>
             </tbody>
           </table>
@@ -243,13 +243,13 @@ async function load() {
         </div>
         <EmptyState v-if="!assists.length" title="Ассистов ещё нет" />
         <div v-else class="table-wrap">
-          <table class="table">
-            <thead><tr><th>Игрок</th><th>Ассисты</th><th>Игры</th></tr></thead>
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Ассисты</th><th class="num">Игры</th></tr></thead>
             <tbody>
               <tr v-for="p in shown(assists, 'assists')" :key="p.playerId">
-                <td><RouterLink :to="`/players/${p.playerId}`">{{ registeredName(p) || 'Игрок' }}</RouterLink></td>
-                <td>{{ p.assists }}</td>
-                <td>{{ p.appearances }}</td>
+                <td class="who"><StatPlayerCell :player="p" /></td>
+                <td class="num">{{ p.assists }}</td>
+                <td class="num">{{ p.appearances }}</td>
               </tr>
             </tbody>
           </table>
@@ -311,6 +311,19 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.85rem;
+}
+.stat-table { table-layout: fixed; }
+.stat-table .num {
+  width: 4.8rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.stat-table .who {
+  vertical-align: middle;
+  overflow: hidden;
+}
+@media (max-width: 720px) {
+  .stat-table .num { width: 4.15rem; }
 }
 .people { display: grid; }
 .person {

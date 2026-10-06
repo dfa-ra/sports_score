@@ -10,6 +10,13 @@ import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
 import com.studentleague.statistics.service.StatisticsService;
+import com.studentleague.teams.domain.TeamMemberStatus;
+import com.studentleague.teams.entity.Team;
+import com.studentleague.teams.entity.TeamMember;
+import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.users.entity.User;
+import com.studentleague.users.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +28,10 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -39,10 +50,16 @@ class StatisticsServiceTest {
     com.studentleague.players.repository.PlayerProfileRepository playerProfileRepository;
 
     @Mock
-    com.studentleague.teams.repository.TeamRepository teamRepository;
+    TeamRepository teamRepository;
 
     @Mock
     MatchLineupPlayerRepository lineupPlayerRepository;
+
+    @Mock
+    TeamMemberRepository teamMemberRepository;
+
+    @Mock
+    UserRepository userRepository;
 
     @InjectMocks
     StatisticsService statisticsService;
@@ -133,6 +150,82 @@ class StatisticsServiceTest {
         assertThat(rows.getFirst().appearances()).isEqualTo(2);
     }
 
+    @Test
+    void scorerPayloadIncludesAvatarAndTeamCrestWhenTheyExist() {
+        UUID tournamentId = UUID.randomUUID();
+        UUID matchId = UUID.randomUUID();
+        UUID scorerId = UUID.randomUUID();
+        UUID plainId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        Match match = finished(matchId, tournamentId, teamId, UUID.randomUUID(), 2, 0);
+
+        MatchEvent goal = new MatchEvent();
+        goal.setMatchId(matchId);
+        goal.setEventType(MatchEventType.GOAL);
+        goal.setPlayerId(scorerId);
+        goal.setTeamId(teamId);
+
+        MatchEvent otherGoal = new MatchEvent();
+        otherGoal.setMatchId(matchId);
+        otherGoal.setEventType(MatchEventType.GOAL);
+        otherGoal.setPlayerId(plainId);
+
+        PlayerProfile scorer = named(scorerId, "Алексей", "Смирнов");
+        scorer.setAvatarUrl("/media/avatars/smirnov.png");
+        PlayerProfile plain = named(plainId, "Павел", "Безфото");
+        plain.setUserId(userId);
+        plain.setAvatarUrl("  ");
+
+        Team team = new Team();
+        team.setId(teamId);
+        team.setName("Кронбарсы");
+        team.setLogoUrl("/media/crests/kronbars.png");
+
+        TeamMember member = new TeamMember();
+        member.setPlayerId(scorerId);
+        member.setTeamId(teamId);
+        member.setStatus(TeamMemberStatus.ACTIVE);
+
+        User user = new User();
+        user.setId(userId);
+        user.setPhotoUrl("https://cdn.example/pavel.jpg");
+
+        when(matchRepository.findByTournamentId(tournamentId)).thenReturn(List.of(match));
+        when(matchEventRepository.findByMatchIdInAndVoidedFalse(any())).thenReturn(List.of(goal, otherGoal));
+        when(playerProfileRepository.findAllById(any())).thenReturn(List.of(scorer, plain));
+        when(teamMemberRepository.findByPlayerIdInAndStatus(any(), eq(TeamMemberStatus.ACTIVE))).thenReturn(List.of(member));
+        when(teamRepository.findAllById(any())).thenReturn(List.of(team));
+        when(userRepository.findAllById(any())).thenReturn(List.of(user));
+
+        List<PlayerStatisticsResponse> rows = statisticsService.scorers(tournamentId, 10);
+
+        PlayerStatisticsResponse withMedia = rows.stream()
+                .filter(row -> scorerId.equals(row.playerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(withMedia.avatarUrl()).isEqualTo("/media/avatars/smirnov.png");
+        assertThat(withMedia.teamId()).isEqualTo(teamId);
+        assertThat(withMedia.teamLogoUrl()).isEqualTo("/media/crests/kronbars.png");
+        assertThat(withMedia.lastName()).isEqualTo("Смирнов");
+        assertThat(withMedia.firstName()).isEqualTo("Алексей");
+
+        PlayerStatisticsResponse withoutTeam = rows.stream()
+                .filter(row -> plainId.equals(row.playerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(withoutTeam.avatarUrl()).isEqualTo("https://cdn.example/pavel.jpg");
+        assertThat(withoutTeam.teamId()).isNull();
+        assertThat(withoutTeam.teamLogoUrl()).isNull();
+
+        verify(playerProfileRepository, times(1)).findAllById(any());
+        verify(teamMemberRepository, times(1)).findByPlayerIdInAndStatus(any(), eq(TeamMemberStatus.ACTIVE));
+        verify(teamRepository, times(1)).findAllById(any());
+        verify(userRepository, times(1)).findAllById(any());
+        verify(userRepository, never()).findById(any());
+    }
+
     private static Match finished(UUID id, UUID tournamentId, UUID homeId, UUID awayId, int homeScore, int awayScore) {
         Match match = new Match();
         match.setId(id);
@@ -161,6 +254,15 @@ class StatisticsServiceTest {
         profile.setFirstName("Иван");
         profile.setLastName("Вратарёв");
         profile.setPosition(position);
+        return profile;
+    }
+
+    private static PlayerProfile named(UUID id, String firstName, String lastName) {
+        PlayerProfile profile = new PlayerProfile();
+        profile.setId(id);
+        profile.setFirstName(firstName);
+        profile.setLastName(lastName);
+        profile.setDisplayName(lastName + " " + firstName);
         return profile;
     }
 }

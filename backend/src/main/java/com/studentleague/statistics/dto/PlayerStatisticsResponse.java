@@ -13,6 +13,8 @@ public record PlayerStatisticsResponse(
         UUID teamId,
         long cleanSheets,
         String firstName,
-        String lastName
+        String lastName,
+        String avatarUrl,
+        String teamLogoUrl
 ) {
 }
