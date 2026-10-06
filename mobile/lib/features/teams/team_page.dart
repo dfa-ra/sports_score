@@ -7,7 +7,7 @@ import '../../core/models.dart';
 import '../../core/theme.dart';
 import '../../state/favorites_store.dart';
 import '../../state/league_store.dart';
-import '../../widgets/marks.dart';
+import '../../widgets/marks.dart' hide PlayerPhoto;
 import '../../widgets/match_row.dart';
 import '../../widgets/player_photo.dart';
 
@@ -183,7 +183,7 @@ class _SquadStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (rows.isEmpty) {
-      return const ListView(children: [EmptyHint(title: 'В составе никого нет')]);
+      return ListView(children: const [EmptyHint(title: 'В составе никого нет')]);
     }
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
