@@ -3,6 +3,7 @@ package com.studentleague.matches.service;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.PlayerOfTheMatchResponse;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.repository.MatchEventRepository;
@@ -74,8 +75,21 @@ public class MatchMapper {
                 sportCode,
                 match.getVenue(),
                 lastGoalScorer,
-                MatchListFields.minute(match, Instant.now())
+                MatchListFields.minute(match, Instant.now()),
+                playerOfTheMatch(match)
         );
+    }
+
+    private PlayerOfTheMatchResponse playerOfTheMatch(Match match) {
+        UUID playerId = match.getPlayerOfTheMatchId();
+        if (playerId == null) {
+            return null;
+        }
+        PlayerProfile profile = playerProfileRepository.findById(playerId).orElse(null);
+        if (profile == null) {
+            return new PlayerOfTheMatchResponse(playerId, null, null);
+        }
+        return new PlayerOfTheMatchResponse(playerId, profile.getFirstName(), profile.getLastName());
     }
 
     private String lastGoalScorer(UUID matchId) {

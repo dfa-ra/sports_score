@@ -25,6 +25,7 @@ public record MatchResponse(
         String sportCode,
         String venue,
         String lastGoalScorer,
-        Integer minute
+        Integer minute,
+        PlayerOfTheMatchResponse playerOfTheMatch
 ) {
 }

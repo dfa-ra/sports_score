@@ -80,5 +80,6 @@ class MatchMapperListFieldsTest {
         assertThat(response.lastGoalScorer()).isEqualTo("Соколова Анна");
         assertThat(response.minute()).isEqualTo(3);
         assertThat(response.homeScore()).isEqualTo(1);
+        assertThat(response.playerOfTheMatch()).isNull();
     }
 }
