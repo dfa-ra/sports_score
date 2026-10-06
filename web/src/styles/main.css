@@ -501,3 +501,80 @@ a.panel:hover {
   .table th, .table td { padding: 0.58rem 0.4rem; }
   .fs-tabs { margin-inline: 0; }
 }
+
+.score-pop {
+  display: inline-block;
+  transform-origin: center;
+}
+.score-pop.is-on { animation: score-pop 300ms var(--ease); }
+@keyframes score-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.goal-enter { animation: goal-enter 400ms var(--ease) both; }
+@keyframes goal-enter {
+  from { opacity: 0; transform: translateY(-0.8rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ice);
+  display: inline-block;
+  flex: 0 0 6px;
+  animation: live-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-dot-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.motm-enter { animation: motm-enter 400ms var(--ease) both; }
+@keyframes motm-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.star-glyph {
+  display: inline-block;
+  line-height: 1;
+  transform-origin: center;
+}
+.star-tap { animation: star-tap 200ms var(--ease); }
+@keyframes star-tap {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.tab-ink.slide {
+  transition: transform 250ms var(--ease), width 250ms var(--ease);
+}
+.tab-panel { animation: tab-fade 200ms var(--ease); }
+@keyframes tab-fade {
+  from { opacity: 0.62; }
+  to { opacity: 1; }
+}
+
+.crest-enter { animation: crest-enter 450ms var(--ease) both; }
+@keyframes crest-enter {
+  from { transform: scale(0.92); }
+  to { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .score-pop.is-on,
+  .goal-enter,
+  .live-dot,
+  .motm-enter,
+  .star-tap,
+  .tab-panel,
+  .crest-enter {
+    animation: none !important;
+  }
+  .tab-ink.slide { transition: none !important; }
+}

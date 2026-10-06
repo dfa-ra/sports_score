@@ -20,6 +20,7 @@ import SquadPlayerSelect from '../components/SquadPlayerSelect.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
+import ScorePop from '../components/ScorePop.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 
 const route = useRoute()
@@ -27,6 +28,9 @@ const router = useRouter()
 const auth = useAuthStore()
 const match = ref<any>(null)
 const events = ref<any[]>([])
+const enteringGoalIds = ref<Set<string>>(new Set())
+let knownGoalIds = new Set<string>()
+let goalMatchId = ''
 const referees = ref<any[]>([])
 const lineups = ref<any>(null)
 const homeForm = ref<any[]>([])
@@ -51,6 +55,8 @@ function crestForViewport() {
 }
 
 const crestSize = ref(crestForViewport())
+const homeStarTap = ref(0)
+const awayStarTap = ref(0)
 const tab = ref<'overview' | 'lineups' | 'protocol'>('overview')
 const connected = ref(false)
 const error = ref('')
@@ -167,6 +173,42 @@ function onScorerChange(eventId: string, playerId: string) {
 
 function applyCrest() {
   crestSize.value = crestForViewport()
+}
+
+watch(events, (list) => {
+  const matchId = String(match.value?.id || '')
+  if (!matchId) return
+  const ids = list
+    .filter((event) => !event?.voided && (event.eventType === 'GOAL' || event.eventType === 'OWN_GOAL'))
+    .map((event) => String(event.id))
+  if (goalMatchId !== matchId) {
+    goalMatchId = matchId
+    knownGoalIds = new Set(ids)
+    enteringGoalIds.value = new Set()
+    return
+  }
+  const fresh = ids.filter((id) => !knownGoalIds.has(id))
+  knownGoalIds = new Set(ids)
+  if (!fresh.length) return
+  const entering = new Set(enteringGoalIds.value)
+  for (const id of fresh) entering.add(id)
+  enteringGoalIds.value = entering
+  window.setTimeout(() => {
+    const next = new Set(enteringGoalIds.value)
+    for (const id of fresh) next.delete(id)
+    enteringGoalIds.value = next
+  }, 520)
+})
+
+function freshGoal(event: { id?: string | null; eventType?: string | null }) {
+  if (event.eventType !== 'GOAL' && event.eventType !== 'OWN_GOAL') return false
+  return enteringGoalIds.value.has(String(event.id))
+}
+
+function tapTeamStar(side: 'home' | 'away', teamId: string) {
+  fav.toggleTeam(teamId)
+  if (side === 'home') homeStarTap.value += 1
+  else awayStarTap.value += 1
 }
 
 watch(protocolPlayers, (players) => {
@@ -460,18 +502,18 @@ onUnmounted(() => {
           type="button"
           :class="{ on: fav.hasTeam(match.homeTeamId) }"
           :aria-label="teams.fullName(match.homeTeamId)"
-          @click="fav.toggleTeam(match.homeTeamId)"
-        >★</button>
+          @click="tapTeamStar('home', match.homeTeamId)"
+        ><span class="star-glyph" :key="homeStarTap" :class="{ 'star-tap': homeStarTap }">★</span></button>
         <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
-          <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="crestSize" />
+          <TeamCrest enter-once :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="crestSize" />
           <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
         </RouterLink>
       </div>
       <div class="center">
-        <p class="score">{{ match.homeScore }} - {{ match.awayScore }}</p>
-        <p v-if="playerOfTheMatchName" class="motm">
+        <p class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
+        <p v-if="playerOfTheMatchName" :key="match.playerOfTheMatch.playerId" class="motm motm-enter">
           <span>Игрок матча</span>
-          <RouterLink :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
+          <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
         </p>
         <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
           {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
@@ -482,18 +524,21 @@ onUnmounted(() => {
       </div>
       <div class="club away">
         <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
-          <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="crestSize" />
+          <TeamCrest enter-once :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="crestSize" />
           <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
         </RouterLink>
         <button
           class="star"
           type="button"
           :class="{ on: fav.hasTeam(match.awayTeamId) }"
-          @click="fav.toggleTeam(match.awayTeamId)"
-        >★</button>
+          @click="tapTeamStar('away', match.awayTeamId)"
+        ><span class="star-glyph" :key="awayStarTap" :class="{ 'star-tap': awayStarTap }">★</span></button>
       </div>
       <div class="under">
-        <p class="state">{{ matchStateLabel(match.status) }}</p>
+        <p class="state">
+          <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
+          {{ matchStateLabel(match.status) }}
+        </p>
         <MatchShareButton
           :home-name="teams.fullName(match.homeTeamId)"
           :away-name="teams.fullName(match.awayTeamId)"
@@ -643,7 +688,7 @@ onUnmounted(() => {
               v-for="ev in block.items"
               :key="ev.id"
               class="ev"
-              :class="ev.home ? 'home' : 'away'"
+              :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
             >
               <span class="who-ev">
                 <b>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
@@ -726,7 +771,7 @@ onUnmounted(() => {
       <h2>Протокол</h2>
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
-        <li v-for="ev in timeline" :key="ev.id">
+        <li v-for="ev in timeline" :key="ev.id" :class="{ 'goal-enter': freshGoal(ev) }">
           <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
@@ -849,13 +894,22 @@ onUnmounted(() => {
   padding: 0 0.2rem;
 }
 .when, .state, .clock-note { margin: 0; font-size: 0.78rem; color: var(--muted); }
-.state { text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; }
+.state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 800;
+}
 .score {
   margin: 0.15rem 0;
   font-size: clamp(2rem, 5.4vw, 2.75rem);
   font-weight: 800;
   line-height: 0.95;
   color: var(--navy);
+  white-space: nowrap;
 }
 .clock {
   margin: 0.2rem 0 0;
@@ -923,7 +977,7 @@ onUnmounted(() => {
   text-transform: uppercase;
   color: var(--muted);
 }
-.motm a {
+.motm-who {
   max-width: 12rem;
   overflow: hidden;
   text-overflow: ellipsis;

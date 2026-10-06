@@ -34,6 +34,13 @@ const playerId = ref('')
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
+const starTap = ref(0)
+
+function tapStar() {
+  if (!team.value?.id) return
+  fav.toggleTeam(team.value.id)
+  starTap.value += 1
+}
 
 const isCaptain = computed(() => me.value && team.value && me.value.id === team.value.captainId)
 const canManage = computed(() => !team.value?.disbanded && (auth.canManageLeague || isCaptain.value))
@@ -160,8 +167,8 @@ async function deleteTeam() {
         class="star"
         type="button"
         :class="{ on: fav.hasTeam(team.id) }"
-        @click="fav.toggleTeam(team.id)"
-      >★</button>
+        @click="tapStar"
+      ><span class="star-glyph" :key="starTap" :class="{ 'star-tap': starTap }">★</span></button>
     </div>
 
     <div class="fs-tabs">

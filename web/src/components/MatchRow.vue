@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { outcomeMark } from '../lib/format'
 import { matchOutcome } from '../lib/match'
 import KickoffWhen from './KickoffWhen.vue'
+import ScorePop from './ScorePop.vue'
 import { useFavorites } from '../stores/favorites'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -25,6 +26,12 @@ const venue = computed(() => {
   const raw = props.match?.venue
   return typeof raw === 'string' ? raw.trim() : ''
 })
+const starTap = ref(0)
+
+function tapStar() {
+  fav.toggleMatch(props.match.id)
+  starTap.value += 1
+}
 </script>
 
 <template>
@@ -34,10 +41,13 @@ const venue = computed(() => {
       type="button"
       :class="{ on: fav.hasMatch(match.id) }"
       :aria-label="fav.hasMatch(match.id) ? 'Убрать из избранного' : 'В избранное'"
-      @click.stop="fav.toggleMatch(match.id)"
-    >★</button>
+      @click.stop="tapStar"
+    ><span class="star-glyph" :key="starTap" :class="{ 'star-tap': starTap }">★</span></button>
     <RouterLink class="body" :to="`/matches/${match.id}`">
-      <KickoffWhen :at="match.scheduledAt" :status="match.status" :minute="match.minute" />
+      <span class="kick-slot">
+        <KickoffWhen :at="match.scheduledAt" :status="match.status" :minute="match.minute" />
+        <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
+      </span>
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
           <TeamCrest :src="homeLogo" :name="homeName" :size="28" />
@@ -51,8 +61,8 @@ const venue = computed(() => {
         <span v-if="isLive && match.lastGoalScorer" class="scorer">{{ match.lastGoalScorer }}</span>
       </span>
       <span class="nums">
-        <strong>{{ match.homeScore }}</strong>
-        <strong>{{ match.awayScore }}</strong>
+        <strong><ScorePop :value="match.homeScore" /></strong>
+        <strong><ScorePop :value="match.awayScore" /></strong>
       </span>
       <span v-if="outcome" class="mark" :class="outcome.toLowerCase()">{{ outcomeMark[outcome] }}</span>
     </RouterLink>
@@ -76,6 +86,16 @@ const venue = computed(() => {
   padding: 0;
 }
 .star.on { color: var(--ice); }
+.kick-slot {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.kick-slot .live-dot {
+  position: absolute;
+  left: 0;
+  bottom: 0.15rem;
+}
 .body {
   display: grid;
   grid-template-columns: 46px 1fr auto auto;

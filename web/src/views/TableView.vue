@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -35,6 +35,21 @@ const tab = computed<Tab>(() => {
   return 'table'
 })
 
+const tabBar = ref<HTMLElement | null>(null)
+const ink = ref({ x: 0, w: 0, slide: false })
+let inkObserver: ResizeObserver | null = null
+
+function placeInk(slide: boolean) {
+  const bar = tabBar.value
+  const btn = bar?.querySelector('button.on') as HTMLElement | null
+  if (!bar || !btn) return
+  ink.value = {
+    x: btn.offsetLeft,
+    w: btn.offsetWidth,
+    slide: slide && ink.value.w > 0,
+  }
+}
+
 const fullList = computed(() => String(route.query.list || '') === 'all')
 
 function shown(rows: any[], key: keyof typeof expanded.value) {
@@ -57,6 +72,15 @@ const results = computed(() =>
 )
 
 onMounted(async () => {
+  await nextTick()
+  placeInk(false)
+  requestAnimationFrame(() => {
+    if (ink.value.w > 0) ink.value = { ...ink.value, slide: true }
+  })
+  if (tabBar.value && typeof ResizeObserver !== 'undefined') {
+    inkObserver = new ResizeObserver(() => placeInk(true))
+    inkObserver.observe(tabBar.value)
+  }
   await teams.load()
   const [{ data }, games] = await Promise.all([
     api.get('/tournaments', { params: { size: 50 } }),
@@ -75,6 +99,13 @@ onMounted(async () => {
 })
 
 watch(tournamentId, load)
+
+watch(tab, async () => {
+  await nextTick()
+  placeInk(true)
+})
+
+onUnmounted(() => inkObserver?.disconnect())
 
 function setTab(next: Tab, list?: 'all') {
   expanded.value = { scorers: false, assists: false, keepers: false }
@@ -136,15 +167,21 @@ async function load() {
       </div>
     </div>
 
-    <div class="fs-tabs">
+    <div ref="tabBar" class="fs-tabs league-tabs">
       <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
       <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
       <button type="button" :class="{ on: tab === 'keepers' }" @click="setTab('keepers')">Вратари</button>
       <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
+      <span
+        class="tab-ink"
+        :class="{ slide: ink.slide, ready: ink.w > 0 }"
+        :style="{ transform: `translateX(${ink.x}px)`, width: `${ink.w}px` }"
+      />
     </div>
 
+    <div :key="tab" class="tab-panel">
     <div v-if="loading" class="skeleton" />
 
     <template v-else-if="tab === 'table'">
@@ -263,11 +300,25 @@ async function load() {
         </div>
       </div>
     </template>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .page { gap: 0.45rem; }
+.league-tabs { position: relative; }
+.league-tabs button,
+.league-tabs button.on { border-bottom-color: transparent; }
+.tab-ink {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--ice);
+  pointer-events: none;
+  opacity: 0;
+}
+.tab-ink.ready { opacity: 1; }
 .league {
   display: grid;
   grid-template-columns: 56px 1fr;

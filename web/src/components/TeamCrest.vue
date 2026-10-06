@@ -7,8 +7,9 @@ const props = withDefaults(
     src?: string | null
     name?: string | null
     size?: number
+    enterOnce?: boolean
   }>(),
-  { size: 22 },
+  { size: 22, enterOnce: false },
 )
 
 const broken = ref(false)
@@ -30,6 +31,7 @@ const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
   <img
     v-if="showImage"
     class="team-crest"
+    :class="{ 'crest-enter': enterOnce }"
     :src="src!"
     :alt="name || 'Эмблема'"
     :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, padding: `${inset}px` }"
@@ -38,6 +40,7 @@ const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
   <span
     v-else
     class="team-crest team-crest--fallback"
+    :class="{ 'crest-enter': enterOnce }"
     :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, fontSize: `${Math.max(8, size * 0.38)}px` }"
     aria-hidden="true"
   >{{ label }}</span>
