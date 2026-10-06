@@ -1,5 +1,6 @@
 package com.studentleague.statistics.service;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
@@ -45,6 +46,7 @@ public class StatisticsService {
     private final MatchLineupPlayerRepository lineupPlayerRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final UserRepository userRepository;
+    private final StandingsBoardCache standingsBoardCache;
 
     public StatisticsService(
             MatchEventRepository matchEventRepository,
@@ -54,7 +56,8 @@ public class StatisticsService {
             TeamRepository teamRepository,
             MatchLineupPlayerRepository lineupPlayerRepository,
             TeamMemberRepository teamMemberRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            StandingsBoardCache standingsBoardCache
     ) {
         this.matchEventRepository = matchEventRepository;
         this.matchRepository = matchRepository;
@@ -64,6 +67,7 @@ public class StatisticsService {
         this.lineupPlayerRepository = lineupPlayerRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.userRepository = userRepository;
+        this.standingsBoardCache = standingsBoardCache;
     }
 
     @Transactional(readOnly = true)
@@ -169,12 +173,14 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public StatisticsBoardResponse board(UUID tournamentId, int limit) {
-        List<PlayerStatisticsResponse> stats = playerStatistics(tournamentId, null, null, null);
-        return new StatisticsBoardResponse(
-                top(stats, Comparator.comparingLong(PlayerStatisticsResponse::goals), limit),
-                top(stats, Comparator.comparingLong(PlayerStatisticsResponse::assists), limit),
-                rankKeepers(keeperCounts(tournamentId), stats, limit)
-        );
+        return standingsBoardCache.board(tournamentId, limit, () -> {
+            List<PlayerStatisticsResponse> stats = playerStatistics(tournamentId, null, null, null);
+            return new StatisticsBoardResponse(
+                    top(stats, Comparator.comparingLong(PlayerStatisticsResponse::goals), limit),
+                    top(stats, Comparator.comparingLong(PlayerStatisticsResponse::assists), limit),
+                    rankKeepers(keeperCounts(tournamentId), stats, limit)
+            );
+        });
     }
 
     @Transactional(readOnly = true)

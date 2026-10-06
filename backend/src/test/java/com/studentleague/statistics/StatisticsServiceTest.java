@@ -1,5 +1,6 @@
 package com.studentleague.statistics;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,6 +63,9 @@ class StatisticsServiceTest {
 
     @Mock
     UserRepository userRepository;
+
+    @Spy
+    StandingsBoardCache standingsBoardCache = new StandingsBoardCache();
 
     @InjectMocks
     StatisticsService statisticsService;
@@ -101,6 +107,26 @@ class StatisticsServiceTest {
         assertThat(stats.getFirst().goals()).isEqualTo(1);
         assertThat(stats.getFirst().assists()).isEqualTo(1);
         assertThat(stats.getFirst().appearances()).isEqualTo(1);
+    }
+
+    @Test
+    void boardIsServedFromCacheUntilTheTournamentIsInvalidated() {
+        UUID tournamentId = UUID.randomUUID();
+        when(matchRepository.findByTournamentId(tournamentId)).thenReturn(List.of());
+        when(playerProfileRepository.findAllById(any())).thenReturn(List.of());
+
+        statisticsService.board(tournamentId, 20);
+        clearInvocations(matchRepository);
+        statisticsService.board(tournamentId, 20);
+        verify(matchRepository, never()).findByTournamentId(any());
+
+        standingsBoardCache.invalidateTournament(tournamentId);
+        statisticsService.board(tournamentId, 20);
+        verify(matchRepository, times(2)).findByTournamentId(tournamentId);
+
+        clearInvocations(matchRepository);
+        statisticsService.board(tournamentId, 5);
+        verify(matchRepository, times(2)).findByTournamentId(tournamentId);
     }
 
     @Test

@@ -44,6 +44,7 @@ public class LocalDiskStorageService implements StorageService {
             Files.createDirectories(dir);
             Path target = dir.resolve(filename);
             Files.write(target, file.getBytes());
+            ImageVariants.writeForFolder(target, sanitize(folder));
             return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
         } catch (IOException e) {
             throw ApiException.badRequest("Failed to store uploaded file");

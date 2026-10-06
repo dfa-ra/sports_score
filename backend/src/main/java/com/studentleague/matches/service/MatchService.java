@@ -1,5 +1,6 @@
 package com.studentleague.matches.service;
 
+import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
@@ -48,6 +49,7 @@ public class MatchService {
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
     private final RoleService roleService;
+    private final StandingsBoardCache standingsBoardCache;
 
     public MatchService(
             MatchRepository matchRepository,
@@ -60,7 +62,8 @@ public class MatchService {
             UserRepository userRepository,
             NotificationService notificationService,
             MatchMapper matchMapper,
-            RoleService roleService
+            RoleService roleService,
+            StandingsBoardCache standingsBoardCache
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -73,6 +76,7 @@ public class MatchService {
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
         this.roleService = roleService;
+        this.standingsBoardCache = standingsBoardCache;
     }
 
     @Transactional
@@ -123,12 +127,14 @@ public class MatchService {
     @Transactional
     public void delete(UUID id) {
         Match match = requireMatch(id);
+        UUID tournamentId = match.getTournamentId();
         matchEventRepository.deleteByMatchId(id);
         matchLineupPlayerRepository.deleteByMatchId(id);
         matchRefereeRepository.deleteByMatchId(id);
         matchAvailabilityRepository.deleteByMatchId(id);
         matchRepository.flush();
         matchRepository.delete(match);
+        standingsBoardCache.invalidateTournament(tournamentId);
     }
 
     @Transactional
