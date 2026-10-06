@@ -7,6 +7,7 @@ const props = withDefaults(
     src?: string | null
     name?: string | null
     size?: number
+    /** Accepted so older call sites compile. The photo is always a plain circle. */
     tile?: boolean
   }>(),
   { size: 56, tile: false },
@@ -22,45 +23,51 @@ watch(
 
 const showImage = computed(() => Boolean(props.src) && !broken.value)
 const label = computed(() => initials(props.name || ''))
+// Older screens pass `tile` for a rounded square. Player photos stay a circle.
+void props.tile
 </script>
 
 <template>
-  <img
-    v-if="showImage"
-    class="player-avatar"
-    :class="{ tile }"
-    :src="src!"
-    :alt="name || 'Фото игрока'"
-    :style="{ width: `${size}px`, height: `${size}px` }"
-    @error="broken = true"
-  />
   <span
-    v-else
-    class="player-avatar player-avatar--fallback"
-    :class="{ tile }"
+    class="player-avatar"
+    :class="{ 'player-avatar--fallback': !showImage }"
     :style="{ width: `${size}px`, height: `${size}px` }"
-    aria-hidden="true"
-  >{{ label }}</span>
+  >
+    <img
+      v-if="showImage"
+      :src="src!"
+      :alt="name || 'Фото игрока'"
+      @error="broken = true"
+    />
+    <span v-else aria-hidden="true">{{ label }}</span>
+  </span>
 </template>
 
 <style scoped>
 .player-avatar {
-  display: block;
-  flex: 0 0 auto;
-  box-sizing: border-box;
-  border-radius: 999px;
-  overflow: hidden;
-  /* Player photos fill the circle and crop at the edge. Team crests stay contain. */
-  object-fit: cover;
-  object-position: center;
-  background: var(--surface, #fff);
-}
-.player-avatar.tile {
-  border-radius: 12px;
-}
-.player-avatar--fallback {
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: transparent;
+  box-shadow: none;
+  line-height: 1;
+}
+.player-avatar img {
+  width: 0;
+  height: 0;
+  min-width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  border: 0;
+}
+.player-avatar--fallback {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 800;

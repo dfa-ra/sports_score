@@ -58,7 +58,6 @@ class PlayerPhoto extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasImage = photoUrl != null && photoUrl!.isNotEmpty;
-    final inset = hasImage ? math.max(2.0, (size * 0.1465).ceilToDouble()) : 0.0;
     final fallback = Text(
       initials(name),
       style: TextStyle(fontSize: size * 0.32, fontWeight: FontWeight.w800, color: AppColors.navy),
@@ -67,16 +66,16 @@ class PlayerPhoto extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        padding: EdgeInsets.all(inset),
-        color: hasImage ? AppColors.surface : const Color(0x294CB4E5),
+        color: hasImage ? Colors.transparent : const Color(0x294CB4E5),
         alignment: Alignment.center,
         child: !hasImage
             ? fallback
             : Image.network(
                 photoUrl!,
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.contain,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
                 filterQuality: FilterQuality.medium,
                 errorBuilder: (_, __, ___) => fallback,
               ),

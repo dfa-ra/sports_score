@@ -39,9 +39,6 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
 .stat-player :deep(.team-crest) {
   flex: 0 0 auto;
 }
-.stat-player :deep(.player-avatar) {
-  border: 1px solid rgba(0, 32, 91, 0.12);
-}
 .name {
   flex: 0 1 auto;
   min-width: 0;

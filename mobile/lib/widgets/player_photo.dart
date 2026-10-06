@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../core/format.dart';
@@ -17,13 +15,15 @@ class PlayerPhoto extends StatelessWidget {
   final String? url;
   final String name;
   final double size;
+
+  /// Accepted so older call sites compile. The photo is always a plain circle.
   final bool tile;
 
   @override
   Widget build(BuildContext context) {
-    final radius = tile ? BorderRadius.circular(size < 40 ? 8 : 12) : null;
+    // `tile` used to draw a rounded square. The photo is always a plain circle.
+    assert(tile == true || tile == false);
     final hasImage = url != null && url!.isNotEmpty;
-    final inset = hasImage ? (tile ? (size < 40 ? 3.0 : 4.0) : math.max(2.0, (size * 0.1465).ceilToDouble())) : 0.0;
     final fallback = Text(
       initials(name),
       style: TextStyle(
@@ -32,26 +32,24 @@ class PlayerPhoto extends StatelessWidget {
         fontSize: size * 0.32,
       ),
     );
-    return Container(
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(inset),
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: hasImage ? AppColors.surface : const Color(0x294CB4E5),
-        shape: tile ? BoxShape.rectangle : BoxShape.circle,
-        borderRadius: radius,
+    return ClipOval(
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        color: hasImage ? Colors.transparent : const Color(0x294CB4E5),
+        child: !hasImage
+            ? fallback
+            : Image.network(
+                url!,
+                fit: BoxFit.cover,
+                alignment: Alignment.center,
+                width: size,
+                height: size,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) => fallback,
+              ),
       ),
-      child: !hasImage
-          ? fallback
-          : Image.network(
-              url!,
-              fit: BoxFit.contain,
-              width: double.infinity,
-              height: double.infinity,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => fallback,
-            ),
     );
   }
 }
