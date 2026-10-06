@@ -22,6 +22,7 @@ import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
 import ScorePop from '../components/ScorePop.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import MatchAnalystStats from '../components/MatchAnalystStats.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -549,6 +550,8 @@ onUnmounted(() => {
     </div>
 
     <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
+
+    <MatchAnalystStats :match-id="String(match.id)" />
 
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>

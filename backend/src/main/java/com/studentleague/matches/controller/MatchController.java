@@ -2,6 +2,7 @@ package com.studentleague.matches.controller;
 
 import com.studentleague.common.dto.PageResponse;
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.dto.AnalystStatsResponse;
 import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
 import com.studentleague.matches.dto.FutsalBoardResponse;
@@ -12,6 +13,7 @@ import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.SetMatchLineupRequest;
 import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.futsal.FutsalBoardService;
+import com.studentleague.matches.service.AnalystStatsService;
 import com.studentleague.matches.service.MatchLineupService;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.matches.service.RefereeMatchService;
@@ -23,7 +25,9 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,17 +54,20 @@ public class MatchController {
     private final RefereeMatchService refereeMatchService;
     private final MatchLineupService matchLineupService;
     private final FutsalBoardService futsalBoardService;
+    private final AnalystStatsService analystStatsService;
 
     public MatchController(
             MatchService matchService,
             RefereeMatchService refereeMatchService,
             MatchLineupService matchLineupService,
-            FutsalBoardService futsalBoardService
+            FutsalBoardService futsalBoardService,
+            AnalystStatsService analystStatsService
     ) {
         this.matchService = matchService;
         this.refereeMatchService = refereeMatchService;
         this.matchLineupService = matchLineupService;
         this.futsalBoardService = futsalBoardService;
+        this.analystStatsService = analystStatsService;
     }
 
     @GetMapping
@@ -129,6 +136,14 @@ public class MatchController {
     @Operation(summary = "Futsal board: team fouls, timeout and short-handed state")
     public FutsalBoardResponse futsal(@PathVariable UUID id) {
         return futsalBoardService.forMatch(id);
+    }
+
+    @GetMapping("/{id}/analyst-stats")
+    @Operation(summary = "Team stats recorded by the analyst. Not cached with standings.")
+    public ResponseEntity<AnalystStatsResponse> analystStats(@PathVariable UUID id) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(analystStatsService.get(id));
     }
 
     @GetMapping("/{id}/lineups")

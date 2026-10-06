@@ -189,6 +189,7 @@ public class RoleService {
             case REFEREE -> 80;
             case CAPTAIN -> 60;
             case PLAYER -> 40;
+            case ANALYST -> 15;
             case FAN -> 10;
         };
     }

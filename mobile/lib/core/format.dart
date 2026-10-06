@@ -3,6 +3,7 @@ const roleLabels = {
   'PLAYER': 'Игрок',
   'CAPTAIN': 'Капитан',
   'REFEREE': 'Судья',
+  'ANALYST': 'Аналитик',
   'ADMIN': 'Админ',
 };
 

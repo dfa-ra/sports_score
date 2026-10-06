@@ -5,5 +5,6 @@ public enum Role {
     PLAYER,
     CAPTAIN,
     REFEREE,
+    ANALYST,
     ADMIN
 }

@@ -18,6 +18,7 @@ const ASSIGNABLE_ROLES = [
   { id: 'PLAYER', label: 'Игрок' },
   { id: 'CAPTAIN', label: 'Капитан' },
   { id: 'REFEREE', label: 'Судья' },
+  { id: 'ANALYST', label: 'Аналитик' },
 ] as const
 
 const users = ref<any[]>([])

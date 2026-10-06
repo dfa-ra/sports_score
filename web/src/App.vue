@@ -15,7 +15,7 @@ const router = useRouter()
 
 const mood = computed(() => {
   if (route.path.startsWith('/login') || route.path.startsWith('/register')) return 'mood-auth'
-  if (route.path.startsWith('/referee')) return 'mood-ref'
+  if (route.path.startsWith('/referee') || route.path.startsWith('/analyst')) return 'mood-ref'
   if (route.path.startsWith('/admin')) return 'mood-admin'
   if (route.path.startsWith('/matches')) return 'mood-pitch'
   return 'mood-home'
@@ -26,6 +26,7 @@ const hideDock = computed(() =>
   || route.path.startsWith('/register')
   || route.path.startsWith('/admin')
   || route.path.startsWith('/referee')
+  || route.path.startsWith('/analyst')
 )
 
 watch(mood, (value) => {
@@ -61,6 +62,7 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
             <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
             <RouterLink v-if="auth.canOfficiate" to="/referee" active-class="on">Судья</RouterLink>
+            <RouterLink v-if="auth.canAnalyze" to="/analyst" active-class="on">Аналитик</RouterLink>
           </nav>
 
           <div class="auth">

@@ -61,6 +61,7 @@ export const roleLabel: Record<string, string> = {
   PLAYER: 'Игрок',
   CAPTAIN: 'Капитан',
   REFEREE: 'Судья',
+  ANALYST: 'Аналитик',
   ADMIN: 'Админ',
 }
 

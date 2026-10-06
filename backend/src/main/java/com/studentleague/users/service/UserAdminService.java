@@ -26,7 +26,7 @@ import java.util.UUID;
 public class UserAdminService {
 
     private static final EnumSet<Role> ASSIGNABLE = EnumSet.of(
-            Role.FAN, Role.PLAYER, Role.CAPTAIN, Role.REFEREE
+            Role.FAN, Role.PLAYER, Role.CAPTAIN, Role.REFEREE, Role.ANALYST
     );
 
     private final UserRepository userRepository;

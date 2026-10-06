@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
 
-export type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE' | 'ADMIN'
+export type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE' | 'ANALYST' | 'ADMIN'
 
 export interface RoleAssignment {
   role: Role
@@ -149,6 +149,7 @@ export const useAuthStore = defineStore('auth', () => {
   const canManageLeague = computed(() => hasRole('ADMIN'))
   const canManageTeam = computed(() => hasRole('CAPTAIN') || hasRole('ADMIN'))
   const canOfficiate = computed(() => hasRole('REFEREE') || hasRole('ADMIN'))
+  const canAnalyze = computed(() => hasRole('ANALYST') || hasRole('ADMIN'))
   const canAccessMyTeam = computed(() =>
     isAuthenticated.value
     && (hasRole('PLAYER') || hasRole('CAPTAIN') || hasRole('ADMIN') || hasRole('REFEREE'))
@@ -165,6 +166,7 @@ export const useAuthStore = defineStore('auth', () => {
     canManageLeague,
     canManageTeam,
     canOfficiate,
+    canAnalyze,
     canAccessMyTeam,
     register,
     login,
