@@ -257,7 +257,7 @@ async function deleteTeam() {
             <tr v-for="row in stats" :key="row.playerId">
               <td>
                 <div class="who">
-                  <PlayerAvatar :src="row.photoUrl" :name="registeredName(row)" :size="36" />
+                  <PlayerAvatar :src="row.photoUrl" :name="registeredName(row)" :size="40" />
                   <RouterLink :to="`/players/${row.playerId}`">{{ registeredName(row) }}</RouterLink>
                   <span v-if="row.playerId === team.captainId" class="captain-badge">Капитан</span>
                 </div>

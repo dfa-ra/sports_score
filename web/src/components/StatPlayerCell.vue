@@ -18,7 +18,7 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
 
 <template>
   <RouterLink class="stat-player" :to="`/players/${player.playerId}`">
-    <PlayerAvatar :src="player.avatarUrl" :name="label" :size="28" />
+    <PlayerAvatar :src="player.avatarUrl" :name="label" :size="40" />
     <span class="name">{{ label }}</span>
     <TeamCrest v-if="player.teamLogoUrl" :src="player.teamLogoUrl" name="" :size="18" />
   </RouterLink>
