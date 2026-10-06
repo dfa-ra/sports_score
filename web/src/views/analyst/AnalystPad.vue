@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { Client, type IMessage } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 import api from '../../api/client'
 import { apiError } from '../../lib/errors'
+import { formatClock, periodLabel } from '../../lib/format'
+import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import { useAuthStore } from '../../stores/auth'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -30,7 +34,28 @@ const stats = ref<any>(null)
 const assignment = ref<any>(null)
 const error = ref('')
 const pending = ref(false)
+const { remaining, cap } = useMatchClock(match)
 let timer = 0
+let matchTimer = 0
+let client: Client | null = null
+
+const clockRunning = computed(() => match.value?.status === 'LIVE' || match.value?.status === 'PAUSED')
+const clockFinished = computed(() => match.value?.status === 'FINISHED')
+const clockSeconds = computed(() => {
+  if (clockFinished.value) return 0
+  if (!clockRunning.value) return cap.value
+  return remaining.value
+})
+const clockCaption = computed(() => {
+  if (clockFinished.value || !match.value) return ''
+  if (!clockRunning.value) return 'Не начался'
+  return periodLabel(match.value.period, match.value.sportCode, match.value.periodCount)
+})
+const clockText = computed(() => {
+  const [minutes, seconds] = formatClock(clockSeconds.value).split(':')
+  return `${(minutes || '0').padStart(2, '0')}:${seconds || '00'}`
+})
+let clockStamp = 0
 
 const homeLabel = computed(() => teams.fullName(match.value?.homeTeamId, 'Хозяева'))
 const awayLabel = computed(() => teams.fullName(match.value?.awayTeamId, 'Гости'))
@@ -81,6 +106,52 @@ async function reload() {
   assignment.value = a.data
 }
 
+function applyLiveClock(live: any) {
+  if (!match.value || !live) return
+  clockStamp = Date.now()
+  match.value = {
+    ...match.value,
+    status: live.status ?? match.value.status,
+    homeScore: live.homeScore ?? match.value.homeScore,
+    awayScore: live.awayScore ?? match.value.awayScore,
+    gameTimeSeconds: live.gameTimeSeconds ?? match.value.gameTimeSeconds,
+    period: live.period ?? match.value.period,
+    periodCount: live.periodCount ?? match.value.periodCount,
+    periodLengthSeconds: live.periodLengthSeconds ?? match.value.periodLengthSeconds,
+    clockRunningSince: live.clockRunningSince ?? null,
+    sportCode: live.sportCode ?? match.value.sportCode,
+  }
+}
+
+async function refreshMatch() {
+  const started = Date.now()
+  try {
+    const { data } = await api.get(`/matches/${route.params.id}`)
+    if (started < clockStamp) return
+    match.value = data
+  } catch {
+    /* the socket or the next poll will catch up */
+  }
+}
+
+function connectClock() {
+  client = new Client({
+    webSocketFactory: () => new SockJS('/ws') as any,
+    connectHeaders: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {},
+    reconnectDelay: 4000,
+    onConnect: () => {
+      client?.subscribe(`/topic/matches/${route.params.id}`, (message: IMessage) => {
+        try {
+          applyLiveClock(JSON.parse(message.body))
+        } catch {
+          /* ignore a bad frame */
+        }
+      })
+    },
+  })
+  client.activate()
+}
+
 async function bump(side: 'home' | 'away', stat: StatId, undo = false) {
   const id = teamId(side)
   if (!id) return
@@ -114,6 +185,8 @@ onMounted(() => {
   reload().catch((e) => {
     error.value = apiError(e, 'Матч не открылся')
   })
+  connectClock()
+  matchTimer = window.setInterval(refreshMatch, 4000)
   timer = window.setInterval(() => {
     if (possessionSide.value === 'HOME' || possessionSide.value === 'AWAY') {
       api.get(`/matches/${route.params.id}/analyst-stats`).then(({ data }) => {
@@ -123,7 +196,11 @@ onMounted(() => {
   }, 1000)
 })
 
-onUnmounted(() => window.clearInterval(timer))
+onUnmounted(() => {
+  window.clearInterval(timer)
+  window.clearInterval(matchTimer)
+  client?.deactivate()
+})
 </script>
 
 <template>
@@ -134,6 +211,8 @@ onUnmounted(() => window.clearInterval(timer))
     </div>
 
     <div class="panel scoreboard">
+      <div class="clock">{{ clockText }}</div>
+      <p v-if="clockCaption" class="clock-caption">{{ clockCaption }}</p>
       <StatusBadge :status="match.status" />
       <p v-if="closed" class="closed">Матч уже завершён</p>
       <p v-else-if="!coverage" class="closed">Вы не назначены на этот матч</p>
@@ -243,6 +322,19 @@ onUnmounted(() => window.clearInterval(timer))
   font-size: 0.85rem;
 }
 .scoreboard { display: grid; gap: 0.45rem; justify-items: center; text-align: center; border-radius: 26px 18px 22px 16px; }
+.clock {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 9vw, 4rem);
+  font-variant-numeric: tabular-nums;
+  color: var(--navy);
+  line-height: 1;
+}
+.clock-caption {
+  margin: 0;
+  color: var(--navy);
+  font-weight: 800;
+  font-size: 0.95rem;
+}
 .sides {
   width: 100%;
   display: grid;
