@@ -47,6 +47,16 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     @Query("""
             select m from Match m
+            where (m.homeTeamId = :teamId or m.awayTeamId = :teamId)
+              and m.status = :status
+            """)
+    List<Match> findByTeamIdAndStatus(
+            @Param("teamId") UUID teamId,
+            @Param("status") MatchStatus status
+    );
+
+    @Query("""
+            select m from Match m
             where m.homeTeamId = :teamId or m.awayTeamId = :teamId
             """)
     Page<Match> findByTeamId(@Param("teamId") UUID teamId, Pageable pageable);

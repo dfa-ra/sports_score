@@ -201,6 +201,14 @@ class LeagueStore extends ChangeNotifier {
     return null;
   }
 
+  Future<List<SquadPlayerStat>> teamPlayerStats(String teamId) async {
+    final data = await api.get('/teams/$teamId/player-stats');
+    return ((data as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => SquadPlayerStat.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
   Future<List<TeamMember>> teamMembers(String teamId) async {
     final data = await api.get('/teams/$teamId/members');
     return ((data as List?) ?? const [])
