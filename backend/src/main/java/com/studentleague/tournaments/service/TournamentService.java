@@ -222,6 +222,7 @@ public class TournamentService {
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
+        standingsBoardCache.invalidateTournament(tournamentId);
         String name = teamRepository.findById(teamId).map(Team::getName).orElse(null);
         return toTeamResponse(entry, name);
     }
@@ -334,6 +335,7 @@ public class TournamentService {
             }
         }
         tournamentTeamRepository.saveAll(entries);
+        standingsBoardCache.invalidateTournament(tournamentId);
         return created.stream().map(table -> toTableResponse(table, entries)).toList();
     }
 
