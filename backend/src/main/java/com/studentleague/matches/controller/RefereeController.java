@@ -1,8 +1,12 @@
 package com.studentleague.matches.controller;
 
+import com.studentleague.matches.dto.AnalystAssignmentResponse;
+import com.studentleague.matches.dto.AnalystPersonResponse;
+import com.studentleague.matches.dto.AssignAnalystsRequest;
 import com.studentleague.matches.dto.CreateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.service.AnalystAssignmentService;
 import com.studentleague.matches.service.RefereeMatchService;
 import com.studentleague.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,11 +16,14 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,9 +38,37 @@ import java.util.UUID;
 public class RefereeController {
 
     private final RefereeMatchService refereeMatchService;
+    private final AnalystAssignmentService analystAssignmentService;
 
-    public RefereeController(RefereeMatchService refereeMatchService) {
+    public RefereeController(
+            RefereeMatchService refereeMatchService,
+            AnalystAssignmentService analystAssignmentService
+    ) {
         this.refereeMatchService = refereeMatchService;
+        this.analystAssignmentService = analystAssignmentService;
+    }
+
+    @GetMapping("/analysts")
+    @Operation(summary = "Search users who already have the analyst role")
+    public List<AnalystPersonResponse> analysts(@RequestParam(defaultValue = "") String q) {
+        return analystAssignmentService.search(q);
+    }
+
+    @PutMapping("/matches/{id}/analysts")
+    @Operation(summary = "Assign analysts to this match (match referee or admin)")
+    public AnalystAssignmentResponse assignAnalysts(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody AssignAnalystsRequest request
+    ) {
+        return analystAssignmentService.assign(principal, id, request);
+    }
+
+    @DeleteMapping("/matches/{id}/analysts")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Clear analyst assignment (match referee or admin)")
+    public void clearAnalysts(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        analystAssignmentService.clear(principal, id);
     }
 
     @GetMapping("/matches")

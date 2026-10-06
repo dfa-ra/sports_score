@@ -11,6 +11,7 @@ import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchReferee;
+import com.studentleague.matches.repository.MatchAnalystAssignmentRepository;
 import com.studentleague.matches.repository.MatchAnalystStatsRepository;
 import com.studentleague.matches.repository.MatchAvailabilityRepository;
 import com.studentleague.matches.repository.MatchEventRepository;
@@ -45,6 +46,7 @@ public class MatchService {
     private final MatchLineupPlayerRepository matchLineupPlayerRepository;
     private final MatchAvailabilityRepository matchAvailabilityRepository;
     private final MatchAnalystStatsRepository matchAnalystStatsRepository;
+    private final MatchAnalystAssignmentRepository matchAnalystAssignmentRepository;
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
     private final UserRepository userRepository;
@@ -60,6 +62,7 @@ public class MatchService {
             MatchLineupPlayerRepository matchLineupPlayerRepository,
             MatchAvailabilityRepository matchAvailabilityRepository,
             MatchAnalystStatsRepository matchAnalystStatsRepository,
+            MatchAnalystAssignmentRepository matchAnalystAssignmentRepository,
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             UserRepository userRepository,
@@ -74,6 +77,7 @@ public class MatchService {
         this.matchLineupPlayerRepository = matchLineupPlayerRepository;
         this.matchAvailabilityRepository = matchAvailabilityRepository;
         this.matchAnalystStatsRepository = matchAnalystStatsRepository;
+        this.matchAnalystAssignmentRepository = matchAnalystAssignmentRepository;
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.userRepository = userRepository;
@@ -137,6 +141,7 @@ public class MatchService {
         matchRefereeRepository.deleteByMatchId(id);
         matchAvailabilityRepository.deleteByMatchId(id);
         matchAnalystStatsRepository.deleteByMatchId(id);
+        matchAnalystAssignmentRepository.deleteByMatchId(id);
         matchRepository.flush();
         matchRepository.delete(match);
         standingsBoardCache.invalidateTournament(tournamentId);

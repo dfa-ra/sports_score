@@ -1,8 +1,10 @@
 package com.studentleague.matches.controller;
 
 import com.studentleague.matches.dto.AdjustAnalystStatRequest;
+import com.studentleague.matches.dto.AnalystDutyResponse;
 import com.studentleague.matches.dto.AnalystStatsResponse;
 import com.studentleague.matches.dto.SetPossessionRequest;
+import com.studentleague.matches.service.AnalystAssignmentService;
 import com.studentleague.matches.service.AnalystStatsService;
 import com.studentleague.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,12 +13,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,9 +31,20 @@ import java.util.UUID;
 public class AnalystController {
 
     private final AnalystStatsService analystStatsService;
+    private final AnalystAssignmentService analystAssignmentService;
 
-    public AnalystController(AnalystStatsService analystStatsService) {
+    public AnalystController(
+            AnalystStatsService analystStatsService,
+            AnalystAssignmentService analystAssignmentService
+    ) {
         this.analystStatsService = analystStatsService;
+        this.analystAssignmentService = analystAssignmentService;
+    }
+
+    @GetMapping("/matches")
+    @Operation(summary = "Matches this analyst is assigned to, or the current tournament for an admin")
+    public List<AnalystDutyResponse> matches(@AuthenticationPrincipal UserPrincipal principal) {
+        return analystAssignmentService.duties(principal);
     }
 
     @PostMapping("/matches/{id}/stats")
