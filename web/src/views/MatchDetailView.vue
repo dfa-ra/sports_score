@@ -47,10 +47,7 @@ const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
 const motmPlayerId = ref('')
 function crestForViewport() {
-  const width = window.innerWidth
-  if (width <= 370) return 44
-  if (width <= 719) return 48
-  return 60
+  return window.innerWidth <= 719 ? 72 : 96
 }
 
 const crestSize = ref(crestForViewport())
@@ -762,19 +759,19 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 .board {
-  --crest: 60px;
+  --crest: 96px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   grid-template-areas:
     "when when when"
     "home score away"
     "under under under";
-  gap: 0.35rem 0.85rem;
+  gap: 0.4rem 0.85rem;
   align-items: center;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 0.85rem 0.85rem 0.95rem;
+  padding: 1rem 0.9rem 1.05rem;
 }
 .when { grid-area: when; text-align: center; }
 .under {
@@ -819,12 +816,15 @@ onUnmounted(() => {
 .who strong {
   flex: 1 1 auto;
   min-width: 0;
-  color: var(--navy);
-  font-size: 1.2rem;
+  max-width: 100%;
+  color: #00205B;
+  font-size: 22px;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: start;
   overflow-wrap: break-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -968,35 +968,54 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
   .board {
-    --crest: 48px;
-    padding: 0.55rem 0.45rem 0.75rem;
-    gap: 0.25rem 0.4rem;
+    --crest: 72px;
+    align-items: start;
+    padding: 0.7rem 0.28rem 0.8rem;
+    gap: 0.35rem 0.28rem;
   }
   .club {
     position: relative;
-    gap: 0;
-    padding-top: 0.85rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding-top: 0.95rem;
   }
+  .club.away { align-items: flex-end; }
   .star {
     position: absolute;
     top: 0;
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     line-height: 1;
   }
   .club .star { left: 0; }
   .club.away .star { left: auto; right: 0; }
-  .who { width: 100%; gap: 0.4rem; }
-  .who strong { font-size: 0.92rem; }
+  .who {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    gap: 0.35rem;
+  }
+  .club.away .who {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .who strong { width: 100%; text-align: start; }
+  .club.away .who strong { text-align: end; }
+  .center {
+    align-self: start;
+    min-width: 0;
+    margin-top: calc(0.95rem + (var(--crest) - 2rem) / 2);
+    padding: 0;
+  }
   .lineups { grid-template-columns: 1fr; }
 }
 @media (max-width: 370px) {
   .board {
-    --crest: 44px;
-    padding-left: 0.3rem;
-    padding-right: 0.3rem;
-    gap: 0.2rem 0.25rem;
+    --crest: 72px;
+    padding-left: 0.28rem;
+    padding-right: 0.28rem;
+    gap: 0.35rem 0.3rem;
   }
-  .center { min-width: 0; padding: 0; }
   .score { font-size: 1.75rem; }
 }
 </style>
