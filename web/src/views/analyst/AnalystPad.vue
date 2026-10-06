@@ -38,15 +38,15 @@ let timer = 0
 let matchTimer = 0
 let client: Client | null = null
 
+const closed = computed(() => match.value?.status === 'FINISHED' || match.value?.status === 'CANCELLED')
 const clockRunning = computed(() => match.value?.status === 'LIVE' || match.value?.status === 'PAUSED')
-const clockFinished = computed(() => match.value?.status === 'FINISHED')
 const clockSeconds = computed(() => {
-  if (clockFinished.value) return 0
+  if (closed.value) return 0
   if (!clockRunning.value) return cap.value
   return remaining.value
 })
 const clockCaption = computed(() => {
-  if (clockFinished.value || !match.value) return ''
+  if (closed.value || !match.value) return ''
   if (!clockRunning.value) return 'Не начался'
   return periodLabel(match.value.period, match.value.sportCode, match.value.periodCount)
 })
@@ -89,9 +89,19 @@ async function reload() {
   stats.value = s.data
 }
 
+async function pullStats() {
+  try {
+    const { data } = await api.get(`/matches/${route.params.id}/analyst-stats`)
+    stats.value = data
+  } catch {
+    /* keep the numbers already on screen */
+  }
+}
+
 function applyLiveClock(live: any) {
   if (!match.value || !live) return
   clockStamp = Date.now()
+  const wasClosed = closed.value
   match.value = {
     ...match.value,
     status: live.status ?? match.value.status,
@@ -104,6 +114,7 @@ function applyLiveClock(live: any) {
     clockRunningSince: live.clockRunningSince ?? null,
     sportCode: live.sportCode ?? match.value.sportCode,
   }
+  if (!wasClosed && closed.value) pullStats()
 }
 
 async function refreshMatch() {
@@ -111,7 +122,9 @@ async function refreshMatch() {
   try {
     const { data } = await api.get(`/matches/${route.params.id}`)
     if (started < clockStamp) return
+    const wasClosed = closed.value
     match.value = data
+    if (!wasClosed && closed.value) await pullStats()
   } catch {
     /* the socket or the next poll will catch up */
   }
@@ -136,6 +149,7 @@ function connectClock() {
 }
 
 async function bump(side: 'home' | 'away', stat: StatId, undo = false) {
+  if (closed.value) return
   const id = teamId(side)
   if (!id) return
   error.value = ''
@@ -152,6 +166,7 @@ async function bump(side: 'home' | 'away', stat: StatId, undo = false) {
 }
 
 async function hold(side: Side) {
+  if (closed.value) return
   error.value = ''
   pending.value = true
   try {
@@ -171,11 +186,8 @@ onMounted(() => {
   connectClock()
   matchTimer = window.setInterval(refreshMatch, 4000)
   timer = window.setInterval(() => {
-    if (possessionSide.value === 'HOME' || possessionSide.value === 'AWAY') {
-      api.get(`/matches/${route.params.id}/analyst-stats`).then(({ data }) => {
-        stats.value = data
-      }).catch(() => {})
-    }
+    if (closed.value) return
+    if (possessionSide.value === 'HOME' || possessionSide.value === 'AWAY') pullStats()
   }, 1000)
 })
 
@@ -193,6 +205,9 @@ onUnmounted(() => {
       <h1>Пульт аналитика</h1>
     </div>
 
+    <p v-if="closed" class="closed-note">Матч завершён</p>
+
+    <div class="pad-face" :class="{ closed }">
     <div class="panel scoreboard">
       <div class="clock">{{ clockText }}</div>
       <p v-if="clockCaption" class="clock-caption">{{ clockCaption }}</p>
@@ -216,7 +231,7 @@ onUnmounted(() => {
           class="btn large"
           :class="possessionSide === 'HOME' ? 'on' : 'secondary'"
           type="button"
-          :disabled="pending"
+          :disabled="pending || closed"
           :aria-pressed="possessionSide === 'HOME'"
           @click="hold('HOME')"
         >Мяч у хозяев</button>
@@ -224,7 +239,7 @@ onUnmounted(() => {
           class="btn large"
           :class="possessionSide === 'AWAY' ? 'on' : 'secondary'"
           type="button"
-          :disabled="pending"
+          :disabled="pending || closed"
           :aria-pressed="possessionSide === 'AWAY'"
           @click="hold('AWAY')"
         >Мяч у гостей</button>
@@ -233,7 +248,7 @@ onUnmounted(() => {
         class="btn large pause"
         :class="possessionSide === 'PAUSED' ? 'on' : 'secondary'"
         type="button"
-        :disabled="pending"
+        :disabled="pending || closed"
         :aria-pressed="possessionSide === 'PAUSED'"
         @click="hold('PAUSED')"
       >Пауза владения</button>
@@ -253,14 +268,14 @@ onUnmounted(() => {
         </div>
         <p class="summary">{{ stats?.home?.shots ?? 0 }} / {{ stats?.home?.shotsOnTarget ?? 0 }} в створ</p>
         <div v-for="stat in STATS" :key="stat.id" class="cell">
-          <button class="btn large hit" type="button" :disabled="pending" @click="bump('home', stat.id)">
+          <button class="btn large hit" type="button" :disabled="pending || closed" @click="bump('home', stat.id)">
             <b>{{ countOf('home', stat.id) }}</b>
             <span>{{ stat.label }}</span>
           </button>
           <button
             class="undo"
             type="button"
-            :disabled="pending || countOf('home', stat.id) === 0"
+            :disabled="pending || closed || countOf('home', stat.id) === 0"
             :aria-label="`Убрать: ${stat.label}`"
             @click="bump('home', stat.id, true)"
           >−</button>
@@ -273,19 +288,20 @@ onUnmounted(() => {
         </div>
         <p class="summary">{{ stats?.away?.shots ?? 0 }} / {{ stats?.away?.shotsOnTarget ?? 0 }} в створ</p>
         <div v-for="stat in STATS" :key="stat.id" class="cell">
-          <button class="btn large hit" type="button" :disabled="pending" @click="bump('away', stat.id)">
+          <button class="btn large hit" type="button" :disabled="pending || closed" @click="bump('away', stat.id)">
             <b>{{ countOf('away', stat.id) }}</b>
             <span>{{ stat.label }}</span>
           </button>
           <button
             class="undo"
             type="button"
-            :disabled="pending || countOf('away', stat.id) === 0"
+            :disabled="pending || closed || countOf('away', stat.id) === 0"
             :aria-label="`Убрать: ${stat.label}`"
             @click="bump('away', stat.id, true)"
           >−</button>
         </div>
       </div>
+    </div>
     </div>
 
     <p v-if="error" class="form-error">{{ error }}</p>
@@ -300,6 +316,15 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 0.85rem;
 }
+.closed-note {
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+  color: var(--navy);
+}
+.pad-face { display: grid; gap: 0.9rem; }
+.pad-face.closed { opacity: 0.45; pointer-events: none; }
+.pad-face.closed :is(.btn, .undo):disabled { opacity: 1; cursor: default; }
 .scoreboard { display: grid; gap: 0.45rem; justify-items: center; text-align: center; border-radius: 26px 18px 22px 16px; }
 .clock {
   font-family: var(--font-display);

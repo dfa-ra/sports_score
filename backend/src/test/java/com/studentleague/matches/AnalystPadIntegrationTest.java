@@ -1,9 +1,12 @@
 package com.studentleague.matches;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.domain.PossessionSide;
+import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchAnalystStats;
 import com.studentleague.matches.repository.MatchAnalystStatsRepository;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.support.AbstractIntegrationTest;
 import com.studentleague.users.domain.Role;
 import org.junit.jupiter.api.Test;
@@ -28,6 +31,9 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
 
     @Autowired
     private MatchAnalystStatsRepository analystStatsRepository;
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     @Test
     void analystRoleIsOptInAndPadStatsStayOffTheRefereeFoulCount() throws Exception {
@@ -137,6 +143,90 @@ class AnalystPadIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.homePossessionPercent").value(80))
                 .andExpect(jsonPath("$.awayPossessionPercent").value(20))
                 .andExpect(jsonPath("$.home.fouls").value(1));
+    }
+
+    @Test
+    void finishedMatchRejectsShotAndPossessionAndKeepsThePercent() throws Exception {
+        String adminToken = createAdminAndLogin("freeze-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String fanEmail = "freeze-fan-" + System.nanoTime() + "@example.com";
+        String fanToken = registerAndLogin(fanEmail, "Str0ngPass!");
+        String fanId = userRepository.findByEmailIgnoreCase(fanEmail).orElseThrow().getId().toString();
+        mockMvc.perform(patch("/api/v1/admin/users/" + fanId)
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roles\":[\"FAN\",\"ANALYST\"]}"))
+                .andExpect(status().isOk());
+
+        Fixture fx = setupMatch(adminToken);
+        postStat(fanToken, fx.matchId, fx.homeTeamId, "SHOT_ON_TARGET")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(1));
+        mockMvc.perform(post("/api/v1/analyst/matches/" + fx.matchId + "/possession")
+                        .header("Authorization", auth(fanToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"side\":\"HOME\"}"))
+                .andExpect(status().isOk());
+
+        Instant since = Instant.now().minus(200, ChronoUnit.SECONDS);
+        MatchAnalystStats stored = analystStatsRepository.findById(UUID.fromString(fx.matchId)).orElseThrow();
+        stored.getHome().setPossessionSeconds(10);
+        stored.getAway().setPossessionSeconds(30);
+        stored.setPossessionSide(PossessionSide.HOME);
+        stored.setPossessionSince(since);
+        stored.setPossessionTracked(true);
+        analystStatsRepository.saveAndFlush(stored);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"));
+
+        Match match = matchRepository.findById(UUID.fromString(fx.matchId)).orElseThrow();
+        match.setFinishedAt(since.plus(40, ChronoUnit.SECONDS));
+        matchRepository.saveAndFlush(match);
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/analyst-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(1))
+                .andExpect(jsonPath("$.home.shotsOnTarget").value(1))
+                .andExpect(jsonPath("$.homePossessionSeconds").value(50))
+                .andExpect(jsonPath("$.awayPossessionSeconds").value(30))
+                .andExpect(jsonPath("$.homePossessionPercent").value(63))
+                .andExpect(jsonPath("$.awayPossessionPercent").value(37))
+                .andExpect(jsonPath("$.possessionSide").value("HOME"));
+
+        postStat(fanToken, fx.matchId, fx.homeTeamId, "SHOT_OFF").andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/analyst/matches/" + fx.matchId + "/stats/undo")
+                        .header("Authorization", auth(fanToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s","stat":"SHOT_ON_TARGET"}
+                                """.formatted(fx.homeTeamId)))
+                .andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/analyst/matches/" + fx.matchId + "/possession")
+                        .header("Authorization", auth(fanToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"side\":\"AWAY\"}"))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/analyst-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.shots").value(1))
+                .andExpect(jsonPath("$.homePossessionSeconds").value(50))
+                .andExpect(jsonPath("$.possessionSide").value("HOME"));
+
+        match = matchRepository.findById(UUID.fromString(fx.matchId)).orElseThrow();
+        match.setStatus(MatchStatus.CANCELLED);
+        matchRepository.saveAndFlush(match);
+        postStat(fanToken, fx.matchId, fx.awayTeamId, "CORNER").andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/analyst/matches/" + fx.matchId + "/possession")
+                        .header("Authorization", auth(fanToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"side\":\"PAUSED\"}"))
+                .andExpect(status().isConflict());
     }
 
     private org.springframework.test.web.servlet.ResultActions postStat(

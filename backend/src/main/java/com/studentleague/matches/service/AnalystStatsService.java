@@ -2,6 +2,7 @@ package com.studentleague.matches.service;
 
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.domain.AnalystStat;
+import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.domain.PossessionSide;
 import com.studentleague.matches.dto.AnalystStatsResponse;
 import com.studentleague.matches.dto.TeamAnalystStatsResponse;
@@ -37,9 +38,9 @@ public class AnalystStatsService {
      */
     @Transactional(readOnly = true)
     public AnalystStatsResponse get(UUID matchId) {
-        requireMatch(matchId);
+        Match match = requireMatch(matchId);
         return statsRepository.findById(matchId)
-                .map(row -> toResponse(row, Instant.now()))
+                .map(row -> toResponse(row, clockAsOf(match)))
                 .orElseGet(() -> empty(matchId));
     }
 
@@ -50,6 +51,7 @@ public class AnalystStatsService {
             throw ApiException.badRequest("Можно только прибавить или убрать единицу");
         }
         Match match = requireMatch(matchId);
+        assertOpen(match);
         boolean home = teamIsHome(match, teamId);
         MatchAnalystStats row = loadForUpdate(matchId);
         row.apply(home, stat, delta);
@@ -59,7 +61,8 @@ public class AnalystStatsService {
     @Transactional
     public AnalystStatsResponse setPossession(UserPrincipal principal, UUID matchId, PossessionSide side) {
         assertCanWrite(principal);
-        requireMatch(matchId);
+        Match match = requireMatch(matchId);
+        assertOpen(match);
         MatchAnalystStats row = loadForUpdate(matchId);
         if (side == PossessionSide.PAUSED && !row.isPossessionTracked()) {
             return toResponse(row, Instant.now());
@@ -122,6 +125,19 @@ public class AnalystStatsService {
         if (principal == null || !principal.hasAnyRole(Role.ANALYST, Role.ADMIN)) {
             throw ApiException.forbidden("Нужна роль аналитика");
         }
+    }
+
+    private void assertOpen(Match match) {
+        if (match.getStatus() == MatchStatus.FINISHED || match.getStatus() == MatchStatus.CANCELLED) {
+            throw ApiException.conflict("Матч уже завершён");
+        }
+    }
+
+    private Instant clockAsOf(Match match) {
+        if (match.getStatus() != MatchStatus.FINISHED && match.getStatus() != MatchStatus.CANCELLED) {
+            return Instant.now();
+        }
+        return match.getFinishedAt() != null ? match.getFinishedAt() : Instant.EPOCH;
     }
 
     private AnalystStatsResponse empty(UUID matchId) {
