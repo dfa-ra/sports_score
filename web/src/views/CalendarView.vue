@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -9,22 +9,62 @@ import EmptyState from '../components/EmptyState.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchRow from '../components/MatchRow.vue'
 
+const PAST_DAYS = 21
+const PAGE_SIZE = 100
+
 const route = useRoute()
 const items = ref<any[]>([])
 const tournaments = ref<Record<string, string>>({})
 const error = ref('')
 const loading = ref(true)
-const day = ref('')
 const mineOnly = ref(false)
 const teams = useTeamDirectory()
 const fav = useFavorites()
+const stripEl = ref<HTMLElement | null>(null)
 let refreshTimer = 0
+let alignedStrip = false
 
 const liveOnly = computed(() => route.name === 'live')
 
+function atNoon(date = new Date()) {
+  const next = new Date(date)
+  next.setHours(12, 0, 0, 0)
+  return next
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+const todayKey = computed(() => ymd(atNoon()))
+const day = ref(todayKey.value)
+
+function oldestKey(batch: any[]) {
+  let oldest = ''
+  for (const match of batch) {
+    const key = ymd(match.scheduledAt)
+    if (!key) continue
+    if (!oldest || key < oldest) oldest = key
+  }
+  return oldest
+}
+
 async function loadMatches() {
-  const { data } = await api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } })
-  items.value = data.content ?? []
+  const fromKey = ymd(addDays(atNoon(), -PAST_DAYS))
+  const collected: any[] = []
+  for (let page = 0; page < 30; page += 1) {
+    const { data } = await api.get('/matches', {
+      params: { size: PAGE_SIZE, page, sort: 'scheduledAt,desc' },
+    })
+    const batch = data.content ?? []
+    collected.push(...batch)
+    const oldest = oldestKey(batch)
+    const last = batch.length < PAGE_SIZE || page + 1 >= Number(data.totalPages ?? page + 1)
+    if (last || (oldest && oldest < fromKey)) break
+  }
+  items.value = collected
 }
 
 onMounted(async () => {
@@ -51,6 +91,21 @@ onUnmounted(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 
+function alignStrip() {
+  const root = stripEl.value
+  if (!root) return
+  const selected = root.querySelector<HTMLElement>('button.on')
+  if (!selected) return
+  const left = selected.offsetLeft - (root.clientWidth - selected.clientWidth) / 2
+  root.scrollLeft = Math.max(0, left)
+}
+
+watch(loading, (isLoading) => {
+  if (isLoading || alignedStrip || liveOnly.value) return
+  alignedStrip = true
+  nextTick(alignStrip)
+})
+
 function pad(n: number) {
   return String(n).padStart(2, '0')
 }
@@ -60,21 +115,27 @@ function weekday(date: Date) {
 }
 
 const strip = computed(() => {
-  const today = new Date()
-  today.setHours(12, 0, 0, 0)
-  const days = []
-  for (let i = -2; i <= 2; i++) {
-    const date = new Date(today)
-    date.setDate(today.getDate() + i)
-    const key = ymd(date)
-    days.push({
-      key,
-      label: i === 0
-        ? `Сегодня ${pad(date.getDate())}.${pad(date.getMonth() + 1)}.`
-        : `${weekday(date)} ${pad(date.getDate())}.${pad(date.getMonth() + 1)}.`,
-    })
+  const today = atNoon()
+  const current = ymd(today)
+  const fromKey = ymd(addDays(today, -PAST_DAYS))
+  const keys = new Set<string>([current])
+  for (const match of items.value) {
+    const key = ymd(match.scheduledAt)
+    if (!key || key < fromKey) continue
+    keys.add(key)
   }
-  return days
+  return [...keys].sort().map((key) => {
+    const [, monthText, dateText] = key.split('-')
+    const month = Number(monthText)
+    const date = Number(dateText)
+    const parsed = new Date(Number(key.slice(0, 4)), month - 1, date, 12)
+    return {
+      key,
+      label: key === current
+        ? `Сегодня ${pad(date)}.${pad(month)}.`
+        : `${weekday(parsed)} ${pad(date)}.${pad(month)}.`,
+    }
+  })
 })
 
 function isMine(match: any) {
@@ -85,14 +146,9 @@ const visible = computed(() => {
   let rows: any[]
   if (liveOnly.value) {
     rows = items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
-  } else if (day.value) {
-    rows = items.value
-      .filter((m) => ymd(m.scheduledAt) === day.value)
-      .slice()
-      .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
   } else {
     rows = items.value
-      .filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
+      .filter((m) => ymd(m.scheduledAt) === day.value)
       .slice()
       .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
   }
@@ -121,10 +177,15 @@ const grouped = computed(() => {
       <h1>Live</h1>
       <MatchGoalAlerts />
     </div>
-    <div class="date-strip">
-      <button type="button" :class="{ on: mineOnly }" @click="mineOnly = !mineOnly">Мои</button>
-      <template v-if="!liveOnly">
-        <button type="button" :class="{ on: !day }" @click="day = ''">Все</button>
+    <div class="calendar-bar">
+      <button
+        type="button"
+        class="fav-toggle"
+        :class="{ on: mineOnly }"
+        :aria-pressed="mineOnly"
+        @click="mineOnly = !mineOnly"
+      >Избранные</button>
+      <div v-if="!liveOnly" ref="stripEl" class="date-strip">
         <button
           v-for="item in strip"
           :key="item.key"
@@ -132,13 +193,13 @@ const grouped = computed(() => {
           :class="{ on: day === item.key }"
           @click="day = item.key"
         >{{ item.label }}</button>
-      </template>
+      </div>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <div v-if="loading" class="skeleton" />
     <EmptyState
       v-else-if="!visible.length"
-      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : day ? 'В этот день матчей нет' : 'Пока нет ближайших матчей'"
+      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : 'В этот день матчей нет'"
     />
     <div v-else class="sheet">
       <section v-for="group in grouped" :key="group.id">
@@ -162,7 +223,37 @@ const grouped = computed(() => {
 
 <style scoped>
 .page { gap: 0; }
-.date-strip { margin: 0 -0.2rem 0.15rem; }
+.calendar-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 0.35rem;
+  margin: 0 -0.2rem 0.15rem;
+}
+.fav-toggle {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: 0.2rem;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.42rem 0.75rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.fav-toggle.on {
+  color: var(--navy);
+  background: var(--ice);
+  border-color: transparent;
+}
+.calendar-bar .date-strip {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
 .live-head {
   display: flex;
   align-items: center;
