@@ -222,12 +222,19 @@ const grouped = computed(() => {
 </template>
 
 <style scoped>
-.page { gap: 0; }
+.page {
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+}
 .calendar-bar {
   display: flex;
   align-items: stretch;
+  flex-wrap: nowrap;
   gap: 0.35rem;
   margin: 0 -0.2rem 0.15rem;
+  min-width: 0;
+  max-width: 100%;
 }
 .fav-toggle {
   flex: 0 0 auto;
@@ -240,6 +247,7 @@ const grouped = computed(() => {
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   padding: 0.42rem 0.75rem;
   border-radius: 999px;
   cursor: pointer;
@@ -250,9 +258,24 @@ const grouped = computed(() => {
   border-color: transparent;
 }
 .calendar-bar .date-strip {
-  flex: 1;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
   margin: 0;
+}
+@media (max-width: 720px) {
+  .calendar-bar {
+    margin-inline: 0;
+    gap: 0.25rem;
+  }
+  .fav-toggle {
+    margin-left: 0;
+    padding: 0.38rem 0.55rem;
+  }
+  .league-head {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
 }
 .live-head {
   display: flex;
@@ -269,5 +292,7 @@ const grouped = computed(() => {
   border-radius: 12px;
   overflow: hidden;
   margin-top: 0.45rem;
+  min-width: 0;
+  max-width: 100%;
 }
 </style>

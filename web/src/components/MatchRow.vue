@@ -72,10 +72,12 @@ function tapStar() {
 <style scoped>
 .row {
   display: grid;
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: stretch;
   border-bottom: 1px solid var(--line);
   background: #fff;
+  min-width: 0;
+  max-width: 100%;
 }
 .star {
   border: 0;
@@ -98,13 +100,15 @@ function tapStar() {
 }
 .body {
   display: grid;
-  grid-template-columns: 46px 1fr auto auto;
+  grid-template-columns: 46px minmax(0, 1fr) auto auto;
   gap: 0.55rem;
   align-items: center;
   padding: 0.55rem 0.7rem 0.55rem 0;
   color: inherit;
   text-decoration: none;
   min-height: 56px;
+  min-width: 0;
+  max-width: 100%;
 }
 .body:hover { color: inherit; background: rgba(76, 180, 229, 0.06); }
 .scorer {
@@ -125,7 +129,7 @@ function tapStar() {
 }
 .side {
   display: grid;
-  grid-template-columns: 28px 1fr;
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 0.4rem;
   align-items: center;
   min-width: 0;
@@ -141,6 +145,7 @@ function tapStar() {
 .side b {
   font-weight: 500;
   font-size: 1rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -168,4 +173,17 @@ function tapStar() {
 .mark.win { background: #1b8a4a; }
 .mark.draw { background: #c47b00; }
 .mark.loss { background: var(--danger); }
+
+@media (max-width: 720px) {
+  .body {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    gap: 0.3rem;
+    padding: 0.45rem 0.4rem 0.45rem 0;
+  }
+  .nums {
+    justify-items: center;
+    align-content: center;
+  }
+  .side { gap: 0.3rem; }
+}
 </style>
