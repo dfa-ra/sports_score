@@ -30,7 +30,7 @@ jobs:
 
   backend-jar:
     name: Backend JAR
-    needs: resolve-version
+    needs: [resolve-version, github-release]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -50,15 +50,19 @@ jobs:
           JAR="$(find target -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar' | head -n 1)"
           test -n "${JAR}"
           cp "${JAR}" "../release-backend/student-league-backend-${VERSION}.jar"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: release-backend/student-league-backend-*.jar
-          if-no-files-found: error
+      - name: Upload backend JAR to the release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release-backend/student-league-backend-*.jar)
+          test ${#files[@]} -gt 0
+          gh release upload "v${{ needs.resolve-version.outputs.version }}" "${files[@]}" --clobber
 
   web-release:
     name: Web release bundle
-    needs: resolve-version
+    needs: [resolve-version, github-release]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -87,14 +91,19 @@ jobs:
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
           tar -czf "../student-league-web-${VERSION}.tar.gz" -C dist .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-release
-          path: student-league-web-*.tar.gz
+      - name: Upload web bundle to the release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(student-league-web-*.tar.gz)
+          test ${#files[@]} -gt 0
+          gh release upload "v${{ needs.resolve-version.outputs.version }}" "${files[@]}" --clobber
 
   android-release:
     name: Android release APK/AAB
-    needs: resolve-version
+    needs: [resolve-version, github-release]
     runs-on: ubuntu-latest
     # Same as iOS: a Maven Central 403 must not block the GitHub Release or prod SSH deploy.
     # stand.sh only needs the backend JAR and web tarball.
@@ -144,15 +153,19 @@ jobs:
           mkdir -p ../release-android
           cp build/app/outputs/flutter-apk/app-release.apk "../release-android/student-league-${VERSION}-android.apk"
           cp build/app/outputs/bundle/release/app-release.aab "../release-android/student-league-${VERSION}-android.aab"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: android-release
-          path: release-android/*
-          if-no-files-found: warn
+      - name: Upload Android builds to the release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release-android/*)
+          test ${#files[@]} -gt 0
+          gh release upload "v${{ needs.resolve-version.outputs.version }}" "${files[@]}" --clobber
 
   ios-release:
     name: iOS IPA (unsigned stub)
-    needs: resolve-version
+    needs: [resolve-version, github-release]
     runs-on: macos-latest
     continue-on-error: true
     defaults:
@@ -178,59 +191,47 @@ jobs:
           # Without signing we ship the Runner.app payload for later re-signing
           cd build/ios/iphoneos
           zip -r "../../../../release-ios/student-league-${VERSION}-ios-unsigned.zip" Runner.app
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ios-release-unsigned
-          path: release-ios/*
-          if-no-files-found: warn
+      - name: Upload iOS payload to the release
+        working-directory: ${{ github.workspace }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release-ios/*)
+          test ${#files[@]} -gt 0
+          gh release upload "v${{ needs.resolve-version.outputs.version }}" "${files[@]}" --clobber
 
   github-release:
     name: Publish GitHub Release
-    needs: [resolve-version, backend-jar, web-release, android-release, ios-release]
-    if: |
-      always() &&
-      needs.backend-jar.result == 'success' &&
-      needs.web-release.result == 'success'
+    needs: [resolve-version]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-      - name: Collect release files
-        run: |
-          mkdir -p out
-          find artifacts -type f \( -name '*.jar' -o -name '*.tar.gz' -o -name '*.apk' -o -name '*.aab' -o -name '*.zip' \) -exec cp {} out/ \;
-          ls -la out
       - name: Write short notes
-        id: notes
         run: |
           chmod +x scripts/release_notes.sh
-          BODY="$(scripts/release_notes.sh "v${{ needs.resolve-version.outputs.version }}")"
-          {
-            echo "body<<EOF"
-            printf '%s\n' "${BODY}"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          scripts/release_notes.sh "v${{ needs.resolve-version.outputs.version }}" > "$RUNNER_TEMP/release-notes.md"
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.resolve-version.outputs.version }}
-          name: KronScore v${{ needs.resolve-version.outputs.version }}
-          generate_release_notes: false
-          body: ${{ steps.notes.outputs.body }}
-          files: out/*
-          fail_on_unmatched_files: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ needs.resolve-version.outputs.version }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "KronScore ${TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          else
+            gh release create "$TAG" --title "KronScore ${TAG}" --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
 
   deploy-prod:
     name: SSH deploy to prod
-    needs: [resolve-version, github-release]
-    if: needs.github-release.result == 'success'
+    needs: [resolve-version, github-release, backend-jar, web-release]
+    if: |
+      needs.github-release.result == 'success' &&
+      needs.backend-jar.result == 'success' &&
+      needs.web-release.result == 'success'
     uses: ./.github/workflows/deploy-remote.yml
     with:
       release_tag: v${{ needs.resolve-version.outputs.version }}
