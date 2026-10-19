@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import api from '../api/client'
+import {
+  ACCESS_STORAGE_KEY,
+  REFRESH_STORAGE_KEY,
+  USER_STORAGE_KEY,
+  accessTokenStillValid,
+  loadRefreshToken,
+  loadStoredValue,
+  refreshCookieAssignment,
+  writeSessionValues,
+} from '../lib/refreshSession'
 
 export type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE' | 'ANALYST' | 'ADMIN'
 
@@ -21,18 +31,43 @@ export interface User {
   roles?: RoleAssignment[]
 }
 
-const ACCESS_KEY = 'sl_access'
-const REFRESH_KEY = 'sl_refresh'
-const USER_KEY = 'sl_user'
+const RESTORE_TIMEOUT_MS = 12_000
 
-function forgetSharedCredentials() {
-  localStorage.removeItem(ACCESS_KEY)
-  localStorage.removeItem(REFRESH_KEY)
-  localStorage.removeItem(USER_KEY)
+function browserLocal(): Storage | null {
+  try {
+    return localStorage
+  } catch {
+    return null
+  }
 }
 
-function readSessionUser(): User | null {
-  const raw = sessionStorage.getItem(USER_KEY)
+function browserSession(): Storage | null {
+  try {
+    return sessionStorage
+  } catch {
+    return null
+  }
+}
+
+function cookieHeader(): string {
+  try {
+    return typeof document === 'undefined' ? '' : document.cookie
+  } catch {
+    return ''
+  }
+}
+
+function writeRefreshCookie(token: string | null) {
+  if (typeof document === 'undefined') return
+  try {
+    const secure = typeof location !== 'undefined' && location.protocol === 'https:'
+    document.cookie = refreshCookieAssignment(token, secure)
+  } catch {
+    // Cookie write can fail in locked-down webviews. localStorage is the other copy.
+  }
+}
+
+function readUser(raw: string | null): User | null {
   if (!raw) return null
   try {
     return JSON.parse(raw) as User
@@ -41,12 +76,17 @@ function readSessionUser(): User | null {
   }
 }
 
-export const useAuthStore = defineStore('auth', () => {
-  forgetSharedCredentials()
+export function isUnauthorized(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } } | null)?.response?.status
+  return status === 401
+}
 
-  const accessToken = ref<string | null>(sessionStorage.getItem(ACCESS_KEY))
-  const refreshToken = ref<string | null>(sessionStorage.getItem(REFRESH_KEY))
-  const user = ref<User | null>(readSessionUser())
+export const useAuthStore = defineStore('auth', () => {
+  const accessToken = ref<string | null>(null)
+  const refreshToken = ref<string | null>(null)
+  const user = ref<User | null>(null)
+  let refreshInFlight: Promise<void> | null = null
+  let restoreInFlight: Promise<void> | null = null
 
   const isAuthenticated = computed(() => !!accessToken.value)
   const role = computed(() => user.value?.role ?? null)
@@ -63,12 +103,32 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function persist() {
-    if (accessToken.value) sessionStorage.setItem(ACCESS_KEY, accessToken.value)
-    else sessionStorage.removeItem(ACCESS_KEY)
-    if (refreshToken.value) sessionStorage.setItem(REFRESH_KEY, refreshToken.value)
-    else sessionStorage.removeItem(REFRESH_KEY)
-    if (user.value) sessionStorage.setItem(USER_KEY, JSON.stringify(user.value))
-    else sessionStorage.removeItem(USER_KEY)
+    writeSessionValues(browserLocal(), browserSession(), {
+      access: accessToken.value,
+      refresh: refreshToken.value,
+      user: user.value ? JSON.stringify(user.value) : null,
+    })
+    writeRefreshCookie(refreshToken.value)
+  }
+
+  function hydrate() {
+    const local = browserLocal()
+    const session = browserSession()
+    refreshToken.value = loadRefreshToken(local, cookieHeader(), session)
+    accessToken.value = loadStoredValue(ACCESS_STORAGE_KEY, local, session)
+    user.value = readUser(loadStoredValue(USER_STORAGE_KEY, local, session))
+    if (accessToken.value && !accessTokenStillValid(accessToken.value)) {
+      accessToken.value = null
+    }
+    if (!accessToken.value) user.value = null
+    if (refreshToken.value || accessToken.value) persist()
+  }
+
+  function applySession(data: { accessToken: string; refreshToken: string; user: User }) {
+    accessToken.value = data.accessToken
+    refreshToken.value = data.refreshToken
+    user.value = data.user
+    persist()
   }
 
   async function register(payload: {
@@ -82,13 +142,6 @@ export const useAuthStore = defineStore('auth', () => {
   }) {
     await api.post('/auth/register', payload)
     return login(payload.email, payload.password)
-  }
-
-  function applySession(data: { accessToken: string; refreshToken: string; user: User }) {
-    accessToken.value = data.accessToken
-    refreshToken.value = data.refreshToken
-    user.value = data.user
-    persist()
   }
 
   async function login(email: string, password: string) {
@@ -114,11 +167,29 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function refresh() {
-    const { data } = await api.post('/auth/refresh', { refreshToken: refreshToken.value })
-    accessToken.value = data.accessToken
-    refreshToken.value = data.refreshToken
-    user.value = data.user
-    persist()
+    if (!refreshInFlight) {
+      refreshInFlight = rotateRefresh().finally(() => {
+        refreshInFlight = null
+      })
+    }
+    return refreshInFlight
+  }
+
+  async function rotateRefresh() {
+    const first = loadRefreshToken(browserLocal(), cookieHeader(), browserSession()) || refreshToken.value
+    if (!first) {
+      throw Object.assign(new Error('No refresh token'), { response: { status: 401 } })
+    }
+    try {
+      const { data } = await api.post('/auth/refresh', { refreshToken: first }, { timeout: RESTORE_TIMEOUT_MS })
+      applySession(data)
+    } catch (error) {
+      if (!isUnauthorized(error)) throw error
+      const newer = loadRefreshToken(browserLocal(), cookieHeader(), browserSession())
+      if (!newer || newer === first) throw error
+      const { data } = await api.post('/auth/refresh', { refreshToken: newer }, { timeout: RESTORE_TIMEOUT_MS })
+      applySession(data)
+    }
   }
 
   async function logout() {
@@ -140,10 +211,62 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function refreshMe() {
     if (!accessToken.value) return null
-    const { data } = await api.get('/auth/me')
+    const { data } = await api.get('/auth/me', { timeout: RESTORE_TIMEOUT_MS })
     user.value = data
     persist()
     return data
+  }
+
+  function restoreSession() {
+    if (!restoreInFlight) restoreInFlight = restoreSessionOnce()
+    return restoreInFlight
+  }
+
+  async function restoreSessionOnce() {
+    hydrate()
+    if (accessToken.value) {
+      try {
+        await refreshMe()
+        return
+      } catch (error) {
+        if (!isUnauthorized(error)) return
+        accessToken.value = null
+      }
+    }
+    if (!refreshToken.value) {
+      user.value = null
+      persist()
+      return
+    }
+    try {
+      await refresh()
+    } catch (error) {
+      if (isUnauthorized(error)) logoutLocal()
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (event) => {
+      let area: Storage | null = null
+      try {
+        area = localStorage
+      } catch {
+        return
+      }
+      if (event.storageArea !== area) return
+      if (event.key === REFRESH_STORAGE_KEY) {
+        refreshToken.value = event.newValue
+        if (!event.newValue) {
+          accessToken.value = null
+          user.value = null
+          writeSessionValues(null, browserSession(), { access: null, refresh: null, user: null })
+          writeRefreshCookie(null)
+        }
+        return
+      }
+      if (event.key === ACCESS_STORAGE_KEY) accessToken.value = event.newValue
+      if (event.key === USER_STORAGE_KEY) user.value = readUser(event.newValue)
+    })
   }
 
   const canManageLeague = computed(() => hasRole('ADMIN'))
@@ -176,6 +299,7 @@ export const useAuthStore = defineStore('auth', () => {
     resetPassword,
     refresh,
     refreshMe,
+    restoreSession,
     logout,
     logoutLocal,
   }

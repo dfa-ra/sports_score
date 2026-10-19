@@ -35,10 +35,11 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (to.name === 'calendar' && to.query.tab === 'live') return { path: '/live' }
   if (to.name === 'calendar' && to.query.tab === 'played') return { path: '/table', query: { tab: 'results' } }
   const auth = useAuthStore()
+  await auth.restoreSession()
   if (to.meta.auth && !auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
   if (to.meta.guest && auth.isAuthenticated) return { name: 'home' }
   if (to.meta.myTeam && !auth.canAccessMyTeam) return { name: 'home' }
