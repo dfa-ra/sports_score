@@ -1,6 +1,6 @@
 {
-  "name": "Лига ИТМО",
-  "short_name": "ИТМО",
+  "name": "ЛИГА",
+  "short_name": "ЛИГА",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
