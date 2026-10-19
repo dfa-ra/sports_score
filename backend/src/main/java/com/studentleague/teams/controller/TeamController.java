@@ -2,6 +2,7 @@ package com.studentleague.teams.controller;
 
 import com.studentleague.common.dto.PageResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.RecentFormResponse;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.dto.AddTeamMemberRequest;
@@ -111,7 +112,7 @@ public class TeamController {
 
     @GetMapping("/{id}/form")
     @Operation(summary = "Last finished results of the team")
-    public List<MatchResponse> form(
+    public List<RecentFormResponse> form(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "5") int limit
     ) {

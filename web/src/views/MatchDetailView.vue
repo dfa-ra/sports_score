@@ -89,11 +89,14 @@ const headToHead = computed(() => {
     .slice(0, 5)
 })
 
-function recentLine(row: any, teamId: string) {
-  const opponentId = row.homeTeamId === teamId ? row.awayTeamId : row.homeTeamId
-  const own = row.homeTeamId === teamId ? row.homeScore : row.awayScore
-  const theirs = row.homeTeamId === teamId ? row.awayScore : row.homeScore
-  return `${own}:${theirs} · ${teams.fullName(opponentId)} · ${formatWhen(row.scheduledAt)}`
+function formSide(row: any, side: 'home' | 'away') {
+  const id = side === 'home' ? row.homeTeamId : row.awayTeamId
+  const apiName = side === 'home' ? row.homeTeamName : row.awayTeamName
+  const apiLogo = side === 'home' ? row.homeLogoUrl : row.awayLogoUrl
+  return {
+    name: apiName || teams.fullName(id),
+    logo: apiLogo || teams.logo(id),
+  }
 }
 const periodBlocks = computed(() => {
   if (!match.value) return []
@@ -736,26 +739,44 @@ onUnmounted(() => {
       <div class="stack recent">
         <div class="panel">
           <h2>Последние игры {{ teams.fullName(match.homeTeamId) }}</h2>
-          <p v-for="f in homeForm" :key="f.id" class="muted recent-line">
-            <TeamCrest
-              :src="teams.logo(f.homeTeamId === match.homeTeamId ? f.awayTeamId : f.homeTeamId)"
-              :name="teams.fullName(f.homeTeamId === match.homeTeamId ? f.awayTeamId : f.homeTeamId)"
-              :size="16"
-            />
-            {{ recentLine(f, match.homeTeamId) }}
-          </p>
+          <RouterLink
+            v-for="f in homeForm"
+            :key="f.id"
+            class="recent-row"
+            :to="`/matches/${f.id}`"
+          >
+            <span class="recent-side home">
+              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
+              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
+            </span>
+            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
+            <span class="recent-side away">
+              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
+              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
+            </span>
+            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+          </RouterLink>
           <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
           <h2>Последние игры {{ teams.fullName(match.awayTeamId) }}</h2>
-          <p v-for="f in awayForm" :key="f.id" class="muted recent-line">
-            <TeamCrest
-              :src="teams.logo(f.homeTeamId === match.awayTeamId ? f.awayTeamId : f.homeTeamId)"
-              :name="teams.fullName(f.homeTeamId === match.awayTeamId ? f.awayTeamId : f.homeTeamId)"
-              :size="16"
-            />
-            {{ recentLine(f, match.awayTeamId) }}
-          </p>
+          <RouterLink
+            v-for="f in awayForm"
+            :key="f.id"
+            class="recent-row"
+            :to="`/matches/${f.id}`"
+          >
+            <span class="recent-side home">
+              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
+              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
+            </span>
+            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
+            <span class="recent-side away">
+              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
+              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
+            </span>
+            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+          </RouterLink>
           <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
@@ -1023,6 +1044,71 @@ onUnmounted(() => {
 h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
 .assign-card h2 { margin: 0; font-size: 1.5rem; }
 .assign-btn { width: 100%; }
+.recent { min-width: 0; }
+.recent .panel { min-width: 0; overflow: hidden; }
+.recent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas:
+    "home score away"
+    "home when away";
+  column-gap: 0.4rem;
+  align-items: center;
+  justify-items: center;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0 -0.15rem;
+  padding: 0.4rem 0.15rem;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.recent-row + .recent-row { border-top: 1px solid var(--line); }
+.recent-row:hover { background: var(--surface-hover); color: inherit; }
+.recent-row:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 1px;
+}
+.recent-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.12rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+.recent-side.home { grid-area: home; }
+.recent-side.away { grid-area: away; }
+.recent-name {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--navy);
+}
+.recent-score {
+  grid-area: score;
+  font-weight: 800;
+  font-size: 1rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.recent-when {
+  grid-area: when;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .recent-line {
   display: flex;
   align-items: center;

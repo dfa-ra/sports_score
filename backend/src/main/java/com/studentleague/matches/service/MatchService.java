@@ -8,6 +8,7 @@ import com.studentleague.matches.dto.AssignRefereeRequest;
 import com.studentleague.matches.dto.CreateMatchRequest;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.RecentFormResponse;
 import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchReferee;
@@ -197,11 +198,9 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
-    public List<MatchResponse> recentForm(UUID teamId, int limit) {
+    public List<RecentFormResponse> recentForm(UUID teamId, int limit) {
         int size = Math.max(1, Math.min(limit, 10));
-        return matchMapper.toList(matchRepository.findRecentByTeamAndStatus(
-                teamId, MatchStatus.FINISHED, Pageable.ofSize(size)
-        ));
+        return matchRepository.findRecentForm(teamId, MatchStatus.FINISHED, Pageable.ofSize(size));
     }
 
     @Transactional(readOnly = true)

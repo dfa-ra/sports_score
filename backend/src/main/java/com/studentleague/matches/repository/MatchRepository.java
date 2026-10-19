@@ -1,6 +1,7 @@
 package com.studentleague.matches.repository;
 
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.dto.RecentFormResponse;
 import com.studentleague.matches.entity.Match;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,13 +34,34 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     boolean existsByHomeTeamIdOrAwayTeamId(UUID homeTeamId, UUID awayTeamId);
 
+    /**
+     * Last finished matches for a team, with both clubs' names and crests.
+     * One select: home and away teams are joined, not loaded per row.
+     */
     @Query("""
-            select m from Match m
+            select new com.studentleague.matches.dto.RecentFormResponse(
+                m.id,
+                m.homeTeamId,
+                home.name,
+                home.shortName,
+                home.logoUrl,
+                m.awayTeamId,
+                away.name,
+                away.shortName,
+                away.logoUrl,
+                m.homeScore,
+                m.awayScore,
+                m.scheduledAt,
+                m.status
+            )
+            from Match m
+            join Team home on home.id = m.homeTeamId
+            join Team away on away.id = m.awayTeamId
             where (m.homeTeamId = :teamId or m.awayTeamId = :teamId)
               and m.status = :status
             order by m.scheduledAt desc
             """)
-    List<Match> findRecentByTeamAndStatus(
+    List<RecentFormResponse> findRecentForm(
             @Param("teamId") UUID teamId,
             @Param("status") MatchStatus status,
             Pageable pageable
