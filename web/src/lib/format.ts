@@ -153,6 +153,13 @@ export function playerTag(name?: string | null, jersey?: number | null) {
   return `#${jersey} ${name || ''}`.trim()
 }
 
+export function isOwnGoal(ev?: {
+  eventType?: string | null
+  metadata?: { ownGoal?: boolean } | null
+} | null) {
+  return ev?.eventType === 'GOAL' && ev.metadata?.ownGoal === true
+}
+
 export function eventDetail(ev: {
   eventType?: string
   playerName?: string | null
@@ -165,8 +172,10 @@ export function eventDetail(ev: {
   secondaryPlayerFirstName?: string | null
   secondaryPlayerLastName?: string | null
   secondaryPlayerJersey?: number | null
+  metadata?: { ownGoal?: boolean } | null
 }) {
   const main = playerTag(registeredName(ev), ev.playerJersey)
+  if (isOwnGoal(ev)) return main ? `${main} · Автогол` : 'Автогол'
   const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
   if (ev.eventType === 'GOAL' && second) return `${main} · пас ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `${main} → ${second}`

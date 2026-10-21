@@ -13,6 +13,7 @@ import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
@@ -89,6 +90,13 @@ public class AdminMatchProtocolService {
         applyMinute(match, event, request.minute());
         event.setTeamId(request.teamId());
         event.setPlayerId(request.playerId());
+        if (Boolean.TRUE.equals(request.ownGoal())) {
+            if (request.eventType() != MatchEventType.GOAL) {
+                throw ApiException.badRequest("Автогол можно отметить только у гола");
+            }
+            event.setMetadata(OwnGoals.apply(null, true));
+            event.setSecondaryPlayerId(null);
+        }
         event.setVoided(false);
         matchEventRepository.save(event);
 
@@ -104,6 +112,9 @@ public class AdminMatchProtocolService {
         // playerId is who scored, secondaryPlayerId is the assist (null clears it).
         if (Boolean.TRUE.equals(request.updatePlayers()) || request.playerId() != null) {
             applyPlayers(match, event, request);
+        }
+        if (request.ownGoal() != null) {
+            applyOwnGoal(event, request.ownGoal());
         }
         matchEventRepository.save(event);
         return publish(match, event, "MATCH_EVENT");
@@ -145,7 +156,7 @@ public class AdminMatchProtocolService {
         event.setPlayerId(request.playerId());
         event.setTeamId(scorerTeam);
         UUID assistId = request.secondaryPlayerId();
-        if (assistId == null) {
+        if (Boolean.TRUE.equals(request.ownGoal()) || assistId == null) {
             event.setSecondaryPlayerId(null);
             return;
         }
@@ -154,6 +165,16 @@ public class AdminMatchProtocolService {
         }
         teamOf(match, assistId, scorerTeam);
         event.setSecondaryPlayerId(assistId);
+    }
+
+    private void applyOwnGoal(MatchEvent event, boolean ownGoal) {
+        if (event.getEventType() != MatchEventType.GOAL) {
+            throw ApiException.badRequest("Автогол можно отметить только у гола");
+        }
+        if (ownGoal) {
+            event.setSecondaryPlayerId(null);
+        }
+        event.setMetadata(OwnGoals.apply(event.getMetadata(), ownGoal));
     }
 
     /** Scorer or assist must already play for one of the two clubs. The goal's team follows the scorer. */

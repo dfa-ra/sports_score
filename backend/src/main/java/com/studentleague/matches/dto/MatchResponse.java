@@ -26,6 +26,8 @@ public record MatchResponse(
         String venue,
         String lastGoalScorer,
         Integer minute,
-        PlayerOfTheMatchResponse playerOfTheMatch
+        PlayerOfTheMatchResponse playerOfTheMatch,
+        PlayerOfTheMatchResponse homeGoalkeeper,
+        PlayerOfTheMatchResponse awayGoalkeeper
 ) {
 }

@@ -1,7 +1,7 @@
 package com.studentleague.teams.service;
 
-import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.entity.MatchLineupPlayer;
@@ -172,9 +172,7 @@ public final class TeamSquadStats {
     }
 
     private static boolean ownGoal(MatchEvent event) {
-        return event.getEventType() == MatchEventType.GOAL
-                && event.getMetadata() != null
-                && Boolean.TRUE.equals(event.getMetadata().get("ownGoal"));
+        return OwnGoals.is(event);
     }
 
     private static String registeredName(TeamPlayerStatResponse row) {

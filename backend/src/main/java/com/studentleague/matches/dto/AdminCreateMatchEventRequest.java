@@ -11,6 +11,7 @@ public record AdminCreateMatchEventRequest(
         @NotNull MatchEventType eventType,
         @NotNull UUID teamId,
         @NotNull UUID playerId,
-        @NotNull @Min(0) @Max(200) Integer minute
+        @NotNull @Min(0) @Max(200) Integer minute,
+        Boolean ownGoal
 ) {
 }

@@ -11,6 +11,7 @@ export type TimedEvent = {
   timestamp?: string | null
   period?: number | null
   teamId?: string | null
+  metadata?: { ownGoal?: boolean } | null
 }
 
 /** Earlier match-minute first. Tie-break by when the row was written. */
@@ -37,7 +38,9 @@ export function buildPeriodBlocks<T extends TimedEvent>(
   for (const ev of chrono) {
     const scoring = ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL'
     if (scoring) {
-      if (ev.teamId === match.homeTeamId) home += 1
+      const byHome = ev.teamId === match.homeTeamId
+      const ownGoal = ev.eventType === 'OWN_GOAL' || ev.metadata?.ownGoal === true
+      if (ownGoal ? !byHome : byHome) home += 1
       else away += 1
     }
     const period = ev.period || 1

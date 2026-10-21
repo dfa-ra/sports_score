@@ -15,6 +15,7 @@ import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
@@ -191,6 +192,10 @@ public class RefereeMatchService {
             throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
         }
         validateEventPayload(match, request);
+        boolean ownGoal = OwnGoals.is(request.metadata());
+        if (ownGoal && request.eventType() != MatchEventType.GOAL) {
+            throw ApiException.badRequest("Автогол можно отметить только у гола");
+        }
 
         Instant now = Instant.now();
         int period = MatchClock.periodIndex(match);
@@ -209,8 +214,12 @@ public class RefereeMatchService {
         event.setPeriod(match.getPeriod());
         event.setTeamId(request.teamId());
         event.setPlayerId(request.playerId());
-        event.setSecondaryPlayerId(request.secondaryPlayerId());
-        event.setMetadata(stampMetadata(match, request));
+        event.setSecondaryPlayerId(ownGoal ? null : request.secondaryPlayerId());
+        Map<String, Object> metadata = stampMetadata(match, request);
+        if (request.eventType() == MatchEventType.GOAL) {
+            metadata = OwnGoals.apply(metadata, ownGoal);
+        }
+        event.setMetadata(metadata);
         event.setVoided(false);
         matchEventRepository.save(event);
 

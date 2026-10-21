@@ -5,7 +5,7 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventDetail, eventLabel, formatClock, formatWhen, labelOf, periodLabel, playerTag } from '../lib/format'
+import { eventDetail, eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
 import { buildPeriodBlocks, compareMatchEvents, eventMinute, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
@@ -46,12 +46,16 @@ const protocolType = ref<'GOAL' | 'YELLOW_CARD' | 'RED_CARD'>('GOAL')
 const protocolTeamId = ref('')
 const protocolPlayerId = ref('')
 const protocolMinute = ref(1)
+const protocolOwnGoal = ref(false)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
 const minuteDrafts = ref<Record<string, number>>({})
 const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
+const ownGoalDrafts = ref<Record<string, boolean>>({})
 const motmPlayerId = ref('')
+const homeKeeperId = ref('')
+const awayKeeperId = ref('')
 function crestForViewport() {
   return window.innerWidth <= 719 ? 72 : 96
 }
@@ -160,16 +164,30 @@ function syncDrafts() {
   const minutes: Record<string, number> = {}
   const players: Record<string, string> = {}
   const assists: Record<string, string> = {}
+  const ownGoals: Record<string, boolean> = {}
   for (const event of events.value) {
     minutes[event.id] = eventMinute(event.gameTime)
     players[event.id] = event.playerId || ''
-    assists[event.id] = event.secondaryPlayerId && event.secondaryPlayerId !== event.playerId
+    const ownGoal = isOwnGoal(event)
+    ownGoals[event.id] = ownGoal
+    assists[event.id] = !ownGoal && event.secondaryPlayerId && event.secondaryPlayerId !== event.playerId
       ? event.secondaryPlayerId
       : ''
   }
   minuteDrafts.value = minutes
   playerDrafts.value = players
   assistDrafts.value = assists
+  ownGoalDrafts.value = ownGoals
+}
+
+function onOwnGoalToggle(eventId: string, ownGoal: boolean) {
+  ownGoalDrafts.value[eventId] = ownGoal
+  if (ownGoal) assistDrafts.value[eventId] = ''
+}
+
+function onOwnGoalInput(eventId: string, event: Event) {
+  const input = event.target as HTMLInputElement | null
+  onOwnGoalToggle(eventId, !!input?.checked)
 }
 
 function onScorerChange(eventId: string, playerId: string) {
@@ -239,6 +257,8 @@ async function load() {
   ])
   match.value = m.data
   motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
+  homeKeeperId.value = m.data.homeGoalkeeper?.playerId || ''
+  awayKeeperId.value = m.data.awayGoalkeeper?.playerId || ''
   events.value = e.data
   syncDrafts()
   referees.value = r.data
@@ -360,6 +380,7 @@ async function addProtocolEvent() {
       teamId: protocolTeamId.value,
       playerId: protocolPlayerId.value,
       minute: Number(protocolMinute.value),
+      ownGoal: protocolType.value === 'GOAL' ? protocolOwnGoal.value : false,
     })
     ok.value = 'Событие записано в протокол.'
     await load()
@@ -378,13 +399,15 @@ async function saveGoal(event: any) {
     error.value = 'Выберите забившего.'
     return
   }
+  const ownGoal = !!ownGoalDrafts.value[event.id]
   pending.value = true
   try {
     await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
       minute: Number(minuteDrafts.value[event.id] ?? 0),
       playerId,
-      secondaryPlayerId: assistDrafts.value[event.id] || null,
+      secondaryPlayerId: ownGoal ? null : (assistDrafts.value[event.id] || null),
       updatePlayers: true,
+      ownGoal,
     })
     ok.value = 'Гол обновлён.'
     await load()
@@ -441,6 +464,28 @@ async function deleteMatch() {
     await router.push('/admin')
   } catch (e: any) {
     error.value = apiError(e, 'Матч не удалился.')
+    pending.value = false
+  }
+}
+
+async function saveKeepers() {
+  error.value = ''
+  ok.value = ''
+  pending.value = true
+  try {
+    await api.put(`/admin/matches/${match.value.id}/goalkeeper`, {
+      teamId: match.value.homeTeamId,
+      playerId: homeKeeperId.value || null,
+    })
+    await api.put(`/admin/matches/${match.value.id}/goalkeeper`, {
+      teamId: match.value.awayTeamId,
+      playerId: awayKeeperId.value || null,
+    })
+    ok.value = 'Вратари сохранены.'
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e, 'Вратари не сохранились.')
+  } finally {
     pending.value = false
   }
 }
@@ -601,8 +646,29 @@ onUnmounted(() => {
           >Снять</button>
         </div>
       </form>
+      <form class="stack motm-form" @submit.prevent="saveKeepers">
+        <h2>Вратари</h2>
+        <p class="muted">Кто стоял в воротах. Один на команду, новый выбор заменяет предыдущий. Если оставить «Как в составе», сухой матч засчитается вратарю из заявленного состава.</p>
+        <label class="field">{{ teams.fullName(match.homeTeamId) }}
+          <select v-model="homeKeeperId">
+            <option value="">Как в составе</option>
+            <option v-for="player in playersOf(match.homeTeamId)" :key="player.playerId" :value="player.playerId">
+              {{ protocolPlayerLabel(player) }}
+            </option>
+          </select>
+        </label>
+        <label class="field">{{ teams.fullName(match.awayTeamId) }}
+          <select v-model="awayKeeperId">
+            <option value="">Как в составе</option>
+            <option v-for="player in playersOf(match.awayTeamId)" :key="player.playerId" :value="player.playerId">
+              {{ protocolPlayerLabel(player) }}
+            </option>
+          </select>
+        </label>
+        <button class="btn" type="submit" :disabled="pending">Сохранить вратарей</button>
+      </form>
       <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. У гола можно сменить забившего и ассистента: пас не обязателен, его можно убрать. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
+      <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и ассистента можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
         <label class="field">Событие
           <select v-model="protocolType">
@@ -628,6 +694,10 @@ onUnmounted(() => {
         <label class="field">Минута от начала
           <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
         </label>
+        <label v-if="protocolType === 'GOAL'" class="check-line">
+          <input v-model="protocolOwnGoal" type="checkbox" />
+          Автогол
+        </label>
         <button class="btn" type="submit" :disabled="pending || !protocolPlayers.length">Добавить в протокол</button>
       </form>
       <div v-for="ev in editableEvents" :key="ev.id" class="proto-row">
@@ -645,7 +715,16 @@ onUnmounted(() => {
               @update:model-value="onScorerChange(ev.id, $event)"
             />
           </span>
-          <span class="field player">Ассистент
+          <label class="check-line">
+            <input
+              type="checkbox"
+              :checked="!!ownGoalDrafts[ev.id]"
+              :disabled="pending"
+              @change="onOwnGoalInput(ev.id, $event)"
+            />
+            Автогол
+          </label>
+          <span v-if="!ownGoalDrafts[ev.id]" class="field player">Ассистент
             <SquadPlayerSelect
               v-model="assistDrafts[ev.id]"
               :options="assistOptions(ev.id)"
@@ -724,7 +803,8 @@ onUnmounted(() => {
             >
               <span class="who-ev">
                 <b>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
-                <span v-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="line">
+                <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
+                <span v-if="ev.eventType === 'GOAL' && !isOwnGoal(ev) && registeredName(ev, 'secondary')" class="line">
                   пас {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}
                 </span>
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
@@ -1117,6 +1197,23 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   margin: 0.25rem 0;
 }
 .protocol-form { margin: 0.4rem 0 0.8rem; }
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+.own-tag {
+  margin-left: 0.35rem;
+  color: var(--navy);
+  background: color-mix(in srgb, var(--ice) 35%, #fff);
+  border-radius: 999px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
 .proto-row {
   display: flex;
   flex-wrap: wrap;

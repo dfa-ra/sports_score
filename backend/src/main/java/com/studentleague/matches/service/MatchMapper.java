@@ -76,12 +76,17 @@ public class MatchMapper {
                 match.getVenue(),
                 lastGoalScorer,
                 MatchListFields.minute(match, Instant.now()),
-                playerOfTheMatch(match)
+                playerOfTheMatch(match),
+                namedPlayer(match.getHomeGoalkeeperId()),
+                namedPlayer(match.getAwayGoalkeeperId())
         );
     }
 
     private PlayerOfTheMatchResponse playerOfTheMatch(Match match) {
-        UUID playerId = match.getPlayerOfTheMatchId();
+        return namedPlayer(match.getPlayerOfTheMatchId());
+    }
+
+    private PlayerOfTheMatchResponse namedPlayer(UUID playerId) {
         if (playerId == null) {
             return null;
         }

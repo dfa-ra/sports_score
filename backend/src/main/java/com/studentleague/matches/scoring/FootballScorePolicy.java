@@ -23,8 +23,7 @@ public class FootballScorePolicy implements ScorePolicy {
             if (event.getEventType() != MatchEventType.GOAL || event.getTeamId() == null) {
                 continue;
             }
-            boolean ownGoal = event.getMetadata() != null
-                    && Boolean.TRUE.equals(event.getMetadata().get("ownGoal"));
+            boolean ownGoal = OwnGoals.is(event);
             if (event.getTeamId().equals(homeTeamId)) {
                 if (ownGoal) {
                     away++;

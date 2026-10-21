@@ -8,6 +8,7 @@ import com.studentleague.matches.entity.MatchLineupPlayer;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
@@ -100,7 +101,11 @@ public class StatisticsService {
                     PlayerAccumulator acc = stats.computeIfAbsent(event.getPlayerId(), PlayerAccumulator::new);
                     appeared.add(event.getPlayerId());
                     switch (event.getEventType()) {
-                        case GOAL -> acc.goals++;
+                        case GOAL -> {
+                            if (!OwnGoals.is(event)) {
+                                acc.goals++;
+                            }
+                        }
                         case ASSIST -> acc.assists++;
                         case YELLOW_CARD -> acc.yellowCards++;
                         case RED_CARD -> acc.redCards++;
@@ -112,6 +117,7 @@ public class StatisticsService {
                     }
                 }
                 if (event.getEventType() == com.studentleague.matches.domain.MatchEventType.GOAL
+                        && !OwnGoals.is(event)
                         && event.getSecondaryPlayerId() != null
                         && (playerId == null || playerId.equals(event.getSecondaryPlayerId()))) {
                     PlayerAccumulator assist = stats.computeIfAbsent(event.getSecondaryPlayerId(), PlayerAccumulator::new);
@@ -331,6 +337,15 @@ public class StatisticsService {
             UUID teamId,
             boolean clean
     ) {
+        UUID chosen = designatedKeeper(match, teamId);
+        if (chosen != null) {
+            counts.appearances.merge(chosen, 1L, Long::sum);
+            counts.noteTeam(chosen, teamId);
+            if (clean) {
+                counts.cleanSheets.merge(chosen, 1L, Long::sum);
+            }
+            return true;
+        }
         List<UUID> keepers = lineups.getOrDefault(match.getId() + ":" + teamId, List.of()).stream()
                 .map(MatchLineupPlayer::getPlayerId)
                 .filter(playerId -> looksLikeGoalkeeper(positionOf(profiles, playerId)))
@@ -369,6 +384,19 @@ public class StatisticsService {
                     counts.appearances.merge(keeperId, 1L, Long::sum);
                     counts.noteTeam(keeperId, teamId);
                 });
+    }
+
+    private static UUID designatedKeeper(Match match, UUID teamId) {
+        if (match == null || teamId == null) {
+            return null;
+        }
+        if (teamId.equals(match.getHomeTeamId())) {
+            return match.getHomeGoalkeeperId();
+        }
+        if (teamId.equals(match.getAwayTeamId())) {
+            return match.getAwayGoalkeeperId();
+        }
+        return null;
     }
 
     private static String positionOf(Map<UUID, PlayerProfile> profiles, UUID playerId) {

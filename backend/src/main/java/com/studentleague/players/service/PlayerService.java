@@ -9,6 +9,7 @@ import com.studentleague.matches.entity.MatchLineupPlayer;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.dto.PlayerCardResponse;
 import com.studentleague.players.dto.PlayerProfileRequest;
 import com.studentleague.players.dto.PlayerProfileResponse;
@@ -182,8 +183,10 @@ public class PlayerService {
                 teamSummary = toTeamSummary(team, captainTeamIds.contains(team.getId()));
             }
         }
-        List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(playerId, memberships);
-        Map<String, Object> statistics = seasonTotals(history, profile.getPosition());
+        CleanSheetTally sheets = new CleanSheetTally();
+        List<PlayerCardResponse.MatchHistoryItem> history = buildMatchHistory(
+                playerId, memberships, profile.getPosition(), sheets);
+        Map<String, Object> statistics = seasonTotals(history, profile.getPosition(), sheets);
 
         return new PlayerCardResponse(
                 profile.getId(),
@@ -206,7 +209,11 @@ public class PlayerService {
                 team.getId(), team.getName(), team.getShortName(), team.getLogoUrl(), captain);
     }
 
-    private Map<String, Object> seasonTotals(List<PlayerCardResponse.MatchHistoryItem> history, String position) {
+    private Map<String, Object> seasonTotals(
+            List<PlayerCardResponse.MatchHistoryItem> history,
+            String position,
+            CleanSheetTally sheets
+    ) {
         Map<String, Object> statistics = new LinkedHashMap<>();
         List<PlayerCardResponse.MatchHistoryItem> finished = history.stream()
                 .filter(item -> MatchStatus.FINISHED.name().equals(item.status()))
@@ -216,23 +223,38 @@ public class PlayerService {
         statistics.put("assists", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::assists).sum());
         statistics.put("yellowCards", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::yellowCards).sum());
         statistics.put("redCards", finished.stream().mapToInt(PlayerCardResponse.MatchHistoryItem::redCards).sum());
-        if (looksLikeGoalkeeper(position)) {
-            long cleanSheets = finished.stream().filter(PlayerService::isCleanSheet).count();
-            statistics.put("cleanSheets", cleanSheets);
+        if (sheets.relevant || looksLikeGoalkeeper(position)) {
+            statistics.put("cleanSheets", sheets.count);
         }
         return statistics;
     }
 
-    private static boolean isCleanSheet(PlayerCardResponse.MatchHistoryItem item) {
-        int conceded = item.home() ? nz(item.awayScore()) : nz(item.homeScore());
-        return conceded == 0;
+    private static boolean stoodInGoal(Match match, UUID playerId, UUID teamId, String position) {
+        if (match == null || playerId == null || teamId == null) {
+            return false;
+        }
+        UUID chosen = null;
+        if (teamId.equals(match.getHomeTeamId())) {
+            chosen = match.getHomeGoalkeeperId();
+        } else if (teamId.equals(match.getAwayTeamId())) {
+            chosen = match.getAwayGoalkeeperId();
+        }
+        if (chosen != null) {
+            return chosen.equals(playerId);
+        }
+        return looksLikeGoalkeeper(position);
     }
 
     private static int nz(Integer value) {
         return value == null ? 0 : value;
     }
 
-    private List<PlayerCardResponse.MatchHistoryItem> buildMatchHistory(UUID playerId, List<TeamMember> memberships) {
+    private List<PlayerCardResponse.MatchHistoryItem> buildMatchHistory(
+            UUID playerId,
+            List<TeamMember> memberships,
+            String position,
+            CleanSheetTally sheets
+    ) {
         List<MatchLineupPlayer> lineups = lineupPlayerRepository.findByPlayerId(playerId);
         List<MatchEvent> involvement = matchEventRepository.findActiveInvolvingPlayer(playerId);
 
@@ -246,6 +268,9 @@ public class PlayerService {
         Set<UUID> matchIds = new HashSet<>();
         matchIds.addAll(lineupByMatch.keySet());
         matchIds.addAll(eventsByMatch.keySet());
+        for (Match kept : matchRepository.findByHomeGoalkeeperIdOrAwayGoalkeeperId(playerId, playerId)) {
+            matchIds.add(kept.getId());
+        }
         if (matchIds.isEmpty()) {
             return List.of();
         }
@@ -297,7 +322,11 @@ public class PlayerService {
                 }
                 if (playerId.equals(event.getPlayerId())) {
                     switch (event.getEventType()) {
-                        case GOAL -> goals++;
+                        case GOAL -> {
+                            if (!OwnGoals.is(event)) {
+                                goals++;
+                            }
+                        }
                         case ASSIST -> assists++;
                         case YELLOW_CARD -> yellowCards++;
                         case RED_CARD -> redCards++;
@@ -306,8 +335,16 @@ public class PlayerService {
                     }
                 }
                 if (event.getEventType() == MatchEventType.GOAL
+                        && !OwnGoals.is(event)
                         && playerId.equals(event.getSecondaryPlayerId())) {
                     assists++;
+                }
+            }
+            if (stoodInGoal(match, playerId, teamId, position)) {
+                sheets.relevant = true;
+                int conceded = home ? nz(match.getAwayScore()) : nz(match.getHomeScore());
+                if (match.getStatus() == MatchStatus.FINISHED && conceded == 0) {
+                    sheets.count++;
                 }
             }
 
@@ -388,6 +425,11 @@ public class PlayerService {
         // Stored game time is seconds from kickoff once it reaches two minutes.
         // Smaller legacy values were sometimes a bare minute and stay as typed.
         return lastEventMinute >= 120 ? lastEventMinute / 60 : lastEventMinute;
+    }
+
+    private static final class CleanSheetTally {
+        private int count;
+        private boolean relevant;
     }
 
     private static boolean looksLikeGoalkeeper(String position) {

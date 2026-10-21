@@ -4,8 +4,10 @@ import com.studentleague.matches.dto.AdminCreateMatchEventRequest;
 import com.studentleague.matches.dto.AdminUpdateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.SetMatchGoalkeeperRequest;
 import com.studentleague.matches.dto.SetPlayerOfTheMatchRequest;
 import com.studentleague.matches.service.AdminMatchProtocolService;
+import com.studentleague.matches.service.MatchGoalkeeperService;
 import com.studentleague.matches.service.PlayerOfTheMatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,13 +35,25 @@ public class AdminMatchController {
 
     private final AdminMatchProtocolService protocolService;
     private final PlayerOfTheMatchService playerOfTheMatchService;
+    private final MatchGoalkeeperService matchGoalkeeperService;
 
     public AdminMatchController(
             AdminMatchProtocolService protocolService,
-            PlayerOfTheMatchService playerOfTheMatchService
+            PlayerOfTheMatchService playerOfTheMatchService,
+            MatchGoalkeeperService matchGoalkeeperService
     ) {
         this.protocolService = protocolService;
         this.playerOfTheMatchService = playerOfTheMatchService;
+        this.matchGoalkeeperService = matchGoalkeeperService;
+    }
+
+    @PutMapping("/{id}/goalkeeper")
+    @Operation(summary = "Set or clear who stood in goal for one team (ADMIN)")
+    public MatchResponse setGoalkeeper(
+            @PathVariable UUID id,
+            @Valid @RequestBody SetMatchGoalkeeperRequest request
+    ) {
+        return matchGoalkeeperService.setByAdmin(id, request);
     }
 
     @PutMapping("/{id}/player-of-the-match")

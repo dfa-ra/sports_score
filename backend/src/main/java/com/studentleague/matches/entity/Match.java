@@ -71,6 +71,12 @@ public class Match {
     @Column(name = "player_of_the_match_id")
     private UUID playerOfTheMatchId;
 
+    @Column(name = "home_goalkeeper_id")
+    private UUID homeGoalkeeperId;
+
+    @Column(name = "away_goalkeeper_id")
+    private UUID awayGoalkeeperId;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -220,5 +226,21 @@ public class Match {
 
     public void setPlayerOfTheMatchId(UUID playerOfTheMatchId) {
         this.playerOfTheMatchId = playerOfTheMatchId;
+    }
+
+    public UUID getHomeGoalkeeperId() {
+        return homeGoalkeeperId;
+    }
+
+    public void setHomeGoalkeeperId(UUID homeGoalkeeperId) {
+        this.homeGoalkeeperId = homeGoalkeeperId;
+    }
+
+    public UUID getAwayGoalkeeperId() {
+        return awayGoalkeeperId;
+    }
+
+    public void setAwayGoalkeeperId(UUID awayGoalkeeperId) {
+        this.awayGoalkeeperId = awayGoalkeeperId;
     }
 }

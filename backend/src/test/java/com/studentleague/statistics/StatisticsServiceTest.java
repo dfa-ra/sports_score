@@ -26,6 +26,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -174,6 +175,91 @@ class StatisticsServiceTest {
         assertThat(rows.getFirst().lastName()).isEqualTo("Вратарёв");
         assertThat(rows.getFirst().cleanSheets()).isEqualTo(1);
         assertThat(rows.getFirst().appearances()).isEqualTo(2);
+    }
+
+    @Test
+    void ownGoalDoesNotCountTowardTheScorerOrTheAssist() {
+        UUID matchId = UUID.randomUUID();
+        UUID scorerId = UUID.randomUUID();
+        UUID assistId = UUID.randomUUID();
+        UUID teamId = UUID.randomUUID();
+
+        Match match = new Match();
+        match.setId(matchId);
+        match.setHomeTeamId(teamId);
+        match.setAwayTeamId(UUID.randomUUID());
+
+        MatchEvent own = new MatchEvent();
+        own.setMatchId(matchId);
+        own.setEventType(MatchEventType.GOAL);
+        own.setPlayerId(scorerId);
+        own.setSecondaryPlayerId(assistId);
+        own.setTeamId(teamId);
+        own.setMetadata(Map.of("ownGoal", true));
+
+        MatchEvent normal = new MatchEvent();
+        normal.setMatchId(matchId);
+        normal.setEventType(MatchEventType.GOAL);
+        normal.setPlayerId(scorerId);
+        normal.setTeamId(teamId);
+
+        when(matchRepository.findAll()).thenReturn(List.of(match));
+        when(matchEventRepository.findByMatchIdInAndVoidedFalse(any())).thenReturn(List.of(own, normal));
+        when(playerProfileRepository.findAllById(any())).thenReturn(List.of());
+
+        List<PlayerStatisticsResponse> stats = statisticsService.playerStatistics(null, null, null, null);
+
+        PlayerStatisticsResponse scorer = stats.stream()
+                .filter(row -> scorerId.equals(row.playerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(scorer.goals()).isEqualTo(1);
+        assertThat(scorer.assists()).isZero();
+        assertThat(stats.stream().noneMatch(row -> assistId.equals(row.playerId()))).isTrue();
+    }
+
+    @Test
+    void chosenGoalkeeperTakesTheCleanSheetAndAnUnsetMatchKeepsTheLineupKeeper() {
+        UUID tournamentId = UUID.randomUUID();
+        UUID homeId = UUID.randomUUID();
+        UUID awayId = UUID.randomUUID();
+        UUID keeperId = UUID.randomUUID();
+        UUID forwardId = UUID.randomUUID();
+        UUID chosenId = UUID.randomUUID();
+        UUID plainId = UUID.randomUUID();
+
+        Match chosen = finished(chosenId, tournamentId, homeId, awayId, 1, 0);
+        chosen.setHomeGoalkeeperId(forwardId);
+        Match plain = finished(plainId, tournamentId, homeId, awayId, 2, 0);
+
+        when(matchRepository.findByTournamentId(tournamentId)).thenReturn(List.of(chosen, plain));
+        when(lineupPlayerRepository.findByMatchIdIn(any())).thenReturn(List.of(
+                lineup(chosenId, homeId, keeperId),
+                lineup(chosenId, homeId, forwardId),
+                lineup(plainId, homeId, keeperId),
+                lineup(plainId, homeId, forwardId)
+        ));
+        when(playerProfileRepository.findAllById(any())).thenReturn(List.of(
+                profile(keeperId, "Иван Вратарёв", "Вратарь"),
+                profile(forwardId, "Пётр Нападающий", "Нападающий")
+        ));
+        when(matchEventRepository.findByMatchIdInAndVoidedFalse(any())).thenReturn(List.of());
+
+        List<PlayerStatisticsResponse> rows = statisticsService.goalkeepers(tournamentId, 10);
+
+        assertThat(rows).extracting(PlayerStatisticsResponse::playerId).containsExactlyInAnyOrder(keeperId, forwardId);
+        PlayerStatisticsResponse keeper = rows.stream()
+                .filter(row -> keeperId.equals(row.playerId()))
+                .findFirst()
+                .orElseThrow();
+        PlayerStatisticsResponse forward = rows.stream()
+                .filter(row -> forwardId.equals(row.playerId()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(keeper.cleanSheets()).isEqualTo(1);
+        assertThat(forward.cleanSheets()).isEqualTo(1);
+        assertThat(keeper.appearances()).isEqualTo(1);
+        assertThat(forward.appearances()).isEqualTo(1);
     }
 
     @Test

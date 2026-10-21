@@ -74,3 +74,30 @@ test('protocol order follows the match minute, earlier first', () => {
   assert.deepEqual(ordered, ['first-half-early', 'first-half-late', 'second-half', 'card'])
   assert.deepEqual(byWritten, ordered)
 })
+
+test('an own goal adds the minute to the other team and keeps the kickoff minute', () => {
+  const home = 'home'
+  const blocks = buildPeriodBlocks([
+    {
+      id: 'own',
+      eventType: 'GOAL',
+      teamId: home,
+      period: 1,
+      gameTime: 5 * 60,
+      timestamp: '2026-10-04T12:05:00Z',
+      metadata: { ownGoal: true },
+    },
+    {
+      id: 'normal',
+      eventType: 'GOAL',
+      teamId: home,
+      period: 1,
+      gameTime: 9 * 60,
+      timestamp: '2026-10-04T12:09:00Z',
+    },
+  ], { homeTeamId: home })
+
+  assert.equal(eventMinute(blocks[0].items[0].gameTime), 5)
+  assert.deepEqual(blocks[0].items.map((item) => item.scoreline), ['0-1', '1-1'])
+  assert.equal(blocks[0].score, '1-1')
+})

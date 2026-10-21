@@ -6,7 +6,9 @@ import com.studentleague.matches.dto.AssignAnalystsRequest;
 import com.studentleague.matches.dto.CreateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.SetMatchGoalkeeperRequest;
 import com.studentleague.matches.service.AnalystAssignmentService;
+import com.studentleague.matches.service.MatchGoalkeeperService;
 import com.studentleague.matches.service.RefereeMatchService;
 import com.studentleague.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,13 +41,26 @@ public class RefereeController {
 
     private final RefereeMatchService refereeMatchService;
     private final AnalystAssignmentService analystAssignmentService;
+    private final MatchGoalkeeperService matchGoalkeeperService;
 
     public RefereeController(
             RefereeMatchService refereeMatchService,
-            AnalystAssignmentService analystAssignmentService
+            AnalystAssignmentService analystAssignmentService,
+            MatchGoalkeeperService matchGoalkeeperService
     ) {
         this.refereeMatchService = refereeMatchService;
         this.analystAssignmentService = analystAssignmentService;
+        this.matchGoalkeeperService = matchGoalkeeperService;
+    }
+
+    @PutMapping("/matches/{id}/goalkeeper")
+    @Operation(summary = "Set or clear who stood in goal for one team (assigned referee or admin)")
+    public MatchResponse setGoalkeeper(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody SetMatchGoalkeeperRequest request
+    ) {
+        return matchGoalkeeperService.setByReferee(principal, id, request);
     }
 
     @GetMapping("/analysts")

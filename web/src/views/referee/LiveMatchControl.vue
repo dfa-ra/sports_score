@@ -21,11 +21,13 @@ type Sheet = {
   step: Step
   teamId?: string
   player?: any
+  ownGoal?: boolean
 }
 
 const route = useRoute()
 const match = ref<any>(null)
 const events = ref<any[]>([])
+const lineups = ref<any>(null)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
 const message = ref('')
@@ -54,6 +56,7 @@ const sheetTitle = computed(() => {
   const current = sheet.value
   if (!current) return ''
   if (current.kind === 'GOAL') {
+    if (current.ownGoal) return 'Кто забил в свои ворота?'
     if (current.step === 'team') return 'Кто забил?'
     if (current.step === 'player') return 'Кто забил гол?'
     return 'Кто отдал передачу?'
@@ -67,8 +70,11 @@ const sheetTitle = computed(() => {
 const sheetHint = computed(() => {
   const current = sheet.value
   if (!current) return ''
+  if (current.kind === 'GOAL' && current.ownGoal) {
+    return 'Очко получит соперник. Передачи нет.'
+  }
   if (current.kind === 'GOAL' && current.step === 'assist' && current.player) {
-    return `Гол: ${nameOf(current.player)}. Если паса не было — пропустите.`
+    return `Гол: ${nameOf(current.player)}. Если паса не было — пропустите. Автогол — мяч в свои ворота.`
   }
   if (current.step === 'team') return heldClock.value ? 'Часы стоят. Сначала команда.' : 'Сначала команда.'
   return heldClock.value ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.'
@@ -77,12 +83,14 @@ const sheetHint = computed(() => {
 async function reload() {
   await teams.load()
   const id = route.params.id
-  const [m, e] = await Promise.all([
+  const [m, e, l] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
+    api.get(`/matches/${id}/lineups`),
   ])
   match.value = m.data
   events.value = e.data
+  lineups.value = l.data
   const [home, away] = await Promise.all([
     api.get(`/teams/${m.data.homeTeamId}/members`),
     api.get(`/teams/${m.data.awayTeamId}/members`),
@@ -172,25 +180,72 @@ function pickTeam(teamId: string) {
   sheet.value = { ...sheet.value, teamId, step: 'player' }
 }
 
+function keeperChoices(teamId?: string) {
+  if (!match.value || !teamId) return []
+  const home = teamId === match.value.homeTeamId
+  const side = home ? lineups.value?.home : lineups.value?.away
+  if (side?.confirmed) return [...(side.starters ?? []), ...(side.bench ?? [])]
+  return home ? homeRoster.value : awayRoster.value
+}
+
+function chosenKeeperId(teamId?: string) {
+  if (!match.value || !teamId) return ''
+  const picked = teamId === match.value.homeTeamId ? match.value.homeGoalkeeper : match.value.awayGoalkeeper
+  return picked?.playerId || ''
+}
+
+function toggleOwnGoal() {
+  const current = sheet.value
+  if (!current) return
+  sheet.value = { ...current, ownGoal: !current.ownGoal }
+}
+
 function pickPlayer(player: any) {
   const current = sheet.value
   if (!current?.teamId) return
   if (current.kind === 'GOAL') {
+    if (current.ownGoal) {
+      addEvent({
+        eventType: 'GOAL',
+        teamId: current.teamId,
+        playerId: player.playerId,
+        metadata: { ownGoal: true },
+      })
+      return
+    }
     sheet.value = { ...current, player, step: 'assist' }
     return
   }
   addEvent({ eventType: current.kind, teamId: current.teamId, playerId: player.playerId })
 }
 
-function confirmGoal(assistPlayerId?: string | null) {
+function confirmGoal(assistPlayerId?: string | null, ownGoal = false) {
   const current = sheet.value
   if (!current?.teamId || !current.player) return
+  const flagged = ownGoal || !!current.ownGoal
   addEvent({
     eventType: 'GOAL',
     teamId: current.teamId,
     playerId: current.player.playerId,
-    secondaryPlayerId: assistPlayerId || undefined,
+    secondaryPlayerId: flagged ? undefined : (assistPlayerId || undefined),
+    metadata: flagged ? { ownGoal: true } : undefined,
   })
+}
+
+async function setKeeper(teamId: string, playerId: string) {
+  if (!playerId || chosenKeeperId(teamId) === playerId) return
+  message.value = ''
+  error.value = ''
+  pending.value = true
+  try {
+    await api.put(`/referee/matches/${route.params.id}/goalkeeper`, { teamId, playerId })
+    message.value = 'Вратарь записан.'
+    await reload()
+  } catch (e: any) {
+    error.value = apiError(e, 'Вратаря не удалось записать')
+  } finally {
+    pending.value = false
+  }
 }
 
 function backSheet() {
@@ -272,6 +327,37 @@ onUnmounted(() => {
     </div>
     <p v-if="expired && live" class="form-ok">Время тайма вышло.</p>
 
+    <div class="panel stack keepers">
+      <h2>Вратари</h2>
+      <p class="muted">Нажмите, кто стоял в воротах. Другой выбор заменяет первый. Если никого не нажать, останется вратарь из состава.</p>
+      <div class="keeper-grid">
+        <div>
+          <h3>{{ homeLabel }}</h3>
+          <p v-if="!keeperChoices(match.homeTeamId).length" class="muted">В составе никого.</p>
+          <button
+            v-for="p in keeperChoices(match.homeTeamId)"
+            :key="p.playerId"
+            class="btn secondary pick"
+            :class="{ on: chosenKeeperId(match.homeTeamId) === p.playerId }"
+            :disabled="pending"
+            @click="setKeeper(match.homeTeamId, p.playerId)"
+          >{{ nameOf(p) }}</button>
+        </div>
+        <div>
+          <h3>{{ awayLabel }}</h3>
+          <p v-if="!keeperChoices(match.awayTeamId).length" class="muted">В составе никого.</p>
+          <button
+            v-for="p in keeperChoices(match.awayTeamId)"
+            :key="p.playerId"
+            class="btn secondary pick"
+            :class="{ on: chosenKeeperId(match.awayTeamId) === p.playerId }"
+            :disabled="pending"
+            @click="setKeeper(match.awayTeamId, p.playerId)"
+          >{{ nameOf(p) }}</button>
+        </div>
+      </div>
+    </div>
+
     <div class="grid events">
       <button class="btn large goal" :disabled="pending || !live" @click="openSheet('GOAL')">Гол</button>
       <button class="btn large yellow" :disabled="pending || !live" @click="openSheet('YELLOW_CARD')">Жёлтая</button>
@@ -295,7 +381,7 @@ onUnmounted(() => {
         <p class="step">
           {{ sheet.step === 'team' ? '1' : sheet.step === 'player' ? '2' : '3' }}
           /
-          {{ sheet.kind === 'GOAL' ? '3' : '2' }}
+          {{ sheet.kind === 'GOAL' && !sheet.ownGoal ? '3' : '2' }}
         </p>
         <h2>{{ sheetTitle }}</h2>
         <p class="muted">{{ sheetHint }}</p>
@@ -306,6 +392,14 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="sheet.step === 'player'" class="chip-col">
+          <button
+            v-if="sheet.kind === 'GOAL'"
+            class="btn large"
+            :class="{ on: sheet.ownGoal }"
+            type="button"
+            :disabled="pending"
+            @click="toggleOwnGoal"
+          >Автогол</button>
           <p v-if="!rosterOf(sheet.teamId).length" class="muted">В заявке никого.</p>
           <button
             v-for="p in rosterOf(sheet.teamId)"
@@ -317,6 +411,7 @@ onUnmounted(() => {
         </div>
 
         <div v-else class="chip-col">
+          <button class="btn large on" :disabled="pending" @click="confirmGoal(null, true)">Автогол</button>
           <button class="btn large" :disabled="pending" @click="confirmGoal(null)">Без передачи</button>
           <button
             v-for="p in rosterOf(sheet.teamId).filter((x: any) => x.playerId !== sheet?.player?.playerId)"
@@ -410,6 +505,10 @@ h2 { font-size: 1.15rem; margin: 0 0 0.35rem; }
 .pick-grid { display: grid; gap: 0.6rem; margin-top: 0.9rem; }
 .chip-col { display: grid; gap: 0.45rem; margin-top: 0.9rem; }
 .btn.pick { justify-content: flex-start; text-align: left; }
+.btn.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.keepers h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+.keeper-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+.keeper-grid .btn { margin-bottom: 0.35rem; }
 .sheet-nav {
   display: flex;
   justify-content: space-between;

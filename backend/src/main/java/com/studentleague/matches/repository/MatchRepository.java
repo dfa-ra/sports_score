@@ -34,6 +34,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
 
     boolean existsByHomeTeamIdOrAwayTeamId(UUID homeTeamId, UUID awayTeamId);
 
+    List<Match> findByHomeGoalkeeperIdOrAwayGoalkeeperId(UUID homeGoalkeeperId, UUID awayGoalkeeperId);
+
     /**
      * Last finished matches for a team, with both clubs' names and crests.
      * One select: home and away teams are joined, not loaded per row.
