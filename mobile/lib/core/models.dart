@@ -230,6 +230,8 @@ class MatchEvent {
     this.secondaryPlayerFirstName = '',
     this.secondaryPlayerLastName = '',
     this.secondaryPlayerJersey,
+    this.playerId,
+    this.ownGoal = false,
     this.gameTime,
     this.period,
     this.voided = false,
@@ -238,6 +240,8 @@ class MatchEvent {
   final String id;
   final String eventType;
   final String teamId;
+  final String? playerId;
+  final bool ownGoal;
   final String? playerName;
   final String playerFirstName;
   final String playerLastName;
@@ -263,6 +267,9 @@ class MatchEvent {
       secondaryPlayerFirstName: json['secondaryPlayerFirstName']?.toString() ?? '',
       secondaryPlayerLastName: json['secondaryPlayerLastName']?.toString() ?? '',
       secondaryPlayerJersey: (json['secondaryPlayerJersey'] as num?)?.toInt(),
+      playerId: json['playerId']?.toString(),
+      ownGoal: json['eventType']?.toString() == 'OWN_GOAL' ||
+          (json['metadata'] is Map && (json['metadata'] as Map)['ownGoal'] == true),
       gameTime: (json['gameTime'] as num?)?.toInt() ?? (json['gameTimeSeconds'] as num?)?.toInt(),
       period: (json['period'] as num?)?.toInt(),
       voided: json['voided'] == true,

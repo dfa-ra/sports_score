@@ -25,6 +25,19 @@ export function compareMatchEvents(a: TimedEvent, b: TimedEvent) {
 
 const visibleTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'OWN_GOAL'])
 
+/**
+ * Which touchline the row belongs to. An own goal is filed with the team that
+ * received the point. The event still names the player who kicked it in.
+ */
+export function eventOnHomeSide(
+  ev: { eventType?: string | null; teamId?: string | null; metadata?: { ownGoal?: boolean } | null },
+  homeTeamId?: string | null,
+) {
+  const byHome = ev.teamId === homeTeamId
+  const ownGoal = ev.eventType === 'OWN_GOAL' || (ev.eventType === 'GOAL' && ev.metadata?.ownGoal === true)
+  return ownGoal ? !byHome : byHome
+}
+
 export function buildPeriodBlocks<T extends TimedEvent>(
   events: T[],
   match: { homeTeamId?: string | null },
@@ -37,17 +50,16 @@ export function buildPeriodBlocks<T extends TimedEvent>(
   const byPeriod = new Map<number, { items: Array<T & { home: boolean; scoreline: string | null }>; score: string }>()
   for (const ev of chrono) {
     const scoring = ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL'
+    const forHome = eventOnHomeSide(ev, match.homeTeamId)
     if (scoring) {
-      const byHome = ev.teamId === match.homeTeamId
-      const ownGoal = ev.eventType === 'OWN_GOAL' || ev.metadata?.ownGoal === true
-      if (ownGoal ? !byHome : byHome) home += 1
+      if (forHome) home += 1
       else away += 1
     }
     const period = ev.period || 1
     const block = byPeriod.get(period) ?? { items: [], score: '0-0' }
     block.items.push({
       ...ev,
-      home: ev.teamId === match.homeTeamId,
+      home: forHome,
       scoreline: scoring ? `${home}-${away}` : null,
     })
     block.score = `${home}-${away}`

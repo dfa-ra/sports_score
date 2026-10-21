@@ -90,8 +90,15 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
     var away = 0;
     final map = <int, _PeriodBlock>{};
     for (final ev in chrono) {
-      if (ev.eventType == 'GOAL' || ev.eventType == 'OWN_GOAL') {
-        if (ev.teamId == current.homeTeamId) {
+      final scoring = ev.eventType == 'GOAL' || ev.eventType == 'OWN_GOAL';
+      final forHome = eventOnHomeSide(
+        teamId: ev.teamId,
+        homeTeamId: current.homeTeamId,
+        eventType: ev.eventType,
+        ownGoal: ev.ownGoal,
+      );
+      if (scoring) {
+        if (forHome) {
           home += 1;
         } else {
           away += 1;
@@ -107,8 +114,8 @@ class _MatchDetailPageState extends State<MatchDetailPage> with SingleTickerProv
       );
       block.items.add(_TimelineItem(
         event: ev,
-        home: ev.teamId == current.homeTeamId,
-        scoreline: ev.eventType == 'GOAL' || ev.eventType == 'OWN_GOAL' ? '$home-$away' : null,
+        home: forHome,
+        scoreline: scoring ? '$home-$away' : null,
       ));
       block.score = '$home-$away';
     }
@@ -464,10 +471,28 @@ class _EventRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final mark = _Mark(type: item.event.eventType);
     final minute = Text("${eventMinute(item.event.gameTime)}'", style: const TextStyle(color: AppColors.muted));
+    final name = Text(item.event.label, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy));
+    final playerId = item.event.playerId;
     final who = Column(
       crossAxisAlignment: item.home ? CrossAxisAlignment.start : CrossAxisAlignment.end,
       children: [
-        Text(item.event.label, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+        if (playerId == null || playerId.isEmpty)
+          name
+        else
+          GestureDetector(
+            onTap: () => context.push('/players/$playerId'),
+            child: name,
+          ),
+        if (item.event.ownGoal || item.event.eventType == 'OWN_GOAL')
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7EEF8),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text('Автогол', style: TextStyle(color: AppColors.navy, fontSize: 11, fontWeight: FontWeight.w800)),
+          ),
         if (item.scoreline != null) Text(item.scoreline!, style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w700)),
       ],
     );
@@ -576,38 +601,74 @@ class _Protocol extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        for (final ev in rows)
-          Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: const Color(0xFFF6F9FC), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 56,
-                  child: Text("${eventMinute(ev.gameTime)}'", style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800)),
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(eventLabel(ev.eventType), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
-                      Text(
-                        [
-                          if (playerTag(ev.visiblePlayerName, ev.playerJersey).isNotEmpty) playerTag(ev.visiblePlayerName, ev.playerJersey),
-                          if (ev.eventType == 'GOAL' && ev.visibleSecondaryName.isNotEmpty) 'пас ${playerTag(ev.visibleSecondaryName, ev.secondaryPlayerJersey)}',
-                          periodLabel(ev.period, sportCode: match.sportCode, periodCount: match.periodCount),
-                        ].join(' · '),
-                        style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+        for (final ev in rows) _ProtocolRow(event: ev, match: match),
       ],
+    );
+  }
+}
+
+class _ProtocolRow extends StatelessWidget {
+  const _ProtocolRow({required this.event, required this.match});
+  final MatchEvent event;
+  final LeagueMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTeam = event.teamId.isNotEmpty;
+    final onHome = !hasTeam ||
+        eventOnHomeSide(
+          teamId: event.teamId,
+          homeTeamId: match.homeTeamId,
+          eventType: event.eventType,
+          ownGoal: event.ownGoal,
+        );
+    final minute = SizedBox(
+      width: 56,
+      child: Text(
+        "${eventMinute(event.gameTime)}'",
+        textAlign: onHome ? TextAlign.right : TextAlign.left,
+        style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800),
+      ),
+    );
+    final who = playerTag(event.visiblePlayerName, event.playerJersey);
+    final playerId = event.playerId;
+    final name = who.isEmpty
+        ? null
+        : (playerId == null || playerId.isEmpty
+            ? Text(who, style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 12))
+            : GestureDetector(
+                onTap: () => context.push('/players/$playerId'),
+                child: Text(who, style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.w800, fontSize: 12)),
+              ));
+    final own = event.ownGoal || event.eventType == 'OWN_GOAL';
+    final detail = [
+      if (!own && event.eventType == 'GOAL' && event.visibleSecondaryName.isNotEmpty)
+        'пас ${playerTag(event.visibleSecondaryName, event.secondaryPlayerJersey)}',
+      periodLabel(event.period, sportCode: match.sportCode, periodCount: match.periodCount),
+    ].join(' · ');
+    final body = Column(
+      crossAxisAlignment: onHome ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      children: [
+        Text(eventLabel(event.eventType), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy)),
+        if (own)
+          Container(
+            margin: const EdgeInsets.only(top: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            decoration: BoxDecoration(color: const Color(0xFFD7EEF8), borderRadius: BorderRadius.circular(999)),
+            child: const Text('Автогол', style: TextStyle(color: AppColors.navy, fontSize: 11, fontWeight: FontWeight.w800)),
+          ),
+        if (name != null) name,
+        Text(detail, style: const TextStyle(color: AppColors.muted, fontSize: 12)),
+      ],
+    );
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFF6F9FC), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.line)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: onHome ? [Expanded(child: body), minute] : [minute, Expanded(child: body)],
+      ),
     );
   }
 }

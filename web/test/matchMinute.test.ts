@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute } from '../src/lib/matchMinute.ts'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide } from '../src/lib/matchMinute.ts'
 
 test('13:00 left in a 15:00 first half displays 2 minutes, not 13', () => {
   const stored = 2 * 60
@@ -98,6 +98,46 @@ test('an own goal adds the minute to the other team and keeps the kickoff minute
   ], { homeTeamId: home })
 
   assert.equal(eventMinute(blocks[0].items[0].gameTime), 5)
+  assert.equal(blocks[0].items[0].home, false)
+  assert.equal(blocks[0].items[1].home, true)
   assert.deepEqual(blocks[0].items.map((item) => item.scoreline), ['0-1', '1-1'])
   assert.equal(blocks[0].score, '1-1')
+})
+
+test('an own goal by the away player is drawn on the home side and raises the home score', () => {
+  const home = 'home'
+  const away = 'away'
+  const blocks = buildPeriodBlocks([
+    {
+      id: 'card',
+      eventType: 'YELLOW_CARD',
+      teamId: away,
+      playerId: 'away-card',
+      period: 2,
+      gameTime: 23 * 60,
+      timestamp: '2026-10-18T12:23:00Z',
+    },
+    {
+      id: 'own',
+      eventType: 'GOAL',
+      teamId: away,
+      playerId: 'away-scorer',
+      period: 2,
+      gameTime: 28 * 60,
+      timestamp: '2026-10-18T12:28:00Z',
+      metadata: { ownGoal: true },
+    },
+  ], { homeTeamId: home })
+
+  const card = blocks[0].items[0]
+  const own = blocks[0].items[1]
+  assert.equal(eventOnHomeSide(card, home), false)
+  assert.equal(card.home, false)
+  assert.equal(card.scoreline, null)
+  assert.equal(eventOnHomeSide(own, home), true)
+  assert.equal(own.home, true)
+  assert.equal(own.scoreline, '1-0')
+  assert.equal(own.playerId, 'away-scorer')
+  assert.equal(own.teamId, away)
+  assert.equal(blocks[0].score, '1-0')
 })

@@ -73,6 +73,18 @@ String matchStateLabel(String status) {
   };
 }
 
+/// Own goals sit with the team that received the point. Cards stay with the player.
+bool eventOnHomeSide({
+  required String? teamId,
+  required String? homeTeamId,
+  required String? eventType,
+  bool ownGoal = false,
+}) {
+  final byHome = teamId != null && teamId == homeTeamId;
+  final own = eventType == 'OWN_GOAL' || (eventType == 'GOAL' && ownGoal);
+  return own ? !byHome : byHome;
+}
+
 int eventMinute(int? gameTime) {
   final raw = gameTime ?? 0;
   if (raw < 0) return 0;

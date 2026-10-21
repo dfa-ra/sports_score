@@ -66,7 +66,7 @@ export function matchStateLabel(status?: string | null) {
   return status || ''
 }
 
-export { buildPeriodBlocks, compareMatchEvents, eventMinute } from './matchMinute'
+export { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide } from './matchMinute'
 
 export function ymd(value?: string | number | Date | null) {
   if (!value) return ''

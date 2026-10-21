@@ -157,7 +157,9 @@ export function isOwnGoal(ev?: {
   eventType?: string | null
   metadata?: { ownGoal?: boolean } | null
 } | null) {
-  return ev?.eventType === 'GOAL' && ev.metadata?.ownGoal === true
+  if (!ev) return false
+  if (ev.eventType === 'OWN_GOAL') return true
+  return ev.eventType === 'GOAL' && ev.metadata?.ownGoal === true
 }
 
 export function eventDetail(ev: {

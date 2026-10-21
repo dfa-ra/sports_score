@@ -5,9 +5,9 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventDetail, eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
+import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, longKickoff, matchStateLabel } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -226,6 +226,26 @@ watch(events, (list) => {
 function freshGoal(event: { id?: string | null; eventType?: string | null }) {
   if (event.eventType !== 'GOAL' && event.eventType !== 'OWN_GOAL') return false
   return enteringGoalIds.value.has(String(event.id))
+}
+
+function protocolSide(ev: { teamId?: string | null; eventType?: string | null; metadata?: { ownGoal?: boolean } | null }) {
+  if (!ev.teamId || !match.value) return 'plain'
+  return eventOnHomeSide(ev, match.value.homeTeamId) ? 'home' : 'away'
+}
+
+function protocolExtra(ev: {
+  eventType?: string | null
+  metadata?: { ownGoal?: boolean } | null
+  secondaryPlayerName?: string | null
+  secondaryPlayerFirstName?: string | null
+  secondaryPlayerLastName?: string | null
+  secondaryPlayerJersey?: number | null
+}) {
+  if (isOwnGoal(ev)) return ''
+  const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
+  if (ev.eventType === 'GOAL' && second) return `· пас ${second}`
+  if (ev.eventType === 'SUBSTITUTION' && second) return `→ ${second}`
+  return ''
 }
 
 function tapTeamStar(side: 'home' | 'away', teamId: string) {
@@ -802,7 +822,10 @@ onUnmounted(() => {
               :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
             >
               <span class="who-ev">
-                <b>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</b>
+                <b>
+                  <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
+                  <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
+                </b>
                 <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
                 <span v-if="ev.eventType === 'GOAL' && !isOwnGoal(ev) && registeredName(ev, 'secondary')" class="line">
                   пас {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}
@@ -905,11 +928,21 @@ onUnmounted(() => {
       <h2>Протокол</h2>
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
-        <li v-for="ev in timeline" :key="ev.id" :class="{ 'goal-enter': freshGoal(ev) }">
+        <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
           <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
-            <p class="muted">{{ eventDetail(ev) }} · {{ periodLabel(ev.period, match.sportCode, match.periodCount) }}</p>
+            <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
+            <p class="muted">
+              <template v-if="ev.playerId || playerTag(registeredName(ev), ev.playerJersey)">
+                <RouterLink v-if="ev.playerId" class="player-link" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || 'Игрок' }}</RouterLink>
+                <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) }}</template>
+                <template v-if="protocolExtra(ev)"> {{ protocolExtra(ev) }}</template>
+                ·
+              </template>
+              <template v-else-if="isOwnGoal(ev)">Автогол · </template>
+              <span class="when-label">{{ periodLabel(ev.period, match.sportCode, match.periodCount) }}</span>
+            </p>
           </div>
         </li>
       </ul>
@@ -1083,6 +1116,7 @@ onUnmounted(() => {
 .ev.away .mark { order: 2; }
 .ev.away em { order: 1; }
 .who-ev { display: grid; gap: 0.1rem; min-width: 0; }
+.who-ev a { color: inherit; }
 .ev b { font-weight: 800; color: var(--navy); }
 .ev em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
 .line { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
@@ -1205,6 +1239,8 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   color: var(--navy);
 }
 .own-tag {
+  justify-self: start;
+  width: max-content;
   margin-left: 0.35rem;
   color: var(--navy);
   background: color-mix(in srgb, var(--ice) 35%, #fff);
@@ -1214,6 +1250,8 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   font-style: normal;
   font-weight: 800;
 }
+.ev.home .own-tag { margin-left: 0; }
+.ev.away .own-tag { justify-self: end; }
 .proto-row {
   display: flex;
   flex-wrap: wrap;
@@ -1237,6 +1275,15 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   border-radius: 12px;
   background: #f6f9fc;
 }
+.timeline li.home {
+  grid-template-columns: 1fr 72px;
+}
+.timeline li.home .t { order: 2; text-align: right; }
+.timeline li.home > div { order: 1; text-align: left; }
+.timeline li.away { text-align: right; }
+.timeline li.away > div { text-align: right; }
+.when-label { white-space: nowrap; }
+.player-link { color: var(--navy); font-weight: 800; }
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
   .board {
