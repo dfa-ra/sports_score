@@ -119,11 +119,19 @@ public class TeamService {
 
     @Transactional(readOnly = true)
     public TeamResponse myTeam(UserPrincipal principal) {
+        if (principal == null) {
+            throw ApiException.unauthorized("Нужно войти");
+        }
         if (!principal.hasAnyRole(Role.PLAYER, Role.CAPTAIN, Role.ADMIN, Role.REFEREE)) {
             throw ApiException.forbidden("У болельщика нет вкладки «Моя команда»");
         }
-        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> ApiException.notFound("Сначала заполните профиль игрока"));
+        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId()).orElse(null);
+        if (profile == null) {
+            if (principal.hasRole(Role.ADMIN) || principal.hasRole(Role.REFEREE)) {
+                throw ApiException.notFound("Вы ещё не в команде");
+            }
+            throw ApiException.notFound("Сначала заполните профиль игрока");
+        }
         return teamMemberRepository.findByPlayerIdAndStatus(profile.getId(), TeamMemberStatus.ACTIVE).stream()
                 .map(member -> teamRepository.findById(member.getTeamId()).orElse(null))
                 .filter(team -> team != null && !team.isDisbanded())
@@ -412,7 +420,7 @@ public class TeamService {
 
     private Team requireTeam(UUID teamId) {
         return teamRepository.findById(teamId)
-                .orElseThrow(() -> ApiException.notFound("Team not found"));
+                .orElseThrow(() -> ApiException.notFound("Команда не найдена"));
     }
 
     private Team requireActiveTeam(UUID teamId) {

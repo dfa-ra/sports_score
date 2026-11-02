@@ -1,5 +1,7 @@
 package com.studentleague.matches.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -10,6 +12,6 @@ public record MatchRefereeResponse(
         Instant assignedAt,
         String firstName,
         String lastName,
-        String email
+        @JsonInclude(JsonInclude.Include.NON_NULL) String email
 ) {
 }

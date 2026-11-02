@@ -32,7 +32,7 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         ApiError error = new ApiError(
                 "UNAUTHORIZED",
-                "Authentication required",
+                "Нужно войти",
                 List.of(),
                 Instant.now(),
                 request.getRequestURI()

@@ -1,17 +1,24 @@
 package com.studentleague.common.exception;
 
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
@@ -19,6 +26,8 @@ import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex, HttpServletRequest request) {
@@ -30,7 +39,7 @@ public class GlobalExceptionHandler {
         List<ApiError.FieldErrorDetail> details = ex.getBindingResult().getFieldErrors().stream()
                 .map(err -> new ApiError.FieldErrorDetail(err.getField(), err.getDefaultMessage()))
                 .toList();
-        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Validation failed", details, request));
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Проверьте введённые данные", details, request));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -38,19 +47,25 @@ public class GlobalExceptionHandler {
         List<ApiError.FieldErrorDetail> details = ex.getConstraintViolations().stream()
                 .map(v -> new ApiError.FieldErrorDetail(v.getPropertyPath().toString(), v.getMessage()))
                 .toList();
-        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Validation failed", details, request));
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Проверьте введённые данные", details, request));
     }
 
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
     public ResponseEntity<ApiError> handleAuth(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(error("UNAUTHORIZED", ex.getMessage() == null ? "Unauthorized" : ex.getMessage(), List.of(), request));
+                .body(error("UNAUTHORIZED", "Нужно войти", List.of(), request));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(error("FORBIDDEN", "Access denied", List.of(), request));
+                .body(error("FORBIDDEN", "Недостаточно прав", List.of(), request));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethod(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(error("METHOD_NOT_ALLOWED", "Метод не поддерживается", List.of(), request));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -62,6 +77,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
         String name = ex.getName() == null ? "id" : ex.getName();
+        if (ex.getRequiredType() != null && ex.getRequiredType().isEnum()) {
+            return ResponseEntity.badRequest().body(error(
+                    "BAD_REQUEST",
+                    "Некорректное значение",
+                    List.of(new ApiError.FieldErrorDetail(name, "Некорректное значение")),
+                    request
+            ));
+        }
         return ResponseEntity.badRequest().body(error(
                 "BAD_REQUEST",
                 "Некорректный идентификатор",
@@ -70,16 +93,50 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleUnreadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        String message = "Некорректное тело запроса";
+        if (ex.getMostSpecificCause() instanceof InvalidFormatException invalid
+                && invalid.getTargetType() != null
+                && invalid.getTargetType().isEnum()) {
+            message = "Некорректное значение";
+        }
+        return ResponseEntity.badRequest().body(error("BAD_REQUEST", message, List.of(), request));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest().body(error(
+                "BAD_REQUEST",
+                "Не хватает параметра",
+                List.of(new ApiError.FieldErrorDetail(ex.getParameterName(), "Обязательный параметр")),
+                request
+        ));
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiError> handleMissingResource(NoResourceFoundException ex, HttpServletRequest request) {
+        String message = request.getRequestURI() != null && request.getRequestURI().startsWith("/api/")
+                ? "Адрес не найден"
+                : "Файл не найден";
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(error("NOT_FOUND", "Файл не найден", List.of(), request));
+                .body(error("NOT_FOUND", message, List.of(), request));
+    }
+
+    @ExceptionHandler(NoHandlerFoundException.class)
+    public ResponseEntity<ApiError> handleNoHandler(NoHandlerFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("NOT_FOUND", "Адрес не найден", List.of(), request));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
+        log.error("Unhandled {} {}", request.getMethod(), request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error("INTERNAL_ERROR", "Unexpected server error", List.of(), request));
+                .body(error("INTERNAL_ERROR", "Внутренняя ошибка сервера", List.of(), request));
     }
 
     private static ApiError error(String code, String message, List<ApiError.FieldErrorDetail> details, HttpServletRequest request) {

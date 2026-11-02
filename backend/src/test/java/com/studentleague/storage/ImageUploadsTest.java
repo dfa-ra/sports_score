@@ -46,6 +46,20 @@ public class ImageUploadsTest {
     }
 
     @Test
+    void rejectsTextDisguisedAsJpegAndOversizedFile() {
+        assertThatThrownBy(() -> ImageUploads.requireRasterImage(new MockMultipartFile(
+                "file", "x.jpg", "image/jpeg", "not an image".getBytes())))
+                .isInstanceOf(ApiException.class);
+        byte[] oversized = new byte[(int) ImageUploads.MAX_BYTES + 1];
+        oversized[0] = (byte) 0xFF;
+        oversized[1] = (byte) 0xD8;
+        oversized[2] = (byte) 0xFF;
+        assertThatThrownBy(() -> ImageUploads.requireRasterImage(new MockMultipartFile(
+                "file", "x.jpg", "image/jpeg", oversized)))
+                .isInstanceOf(ApiException.class);
+    }
+
+    @Test
     void rejectsSvgAndEmpty() {
         assertThatThrownBy(() -> ImageUploads.requireRasterImage(new MockMultipartFile(
                 "file", "x.svg", "image/svg+xml", "<svg></svg>".getBytes())))

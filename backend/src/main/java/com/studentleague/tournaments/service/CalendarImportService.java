@@ -84,6 +84,9 @@ public class CalendarImportService {
             throw ApiException.badRequest("В файле нет строк. Нужны колонки: date, time, home, away");
         }
         Header header = Header.parse(rows.getFirst());
+        if (!header.hasAny("date", "дата") || !header.hasAny("home", "хозяева", "хозяин") || !header.hasAny("away", "гости", "гость")) {
+            throw ApiException.badRequest("Не удалось прочитать календарь. Нужны колонки: date, time, home, away");
+        }
         List<UUID> created = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         int skipped = 0;
@@ -110,6 +113,12 @@ public class CalendarImportService {
                 skipped++;
                 warnings.add("Строка " + (i + 1) + ": " + ex.getMessage());
             }
+        }
+        if (created.isEmpty()) {
+            String detail = warnings.isEmpty()
+                    ? "В файле нет матчей"
+                    : warnings.getFirst();
+            throw ApiException.badRequest("Календарь не импортирован. " + detail);
         }
         return new CalendarImportResponse(created.size(), skipped, created, warnings);
     }
@@ -196,6 +205,8 @@ public class CalendarImportService {
             return readCsv(file);
         } catch (IOException ex) {
             throw ApiException.badRequest("Не удалось прочитать файл: " + ex.getMessage());
+        } catch (RuntimeException ex) {
+            throw ApiException.badRequest("Не удалось прочитать файл календаря");
         }
     }
 
@@ -257,6 +268,15 @@ public class CalendarImportService {
                 }
             }
             return new Header(columns);
+        }
+
+        boolean hasAny(String... aliases) {
+            for (String alias : aliases) {
+                if (columns.containsKey(alias)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         String get(String[] row, String... aliases) {

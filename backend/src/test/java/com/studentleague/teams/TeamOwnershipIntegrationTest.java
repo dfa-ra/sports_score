@@ -279,4 +279,69 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[?(@.code=='FUTSAL' && @.name=='Футзал')]").exists())
                 .andExpect(jsonPath("$[?(@.code=='BASKETBALL')]").exists());
     }
+
+    @Test
+    void teamNameBeyondColumnLengthIsRejected() throws Exception {
+        String adminToken = createAdminAndLogin("admin-len-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String captainEmail = "captain-len-" + System.nanoTime() + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!", "CAPTAIN", "https://example.com/cap.jpg");
+
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Cap","lastName":"Tain","jerseyNumber":1,"position":"PG"}
+                                """))
+                .andExpect(status().isOk());
+        String captainPlayerId = objectMapper.readTree(
+                mockMvc.perform(get("/api/v1/players/me").header("Authorization", auth(captainToken)))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        ).get("id").asText();
+
+        MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s"}
+                                """.formatted(captainPlayerId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String teamId = objectMapper.readTree(teamResult.getResponse().getContentAsString()).get("id").asText();
+        captainToken = loginOnly(captainEmail, "Str0ngPass!");
+
+        String tooLong = "А".repeat(201);
+        mockMvc.perform(put("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + tooLong + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details[?(@.field=='name')].message")
+                        .value(org.hamcrest.Matchers.hasItem("Название не длиннее 150 символов")));
+
+        mockMvc.perform(get("/api/v1/teams/" + teamId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Campus United"));
+
+        mockMvc.perform(put("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + "Б".repeat(151) + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/v1/teams/" + teamId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Campus United"));
+
+        String maxName = "В".repeat(150);
+        mockMvc.perform(put("/api/v1/teams/" + teamId)
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"" + maxName + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value(maxName));
+    }
 }

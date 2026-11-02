@@ -12,7 +12,8 @@ const MAX_PAGES = 20
 
 export function refereeTitle(user: RefereeUser) {
   const name = [user.lastName, user.firstName].filter(Boolean).join(' ')
-  return name ? `${name} · ${user.email}` : user.email
+  if (name && user.email) return `${name} · ${user.email}`
+  return name || user.email || ''
 }
 
 /** Every user with the referee role. Admin screens only. Walks pages so a short page size cannot drop anyone. */
