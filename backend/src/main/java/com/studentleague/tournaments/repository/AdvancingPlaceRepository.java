@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface AdvancingPlaceRepository extends JpaRepository<AdvancingPlace, UUID> {
     List<AdvancingPlace> findByTournamentIdOrderByPlaceAsc(UUID tournamentId);
+
+    void deleteByTournamentId(UUID tournamentId);
 }

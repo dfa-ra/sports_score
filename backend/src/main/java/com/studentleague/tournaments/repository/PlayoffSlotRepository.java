@@ -19,4 +19,6 @@ public interface PlayoffSlotRepository extends JpaRepository<PlayoffSlot, UUID> 
     Optional<PlayoffSlot> findByMatchId(UUID matchId);
 
     Optional<PlayoffSlot> findByIdAndTournamentId(UUID id, UUID tournamentId);
+
+    void deleteByTournamentId(UUID tournamentId);
 }

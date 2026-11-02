@@ -15,6 +15,7 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent, UUID> {
     List<MatchEvent> findByMatchIdOrderByTimestampAsc(UUID matchId);
     Optional<MatchEvent> findFirstByMatchIdOrderByTimestampDesc(UUID matchId);
     void deleteByMatchId(UUID matchId);
+    boolean existsByMatchIdIn(Collection<UUID> matchIds);
     boolean existsByTeamId(UUID teamId);
     List<MatchEvent> findByMatchIdAndVoidedFalseOrderByTimestampAsc(UUID matchId);
     List<MatchEvent> findByMatchIdInAndVoidedFalse(java.util.Collection<UUID> matchIds);

@@ -1,6 +1,7 @@
 package com.studentleague.cache;
 
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.repository.MatchAvailabilityRepository;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
@@ -12,6 +13,8 @@ import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.format.TournamentFormatHandler;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
+import com.studentleague.tournaments.repository.AdvancingPlaceRepository;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
@@ -67,6 +70,9 @@ class StandingsBoardCacheTest {
                 mock(MatchEventRepository.class),
                 mock(MatchLineupPlayerRepository.class),
                 mock(MatchRefereeRepository.class),
+                mock(MatchAvailabilityRepository.class),
+                mock(PlayoffSlotRepository.class),
+                mock(AdvancingPlaceRepository.class),
                 mock(NotificationService.class),
                 formatRegistry,
                 cache

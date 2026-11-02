@@ -4,6 +4,7 @@ import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchAvailabilityRepository;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
@@ -36,6 +37,8 @@ import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.format.StandingsContext;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
+import com.studentleague.tournaments.repository.AdvancingPlaceRepository;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
@@ -70,6 +73,9 @@ public class TournamentService {
     private final MatchEventRepository matchEventRepository;
     private final MatchLineupPlayerRepository matchLineupPlayerRepository;
     private final MatchRefereeRepository matchRefereeRepository;
+    private final MatchAvailabilityRepository matchAvailabilityRepository;
+    private final PlayoffSlotRepository playoffSlotRepository;
+    private final AdvancingPlaceRepository advancingPlaceRepository;
     private final NotificationService notificationService;
     private final TournamentFormatRegistry formatRegistry;
     private final StandingsBoardCache standingsBoardCache;
@@ -85,6 +91,9 @@ public class TournamentService {
             MatchEventRepository matchEventRepository,
             MatchLineupPlayerRepository matchLineupPlayerRepository,
             MatchRefereeRepository matchRefereeRepository,
+            MatchAvailabilityRepository matchAvailabilityRepository,
+            PlayoffSlotRepository playoffSlotRepository,
+            AdvancingPlaceRepository advancingPlaceRepository,
             NotificationService notificationService,
             TournamentFormatRegistry formatRegistry,
             StandingsBoardCache standingsBoardCache
@@ -99,6 +108,9 @@ public class TournamentService {
         this.matchEventRepository = matchEventRepository;
         this.matchLineupPlayerRepository = matchLineupPlayerRepository;
         this.matchRefereeRepository = matchRefereeRepository;
+        this.matchAvailabilityRepository = matchAvailabilityRepository;
+        this.playoffSlotRepository = playoffSlotRepository;
+        this.advancingPlaceRepository = advancingPlaceRepository;
         this.notificationService = notificationService;
         this.formatRegistry = formatRegistry;
         this.standingsBoardCache = standingsBoardCache;
@@ -157,6 +169,35 @@ public class TournamentService {
             tournament.setFormat(TournamentFormat.normalize(request.format()));
         }
         return toResponse(tournamentRepository.save(tournament));
+    }
+
+    /**
+     * Deletes a tournament that has no played matches.
+     * Played means LIVE, PAUSED or FINISHED, a non-zero score, or any match event.
+     * Scheduled and cancelled 0-0 fixtures, including an unplayed playoff pair, go with the tournament.
+     * Played matches are not removed: the request fails with 409 and nothing is deleted.
+     * tournament_teams, playoff_slots and tournament_advancing_places have no ON DELETE,
+     * so those rows are removed explicitly. tournament_tables already cascades.
+     */
+    @Transactional
+    public void delete(UUID id) {
+        Tournament tournament = requireTournament(id);
+        List<Match> matches = matchRepository.findByTournamentId(id);
+        if (hasPlayedMatch(matches)) {
+            throw ApiException.conflict("Нельзя удалить турнир: в нём есть сыгранные матчи");
+        }
+        playoffSlotRepository.deleteByTournamentId(id);
+        playoffSlotRepository.flush();
+        for (Match match : matches) {
+            deleteUnplayedMatch(match);
+        }
+        matchRepository.flush();
+        tournamentTeamRepository.deleteAll(tournamentTeamRepository.findByTournamentId(id));
+        tournamentTeamRepository.flush();
+        advancingPlaceRepository.deleteByTournamentId(id);
+        advancingPlaceRepository.flush();
+        tournamentRepository.delete(tournament);
+        standingsBoardCache.invalidateTournament(id);
     }
 
     @Transactional(readOnly = true)
@@ -412,6 +453,37 @@ public class TournamentService {
             result.add(new StandingTableResponse(table.getId(), table.getName(), table.getSortOrder(), rows));
         }
         return new TournamentStandingsResponse(result);
+    }
+
+    private void deleteUnplayedMatch(Match match) {
+        UUID matchId = match.getId();
+        matchEventRepository.deleteByMatchId(matchId);
+        matchLineupPlayerRepository.deleteByMatchId(matchId);
+        matchRefereeRepository.deleteByMatchId(matchId);
+        matchAvailabilityRepository.deleteByMatchId(matchId);
+        matchRepository.delete(match);
+    }
+
+    private boolean hasPlayedMatch(List<Match> matches) {
+        if (matches.isEmpty()) {
+            return false;
+        }
+        List<UUID> withoutRecordedPlay = new ArrayList<>();
+        for (Match match : matches) {
+            if (recordedPlay(match)) {
+                return true;
+            }
+            withoutRecordedPlay.add(match.getId());
+        }
+        return matchEventRepository.existsByMatchIdIn(withoutRecordedPlay);
+    }
+
+    private static boolean recordedPlay(Match match) {
+        MatchStatus status = match.getStatus();
+        if (status == MatchStatus.LIVE || status == MatchStatus.PAUSED || status == MatchStatus.FINISHED) {
+            return true;
+        }
+        return match.getHomeScore() != 0 || match.getAwayScore() != 0;
     }
 
     private void requireChronologicalDates(LocalDate startDate, LocalDate endDate) {
