@@ -4,10 +4,13 @@ import com.studentleague.matches.dto.AdminCreateMatchEventRequest;
 import com.studentleague.matches.dto.AdminUpdateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.PenaltyShootoutResponse;
+import com.studentleague.matches.dto.ReplacePenaltyShootoutRequest;
 import com.studentleague.matches.dto.SetMatchGoalkeeperRequest;
 import com.studentleague.matches.dto.SetPlayerOfTheMatchRequest;
 import com.studentleague.matches.service.AdminMatchProtocolService;
 import com.studentleague.matches.service.MatchGoalkeeperService;
+import com.studentleague.matches.service.PenaltyShootoutService;
 import com.studentleague.matches.service.PlayerOfTheMatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -36,15 +39,27 @@ public class AdminMatchController {
     private final AdminMatchProtocolService protocolService;
     private final PlayerOfTheMatchService playerOfTheMatchService;
     private final MatchGoalkeeperService matchGoalkeeperService;
+    private final PenaltyShootoutService penaltyShootoutService;
 
     public AdminMatchController(
             AdminMatchProtocolService protocolService,
             PlayerOfTheMatchService playerOfTheMatchService,
-            MatchGoalkeeperService matchGoalkeeperService
+            MatchGoalkeeperService matchGoalkeeperService,
+            PenaltyShootoutService penaltyShootoutService
     ) {
         this.protocolService = protocolService;
         this.playerOfTheMatchService = playerOfTheMatchService;
         this.matchGoalkeeperService = matchGoalkeeperService;
+        this.penaltyShootoutService = penaltyShootoutService;
+    }
+
+    @PutMapping("/{id}/shootout")
+    @Operation(summary = "Replace the penalty shootout of a finished drawn playoff match and recompute the winner (ADMIN)")
+    public PenaltyShootoutResponse replaceShootout(
+            @PathVariable UUID id,
+            @Valid @RequestBody ReplacePenaltyShootoutRequest request
+    ) {
+        return penaltyShootoutService.replace(id, request);
     }
 
     @PutMapping("/{id}/goalkeeper")

@@ -5,8 +5,11 @@ import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.entity.PenaltyKick;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.repository.PenaltyKickRepository;
+import com.studentleague.matches.shootout.ShootoutRules;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.teams.entity.Team;
@@ -60,6 +63,7 @@ public class PlayoffService {
     private final PlayoffSlotRepository playoffSlotRepository;
     private final MatchRepository matchRepository;
     private final MatchEventRepository matchEventRepository;
+    private final PenaltyKickRepository penaltyKickRepository;
     private final TeamRepository teamRepository;
     private final TournamentService tournamentService;
     private final NotificationService notificationService;
@@ -73,6 +77,7 @@ public class PlayoffService {
             PlayoffSlotRepository playoffSlotRepository,
             MatchRepository matchRepository,
             MatchEventRepository matchEventRepository,
+            PenaltyKickRepository penaltyKickRepository,
             TeamRepository teamRepository,
             TournamentService tournamentService,
             NotificationService notificationService,
@@ -85,6 +90,7 @@ public class PlayoffService {
         this.playoffSlotRepository = playoffSlotRepository;
         this.matchRepository = matchRepository;
         this.matchEventRepository = matchEventRepository;
+        this.penaltyKickRepository = penaltyKickRepository;
         this.teamRepository = teamRepository;
         this.tournamentService = tournamentService;
         this.notificationService = notificationService;
@@ -224,7 +230,14 @@ public class PlayoffService {
             matchRepository.save(match);
         }
         playoffSlotRepository.save(slot);
-        return toSlotResponse(slot, roundCountOf(tournamentId), loadTeams(teamIds(List.of(slot))), loadMatches(List.of(slot)));
+        Map<UUID, Match> matches = loadMatches(List.of(slot));
+        return toSlotResponse(
+                slot,
+                roundCountOf(tournamentId),
+                loadTeams(teamIds(List.of(slot))),
+                matches,
+                penaltiesOf(matches)
+        );
     }
 
     @Transactional
@@ -458,11 +471,12 @@ public class PlayoffService {
         Map<UUID, Team> teams = loadTeams(idsForView(slots, qualified, tournamentId));
         qualified = withNames(qualified, teams);
         Map<UUID, Match> matches = loadMatches(slots);
+        Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
         int rounds = slots.isEmpty() ? 0 : slots.getLast().getRoundNumber();
         Map<Integer, List<PlayoffSlotResponse>> byRound = new LinkedHashMap<>();
         for (PlayoffSlot slot : slots) {
             byRound.computeIfAbsent(slot.getRoundNumber(), ignored -> new ArrayList<>())
-                    .add(toSlotResponse(slot, rounds, teams, matches));
+                    .add(toSlotResponse(slot, rounds, teams, matches, penalties));
         }
         List<PlayoffRoundResponse> roundResponses = new ArrayList<>();
         for (Map.Entry<Integer, List<PlayoffSlotResponse>> entry : byRound.entrySet()) {
@@ -530,9 +544,19 @@ public class PlayoffService {
             PlayoffSlot slot,
             int rounds,
             Map<UUID, Team> teams,
-            Map<UUID, Match> matches
+            Map<UUID, Match> matches,
+            Map<UUID, ShootoutRules.Tally> penalties
     ) {
         Match match = slot.getMatchId() == null ? null : matches.get(slot.getMatchId());
+        Integer penaltyHome = null;
+        Integer penaltyAway = null;
+        if (match != null && match.getHomeScore() == match.getAwayScore()) {
+            ShootoutRules.Tally tally = penalties.get(match.getId());
+            if (tally != null) {
+                penaltyHome = tally.homeScored();
+                penaltyAway = tally.awayScored();
+            }
+        }
         return new PlayoffSlotResponse(
                 slot.getId(),
                 slot.getRoundNumber(),
@@ -553,8 +577,25 @@ public class PlayoffService {
                 slot.getVenue(),
                 match == null ? null : match.getStatus().name(),
                 match == null ? null : match.getHomeScore(),
-                match == null ? null : match.getAwayScore()
+                match == null ? null : match.getAwayScore(),
+                penaltyHome,
+                penaltyAway
         );
+    }
+
+    private Map<UUID, ShootoutRules.Tally> penaltiesOf(Map<UUID, Match> matches) {
+        if (matches.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, UUID> homeByMatch = new HashMap<>();
+        for (Match match : matches.values()) {
+            homeByMatch.put(match.getId(), match.getHomeTeamId());
+        }
+        List<ShootoutRules.ScoredKick> kicks = new ArrayList<>();
+        for (PenaltyKick row : penaltyKickRepository.findByMatchIdInOrderByKickOrderAsc(matches.keySet())) {
+            kicks.add(new ShootoutRules.ScoredKick(row.getMatchId(), row.getTeamId(), row.isScored()));
+        }
+        return ShootoutRules.byMatch(kicks, homeByMatch);
     }
 
     private List<UnassignedMatchResponse> unassigned(UUID tournamentId, Map<UUID, Team> teams) {
@@ -726,14 +767,21 @@ public class PlayoffService {
         return slot;
     }
 
-    private static UUID winnerOf(Match match) {
+    private UUID winnerOf(Match match) {
         if (match.getHomeScore() > match.getAwayScore()) {
             return match.getHomeTeamId();
         }
         if (match.getAwayScore() > match.getHomeScore()) {
             return match.getAwayTeamId();
         }
-        return null;
+        if (match.getBracketRound() == null) {
+            return null;
+        }
+        List<ShootoutRules.Kick> kicks = new ArrayList<>();
+        for (PenaltyKick row : penaltyKickRepository.findByMatchIdOrderByKickOrderAsc(match.getId())) {
+            kicks.add(new ShootoutRules.Kick(row.getTeamId(), row.isScored()));
+        }
+        return ShootoutRules.winner(match.getHomeTeamId(), match.getAwayTeamId(), kicks);
     }
 
     private static String waitingLabel(PlayoffSlot slot, boolean home) {

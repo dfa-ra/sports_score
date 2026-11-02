@@ -54,6 +54,7 @@ public class RefereeMatchService {
     private final StandingsBoardCache standingsBoardCache;
     private final PlayoffService playoffService;
     private final TournamentRepository tournamentRepository;
+    private final PenaltyShootoutService penaltyShootoutService;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -68,7 +69,8 @@ public class RefereeMatchService {
             MatchMapper matchMapper,
             StandingsBoardCache standingsBoardCache,
             PlayoffService playoffService,
-            TournamentRepository tournamentRepository
+            TournamentRepository tournamentRepository,
+            PenaltyShootoutService penaltyShootoutService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -83,6 +85,7 @@ public class RefereeMatchService {
         this.standingsBoardCache = standingsBoardCache;
         this.playoffService = playoffService;
         this.tournamentRepository = tournamentRepository;
+        this.penaltyShootoutService = penaltyShootoutService;
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +157,7 @@ public class RefereeMatchService {
         Instant now = Instant.now();
         MatchClock.freeze(match, now);
         recalculateScore(match);
+        penaltyShootoutService.requireWinner(match);
         match.setStatus(MatchStatus.FINISHED);
         match.setFinishedAt(now);
         matchRepository.save(match);

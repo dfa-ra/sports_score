@@ -5,7 +5,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
-import { matchStateLabel } from '../lib/match'
+import { matchStateLabel, publicScore } from '../lib/match'
 import { setPageMeta } from '../lib/pageMeta'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -330,7 +330,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="22" />
           <span>{{ names.fullName(m.homeTeamId) }}</span>
         </span>
-        <span class="match-score">{{ m.homeScore }}:{{ m.awayScore }}</span>
+        <span class="match-score">{{ publicScore(m) }}</span>
         <span class="match-side away">
           <span>{{ names.fullName(m.awayTeamId) }}</span>
           <TeamCrest :src="names.logo(m.awayTeamId)" :name="names.fullName(m.awayTeamId)" :size="22" />
@@ -493,6 +493,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
 .match-score {
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+  white-space: nowrap;
 }
 .match-meta {
   display: grid;

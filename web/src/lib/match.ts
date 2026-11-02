@@ -4,6 +4,8 @@ export function matchOutcome(match: {
   awayTeamId?: string
   homeScore?: number
   awayScore?: number
+  penaltyHome?: number | null
+  penaltyAway?: number | null
 }, teamId?: string | null) {
   if (!teamId || match.status !== 'FINISHED') return null
   const home = teamId === match.homeTeamId
@@ -12,7 +14,38 @@ export function matchOutcome(match: {
   const conceded = home ? Number(match.awayScore) : Number(match.homeScore)
   if (scored > conceded) return 'WIN'
   if (scored < conceded) return 'LOSS'
+  const pens = penaltyPair(match)
+  if (!pens) return 'DRAW'
+  const taken = home ? pens.home : pens.away
+  const allowed = home ? pens.away : pens.home
+  if (taken > allowed) return 'WIN'
+  if (taken < allowed) return 'LOSS'
   return 'DRAW'
+}
+
+export function penaltyPair(match: {
+  homeScore?: number | null
+  awayScore?: number | null
+  penaltyHome?: number | null
+  penaltyAway?: number | null
+}) {
+  const home = Number(match.homeScore ?? 0)
+  const away = Number(match.awayScore ?? 0)
+  if (home !== away || match.penaltyHome == null || match.penaltyAway == null) return null
+  return { home: match.penaltyHome, away: match.penaltyAway }
+}
+
+export function publicScore(match: {
+  homeScore?: number | null
+  awayScore?: number | null
+  penaltyHome?: number | null
+  penaltyAway?: number | null
+}) {
+  const home = Number(match.homeScore ?? 0)
+  const away = Number(match.awayScore ?? 0)
+  const pens = penaltyPair(match)
+  if (!pens) return `${home}:${away}`
+  return `${home}:${away} (пен. ${pens.home}:${pens.away})`
 }
 
 export function kickoffDayMonth(value?: string | number | Date | null) {

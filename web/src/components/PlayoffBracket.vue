@@ -5,6 +5,7 @@ import api from '../api/client'
 import TeamCrest from './TeamCrest.vue'
 import { fromLocalInput, toLocalInput } from '../lib/datetime'
 import { apiError } from '../lib/errors'
+import { publicScore } from '../lib/match'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const props = defineProps<{
@@ -41,6 +42,15 @@ function placeLabel(group?: string | null, place?: number | null) {
 
 function showScore(slot: any) {
   return slot.matchStatus === 'LIVE' || slot.matchStatus === 'PAUSED' || slot.matchStatus === 'FINISHED'
+}
+
+function slotScore(slot: any) {
+  return publicScore({
+    homeScore: slot.homeScore,
+    awayScore: slot.awayScore,
+    penaltyHome: slot.penaltyHome,
+    penaltyAway: slot.penaltyAway,
+  })
 }
 
 async function save(slot: any) {
@@ -97,7 +107,7 @@ async function save(slot: any) {
               <span v-else class="wait">{{ slot.awayWaitingLabel || 'Ожидает соперника' }}</span>
             </div>
           </component>
-          <p v-if="showScore(slot)" class="score">{{ slot.homeScore }}:{{ slot.awayScore }}</p>
+          <p v-if="showScore(slot)" class="score">{{ slotScore(slot) }}</p>
           <p v-else-if="slot.venue" class="meta">{{ slot.venue }}</p>
           <form v-if="editable && drafts[slot.id]" class="edit" @submit.prevent="save(slot)">
             <label class="field">Время

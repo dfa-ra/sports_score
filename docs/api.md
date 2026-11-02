@@ -227,11 +227,12 @@ Backend проверяет подпись токена, срок, issuer Google 
 | Метод | Путь | Auth |
 |---|---|---|
 | GET | `/matches` | Публичный — фильтры |
-| GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode` |
+| GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode`, `bracketRound` (номер круга плей-офф или `null`), `penaltyHome`, `penaltyAway` |
 | POST | `/matches` | ADMIN. Опционально `periodCount` (1–8), `periodLengthMinutes` (1–90, иначе 2×20) и `venue` (зал, до 120 символов) |
 | PUT | `/matches/{id}` | ADMIN. Опционально `venue` (зал, до 120 символов); пустая строка очищает |
 | POST | `/matches/{id}/referees` | ADMIN |
 | GET | `/matches/{id}/events` | Публичный. Имена игроков, `period`, `secondaryPlayer*` = пас / кто вышел |
+| GET | `/matches/{id}/shootout` | Публичный. `{ penaltyHome, penaltyAway, decisive, kicks }`. Без серии `penaltyHome` и `penaltyAway` — `null`, `kicks` — пустой список |
 | GET | `/matches/{id}/referees` | Публичный |
 | GET | `/matches/{id}/lineups` | Публичный — основа и скамейка; если капитан не записал, вся заявка как скамейка |
 | PUT | `/matches/{id}/lineups` | Капитан этой команды, назначенный судья или ADMIN |
@@ -248,7 +249,9 @@ Backend проверяет подпись токена, срок, issuer Google 
 | POST | `/referee/matches/{id}/start` | Назначенный судья |
 | POST | `/referee/matches/{id}/pause` | Назначенный судья |
 | POST | `/referee/matches/{id}/resume` | Назначенный судья |
-| POST | `/referee/matches/{id}/finish` | Назначенный судья |
+| POST | `/referee/matches/{id}/finish` | Назначенный судья. Ничья в плей-офф без решённой серии — 400 «Ничья в плей-офф не закрывается без серии пенальти». Ничья серии — 400 «Серия пенальти не может закончиться вничью» |
+| POST | `/referee/matches/{id}/shootout` | Назначенный судья, матч LIVE или PAUSED. Тело: `{ "teamId", "scored" }`. Один удар: гол или мимо. Первой бьёт команда хозяев, затем гости. Ответ: `{ penaltyHome, penaltyAway, decisive, kicks: [{ id, teamId, order, round, scored }] }` |
+| DELETE | `/referee/matches/{id}/shootout/last` | Назначенный судья — убрать последний удар, пока матч идёт |
 | POST | `/referee/matches/{id}/next-period` | Назначенный судья — следующий тайм, часы с нуля |
 | POST | `/referee/matches/{id}/events` | Назначенный судья. Для гола/карточки/замены нужен `playerId`; голевая — `secondaryPlayerId` |
 | POST | `/referee/matches/{id}/events/{eventId}/void` | Назначенный судья |
@@ -263,7 +266,24 @@ Backend проверяет подпись токена, срок, issuer Google 
 | GET | `/statistics/board` | Публичный — `{ scorers, assists, goalkeepers }` за один проход. `tournamentId`, `limit` (до 100) |
 | GET | `/statistics/teams` | Публичный — фильтры |
 
-Считается из не-voided записей `MatchEvent`.
+Считается из не-voided записей `MatchEvent`. Удары серии пенальти в статистику не входят.
+
+---
+
+## Серия пенальти
+
+Только матч плей-офф (`bracketRound` не `null`) при равном счёте основного времени. Групповой матч по-прежнему заканчивается вничью без серии.
+
+| Метод | Путь | Auth |
+|---|---|---|
+| GET | `/matches/{id}/shootout` | Публичный |
+| POST | `/referee/matches/{id}/shootout` | Назначенный судья |
+| DELETE | `/referee/matches/{id}/shootout/last` | Назначенный судья |
+| PUT | `/admin/matches/{id}/shootout` | ADMIN. Тело: `{ "kicks": [{ "teamId", "scored" }] }`. Заменяет серию завершённого матча и заново ставит победителя в следующую пару |
+
+`penaltyHome` и `penaltyAway` в `GET /matches/{id}` и в слоте `GET /tournaments/{id}/playoff` — число забитых ударов серии. Поля `null`, если серии нет или счёт основного времени уже не равный. `homeScore` и `awayScore` от серии не меняются.
+
+Если следующая пара LIVE, PAUSED, FINISHED или в ней уже есть события, правка победителя отвечает 409: «Следующий матч плей-офф уже начался, состав пары не меняется».
 
 ---
 

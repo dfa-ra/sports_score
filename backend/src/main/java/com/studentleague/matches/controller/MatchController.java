@@ -11,6 +11,7 @@ import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchLineupsResponse;
 import com.studentleague.matches.dto.MatchRefereeResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.PenaltyShootoutResponse;
 import com.studentleague.matches.dto.SetMatchLineupRequest;
 import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.futsal.FutsalBoardService;
@@ -18,6 +19,7 @@ import com.studentleague.matches.service.AnalystAssignmentService;
 import com.studentleague.matches.service.AnalystStatsService;
 import com.studentleague.matches.service.MatchLineupService;
 import com.studentleague.matches.service.MatchService;
+import com.studentleague.matches.service.PenaltyShootoutService;
 import com.studentleague.matches.service.RefereeMatchService;
 import com.studentleague.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -58,6 +60,7 @@ public class MatchController {
     private final FutsalBoardService futsalBoardService;
     private final AnalystStatsService analystStatsService;
     private final AnalystAssignmentService analystAssignmentService;
+    private final PenaltyShootoutService penaltyShootoutService;
 
     public MatchController(
             MatchService matchService,
@@ -65,7 +68,8 @@ public class MatchController {
             MatchLineupService matchLineupService,
             FutsalBoardService futsalBoardService,
             AnalystStatsService analystStatsService,
-            AnalystAssignmentService analystAssignmentService
+            AnalystAssignmentService analystAssignmentService,
+            PenaltyShootoutService penaltyShootoutService
     ) {
         this.matchService = matchService;
         this.refereeMatchService = refereeMatchService;
@@ -73,6 +77,7 @@ public class MatchController {
         this.futsalBoardService = futsalBoardService;
         this.analystStatsService = analystStatsService;
         this.analystAssignmentService = analystAssignmentService;
+        this.penaltyShootoutService = penaltyShootoutService;
     }
 
     @GetMapping
@@ -97,6 +102,12 @@ public class MatchController {
     @Operation(summary = "Get match details")
     public MatchResponse get(@PathVariable UUID id) {
         return matchService.get(id);
+    }
+
+    @GetMapping("/{id}/shootout")
+    @Operation(summary = "Penalty shootout kicks for a match. Empty when the match has no series")
+    public PenaltyShootoutResponse shootout(@PathVariable UUID id) {
+        return penaltyShootoutService.view(id);
     }
 
     @PutMapping("/{id}")

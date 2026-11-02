@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { outcomeMark } from '../lib/format'
-import { matchOutcome } from '../lib/match'
+import { matchOutcome, penaltyPair, publicScore } from '../lib/match'
 import KickoffWhen from './KickoffWhen.vue'
 import ScorePop from './ScorePop.vue'
 import { useFavorites } from '../stores/favorites'
@@ -19,6 +19,7 @@ const props = defineProps<{
 const fav = useFavorites()
 const teams = useTeamDirectory()
 const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
+const shootoutScore = computed(() => (penaltyPair(props.match) ? publicScore(props.match) : ''))
 const isLive = computed(() => props.match.status === 'LIVE' || props.match.status === 'PAUSED')
 const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
 const awayLogo = computed(() => teams.logo(props.match.awayTeamId))
@@ -69,7 +70,8 @@ function tapStar() {
         <span v-if="venue" class="venue">{{ venue }}</span>
         <span v-if="isLive && match.lastGoalScorer" class="scorer">{{ match.lastGoalScorer }}</span>
       </span>
-      <span class="nums">
+      <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
+      <span v-else class="nums">
         <strong><ScorePop :value="match.homeScore" /></strong>
         <strong><ScorePop :value="match.awayScore" /></strong>
       </span>
@@ -168,6 +170,11 @@ function tapStar() {
   font-weight: 800;
   color: var(--navy);
   min-width: 1.1rem;
+}
+.nums.shootout {
+  display: block;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 .mark {
   width: 1.35rem;

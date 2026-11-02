@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
 import { registeredName } from '../../lib/playerTitle'
-import { protocolMinute } from '../../lib/match'
+import { protocolMinute, publicScore } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
@@ -28,6 +28,7 @@ type Sheet = {
 const route = useRoute()
 const auth = useAuthStore()
 const match = ref<any>(null)
+const shootout = ref<any>(null)
 const events = ref<any[]>([])
 const referees = ref<any[]>([])
 const lineups = ref<any>(null)
@@ -44,6 +45,40 @@ const { elapsed, remaining, expired, cap } = useMatchClock(match)
 const homeLabel = computed(() => teams.fullName(match.value?.homeTeamId, 'Хозяева'))
 const awayLabel = computed(() => teams.fullName(match.value?.awayTeamId, 'Гости'))
 const live = computed(() => match.value?.status === 'LIVE' || match.value?.status === 'PAUSED')
+const playoffDraw = computed(() => {
+  const current = match.value
+  if (!current || current.bracketRound == null) return false
+  return Number(current.homeScore) === Number(current.awayScore)
+})
+const shootoutOpen = computed(() => live.value && playoffDraw.value)
+const shootoutLine = computed(() => {
+  const current = match.value
+  if (!current) return ''
+  const series = shootout.value
+  if (series?.kicks?.length) {
+    return publicScore({
+      homeScore: current.homeScore,
+      awayScore: current.awayScore,
+      penaltyHome: series.penaltyHome,
+      penaltyAway: series.penaltyAway,
+    })
+  }
+  return publicScore(current)
+})
+const turnTeamId = computed(() => {
+  const current = match.value
+  const kicks = shootout.value?.kicks ?? []
+  if (!current || !shootoutOpen.value || shootout.value?.decisive) return ''
+  let home = 0
+  let away = 0
+  for (const kick of kicks) {
+    if (kick.teamId === current.homeTeamId) home += 1
+    else away += 1
+  }
+  if (home === away) return current.homeTeamId
+  if (home === away + 1) return current.awayTeamId
+  return ''
+})
 const protocol = computed(() => [...events.value].reverse())
 const canControl = computed(() => {
   if (auth.canManageLeague) return true
@@ -111,12 +146,14 @@ const sheetHint = computed(() => {
 async function reload() {
   await teams.load()
   const id = route.params.id
-  const [m, e, l, r] = await Promise.all([
+  const [m, e, l, r, s] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/lineups`),
     api.get(`/matches/${id}/referees`),
+    api.get(`/matches/${id}/shootout`),
   ])
+  shootout.value = s.data
   referees.value = r.data
   match.value = m.data
   if (!canControl.value) {
@@ -173,6 +210,36 @@ async function releaseClock() {
 async function closeSheet() {
   sheet.value = null
   await releaseClock()
+}
+
+async function recordKick(teamId: string, scored: boolean) {
+  message.value = ''
+  error.value = ''
+  pending.value = true
+  try {
+    const { data } = await api.post(`/referee/matches/${route.params.id}/shootout`, { teamId, scored })
+    shootout.value = data
+    await refreshMatch()
+  } catch (reason) {
+    error.value = apiError(reason, 'Удар не записался.')
+  } finally {
+    pending.value = false
+  }
+}
+
+async function undoKick() {
+  message.value = ''
+  error.value = ''
+  pending.value = true
+  try {
+    const { data } = await api.delete(`/referee/matches/${route.params.id}/shootout/last`)
+    shootout.value = data
+    await refreshMatch()
+  } catch (reason) {
+    error.value = apiError(reason, 'Последний удар не убрался.')
+  } finally {
+    pending.value = false
+  }
 }
 
 async function action(path: string) {
@@ -410,7 +477,9 @@ onUnmounted(() => {
           <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="28" />
           {{ homeLabel }}
         </strong>
-        <div class="score">{{ match.homeScore }} : {{ match.awayScore }}</div>
+        <div class="score">
+          {{ shootoutOpen && shootout?.kicks?.length ? shootoutLine : `${match.homeScore} : ${match.awayScore}` }}
+        </div>
         <strong class="club">
           <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="28" />
           {{ awayLabel }}
@@ -445,9 +514,35 @@ onUnmounted(() => {
         :disabled="pending || !live || (match.period ?? 1) >= match.periodCount"
         @click="action('next-period')"
       >Следующий {{ match.sportCode === 'BASKETBALL' ? 'четверть' : 'тайм' }}</button>
-      <button class="btn large danger" :disabled="pending || !live" @click="action('finish')">Финиш</button>
+      <button
+        class="btn large danger"
+        :disabled="pending || !live || (shootoutOpen && !shootout?.decisive)"
+        @click="action('finish')"
+      >Финиш</button>
     </div>
     <p v-if="expired && live" class="form-ok">Время тайма вышло.</p>
+
+    <div v-if="shootoutOpen" class="panel stack shootout">
+      <h2>Серия пенальти</h2>
+      <p class="muted">
+        Ничья в плей-офф. «Финиш» откроется, когда серия определит победителя.
+        Первые пять раундов — основа, дальше бьют, пока один не забьёт, а другой не промахнётся.
+      </p>
+      <p v-if="shootout?.kicks?.length" class="pen-line">{{ shootoutLine }}</p>
+      <p class="muted">{{ turnTeamId === match.homeTeamId ? `Бьёт ${homeLabel}` : turnTeamId === match.awayTeamId ? `Бьёт ${awayLabel}` : 'Серия решена' }}</p>
+      <div class="kick-row">
+        <button class="btn secondary" type="button" :disabled="pending || turnTeamId !== match.homeTeamId" @click="recordKick(match.homeTeamId, true)">{{ homeLabel }}: гол</button>
+        <button class="btn secondary" type="button" :disabled="pending || turnTeamId !== match.homeTeamId" @click="recordKick(match.homeTeamId, false)">{{ homeLabel }}: мимо</button>
+        <button class="btn secondary" type="button" :disabled="pending || turnTeamId !== match.awayTeamId" @click="recordKick(match.awayTeamId, true)">{{ awayLabel }}: гол</button>
+        <button class="btn secondary" type="button" :disabled="pending || turnTeamId !== match.awayTeamId" @click="recordKick(match.awayTeamId, false)">{{ awayLabel }}: мимо</button>
+      </div>
+      <button v-if="shootout?.kicks?.length" class="btn secondary" type="button" :disabled="pending" @click="undoKick">Убрать последний удар</button>
+      <ol v-if="shootout?.kicks?.length" class="kick-list">
+        <li v-for="kick in shootout.kicks" :key="kick.id">
+          Раунд {{ kick.round }} · {{ kick.teamId === match.homeTeamId ? homeLabel : awayLabel }} · {{ kick.scored ? 'гол' : 'мимо' }}
+        </li>
+      </ol>
+    </div>
 
     <div class="panel stack keepers">
       <h2>Вратари</h2>
@@ -656,6 +751,10 @@ h2 { font-size: 1.15rem; margin: 0 0 0.35rem; }
 .btn.pick { justify-content: flex-start; text-align: left; }
 .btn.on { background: var(--navy); color: #fff; border-color: var(--navy); }
 .keepers h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+.shootout h2 { margin: 0; }
+.pen-line { margin: 0; font-weight: 800; color: var(--navy); }
+.kick-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.kick-list { margin: 0; padding-left: 1.2rem; }
 .keeper-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
 .keeper-grid .btn { margin-bottom: 0.35rem; }
 .sheet-nav {

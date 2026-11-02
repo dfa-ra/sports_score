@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as protocolMinuteOf } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, publicScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -22,6 +22,7 @@ import SquadPlayerSelect from '../components/SquadPlayerSelect.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
+import PenaltyShootoutAdmin from '../components/PenaltyShootoutAdmin.vue'
 import ScorePop from '../components/ScorePop.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import MatchAnalystStats from '../components/MatchAnalystStats.vue'
@@ -273,6 +274,7 @@ const assignedReferee = computed(() => {
   return referees.value.some((row) => row.refereeId === id)
 })
 const canUsePad = computed(() => auth.canManageLeague || assignedReferee.value)
+const shootoutScore = computed(() => (match.value && penaltyPair(match.value) ? publicScore(match.value) : ''))
 
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
@@ -674,7 +676,8 @@ onUnmounted(() => {
         </RouterLink>
       </div>
       <div class="center">
-        <p class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
+        <p v-if="shootoutScore" class="score shootout">{{ shootoutScore }}</p>
+        <p v-else class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
         <p v-if="playerOfTheMatchName" :key="match.playerOfTheMatch.playerId" class="motm motm-enter">
           <span>Игрок матча</span>
           <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
@@ -762,6 +765,17 @@ onUnmounted(() => {
         </label>
         <button class="btn" type="submit" :disabled="pending">Сохранить вратарей</button>
       </form>
+      <PenaltyShootoutAdmin
+        v-if="match.bracketRound && match.status === 'FINISHED' && match.homeScore === match.awayScore"
+        :match-id="String(match.id)"
+        :home-team-id="match.homeTeamId"
+        :away-team-id="match.awayTeamId"
+        :home-label="teams.fullName(match.homeTeamId)"
+        :away-label="teams.fullName(match.awayTeamId)"
+        :home-score="match.homeScore"
+        :away-score="match.awayScore"
+        @saved="load"
+      />
       <h2>Протокол</h2>
       <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и ассистента можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
@@ -1001,6 +1015,7 @@ onUnmounted(() => {
 
     <div v-else-if="tab === 'protocol'" class="panel">
       <h2>Протокол</h2>
+      <p v-if="shootoutScore" class="shootout-line">{{ shootoutScore }}</p>
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
@@ -1162,6 +1177,10 @@ onUnmounted(() => {
   color: var(--navy);
   white-space: nowrap;
 }
+.score.shootout {
+  font-size: clamp(1.05rem, 3.8vw, 1.7rem);
+  letter-spacing: 0;
+}
 .clock {
   margin: 0.2rem 0 0;
   font-size: 0.78rem;
@@ -1315,6 +1334,11 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   margin: 0.25rem 0;
 }
 .protocol-form { margin: 0.4rem 0 0.8rem; }
+.shootout-line {
+  margin: 0 0 0.8rem;
+  font-weight: 800;
+  color: var(--navy);
+}
 .check-line {
   display: flex;
   align-items: center;
