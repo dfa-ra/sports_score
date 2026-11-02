@@ -132,7 +132,11 @@ async function addMember() {
 }
 
 async function removeMember(id: string) {
+  const member = members.value.find((item) => item.playerId === id)
+  const name = registeredName(member) || 'игрока'
+  if (!confirm(`Убрать «${name}» из состава?`)) return
   pending.value = true
+  error.value = ''
   try {
     await api.delete(`/teams/${team.value.id}/members/${id}`)
     await load()
@@ -175,11 +179,16 @@ async function removeMember(id: string) {
         <ul class="stack">
           <li v-for="m in members" :key="m.id">
             <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>
-            <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" @click="removeMember(m.playerId)">Убрать</button>
+            <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" type="button" :disabled="pending" @click="removeMember(m.playerId)">Убрать</button>
           </li>
         </ul>
         <form v-if="canEditRoster" class="toolbar" @submit.prevent="addMember">
-          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
+          <PlayerPicker
+            v-model="playerId"
+            :exclude-ids="memberIds"
+            hint="Добавить можно только уже зарегистрированного игрока"
+            empty-text="Игрок не найден, он должен сначала зарегистрироваться"
+          />
           <button class="btn" :disabled="pending || !playerId">Добавить игрока</button>
         </form>
       </div>
