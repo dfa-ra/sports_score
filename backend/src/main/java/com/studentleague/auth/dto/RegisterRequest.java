@@ -29,9 +29,9 @@ public record RegisterRequest(
         @Size(max = 100, message = "Фамилия не длиннее 100 символов")
         @Pattern(regexp = PersonNames.PLAIN, message = PersonNames.MESSAGE)
         String lastName,
-        @Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String role,
-        @Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String accountType,
-        List<@Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String> roles,
+        @Pattern(regexp = RegistrationRoles.PATTERN, message = RegistrationRoles.MESSAGE) String role,
+        @Pattern(regexp = RegistrationRoles.PATTERN, message = RegistrationRoles.MESSAGE) String accountType,
+        List<@Pattern(regexp = RegistrationRoles.PATTERN, message = RegistrationRoles.MESSAGE) String> roles,
         @Size(max = 1024) String photoUrl
 ) {
     private static final Set<String> PHOTO_ROLES = Set.of("PLAYER", "CAPTAIN", "REFEREE");
@@ -58,7 +58,11 @@ public record RegisterRequest(
         }
         List<Role> resolved = new ArrayList<>();
         for (String name : names) {
-            resolved.add(Role.valueOf(name));
+            try {
+                resolved.add(Role.valueOf(name));
+            } catch (IllegalArgumentException ex) {
+                // The pattern constraint reports the bad token. Do not turn it into a 500.
+            }
         }
         return resolved;
     }

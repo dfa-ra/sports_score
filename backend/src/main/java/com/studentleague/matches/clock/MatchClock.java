@@ -11,6 +11,11 @@ public final class MatchClock {
 
     public static final int DEFAULT_PERIOD_COUNT = 2;
     public static final int DEFAULT_PERIOD_LENGTH_SECONDS = 15 * 60;
+    /**
+     * Stoppage beyond {@code periodLength × periodCount}. The referee clock
+     * (seconds) and the admin protocol (minutes) share this allowance.
+     */
+    public static final int ADDED_TIME_ALLOWANCE_MINUTES = 5;
 
     private MatchClock() {
     }
@@ -33,6 +38,20 @@ public final class MatchClock {
         return match.getPeriodLengthSeconds() > 0
                 ? match.getPeriodLengthSeconds()
                 : DEFAULT_PERIOD_LENGTH_SECONDS;
+    }
+
+    /**
+     * Latest stored event time: full periods plus the added-time allowance.
+     * A 2×15 match allows 35:00. A 20-minute match allows 25:00, not minute 200.
+     */
+    public static int maxEventSeconds(Match match) {
+        int periods = match.getPeriodCount() > 0 ? match.getPeriodCount() : DEFAULT_PERIOD_COUNT;
+        return periods * periodLength(match) + ADDED_TIME_ALLOWANCE_MINUTES * 60;
+    }
+
+    /** Highest protocol minute from kickoff, including the added-time allowance. */
+    public static int maxProtocolMinute(Match match) {
+        return maxEventSeconds(match) / 60;
     }
 
     public static int periodIndex(Match match) {

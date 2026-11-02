@@ -4,7 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record RegisterDeviceTokenRequest(
-        @NotBlank @Pattern(regexp = "ANDROID|IOS|WEB") String platform,
+        @NotBlank(message = "Укажите платформу")
+        @Pattern(regexp = "ANDROID|IOS|WEB", message = "Платформа: ANDROID, IOS или WEB")
+        String platform,
         @NotBlank String token
 ) {
 }

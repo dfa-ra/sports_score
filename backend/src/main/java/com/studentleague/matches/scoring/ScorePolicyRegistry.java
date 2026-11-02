@@ -29,7 +29,7 @@ public class ScorePolicyRegistry {
 
     public ScorePolicy forSportCode(String code) {
         if (code == null || code.isBlank()) {
-            throw ApiException.badRequest("Sport code is required for scoring");
+            throw ApiException.badRequest("Для подсчёта счёта нужен код вида спорта");
         }
         return policies.getOrDefault(code.toUpperCase(), fallback);
     }

@@ -220,7 +220,7 @@ public class PlayoffService {
         }
         if (slot.getMatchId() != null) {
             Match match = matchRepository.findById(slot.getMatchId())
-                    .orElseThrow(() -> ApiException.notFound("Match not found"));
+                    .orElseThrow(() -> ApiException.notFound("Матч не найден"));
             if (request.scheduledAt() != null) {
                 match.setScheduledAt(request.scheduledAt());
             }
@@ -318,7 +318,7 @@ public class PlayoffService {
         }
         if (slot.getMatchId() != null) {
             Match match = matchRepository.findById(slot.getMatchId())
-                    .orElseThrow(() -> ApiException.notFound("Match not found"));
+                    .orElseThrow(() -> ApiException.notFound("Матч не найден"));
             if (match.getStatus() != MatchStatus.SCHEDULED) {
                 return;
             }
@@ -704,7 +704,7 @@ public class PlayoffService {
 
     private Tournament requireTournament(UUID tournamentId) {
         return tournamentRepository.findById(tournamentId)
-                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+                .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
     }
 
     private TournamentTable requireTable(UUID tournamentId, UUID tableId) {
@@ -715,9 +715,9 @@ public class PlayoffService {
 
     private Match requireTournamentMatch(UUID tournamentId, UUID matchId) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         if (!tournamentId.equals(match.getTournamentId())) {
-            throw ApiException.notFound("Match not found");
+            throw ApiException.notFound("Матч не найден");
         }
         return match;
     }

@@ -26,7 +26,7 @@ public class FutsalBoardService {
     @Transactional(readOnly = true)
     public FutsalBoardResponse forMatch(UUID matchId) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         int elapsed = MatchClock.elapsedSeconds(match, Instant.now());
         return FutsalBoardCalculator.build(
                 match,

@@ -75,7 +75,7 @@ public class CalendarImportService {
     @Transactional
     public CalendarImportResponse importCalendar(UUID tournamentId, MultipartFile file) {
         Tournament tournament = tournamentRepository.findById(tournamentId)
-                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+                .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("Файл календаря пустой");
         }
