@@ -29,9 +29,15 @@ onMounted(async () => {
   if (!sportId.value && data[0]) sportId.value = data[0].id
 })
 
-async function submit() {
+async function submit(event: Event) {
   error.value = ''
-  const dateError = tournamentDatesError(startDate.value, endDate.value)
+  const form = event.currentTarget as HTMLFormElement
+  const dates = [...form.querySelectorAll('input[type="date"]')] as HTMLInputElement[]
+  const start = dates[0]?.value || startDate.value
+  const end = dates[1]?.value || endDate.value
+  startDate.value = start
+  endDate.value = end
+  const dateError = tournamentDatesError(start, end)
   if (dateError) {
     error.value = dateError
     return
@@ -43,8 +49,8 @@ async function submit() {
       description: description.value || undefined,
       sportId: sportId.value,
       seasonYear: Number(seasonYear.value),
-      startDate: startDate.value || undefined,
-      endDate: endDate.value || undefined,
+      startDate: start || undefined,
+      endDate: end || undefined,
       status: status.value,
       format: format.value,
       regulations: regulations.value || undefined,
@@ -61,20 +67,20 @@ async function submit() {
 </script>
 
 <template>
-  <form class="stack" @submit.prevent="submit">
+  <form class="stack" novalidate @submit.prevent="submit">
     <label class="field">Название
-      <input v-model="name" required maxlength="200" placeholder="Осенний кубок" />
+      <input v-model="name" maxlength="200" placeholder="Осенний кубок" />
     </label>
     <label class="field">Описание
       <textarea v-model="description" rows="3" placeholder="Коротко, без пафоса" />
     </label>
     <label class="field">Вид спорта
-      <select v-model="sportId" required>
+      <select v-model="sportId">
         <option v-for="s in sports" :key="s.id" :value="s.id">{{ labelOfSport(s.code, s.name) }}</option>
       </select>
     </label>
     <label class="field">Сезон
-      <input v-model.number="seasonYear" type="number" min="2000" max="2100" required />
+      <input v-model.number="seasonYear" type="number" min="2000" max="2100" />
     </label>
     <label class="field">Старт
       <input v-model="startDate" type="date" />

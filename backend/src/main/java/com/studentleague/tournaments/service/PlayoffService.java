@@ -5,6 +5,7 @@ import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
@@ -58,6 +59,7 @@ public class PlayoffService {
     private final AdvancingPlaceRepository advancingPlaceRepository;
     private final PlayoffSlotRepository playoffSlotRepository;
     private final MatchRepository matchRepository;
+    private final MatchEventRepository matchEventRepository;
     private final TeamRepository teamRepository;
     private final TournamentService tournamentService;
     private final NotificationService notificationService;
@@ -70,6 +72,7 @@ public class PlayoffService {
             AdvancingPlaceRepository advancingPlaceRepository,
             PlayoffSlotRepository playoffSlotRepository,
             MatchRepository matchRepository,
+            MatchEventRepository matchEventRepository,
             TeamRepository teamRepository,
             TournamentService tournamentService,
             NotificationService notificationService,
@@ -81,6 +84,7 @@ public class PlayoffService {
         this.advancingPlaceRepository = advancingPlaceRepository;
         this.playoffSlotRepository = playoffSlotRepository;
         this.matchRepository = matchRepository;
+        this.matchEventRepository = matchEventRepository;
         this.teamRepository = teamRepository;
         this.tournamentService = tournamentService;
         this.notificationService = notificationService;
@@ -263,8 +267,8 @@ public class PlayoffService {
         Match nextMatch = next.getMatchId() == null
                 ? null
                 : matchRepository.findById(next.getMatchId()).orElse(null);
-        if (nextMatch != null && nextMatch.getStatus() != MatchStatus.SCHEDULED) {
-            throw ApiException.badRequest("Следующий матч плей-офф уже начался, состав пары не меняется");
+        if (nextMatch != null && nextPairLocked(nextMatch)) {
+            throw ApiException.conflict("Следующий матч плей-офф уже начался, состав пары не меняется");
         }
         if (winner == null && nextMatch != null) {
             throw ApiException.badRequest(
@@ -278,6 +282,21 @@ public class PlayoffService {
         }
         playoffSlotRepository.save(next);
         ensureMatch(next);
+    }
+
+    /**
+     * A later pair that is already live, paused, finished, or has its own protocol
+     * stays as played. The caller gets 409 and must not rewrite that slot.
+     */
+    private boolean nextPairLocked(Match nextMatch) {
+        MatchStatus status = nextMatch.getStatus();
+        if (status == MatchStatus.LIVE || status == MatchStatus.PAUSED || status == MatchStatus.FINISHED) {
+            return true;
+        }
+        if (status != MatchStatus.SCHEDULED) {
+            return true;
+        }
+        return matchEventRepository.existsByMatchId(nextMatch.getId());
     }
 
     private void ensureMatch(PlayoffSlot slot) {

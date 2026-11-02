@@ -176,6 +176,7 @@ async function removeMember(id: string) {
       </div>
       <div class="panel">
         <h2>Состав</h2>
+        <p v-if="canEditRoster" class="muted">Добавить можно только уже зарегистрированного игрока</p>
         <ul class="stack">
           <li v-for="m in members" :key="m.id">
             <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>

@@ -253,7 +253,12 @@ async function deleteTeam() {
       </div>
       <form v-if="canManage && isCaptain" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
-          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
+          <PlayerPicker
+            v-model="playerId"
+            :exclude-ids="memberIds"
+            hint="Добавить можно только уже зарегистрированного игрока"
+            empty-text="Игрок не найден, он должен сначала зарегистрироваться"
+          />
         </label>
         <button class="btn" type="submit" :disabled="pending || !playerId">Добавить в состав</button>
       </form>
@@ -300,7 +305,12 @@ async function deleteTeam() {
       <TeamCardEditor v-if="!team.disbanded" :team="team" @saved="load" />
       <form v-if="!team.disbanded" class="stack" @submit.prevent="addMember">
         <label class="field">Добавить игрока
-          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
+          <PlayerPicker
+            v-model="playerId"
+            :exclude-ids="memberIds"
+            hint="Добавить можно только уже зарегистрированного игрока"
+            empty-text="Игрок не найден, он должен сначала зарегистрироваться"
+          />
         </label>
         <button class="btn" type="submit" :disabled="pending || !playerId">Добавить в состав</button>
       </form>

@@ -98,9 +98,15 @@ function onApplied(message: string) {
   load()
 }
 
-async function save() {
+async function save(event?: Event) {
   error.value = ''
-  const dateError = tournamentDatesError(startDate.value, endDate.value)
+  const form = event?.currentTarget as HTMLFormElement | undefined
+  const dates = form ? [...form.querySelectorAll('input[type="date"]')] as HTMLInputElement[] : []
+  const start = dates[0]?.value || startDate.value
+  const end = dates[1]?.value || endDate.value
+  startDate.value = start
+  endDate.value = end
+  const dateError = tournamentDatesError(start, end)
   if (dateError) {
     error.value = dateError
     return
@@ -114,8 +120,8 @@ async function save() {
       format: format.value,
       regulations: regulations.value || undefined,
       seasonYear: Number(seasonYear.value),
-      startDate: startDate.value || undefined,
-      endDate: endDate.value || undefined,
+      startDate: start || undefined,
+      endDate: end || undefined,
     })
     ok.value = 'Турнир обновлён.'
     await load()
@@ -308,16 +314,17 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       @applied="onApplied"
     />
 
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа" open>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
       <h2>Настройки турнира</h2>
-      <form class="stack" @submit.prevent="save">
-        <label class="field">Название<input v-model="name" required /></label>
+      <form class="stack" novalidate @submit.prevent="save">
+        <label class="field">Название<input v-model="name" /></label>
         <label class="field">Описание<textarea v-model="description" rows="2" /></label>
         <label class="field">Сезон<input v-model.number="seasonYear" type="number" /></label>
         <label class="field">Старт<input v-model="startDate" type="date" /></label>
         <label class="field">Финиш<input v-model="endDate" type="date" /></label>
+        <p v-if="error" class="form-error">{{ error }}</p>
         <label class="field">Статус
           <select v-model="status">
             <option value="DRAFT">Черновик</option>

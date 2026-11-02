@@ -211,7 +211,7 @@ async function onGoogle(idToken: string) {
             />
             <span class="grow">
               <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" :disabled="submitLocked" @change="onPhoto" />
-              <span v-if="fieldErrors.photo" class="field-error">{{ fieldErrors.photo }}</span>
+              <span v-if="fieldErrors.photo" class="field-error form-error">{{ fieldErrors.photo }}</span>
               <span v-else class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
             </span>
           </span>

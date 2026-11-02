@@ -56,6 +56,12 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         org.junit.jupiter.api.Assertions.assertEquals(UUID.fromString(groupId), stored.getTableId());
         org.junit.jupiter.api.Assertions.assertEquals(MatchStatus.FINISHED, stored.getStatus());
 
+        mockMvc.perform(get("/api/v1/matches/" + kept))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tableId").value(groupId))
+                .andExpect(jsonPath("$.homeScore").value(2))
+                .andExpect(jsonPath("$.status").value("FINISHED"));
+
         mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/places")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -251,6 +257,68 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void adminVoidRecomputesOpenSlotAndRejectsStartedNext() throws Exception {
+        String admin = createAdminAndLogin("po-v-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        Squad alpha = register(admin, tournamentId, "Альфа");
+        Squad beta = register(admin, tournamentId, "Бета");
+        Squad gamma = register(admin, tournamentId, "Гамма");
+        Squad delta = register(admin, tournamentId, "Дельта");
+        join(admin, tournamentId, "Группа A", alpha.teamId, beta.teamId, gamma.teamId, delta.teamId);
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/places")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"places\":[1,2,3,4]}"))
+                .andExpect(status().isOk());
+        MvcResult opened = mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pairsJson(
+                                pair(alpha.teamId, beta.teamId, "Зал 1"),
+                                pair(gamma.teamId, delta.teamId, "Зал 2"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode body = objectMapper.readTree(opened.getResponse().getContentAsString());
+        String firstMatch = body.get("rounds").get(0).get("slots").get(0).get("matchId").asText();
+        String secondMatch = body.get("rounds").get(0).get("slots").get(1).get("matchId").asText();
+
+        String eventId = scoreAndFinish(admin, firstMatch, alpha);
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId));
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + firstMatch + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(nullValue()));
+
+        addAdminGoal(admin, firstMatch, alpha);
+        scoreAndFinish(admin, secondMatch, gamma);
+        MvcResult assembled = mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId))
+                .andReturn();
+        String finalMatch = objectMapper.readTree(assembled.getResponse().getContentAsString())
+                .get("rounds").get(1).get("slots").get(0).get("matchId").asText();
+        mockMvc.perform(post("/api/v1/referee/matches/" + finalMatch + "/start")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+
+        String blockingGoal = goalEventId(firstMatch);
+        mockMvc.perform(post("/api/v1/admin/matches/" + firstMatch + "/events/" + blockingGoal + "/void")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("уже начался")))
+                .andExpect(jsonPath("$.message", containsString("состав пары")));
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId));
+        mockMvc.perform(get("/api/v1/matches/" + firstMatch))
+                .andExpect(jsonPath("$.homeScore").value(1));
+    }
+
+    @Test
     void nonAdminCannotManagePlayoff() throws Exception {
         String admin = createAdminAndLogin("po-a-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String fan = registerAndLogin("po-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");
@@ -364,6 +432,46 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isOk());
         return new Squad(teamId, playerId);
+    }
+
+    private String scoreAndFinish(String admin, String matchId, Squad winner) throws Exception {
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/start")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/events")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s","playerId":"%s","gameTime":40}
+                                """.formatted(winner.teamId, winner.playerId)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/finish")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homeScore").value(1));
+        return goalEventId(matchId);
+    }
+
+    private void addAdminGoal(String admin, String matchId, Squad winner) throws Exception {
+        mockMvc.perform(post("/api/v1/admin/matches/" + matchId + "/events")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s","playerId":"%s","minute":2}
+                                """.formatted(winner.teamId, winner.playerId)))
+                .andExpect(status().isCreated());
+    }
+
+    private String goalEventId(String matchId) throws Exception {
+        MvcResult events = mockMvc.perform(get("/api/v1/matches/" + matchId + "/events"))
+                .andExpect(status().isOk())
+                .andReturn();
+        for (JsonNode event : objectMapper.readTree(events.getResponse().getContentAsString())) {
+            if ("GOAL".equals(event.get("eventType").asText()) && !event.get("voided").asBoolean()) {
+                return event.get("id").asText();
+            }
+        }
+        throw new IllegalStateException("active goal not found");
     }
 
     private static String pair(String home, String away, String venue) {

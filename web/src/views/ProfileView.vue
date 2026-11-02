@@ -56,6 +56,11 @@ const applicationOpen = computed(() =>
   pendingRoles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'REFEREE'),
 )
 
+const badgeRoles = computed(() => {
+  if (!pendingRoles.value.length) return approvedRoles.value
+  return approvedRoles.value.filter((role) => role !== 'FAN')
+})
+
 const isPlayer = computed(() => approvedRoles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'ADMIN'))
 const isCaptain = computed(() => approvedRoles.value.includes('CAPTAIN'))
 
@@ -234,7 +239,10 @@ async function logout() {
       <div>
         <h1>{{ accountName }}</h1>
         <p class="chips">
-          <span v-for="role in approvedRoles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
+          <span v-for="role in badgeRoles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
+          <span v-for="role in pendingRoles" :key="`pending-${role}`" class="badge">
+            Заявка на роль «{{ labelOf(roleLabel, role) }}» на рассмотрении
+          </span>
         </p>
       </div>
       <button v-if="isPlayer" class="pen" type="button" aria-label="Изменить" @click="openForm">✎</button>

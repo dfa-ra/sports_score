@@ -39,10 +39,19 @@ watch(
 async function save() {
   error.value = ''
   ok.value = ''
+  const trimmed = name.value.trim()
+  if (!trimmed) {
+    error.value = 'Укажите название команды.'
+    return
+  }
+  if (trimmed.length > nameMax) {
+    error.value = 'Название не длиннее 150 символов.'
+    return
+  }
   pending.value = true
   try {
     await api.put(`/teams/${props.team.id}`, {
-      name: name.value,
+      name: trimmed,
       shortName: shortName.value || undefined,
     })
     ok.value = 'Карточка обновлена.'
@@ -88,9 +97,9 @@ async function onLogo(event: Event) {
         <span class="field-hint">PNG или JPG. Сохраняется сразу.</span>
       </label>
     </div>
-    <form class="stack" @submit.prevent="save">
+    <form class="stack" novalidate @submit.prevent="save">
       <label class="field">Название
-        <input v-model="name" required :maxlength="nameMax" />
+        <input v-model="name" :maxlength="nameMax" />
         <span class="field-hint">{{ name.length }}/{{ nameMax }}</span>
       </label>
       <label class="field">Короткое имя

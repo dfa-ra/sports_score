@@ -215,12 +215,14 @@ public class RefereeMatchService {
         Instant now = Instant.now();
         int period = MatchClock.periodIndex(match);
         int length = MatchClock.periodLength(match);
-        // The pad may omit gameTime. The hall clock counts down, but we store
-        // seconds from kickoff. An explicit gameTime is the old within-period
-        // count-up (or already kickoff seconds when it is past one period).
-        int kickoff = request.gameTime() != null
-                ? MatchClock.toKickoffSeconds(request.gameTime(), period, length)
-                : MatchClock.kickoffSeconds(match, now);
+        // The pad may omit gameTime, or send 0 while the hall clock is already
+        // running (the stored base stays 0 until pause). 0 is not a minute:
+        // keep a real within-period time, and otherwise store seconds from kickoff.
+        int live = MatchClock.kickoffSeconds(match, now);
+        Integer requested = request.gameTime();
+        int kickoff = requested == null || requested == 0
+                ? live
+                : MatchClock.toKickoffSeconds(requested, period, length);
         MatchEvent event = new MatchEvent();
         event.setMatchId(matchId);
         event.setEventType(request.eventType());

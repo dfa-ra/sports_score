@@ -79,7 +79,8 @@ public class MatchMapper {
                 MatchListFields.minute(match, Instant.now()),
                 playerOfTheMatch(match),
                 namedPlayer(match.getHomeGoalkeeperId()),
-                namedPlayer(match.getAwayGoalkeeperId())
+                namedPlayer(match.getAwayGoalkeeperId()),
+                match.getTableId()
         );
     }
 

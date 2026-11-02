@@ -79,7 +79,7 @@ export function useTournamentApply() {
     }
     try {
       await api.post(`/tournaments/${tournamentId}/teams`, { teamId: id })
-      ok.value = 'Заявка отправлена. Ждём, пока админ допустит команду.'
+      ok.value = 'Заявка отправлена. Ждём допуск, пока админ допустит команду.'
       registeredTeamIds.value = new Set([...registeredTeamIds.value, id])
       const next = teams.value.find((item) => !registeredTeamIds.value.has(item.id))
       teamId.value = next?.id || id

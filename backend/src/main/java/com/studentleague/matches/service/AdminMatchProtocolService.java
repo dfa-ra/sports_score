@@ -15,6 +15,7 @@ import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import org.springframework.stereotype.Service;
@@ -48,6 +49,7 @@ public class AdminMatchProtocolService {
     private final MatchScoreService matchScoreService;
     private final MatchMapper matchMapper;
     private final LiveMatchPublisher liveMatchPublisher;
+    private final PlayoffService playoffService;
 
     public AdminMatchProtocolService(
             MatchRepository matchRepository,
@@ -56,7 +58,8 @@ public class AdminMatchProtocolService {
             TeamMemberRepository teamMemberRepository,
             MatchScoreService matchScoreService,
             MatchMapper matchMapper,
-            LiveMatchPublisher liveMatchPublisher
+            LiveMatchPublisher liveMatchPublisher,
+            PlayoffService playoffService
     ) {
         this.matchRepository = matchRepository;
         this.matchEventRepository = matchEventRepository;
@@ -65,6 +68,7 @@ public class AdminMatchProtocolService {
         this.matchScoreService = matchScoreService;
         this.matchMapper = matchMapper;
         this.liveMatchPublisher = liveMatchPublisher;
+        this.playoffService = playoffService;
     }
 
     @Transactional
@@ -136,7 +140,11 @@ public class AdminMatchProtocolService {
     private MatchEventResponse publish(Match match, MatchEvent event, String type) {
         matchEventRepository.flush();
         matchScoreService.apply(match);
-        MatchResponse matchResponse = matchMapper.toResponse(matchRepository.saveAndFlush(match));
+        matchRepository.saveAndFlush(match);
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            playoffService.advance(match);
+        }
+        MatchResponse matchResponse = matchMapper.toResponse(match);
         MatchEventResponse eventResponse = matchMapper.toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, type);
         return eventResponse;

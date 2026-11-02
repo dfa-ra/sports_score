@@ -1,15 +1,22 @@
 package com.studentleague.matches;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.support.AbstractIntegrationTest;
 import com.studentleague.users.domain.Role;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.lessThan;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -18,6 +25,58 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private MatchRepository matchRepository;
+
+    @Test
+    void runningClockZeroIsStoredAsElapsedMinuteAndExplicitMinuteStays() throws Exception {
+        String adminToken = createAdminAndLogin("clock-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+
+        Match match = matchRepository.findById(java.util.UUID.fromString(fx.matchId)).orElseThrow();
+        match.setStatus(MatchStatus.LIVE);
+        match.setPeriod(1);
+        match.setGameTimeSeconds(0);
+        match.setClockRunningSince(Instant.now().minusSeconds(130));
+        matchRepository.saveAndFlush(match);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 0)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime", allOf(greaterThan(60), lessThan(180))))
+                .andExpect(jsonPath("$.minute").value(2));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 2 * 60)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(2 * 60))
+                .andExpect(jsonPath("$.minute").value(2));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/next-period")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 6)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(15 * 60 + 6))
+                .andExpect(jsonPath("$.minute").value(16));
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 16 * 60)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(16 * 60));
+    }
 
     @Test
     void assignedRefereeControlsMatchAndEventsAffectScore() throws Exception {

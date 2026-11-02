@@ -225,9 +225,10 @@ async function addEvent(payload: Record<string, unknown>) {
   error.value = ''
   pending.value = true
   try {
+    const played = elapsed.value
     await api.post(`/referee/matches/${route.params.id}/events`, {
       ...payload,
-      gameTime: elapsed.value,
+      ...(played > 0 ? { gameTime: played } : {}),
     })
     sheet.value = null
     message.value = 'В протоколе.'
@@ -390,9 +391,9 @@ onUnmounted(() => {
       <RouterLink class="back" to="/referee">← К матчам</RouterLink>
       <h1>Пульт</h1>
     </div>
-    <p class="form-error">Этот пульт только для судьи, назначенного на матч.</p>
+    <p class="form-error">Нет доступа: вы не назначены на этот матч.</p>
   </section>
-  <section v-else-if="match" class="stack pad">
+  <section v-if="match && canControl" class="stack pad">
     <div class="page-title">
       <RouterLink class="back" to="/referee">← К матчам</RouterLink>
       <h1>Пульт</h1>
