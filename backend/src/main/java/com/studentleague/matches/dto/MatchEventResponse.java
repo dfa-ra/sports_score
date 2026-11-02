@@ -27,6 +27,7 @@ public record MatchEventResponse(
         String playerFirstName,
         String playerLastName,
         String secondaryPlayerFirstName,
-        String secondaryPlayerLastName
+        String secondaryPlayerLastName,
+        Integer minute
 ) {
 }

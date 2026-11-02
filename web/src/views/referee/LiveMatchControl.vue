@@ -153,7 +153,10 @@ async function addEvent(payload: Record<string, unknown>) {
   error.value = ''
   pending.value = true
   try {
-    await api.post(`/referee/matches/${route.params.id}/events`, payload)
+    await api.post(`/referee/matches/${route.params.id}/events`, {
+      ...payload,
+      gameTime: elapsed.value,
+    })
     sheet.value = null
     message.value = 'В протоколе.'
     await releaseClock()
@@ -368,7 +371,7 @@ onUnmounted(() => {
       <h2>Протокол</h2>
       <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
-        <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
+        <span v-if="eventMinute(ev.gameTime) != null" class="t">{{ eventMinute(ev.gameTime) }}'</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
         <span>{{ eventDetail(ev) || '—' }}</span>
       </div>

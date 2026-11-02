@@ -4,7 +4,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
-import { isTournamentOpenForApply } from '../lib/format'
+import { formatWhen, isTournamentOpenForApply } from '../lib/format'
+import { matchStateLabel } from '../lib/match'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
@@ -231,9 +232,20 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     <div class="panel stack">
       <h2>Матчи</h2>
       <EmptyState v-if="!matches.length" title="Матчей нет" />
-      <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-        <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
-        <StatusBadge :status="m.status" />
+      <RouterLink v-for="m in matches" :key="m.id" class="row match-row" :to="`/matches/${m.id}`">
+        <span class="match-side">
+          <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="22" />
+          <span>{{ names.fullName(m.homeTeamId) }}</span>
+        </span>
+        <span class="match-score">{{ m.homeScore }}:{{ m.awayScore }}</span>
+        <span class="match-side away">
+          <span>{{ names.fullName(m.awayTeamId) }}</span>
+          <TeamCrest :src="names.logo(m.awayTeamId)" :name="names.fullName(m.awayTeamId)" :size="22" />
+        </span>
+        <span class="match-meta">
+          <span>{{ formatWhen(m.scheduledAt) }}</span>
+          <span v-if="m.status !== 'FINISHED'">{{ matchStateLabel(m.status) }}</span>
+        </span>
       </RouterLink>
     </div>
     <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
@@ -354,6 +366,39 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   text-decoration: none;
 }
 .row:hover { color: var(--accent); }
+.row.match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+.match-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.match-side.away { justify-content: flex-end; }
+.match-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.match-meta {
+  display: grid;
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .row.match-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .match-meta {
+    grid-column: 1 / -1;
+    justify-items: start;
+    white-space: normal;
+  }
+}
 .actions { display: flex; gap: 0.45rem; }
 .club {
   display: inline-flex;
