@@ -5,24 +5,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.Set;
 
 /**
  * JPEG / JPG / PNG / WebP / GIF. SVG не берём — это разметка, не картинка для карусели.
+ * Тип определяется по сигнатуре файла, не по расширению и не по Content-Type.
  */
 public final class ImageUploads {
 
     public static final long MAX_BYTES = 8L * 1024 * 1024;
-
-    private static final Set<String> TYPES = Set.of(
-            "image/jpeg",
-            "image/jpg",
-            "image/pjpeg",
-            "image/png",
-            "image/x-png",
-            "image/webp",
-            "image/gif"
-    );
 
     private ImageUploads() {
     }
@@ -60,17 +50,7 @@ public final class ImageUploads {
     }
 
     static Kind sniff(MultipartFile file) {
-        byte[] header = header(file);
-        Kind fromMagic = fromMagic(header);
-        if (fromMagic != null) {
-            return fromMagic;
-        }
-        String type = normalizeType(file.getContentType());
-        String ext = extensionOf(file.getOriginalFilename());
-        if (TYPES.contains(type) && kindFromExtension(ext) != null) {
-            return kindFromExtension(ext);
-        }
-        return null;
+        return fromMagic(header(file));
     }
 
     private static byte[] header(MultipartFile file) {
@@ -119,13 +99,6 @@ public final class ImageUploads {
         return null;
     }
 
-    private static String normalizeType(String contentType) {
-        if (contentType == null || contentType.isBlank()) {
-            return "";
-        }
-        return contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
-    }
-
     private static String extensionOf(String filename) {
         if (filename == null) {
             return "";
@@ -137,16 +110,6 @@ public final class ImageUploads {
             return "";
         }
         return name.substring(dot + 1).toLowerCase(Locale.ROOT);
-    }
-
-    private static Kind kindFromExtension(String ext) {
-        return switch (ext) {
-            case "jpg", "jpeg" -> Kind.JPEG;
-            case "png" -> Kind.PNG;
-            case "webp" -> Kind.WEBP;
-            case "gif" -> Kind.GIF;
-            default -> null;
-        };
     }
 
     enum Kind {

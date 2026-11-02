@@ -20,6 +20,7 @@ import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
+import com.studentleague.security.CurrentUser;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.Tournament;
@@ -217,12 +218,17 @@ public class MatchService {
     @Transactional(readOnly = true)
     public List<MatchRefereeResponse> listReferees(UUID matchId) {
         requireMatch(matchId);
+        boolean includeEmail = CurrentUser.isAdmin();
         return matchRefereeRepository.findByMatchId(matchId).stream()
-                .map(this::toRefereeResponse)
+                .map(assignment -> toRefereeResponse(assignment, includeEmail))
                 .toList();
     }
 
     private MatchRefereeResponse toRefereeResponse(MatchReferee assignment) {
+        return toRefereeResponse(assignment, true);
+    }
+
+    private MatchRefereeResponse toRefereeResponse(MatchReferee assignment, boolean includeEmail) {
         User referee = assignment.getRefereeId() == null
                 ? null
                 : userRepository.findById(assignment.getRefereeId()).orElse(null);
@@ -233,7 +239,7 @@ public class MatchService {
                 assignment.getAssignedAt(),
                 referee == null ? null : referee.getFirstName(),
                 referee == null ? null : referee.getLastName(),
-                referee == null ? null : referee.getEmail()
+                includeEmail && referee != null ? referee.getEmail() : null
         );
     }
 

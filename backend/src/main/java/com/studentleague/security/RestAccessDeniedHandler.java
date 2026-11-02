@@ -32,7 +32,7 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         ApiError error = new ApiError(
                 "FORBIDDEN",
-                "Access denied",
+                "Недостаточно прав",
                 List.of(),
                 Instant.now(),
                 request.getRequestURI()

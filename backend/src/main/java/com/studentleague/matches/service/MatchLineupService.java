@@ -66,10 +66,17 @@ public class MatchLineupService {
     @Transactional
     public MatchLineupsResponse setLineup(UserPrincipal principal, UUID matchId, SetMatchLineupRequest request) {
         Match match = requireMatch(matchId);
+        UUID teamId = request == null ? null : request.teamId();
+        assertCanSetLineup(principal, match, teamId);
+        if (request == null || request.teamId() == null) {
+            throw ApiException.badRequest("Укажите команду");
+        }
+        if (request.starterPlayerIds() == null || request.starterPlayerIds().isEmpty()) {
+            throw ApiException.badRequest("Нужен хотя бы один игрок в старте");
+        }
         if (!request.teamId().equals(match.getHomeTeamId()) && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("Команда не играет в этом матче");
         }
-        assertCanSetLineup(principal, match, request.teamId());
 
         List<UUID> starters = request.starterPlayerIds().stream().distinct().toList();
         List<UUID> bench = request.benchPlayerIds() == null
@@ -96,7 +103,11 @@ public class MatchLineupService {
             }
         }
 
-        lineupRepository.deleteByMatchIdAndTeamId(matchId, request.teamId());
+        List<MatchLineupPlayer> previous = lineupRepository.findByMatchIdAndTeamId(matchId, request.teamId());
+        if (!previous.isEmpty()) {
+            lineupRepository.deleteAll(previous);
+            lineupRepository.flush();
+        }
         int order = 0;
         for (UUID playerId : starters) {
             saveRow(matchId, request.teamId(), playerId, true, order++);
@@ -171,6 +182,9 @@ public class MatchLineupService {
     }
 
     private void assertCanSetLineup(UserPrincipal principal, Match match, UUID teamId) {
+        if (principal == null) {
+            throw ApiException.forbidden("Состав на матч ставит капитан, судья или админ");
+        }
         if (principal.hasRole(Role.ADMIN)) {
             return;
         }
@@ -178,12 +192,24 @@ public class MatchLineupService {
                 && matchRefereeRepository.existsByMatchIdAndRefereeId(match.getId(), principal.getId())) {
             return;
         }
-        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> ApiException.forbidden("Состав на матч ставит капитан, судья или админ"));
-        Team team = teamRepository.findById(teamId).orElseThrow(() -> ApiException.notFound("Team not found"));
-        if (!profile.getId().equals(team.getCaptainId())) {
+        PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId()).orElse(null);
+        if (profile == null) {
+            throw ApiException.forbidden("Состав на матч ставит капитан, судья или админ");
+        }
+        if (teamId == null) {
+            if (!isCaptainOf(profile, match.getHomeTeamId()) && !isCaptainOf(profile, match.getAwayTeamId())) {
+                throw ApiException.forbidden("Только капитан этой команды может написать стартовый состав");
+            }
+            return;
+        }
+        if (!isCaptainOf(profile, teamId)) {
             throw ApiException.forbidden("Только капитан этой команды может написать стартовый состав");
         }
+    }
+
+    private boolean isCaptainOf(PlayerProfile profile, UUID teamId) {
+        Team team = teamRepository.findById(teamId).orElse(null);
+        return team != null && profile.getId().equals(team.getCaptainId());
     }
 
     private Match requireMatch(UUID matchId) {

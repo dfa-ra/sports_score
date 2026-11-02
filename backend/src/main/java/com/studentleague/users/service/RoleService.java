@@ -149,13 +149,19 @@ public class RoleService {
     }
 
     public UserResponse toUserResponse(User user) {
-        List<RoleAssignmentResponse> roles = assignmentRepository.findByUserId(user.getId()).stream()
+        List<UserRoleAssignment> assignments = assignmentRepository.findByUserId(user.getId());
+        List<RoleAssignmentResponse> roles = assignments.stream()
                 .map(RoleService::toAssignmentResponse)
                 .toList();
+        Role primary = assignments.stream()
+                .filter(assignment -> assignment.getStatus() == RoleStatus.APPROVED)
+                .map(UserRoleAssignment::getRole)
+                .max(Comparator.comparingInt(RoleService::rank))
+                .orElse(user.getRole() == null ? Role.FAN : user.getRole());
         return new UserResponse(
                 user.getId(),
                 user.getEmail(),
-                user.getRole(),
+                primary,
                 user.isEnabled(),
                 user.getFirstName(),
                 user.getLastName(),

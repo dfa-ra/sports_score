@@ -7,7 +7,7 @@ type Person = {
   id: string
   firstName?: string | null
   lastName?: string | null
-  email: string
+  email?: string | null
 }
 
 type Assignment = {
@@ -38,7 +38,8 @@ const directoryReady = ref(false)
 function title(person: Person | null | undefined) {
   if (!person) return ''
   const name = [person.lastName, person.firstName].filter(Boolean).join(' ')
-  return name ? `${name} · ${person.email}` : person.email
+  if (name && person.email) return `${name} · ${person.email}`
+  return name || person.email || ''
 }
 
 function nowLine(person: Person | null | undefined) {

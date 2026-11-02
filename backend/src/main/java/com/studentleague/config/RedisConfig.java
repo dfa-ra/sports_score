@@ -5,8 +5,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
 
 /**
- * Redis is available for cache / pub-sub / rate-limit clustering in later phases.
- * Local rate limiting currently uses in-memory Bucket4j so auth works without Redis.
+ * Redis repositories when app.redis.enabled is true.
+ * Auth rate limits use the same StringRedisTemplate and fall back to memory when it is off.
  */
 @Configuration
 @ConditionalOnProperty(name = "app.redis.enabled", havingValue = "true")

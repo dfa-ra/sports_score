@@ -1,5 +1,6 @@
 package com.studentleague.auth.dto;
 
+import com.studentleague.common.PersonNames;
 import com.studentleague.users.domain.Role;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
@@ -14,9 +15,9 @@ import java.util.Set;
 
 public record RegisterRequest(
         @NotBlank @Email @Size(max = 320) String email,
-        @NotBlank @Size(min = 8, max = 100) String password,
-        @NotBlank @Size(max = 100) String firstName,
-        @NotBlank @Size(max = 100) String lastName,
+        @NotBlank @Size(min = 8, max = 100, message = "Пароль должен быть от 8 до 100 символов") String password,
+        @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PLAIN, message = PersonNames.MESSAGE) String firstName,
+        @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PLAIN, message = PersonNames.MESSAGE) String lastName,
         @Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String role,
         @Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String accountType,
         List<@Pattern(regexp = "FAN|PLAYER|CAPTAIN|REFEREE") String> roles,

@@ -193,7 +193,103 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(referee.getId())))
                 .andExpect(status().isCreated());
 
-        return new Fixture(matchId, homeTeamId, homePlayerId, refereeToken);
+        return new Fixture(matchId, homeTeamId, homePlayerId, refereeToken, refereeEmail);
+    }
+
+    @Test
+    void publicRefereeListOmitsEmailWhileAdminStillReceivesIt() throws Exception {
+        String adminToken = createAdminAndLogin("mail-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[0].firstName").isNotEmpty())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(fx.refereeEmail))));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(fx.refereeEmail));
+
+        mockMvc.perform(get("/api/v1/admin/referees")
+                        .param("q", fx.refereeEmail)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].email").value(fx.refereeEmail));
+    }
+
+    @Test
+    void secondLineupSaveReplacesTheFirstForRefereeAndAdmin() throws Exception {
+        String adminToken = createAdminAndLogin("line-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+        String body = """
+                {"teamId":"%s","starterPlayerIds":["%s"]}
+                """.formatted(fx.homeTeamId, fx.homePlayerId);
+
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.confirmed").value(true))
+                .andExpect(jsonPath("$.home.starters[0].playerId").value(fx.homePlayerId));
+
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.starters[0].playerId").value(fx.homePlayerId));
+    }
+
+    @Test
+    void eventMinuteMustFitTheMatchIncludingSecondHalf() throws Exception {
+        String adminToken = createAdminAndLogin("min-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, -5)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Время события не может быть отрицательным"));
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 99999)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Время события больше длительности матча"));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/next-period")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 16)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 16 * 60)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(16 * 60));
+    }
+
+    private static String goal(Fixture fx, int gameTime) {
+        return """
+                {"eventType":"GOAL","teamId":"%s","playerId":"%s","gameTime":%d}
+                """.formatted(fx.homeTeamId, fx.homePlayerId, gameTime);
     }
 
     private void registerAndApprove(String adminToken, String captainToken, String tournamentId, String teamId) throws Exception {
@@ -230,6 +326,12 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
         return objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private record Fixture(String matchId, String homeTeamId, String homePlayerId, String refereeToken) {
+    private record Fixture(
+            String matchId,
+            String homeTeamId,
+            String homePlayerId,
+            String refereeToken,
+            String refereeEmail
+    ) {
     }
 }

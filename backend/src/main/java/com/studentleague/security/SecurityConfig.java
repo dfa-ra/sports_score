@@ -115,6 +115,14 @@ public class SecurityConfig {
                                 "/api/v1/gallery/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(
+                                "/api/v1/admin/gallery",
+                                "/api/v1/admin/gallery/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/matches/*/goalkeeper").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/uploads/admin/gallery").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/referee/matches/*/goalkeeper")
+                        .hasAnyRole("REFEREE", "ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(disabledGalleryMediaFilter, JwtAuthenticationFilter.class);
