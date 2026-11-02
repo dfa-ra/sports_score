@@ -26,6 +26,7 @@ const memberIds = computed(() => members.value.map((item) => item.playerId))
 const rosterIds = computed(() => new Set(memberIds.value))
 const error = ref('')
 const ok = ref('')
+const unassigned = ref(false)
 const rsvpError = ref('')
 const pending = ref(false)
 const rsvpPending = ref(false)
@@ -51,6 +52,8 @@ const canRsvp = computed(() => !!nextMatch.value && !!myPlayerId.value && roster
 onMounted(load)
 
 async function load() {
+  unassigned.value = false
+  error.value = ''
   try {
     const { data } = await api.get('/teams/mine')
     team.value = data
@@ -80,7 +83,13 @@ async function load() {
       opponentName.value = ''
     }
   } catch (e: any) {
-    error.value = apiError(e, 'Команда ещё не назначена.')
+    team.value = null
+    const message = apiError(e, '')
+    if (e?.response?.status === 404 && message === 'Вы ещё не в команде') {
+      unassigned.value = true
+      return
+    }
+    error.value = message || 'Команда ещё не назначена.'
   }
 }
 
@@ -146,7 +155,11 @@ async function removeMember(id: string) {
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
-    <EmptyState v-if="!team && !error" title="Команды нет" text="Админ создаёт команду и назначает капитана." />
+    <EmptyState
+      v-if="unassigned"
+      title="Вы ещё не в команде"
+      text="Команду назначает администратор"
+    />
     <template v-if="team">
       <div v-if="canEditRoster" class="panel stack">
         <h2>Карточка</h2>

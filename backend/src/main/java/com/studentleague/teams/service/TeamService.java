@@ -412,7 +412,7 @@ public class TeamService {
 
     private Team requireTeam(UUID teamId) {
         return teamRepository.findById(teamId)
-                .orElseThrow(() -> ApiException.notFound("Team not found"));
+                .orElseThrow(() -> ApiException.notFound("Команда не найдена"));
     }
 
     private Team requireActiveTeam(UUID teamId) {
