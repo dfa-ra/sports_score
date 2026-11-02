@@ -53,11 +53,6 @@ jobs:
           export VITE_GOOGLE_CLIENT_ID
           echo "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}"
           npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: web/dist
-          if-no-files-found: error
 
   mobile:
     name: Mobile (Flutter)
@@ -80,8 +75,3 @@ jobs:
       - run: flutter test
       - name: Build debug APK (smoke)
         run: flutter build apk --debug --dart-define=API_BASE_URL=https://itmoliga.ru/api/v1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mobile-debug-apk
-          path: mobile/build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
