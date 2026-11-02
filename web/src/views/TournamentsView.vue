@@ -16,6 +16,7 @@ const error = ref('')
 const loading = ref(true)
 const showForm = ref(false)
 const applying = ref<any | null>(null)
+const applyNote = ref('')
 
 const sorted = computed(() => {
   const rank: Record<string, number> = {
@@ -52,6 +53,12 @@ async function load() {
   }
 }
 
+function onApplied(message: string) {
+  applyNote.value = message
+  applying.value = null
+  load()
+}
+
 onMounted(load)
 </script>
 
@@ -61,6 +68,7 @@ onMounted(load)
       <h1>Турниры</h1>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
+    <p v-if="applyNote" class="form-ok">{{ applyNote }}</p>
     <div v-if="loading" class="grid cards">
       <div v-for="n in 3" :key="n" class="skeleton" />
     </div>
@@ -84,7 +92,7 @@ onMounted(load)
       v-if="applying"
       :tournament="applying"
       @close="applying = null"
-      @applied="load"
+      @applied="onApplied"
     />
   </section>
 </template>
