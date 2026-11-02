@@ -35,6 +35,8 @@ export E2E_FAN_PASSWORD=...
 
 S3 сравнивает футер с SHA: `E2E_EXPECTED_SHA` или `git ls-remote origin refs/heads/main`. Если ни того ни другого нет (прогон вне git) — skip.
 
+Раздел 9 (плей-офф, PO1–PO11) бьёт только в dev и только с `E2E_ADMIN_*`. Пишет по чек-листу и PR #56. Если `GET /tournaments/{id}/playoff` на стенде отдаёт «Файл не найден» (фича не задеплоена) — все PO-тесты `skip`. PO11 всегда skip: матча за 3-е место в PR #56 нет, это вопрос к Костику. Фикстуры переиспользуют `E2E PO 01`…`16` и турниры `E2E PO-2` / `PO-4` / `PO-8` / `PO-16` / `PO-snap` / `PO-sizes`.
+
 ## Секреты GitHub Actions
 
 Workflow `.github/workflows/e2e-dev.yml` — только `workflow_dispatch` и будничное расписание, без деплоя.

@@ -21,7 +21,7 @@ export function emptyIds(): CreatedIds {
 export async function createTournament(
   request: APIRequestContext,
   admin: Session,
-  options: { name?: string; startDate?: string; endDate?: string; status?: string } = {},
+  options: { name?: string; startDate?: string; endDate?: string; status?: string; format?: string } = {},
 ) {
   const name = options.name || uniqueEntityName('турнир')
   return apiSend(request, 'POST', '/tournaments', {
@@ -34,7 +34,7 @@ export async function createTournament(
       startDate: options.startDate ?? '2026-11-10',
       endDate: options.endDate ?? '2026-12-10',
       status: options.status ?? 'REGISTRATION',
-      format: 'ROUND_ROBIN',
+      format: options.format ?? 'ROUND_ROBIN',
     },
   })
 }
