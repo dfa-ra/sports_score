@@ -73,6 +73,8 @@ class AdminMatchOpsIntegrationTest extends AbstractIntegrationTest {
                                 {"eventType":"GOAL","teamId":"%s","playerId":"%s","minute":8}
                                 """.formatted(fx.homeTeamId, fx.homePlayerId)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(8 * 60))
+                .andExpect(jsonPath("$.minute").value(8))
                 .andReturn();
         String eventId = objectMapper.readTree(goal.getResponse().getContentAsString()).get("id").asText();
 

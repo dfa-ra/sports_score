@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
@@ -34,6 +34,7 @@ const sports = ref<any[]>([])
 const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics' | 'gallery'>('users')
 const roleRequests = ref<any[]>([])
 const gallery = ref<any>({ photos: [], vkAlbumUrl: '' })
+const galleryPreviews = ref<Record<string, string>>({})
 const photoUrl = ref('')
 const photoTitle = ref('')
 const photoCaption = ref('')
@@ -110,7 +111,7 @@ async function load() {
     api.get('/teams', { params: { size: 50, includeDisbanded: true } }),
     api.get('/sports'),
     api.get('/admin/role-requests'),
-    api.get('/gallery'),
+    api.get('/admin/gallery'),
     loadAllReferees(refereeQuery.value),
   ])
   users.value = hydrateUsers(u.data.content)
@@ -122,6 +123,7 @@ async function load() {
   roleRequests.value = rr.data
   gallery.value = g.data
   vkAlbumUrl.value = g.data.vkAlbumUrl || ''
+  await loadGalleryPreviews(g.data.photos || [])
   if (tab.value === 'statistics') await loadStats()
   await names.load()
 }
@@ -140,6 +142,37 @@ watch(tab, (value) => {
 })
 
 onMounted(load)
+onUnmounted(revokeGalleryPreviews)
+
+function revokeGalleryPreviews() {
+  for (const url of Object.values(galleryPreviews.value)) {
+    if (url.startsWith('blob:')) URL.revokeObjectURL(url)
+  }
+  galleryPreviews.value = {}
+}
+
+async function loadGalleryPreviews(photos: any[]) {
+  revokeGalleryPreviews()
+  const next: Record<string, string> = {}
+  for (const photo of photos) {
+    const url = String(photo?.url || '')
+    if (photo?.enabled === false && url.startsWith('/media/')) {
+      try {
+        const { data } = await api.get(`/admin/gallery/${photo.id}/file`, { responseType: 'blob' })
+        next[photo.id] = URL.createObjectURL(data)
+      } catch (e: any) {
+        error.value = apiError(e, 'Скрытый кадр не открылся.')
+      }
+      continue
+    }
+    if (url) next[photo.id] = url
+  }
+  galleryPreviews.value = next
+}
+
+function previewOf(photo: any) {
+  return galleryPreviews.value[photo.id] || ''
+}
 
 function approvedRolesOf(user: any): string[] {
   const from = (user.roles ?? [])
@@ -540,7 +573,7 @@ async function deleteTeam(team: any) {
       </label>
       <button class="btn secondary" :disabled="pending" @click="saveVkAlbum">Сохранить ссылку ВК</button>
       <div v-for="photo in galleryPhotos" :key="photo.id" class="slide-row">
-        <img :src="photo.url" alt="" />
+        <img v-if="previewOf(photo)" :src="previewOf(photo)" alt="" />
         <div>
           <strong>{{ slotLabel[photo.slot] || photo.slot }} · {{ photo.title || photo.caption || 'Без подписи' }}</strong>
           <p class="muted">{{ photo.sortOrder }} · {{ photo.url }}</p>
