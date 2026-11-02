@@ -66,7 +66,7 @@ public class AuthController {
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest
     ) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.check(httpRequest, request.email());
         UserResponse user = authService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
@@ -85,7 +85,7 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Login and receive access/refresh tokens")
     public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.check(httpRequest, request.email());
         AuthService.AuthTokens tokens = authService.login(request.email(), request.password());
         return toResponse(tokens);
     }
@@ -103,7 +103,7 @@ public class AuthController {
             @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest
     ) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.check(httpRequest, request.email());
         passwordResetService.requestReset(request.email());
         return ResponseEntity.noContent().build();
     }
@@ -115,7 +115,7 @@ public class AuthController {
             @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest httpRequest
     ) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.check(httpRequest, principal == null ? null : principal.getId().toString());
         passwordResetService.requestResetForCurrentUser(principal == null ? null : principal.getId());
         return ResponseEntity.noContent().build();
     }
@@ -126,7 +126,7 @@ public class AuthController {
             @Valid @RequestBody ResetPasswordRequest request,
             HttpServletRequest httpRequest
     ) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.check(httpRequest, request.token());
         passwordResetService.resetPassword(request.token(), request.password());
         return ResponseEntity.noContent().build();
     }

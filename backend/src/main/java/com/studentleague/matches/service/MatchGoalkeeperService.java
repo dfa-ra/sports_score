@@ -64,6 +64,7 @@ public class MatchGoalkeeperService {
         if (!assigned && !principal.hasRole(Role.ADMIN)) {
             throw ApiException.forbidden("Referee is not assigned to this match");
         }
+        requireTeam(request);
         return apply(match, request);
     }
 
@@ -71,7 +72,14 @@ public class MatchGoalkeeperService {
     public MatchResponse setByAdmin(UUID matchId, SetMatchGoalkeeperRequest request) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> ApiException.notFound("Match not found"));
+        requireTeam(request);
         return apply(match, request);
+    }
+
+    private static void requireTeam(SetMatchGoalkeeperRequest request) {
+        if (request == null || request.teamId() == null) {
+            throw ApiException.badRequest("Укажите команду");
+        }
     }
 
     private MatchResponse apply(Match match, SetMatchGoalkeeperRequest request) {

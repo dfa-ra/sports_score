@@ -192,6 +192,7 @@ public class RefereeMatchService {
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
         }
+        validateEventMinute(match, request);
         validateEventPayload(match, request);
         boolean ownGoal = OwnGoals.is(request.metadata());
         if (ownGoal && request.eventType() != MatchEventType.GOAL) {
@@ -279,6 +280,23 @@ public class RefereeMatchService {
 
     private void recalculateScore(Match match) {
         matchScoreService.apply(match);
+    }
+
+    private void validateEventMinute(Match match, CreateMatchEventRequest request) {
+        Integer gameTime = request.gameTime();
+        if (gameTime == null) {
+            return;
+        }
+        if (gameTime < 0) {
+            throw ApiException.badRequest("Время события не может быть отрицательным");
+        }
+        int length = MatchClock.periodLength(match);
+        int periods = match.getPeriodCount() > 0 ? match.getPeriodCount() : MatchClock.DEFAULT_PERIOD_COUNT;
+        int maxSeconds = periods * length + 5 * 60;
+        int kickoff = MatchClock.toKickoffSeconds(gameTime, MatchClock.periodIndex(match), length);
+        if (kickoff > maxSeconds) {
+            throw ApiException.badRequest("Время события больше длительности матча");
+        }
     }
 
     private void validateEventPayload(Match match, CreateMatchEventRequest request) {

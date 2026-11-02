@@ -58,7 +58,7 @@ public class RefereeController {
     public MatchResponse setGoalkeeper(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id,
-            @Valid @RequestBody SetMatchGoalkeeperRequest request
+            @RequestBody SetMatchGoalkeeperRequest request
     ) {
         return matchGoalkeeperService.setByReferee(principal, id, request);
     }

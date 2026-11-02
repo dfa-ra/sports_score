@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
-import { formatWhen, isTournamentOpenForApply } from '../lib/format'
+import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
 import { matchStateLabel } from '../lib/match'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -30,6 +30,8 @@ const status = ref('REGISTRATION')
 const format = ref('ROUND_ROBIN')
 const regulations = ref('')
 const seasonYear = ref(2026)
+const startDate = ref('')
+const endDate = ref('')
 const tab = ref<'table' | 'rules'>('table')
 const calendarFile = ref<File | null>(null)
 const error = ref('')
@@ -37,6 +39,7 @@ const ok = ref('')
 const pending = ref(false)
 const showMatchForm = ref(false)
 const applying = ref(false)
+const applyNote = ref('')
 
 const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
 const showApply = computed(() =>
@@ -70,10 +73,22 @@ async function load() {
   format.value = t.data.format
   regulations.value = t.data.regulations || ''
   seasonYear.value = t.data.seasonYear
+  startDate.value = t.data.startDate || ''
+  endDate.value = t.data.endDate || ''
+}
+
+function onApplied(message: string) {
+  applyNote.value = message
+  load()
 }
 
 async function save() {
   error.value = ''
+  const dateError = tournamentDatesError(startDate.value, endDate.value)
+  if (dateError) {
+    error.value = dateError
+    return
+  }
   pending.value = true
   try {
     await api.put(`/tournaments/${tournament.value.id}`, {
@@ -83,6 +98,8 @@ async function save() {
       format: format.value,
       regulations: regulations.value || undefined,
       seasonYear: Number(seasonYear.value),
+      startDate: startDate.value || undefined,
+      endDate: endDate.value || undefined,
     })
     ok.value = 'Турнир обновлён.'
     await load()
@@ -197,6 +214,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     <div v-if="showApply" class="panel stack">
       <h2>Заявить команду</h2>
       <p>Пока идёт набор, капитан и админ могут подать заявку. В сетку команду всё равно допускает админ.</p>
+      <p v-if="applyNote" class="form-ok">{{ applyNote }}</p>
       <button v-if="auth.isAuthenticated" class="btn" type="button" @click="applying = true">Заявиться</button>
       <RouterLink v-else class="btn" :to="{ name: 'login', query: { redirect: route.fullPath } }">
         Войти и заявиться
@@ -255,15 +273,19 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       v-if="applying && tournament"
       :tournament="tournament"
       @close="applying = false"
-      @applied="load"
+      @applied="onApplied"
     />
 
     <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <p v-if="error" class="form-error">{{ error }}</p>
+      <p v-if="ok" class="form-ok">{{ ok }}</p>
       <h2>Настройки турнира</h2>
       <form class="stack" @submit.prevent="save">
         <label class="field">Название<input v-model="name" required /></label>
         <label class="field">Описание<textarea v-model="description" rows="2" /></label>
         <label class="field">Сезон<input v-model.number="seasonYear" type="number" /></label>
+        <label class="field">Старт<input v-model="startDate" type="date" /></label>
+        <label class="field">Финиш<input v-model="endDate" type="date" /></label>
         <label class="field">Статус
           <select v-model="status">
             <option value="DRAFT">Черновик</option>

@@ -47,7 +47,7 @@ public class LocalDiskStorageService implements StorageService {
             ImageVariants.writeForFolder(target, sanitize(folder));
             return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
         } catch (IOException e) {
-            throw ApiException.badRequest("Failed to store uploaded file");
+            throw ApiException.badRequest("Не удалось сохранить файл");
         }
     }
 

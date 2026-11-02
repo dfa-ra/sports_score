@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -34,6 +34,7 @@ const playerId = ref('')
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
+const missing = ref(false)
 const starTap = ref(0)
 
 function tapStar() {
@@ -46,29 +47,44 @@ const isCaptain = computed(() => me.value && team.value && me.value.id === team.
 const canManage = computed(() => !team.value?.disbanded && (auth.canManageLeague || isCaptain.value))
 
 onMounted(load)
+watch(() => route.params.id, () => {
+  load()
+})
 
 async function load() {
   const id = route.params.id
-  await names.load()
-  const [t, m, games, squadStats] = await Promise.all([
-    api.get(`/teams/${id}`),
-    api.get(`/teams/${id}/members`),
-    api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
-    api.get(`/teams/${id}/player-stats`),
-  ])
-  team.value = t.data
-  members.value = m.data
-  stats.value = squadStats.data ?? []
-  matches.value = (games.data.content ?? []).filter((row: any) =>
-    row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
-  )
-  if (auth.isAuthenticated) {
-    try {
-      const { data } = await api.get('/players/me')
-      me.value = data
-    } catch {
-      me.value = null
+  missing.value = false
+  error.value = ''
+  try {
+    await names.load()
+    const [t, m, games, squadStats] = await Promise.all([
+      api.get(`/teams/${id}`),
+      api.get(`/teams/${id}/members`),
+      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+      api.get(`/teams/${id}/player-stats`),
+    ])
+    team.value = t.data
+    members.value = m.data
+    stats.value = squadStats.data ?? []
+    matches.value = (games.data.content ?? []).filter((row: any) =>
+      row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
+    )
+    if (auth.isAuthenticated) {
+      try {
+        const { data } = await api.get('/players/me')
+        me.value = data
+      } catch {
+        me.value = null
+      }
     }
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 400 || status === 404) {
+      team.value = null
+      missing.value = true
+      return
+    }
+    error.value = apiError(e, 'Команда не загрузилась.')
   }
 }
 
@@ -306,6 +322,10 @@ async function deleteTeam() {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
+  <section v-else-if="missing" class="stack">
+    <h1>Команда не найдена</h1>
+  </section>
+  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>

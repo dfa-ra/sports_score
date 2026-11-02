@@ -91,6 +91,7 @@ public class PlayerService {
                 || roleService.hasApproved(userId, Role.ADMIN);
         boolean promote = false;
         if (!alreadyPlayer && (existing == null || completeRegistration(request))) {
+            roleService.requireNoPending(userId, Role.PLAYER);
             requirePlayerRegistration(request, existing, user);
             promote = true;
         }

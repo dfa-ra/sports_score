@@ -11,6 +11,7 @@ const auth = useAuthStore()
 const items = ref<any[]>([])
 const loading = ref(true)
 const showForm = ref(false)
+const captainNeedsTeam = ref(false)
 
 async function load() {
   try {
@@ -18,6 +19,14 @@ async function load() {
     items.value = data.content
   } finally {
     loading.value = false
+  }
+  captainNeedsTeam.value = false
+  if (!auth.hasRole('CAPTAIN') || auth.canManageLeague) return
+  try {
+    await api.get('/teams/mine')
+  } catch (e: any) {
+    captainNeedsTeam.value = e?.response?.status === 404
+      && e?.response?.data?.message === 'Вы ещё не в команде'
   }
 }
 
@@ -29,6 +38,7 @@ onMounted(load)
     <div class="page-title">
       <h1>Команды</h1>
     </div>
+    <p v-if="captainNeedsTeam" class="muted">Команду назначает администратор</p>
     <div v-if="auth.canManageLeague" class="toolbar">
       <button class="btn" @click="showForm = !showForm">{{ showForm ? 'Скрыть форму' : 'Создать команду' }}</button>
     </div>

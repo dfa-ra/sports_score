@@ -67,12 +67,12 @@ public class AuthService {
     public UserResponse register(RegisterRequest request) {
         String normalizedEmail = request.email().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
-            throw ApiException.conflict("Email already registered");
+            throw ApiException.conflict("Эта почта уже зарегистрирована");
         }
 
         List<Role> requested = request.resolvedRoles();
         if (requested.isEmpty() || requested.stream().anyMatch(role -> role == Role.ADMIN)) {
-            throw ApiException.badRequest("Можно зарегистрироваться как FAN, PLAYER, CAPTAIN или REFEREE");
+            throw ApiException.badRequest("Можно зарегистрироваться как зритель, игрок, капитан или судья");
         }
 
         if (isReservedAdminEmail(normalizedEmail)) {
@@ -104,10 +104,10 @@ public class AuthService {
     @Transactional
     public AuthTokens login(String email, String rawPassword) {
         User user = userRepository.findByEmailIgnoreCase(email.trim())
-                .orElseThrow(() -> ApiException.unauthorized("Invalid email or password"));
+                .orElseThrow(() -> ApiException.unauthorized("Неверный email или пароль"));
         String hash = user.getPasswordHash();
         if (!user.isEnabled() || hash == null || hash.isBlank() || !passwordEncoder.matches(rawPassword, hash)) {
-            throw ApiException.unauthorized("Invalid email or password");
+            throw ApiException.unauthorized("Неверный email или пароль");
         }
         return issueTokens(user);
     }
@@ -172,14 +172,14 @@ public class AuthService {
     @Transactional
     public AuthTokens refresh(String rawRefreshToken) {
         RefreshToken existing = refreshTokenRepository.findByTokenHash(hashToken(rawRefreshToken))
-                .orElseThrow(() -> ApiException.unauthorized("Invalid refresh token"));
+                .orElseThrow(() -> ApiException.unauthorized("Сессия недействительна. Войдите снова."));
         if (!existing.isActive()) {
-            throw ApiException.unauthorized("Refresh token expired or revoked");
+            throw ApiException.unauthorized("Сессия истекла. Войдите снова.");
         }
         User user = userRepository.findById(existing.getUserId())
-                .orElseThrow(() -> ApiException.unauthorized("Invalid refresh token"));
+                .orElseThrow(() -> ApiException.unauthorized("Сессия недействительна. Войдите снова."));
         if (!user.isEnabled()) {
-            throw ApiException.unauthorized("User disabled");
+            throw ApiException.unauthorized("Аккаунт отключён");
         }
 
         RefreshToken replacement = createRefreshTokenEntity(user.getId());
@@ -206,7 +206,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public UserResponse me(UUID userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         return roleService.toUserResponse(user);
     }
 

@@ -13,6 +13,7 @@ import com.studentleague.matches.entity.MatchAnalystAssignment;
 import com.studentleague.matches.repository.MatchAnalystAssignmentRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.security.CurrentUser;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.entity.Tournament;
@@ -64,7 +65,7 @@ public class AnalystAssignmentService {
     public AnalystAssignmentResponse get(UUID matchId) {
         requireMatch(matchId);
         return assignmentRepository.findById(matchId)
-                .map(this::toResponse)
+                .map(row -> toResponse(row, CurrentUser.isAdmin()))
                 .orElseGet(() -> empty(matchId));
     }
 
@@ -97,7 +98,7 @@ public class AnalystAssignmentService {
             row.setHomeUserId(home.getId());
             row.setAwayUserId(away.getId());
         }
-        return toResponse(assignmentRepository.save(row));
+        return toResponse(assignmentRepository.save(row), true);
     }
 
     @Transactional
@@ -247,13 +248,13 @@ public class AnalystAssignmentService {
                 .orElseThrow(() -> ApiException.notFound("Матч не найден"));
     }
 
-    private AnalystAssignmentResponse toResponse(MatchAnalystAssignment row) {
+    private AnalystAssignmentResponse toResponse(MatchAnalystAssignment row, boolean includeEmail) {
         return new AnalystAssignmentResponse(
                 row.getMatchId(),
                 row.getMode(),
-                person(row.getBothUserId()),
-                person(row.getHomeUserId()),
-                person(row.getAwayUserId())
+                person(row.getBothUserId(), includeEmail),
+                person(row.getHomeUserId(), includeEmail),
+                person(row.getAwayUserId(), includeEmail)
         );
     }
 
@@ -261,14 +262,25 @@ public class AnalystAssignmentService {
         return new AnalystAssignmentResponse(matchId, null, null, null, null);
     }
 
-    private AnalystPersonResponse person(UUID userId) {
+    private AnalystPersonResponse person(UUID userId, boolean includeEmail) {
         if (userId == null) {
             return null;
         }
-        return userRepository.findById(userId).map(this::toPerson).orElse(null);
+        return userRepository.findById(userId)
+                .map(user -> toPerson(user, includeEmail))
+                .orElse(null);
     }
 
     private AnalystPersonResponse toPerson(User user) {
-        return new AnalystPersonResponse(user.getId(), user.getFirstName(), user.getLastName(), user.getEmail());
+        return toPerson(user, true);
+    }
+
+    private AnalystPersonResponse toPerson(User user, boolean includeEmail) {
+        return new AnalystPersonResponse(
+                user.getId(),
+                user.getFirstName(),
+                user.getLastName(),
+                includeEmail ? user.getEmail() : null
+        );
     }
 }
