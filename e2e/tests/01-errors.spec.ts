@@ -1,30 +1,44 @@
 import { expect, test } from '@playwright/test'
-import { apiGet, apiSend, errorCode } from '../src/api'
+import { apiGet, apiSend, errorCode, errorMessage } from '../src/api'
 import { fanSession } from '../src/accounts'
 import { check, title } from '../src/check'
 
-test(title({ id: 'E1', bugs: [1] }, 'несуществующий матч: API 404 и страница «не найдено»'), check({ id: 'E1', bugs: [1] }), async ({ page, request }) => {
-  const numeric = await apiGet(request, '/matches/999999')
-  expect(numeric.status, `GET /matches/999999 → ${numeric.status} ${JSON.stringify(numeric.body)}`).toBe(404)
-  expect(errorCode(numeric.body)).toBe('NOT_FOUND')
+const MISSING_UUID = '00000000-0000-0000-0000-000000000000'
 
-  const missing = await apiGet(request, '/matches/00000000-0000-0000-0000-000000000000')
-  expect(missing.status, 'несуществующий UUID матча → 404, не 500').toBe(404)
-  expect(errorCode(missing.body)).toBe('NOT_FOUND')
+function expectBadId(call: { status: number; body: unknown }, path: string) {
+  expect(call.status, `${path} → ${call.status} ${JSON.stringify(call.body)}`).toBe(400)
+  expect(errorCode(call.body), `${path}: code`).toBe('BAD_REQUEST')
+  expect(errorMessage(call.body), `${path}: «${errorMessage(call.body)}»`).toBe('Некорректный идентификатор')
+}
+
+function expectMissing(call: { status: number; body: unknown }, path: string) {
+  expect(call.status, `${path} → ${call.status} ${JSON.stringify(call.body)}, не 500`).toBe(404)
+  expect(errorCode(call.body), `${path}: code`).toBe('NOT_FOUND')
+}
+
+test(title({ id: 'E1', bugs: [1] }, 'матч: мусорный id → 400, несуществующий UUID → 404, страница «не найдено»'), check({ id: 'E1', bugs: [1] }), async ({ page, request }) => {
+  expectBadId(await apiGet(request, '/matches/999999'), 'GET /matches/999999')
+  expectMissing(await apiGet(request, `/matches/${MISSING_UUID}`), 'GET /matches/<uuid>')
 
   await page.goto('/matches/999999')
   await expect(page.getByText(/матч не найден|не найдено|такой страницы нет/i)).toBeVisible()
+  await page.goto(`/matches/${MISSING_UUID}`)
+  await expect(page.getByText(/матч не найден|не найдено|такой страницы нет/i)).toBeVisible()
 })
 
-test(title({ id: 'E2', bugs: [26, 27, 28, 29] }, 'мусорные id команды и турнира → 404 / «нет такой»'), check({ id: 'E2', bugs: [26, 27, 28, 29] }), async ({ page, request }) => {
-  const team = await apiGet(request, '/teams/new')
-  expect(team.status, `GET /teams/new → ${team.status} ${JSON.stringify(team.body)}`).toBe(404)
-  const tournament = await apiGet(request, '/tournaments/not-a-tournament')
-  expect(tournament.status, `GET /tournaments/мусор → ${tournament.status}`).toBe(404)
+test(title({ id: 'E2', bugs: [26, 27, 28, 29] }, 'команда/турнир: мусорный id → 400, несуществующий UUID → 404'), check({ id: 'E2', bugs: [26, 27, 28, 29] }), async ({ page, request }) => {
+  expectBadId(await apiGet(request, '/teams/new'), 'GET /teams/new')
+  expectBadId(await apiGet(request, '/tournaments/not-a-tournament'), 'GET /tournaments/мусор')
+  expectMissing(await apiGet(request, `/teams/${MISSING_UUID}`), 'GET /teams/<uuid>')
+  expectMissing(await apiGet(request, `/tournaments/${MISSING_UUID}`), 'GET /tournaments/<uuid>')
 
   await page.goto('/teams/new')
+  await expect(page.getByText(/нет такой|не найден|такой страницы нет|некорректн/i)).toBeVisible()
+  await page.goto(`/teams/${MISSING_UUID}`)
   await expect(page.getByText(/нет такой|не найден|такой страницы нет/i)).toBeVisible()
   await page.goto('/tournaments/not-a-tournament')
+  await expect(page.getByText(/нет такой|не найден|такой страницы нет|некорректн/i)).toBeVisible()
+  await page.goto(`/tournaments/${MISSING_UUID}`)
   await expect(page.getByText(/нет такой|не найден|такой страницы нет/i)).toBeVisible()
 })
 
@@ -50,7 +64,7 @@ test(title({ id: 'E5' }, 'без токена мутации → 401'), check({ 
   const posts = [
     { path: '/tournaments', data: { name: 'E2E noauth' } },
     { path: '/teams', data: { name: 'E2E noauth' } },
-    { path: '/matches', data: { tournamentId: '00000000-0000-0000-0000-000000000000' } },
+    { path: '/matches', data: { tournamentId: MISSING_UUID } },
     { path: '/players/me', method: 'PUT' as const, data: { firstName: 'E2E', lastName: 'NoAuth' } },
     { path: '/auth/change-password-email', data: undefined },
   ]

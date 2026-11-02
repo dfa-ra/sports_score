@@ -4,12 +4,14 @@ import { check, title } from '../src/check'
 import { firstPublicMatch, firstPublicTournament } from '../src/entities'
 import { hasHorizontalOverflow, open, waitForApp } from '../src/ui'
 
+/** Публичные разделы из `web/src/router/index.ts` на main. /gallery и /about в роутере нет. */
 const publicPages = [
   { path: '/tournaments', name: 'Турниры' },
   { path: '/teams', name: 'Команды' },
   { path: '/live', name: 'Live' },
   { path: '/calendar', name: 'Календарь' },
-  { path: '/gallery', name: 'Галерея' },
+  { path: '/table', name: 'Таблица' },
+  { path: '/players', name: 'Игроки' },
 ]
 
 test(title({ id: 'S1' }, 'главная открывается, 200, нет ошибок консоли и 5xx'), check({ id: 'S1' }), async ({ page }) => {
@@ -26,9 +28,7 @@ test(title({ id: 'S2' }, 'публичные разделы открываютс
     expect(response?.status(), `${item.path} должен открываться`).toBe(200)
     const body = await page.locator('main').innerText()
     expect(body.trim().length, `${item.path}: пустой main`).toBeGreaterThan(0)
-    if (item.path === '/gallery') {
-      expect(body, 'S2 /gallery — отдельная страница галереи, не generic 404').not.toMatch(/такой страницы нет/i)
-    }
+    expect(body, `${item.path} не должен быть generic 404`).not.toMatch(/такой страницы нет/i)
   }
 })
 

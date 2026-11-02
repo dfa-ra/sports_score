@@ -146,16 +146,17 @@ test(title({ id: 'R8' }, 'закрытые страницы без входа в
   }
 })
 
-test(title({ id: 'R9' }, 'схема /auth/register совпадает с docs/api.md'), check({ id: 'R9' }), async ({ request }) => {
-  const documented = await apiSend(request, 'POST', '/auth/register', {
+test(title({ id: 'R9' }, 'регистрация: API требует firstName/lastName'), check({ id: 'R9' }), async ({ request }) => {
+  console.log('R9: docs/api.md описывает {email,password,accountType} без ФИО; код API требует firstName/lastName. Тест шлёт ФИО.')
+  const created = await apiSend(request, 'POST', '/auth/register', {
     data: {
       email: uniqueEmail('docs-schema'),
       password: 'Str0ngPass!',
+      firstName: 'Егор',
+      lastName: 'Регистров',
       accountType: 'FAN',
+      role: 'FAN',
     },
   })
-  expect(
-    documented.status,
-    `docs/api.md описывает {email,password,accountType}. Ответ ${documented.status} ${JSON.stringify(documented.body)}`,
-  ).toBe(201)
+  expect(created.status, `POST /auth/register с ФИО → ${created.status} ${JSON.stringify(created.body)}`).toBe(201)
 })

@@ -50,11 +50,11 @@ export async function apiSend(
   request: APIRequestContext,
   method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  options: { token?: string; data?: unknown } = {},
+  options: { token?: string; data?: unknown; headers?: Record<string, string> } = {},
 ): Promise<ApiCall> {
   const response = await request.fetch(apiPath(path), {
     method,
-    headers: authHeaders(options.token, options.data !== undefined),
+    headers: { ...authHeaders(options.token, options.data !== undefined), ...options.headers },
     data: options.data === undefined ? undefined : options.data,
     failOnStatusCode: false,
   })
