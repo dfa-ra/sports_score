@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { apiGet, apiSend, asList, asRecord } from '../src/api'
 import { requireRole } from '../src/accounts'
-import { hasRole } from '../src/env'
 import { check, title } from '../src/check'
-import { uniqueEntityName } from '../src/env'
+import { hasRole } from '../src/env'
 import { waitForApp } from '../src/ui'
 
 test(title({ id: 'T1', bugs: [3] }, 'список матчей турнира: команды и даты есть, ФИНАЛ только у финала'), check({ id: 'T1', bugs: [3] }), async ({ page, request }) => {
@@ -68,7 +67,7 @@ test(title({ id: 'T3', bugs: [2] }, 'одно отключённое фото н
     token: admin.accessToken,
     data: {
       url: '/media/e2e-disabled-should-not-leak.png',
-      title: uniqueEntityName('фото'),
+      title: 'E2E фото',
       slot: 'GALLERY',
       enabled: false,
     },

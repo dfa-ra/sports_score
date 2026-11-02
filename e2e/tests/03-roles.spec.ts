@@ -1,11 +1,18 @@
 import { expect, test } from '@playwright/test'
 import { apiGet, apiSend } from '../src/api'
 import { fanSession, injectSession, registerFan, requireRole, skipWithout } from '../src/accounts'
+import { hasRole } from '../src/env'
 import { check, title } from '../src/check'
 import { firstPublicMatch, firstPublicTeam } from '../src/entities'
 
 test(title({ id: 'P1' }, 'болельщик не ходит в /admin и /referee; admin API → 403'), check({ id: 'P1' }), async ({ page, request }) => {
   const fan = await fanSession(request)
+  const create = await apiSend(request, 'POST', '/tournaments', {
+    token: fan.accessToken,
+    data: { name: 'E2E fan forbidden', sportId: '11111111-1111-1111-1111-111111111101', seasonYear: 2026, format: 'ROUND_ROBIN' },
+  })
+  expect(create.status, `POST /tournaments болельщиком → ${create.status}`).toBe(403)
+
   await injectSession(page, fan)
   await page.goto('/admin')
   await expect(page).not.toHaveURL(/\/admin/)
@@ -13,23 +20,18 @@ test(title({ id: 'P1' }, 'болельщик не ходит в /admin и /refer
   await page.goto('/referee')
   await expect(page).not.toHaveURL(/\/referee/)
   await expect(page.getByText(/нет доступа/i)).toBeVisible()
-
-  const create = await apiSend(request, 'POST', '/tournaments', {
-    token: fan.accessToken,
-    data: { name: 'E2E fan forbidden', sportId: '11111111-1111-1111-1111-111111111101', seasonYear: 2026, format: 'ROUND_ROBIN' },
-  })
-  expect(create.status, `POST /tournaments болельщиком → ${create.status}`).toBe(403)
 })
 
 test(title({ id: 'P2' }, 'капитан не может править чужую команду'), check({ id: 'P2' }), async ({ page, request }) => {
   const reason = skipWithout('CAPTAIN')
   test.skip(!!reason, reason || '')
   const captain = await requireRole(request, 'CAPTAIN')
-  const foreign = await firstPublicTeam(request)
-  expect(foreign?.id, 'на стенде должна быть хотя бы одна команда').toBeTruthy()
   const mine = await apiGet(request, '/teams/mine', captain.accessToken)
   const myId = mine.status === 200 ? String((mine.body as { id?: string }).id || '') : ''
-  expect(foreign.id === myId, 'для проверки нужна чужая команда, не своя').toBeFalsy()
+  const foreign = await firstPublicTeam(request, [myId])
+  expect(foreign?.id, 'на стенде должна быть хотя бы одна чужая команда').toBeTruthy()
+  if (!foreign?.id) throw new Error('нет чужой команды')
+  expect(String(foreign.id), 'для проверки нужна чужая команда, не /teams/mine').not.toBe(myId)
 
   await injectSession(page, captain)
   await page.goto(`/teams/${foreign.id}`)
@@ -93,7 +95,7 @@ test(title({ id: 'P5', bugs: [15, 16, 17, 18, 19] }, 'роль в UI совпа�
 
 test(title({ id: 'P6' }, 'IDOR: чужой профиль по id нельзя менять'), check({ id: 'P6' }), async ({ request }) => {
   const a = await fanSession(request)
-  const b = await registerFan(request, 'idor')
+  const b = hasRole('PLAYER') ? await requireRole(request, 'PLAYER') : await registerFan(request, 'idor')
   const otherId = String(b.user.id || '')
   expect(otherId).toBeTruthy()
 

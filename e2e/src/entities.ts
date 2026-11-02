@@ -10,6 +10,8 @@ export type CreatedIds = {
   teamIds: string[]
   matchIds: string[]
   galleryIds: string[]
+  /** true только для одноразовых сущностей. Пул E2E не удаляем: DELETE /tournaments даёт 500. */
+  disposable?: boolean
 }
 
 export function emptyIds(): CreatedIds {
@@ -37,13 +39,30 @@ export async function createTournament(
   })
 }
 
-export async function createTeam(request: APIRequestContext, admin: Session, name?: string) {
+export async function createTeam(
+  request: APIRequestContext,
+  admin: Session,
+  name?: string,
+  shortName?: string,
+) {
   return apiSend(request, 'POST', '/teams', {
     token: admin.accessToken,
     data: {
       name: name || uniqueEntityName('команда'),
-      shortName: `E2${Math.random().toString(36).slice(2, 5)}`.slice(0, 8),
+      shortName: (shortName || `E2${Math.random().toString(36).slice(2, 5)}`).slice(0, 8),
     },
+  })
+}
+
+export async function updateTournament(
+  request: APIRequestContext,
+  admin: Session,
+  tournamentId: string,
+  data: Record<string, unknown>,
+) {
+  return apiSend(request, 'PUT', `/tournaments/${tournamentId}`, {
+    token: admin.accessToken,
+    data,
   })
 }
 
@@ -110,27 +129,32 @@ export async function firstPublicMatch(request: APIRequestContext) {
   return asList(call.body)[0]
 }
 
-export async function firstPublicTeam(request: APIRequestContext) {
-  const call = await apiGet(request, '/teams?size=20')
-  return asList(call.body)[0]
+export async function firstPublicTeam(request: APIRequestContext, excludeIds: string[] = []) {
+  const skip = new Set(excludeIds.filter(Boolean))
+  const rows: Record<string, unknown>[] = []
+  for (let page = 0; page < 4; page++) {
+    const call = await apiGet(request, `/teams?size=50&page=${page}`)
+    const batch = asList(call.body)
+    rows.push(...batch)
+    if (batch.length < 50) break
+  }
+  return rows.find((row) => !skip.has(String(row.id)))
 }
 
 export async function cleanupCreated(request: APIRequestContext, admin: Session, ids: CreatedIds) {
   for (const matchId of ids.matchIds) {
     await apiSend(request, 'DELETE', `/matches/${matchId}`, { token: admin.accessToken })
   }
+  for (const galleryId of ids.galleryIds) {
+    await apiSend(request, 'DELETE', `/admin/gallery/${galleryId}`, { token: admin.accessToken })
+  }
+  if (!ids.disposable) return
   for (const teamId of ids.teamIds) {
     await apiSend(request, 'DELETE', `/teams/${teamId}`, { token: admin.accessToken })
     await apiSend(request, 'DELETE', `/teams/${teamId}?purge=true`, { token: admin.accessToken })
   }
-  for (const galleryId of ids.galleryIds) {
-    await apiSend(request, 'DELETE', `/admin/gallery/${galleryId}`, { token: admin.accessToken })
-  }
   if (ids.tournamentId) {
-    await apiSend(request, 'PUT', `/tournaments/${ids.tournamentId}`, {
-      token: admin.accessToken,
-      data: { status: 'CANCELLED', name: uniqueEntityName('архив') },
-    })
+    await updateTournament(request, admin, ids.tournamentId, { status: 'CANCELLED' })
   }
 }
 

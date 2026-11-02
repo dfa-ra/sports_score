@@ -40,20 +40,36 @@ test(title({ id: 'C3' }, 'добавить зарегистрированног�
   const player = await requireRole(request, 'PLAYER')
   const mine = await apiGet(request, '/teams/mine', captain.accessToken)
   test.skip(mine.status !== 200, 'нужна команда у капитана')
+  const teamId = String((mine.body as { id: string }).id)
   const me = await apiGet(request, '/players/me', player.accessToken)
   expect(me.status).toBe(200)
+  const playerId = String((me.body as { id?: string }).id || '')
+  const lastName = String((me.body as { lastName?: string }).lastName || player.user.lastName || '')
+  const firstName = String((me.body as { firstName?: string }).firstName || player.user.firstName || '')
+  const query = lastName.length >= 2 ? lastName : firstName
+  expect(query.length, 'у игрока должна быть фамилия или имя ≥ 2 символов').toBeGreaterThanOrEqual(2)
+  const membersBefore = asList((await apiGet(request, `/teams/${teamId}/members`)).body)
+  const already = membersBefore.some((row) => String(row.playerId) === playerId)
+  if (already) {
+    await apiSend(request, 'DELETE', `/teams/${teamId}/members/${playerId}`, { token: captain.accessToken })
+  }
   await injectSession(page, captain)
   await page.goto('/my-team')
-  await expect(page.getByText(/только зарегистрир|после подтверждения|из поиска/i)).toBeVisible()
-  const query = String((me.body as { lastName?: string }).lastName || player.user.lastName || '')
-  await page.getByPlaceholder('Фамилия или имя').fill(query)
-  await page.getByRole('button', { name: query }).first().click()
+  await expect(page.getByRole('heading', { name: 'Моя команда' })).toBeVisible()
+  const search = page.getByPlaceholder('Фамилия или имя')
+  await search.fill(query)
+  const hint = page.getByRole('button', { name: new RegExp(`${lastName}|${firstName}`, 'i') }).first()
+  await expect(hint).toBeVisible()
+  await hint.click()
   await page.getByRole('button', { name: 'Добавить игрока' }).click()
   await expect(page.getByText(/игрок добавлен/i)).toBeVisible()
-  const members = await apiGet(request, `/teams/${(mine.body as { id: string }).id}/members`)
-  const added = asList(members.body).some((row) => row.playerId === (me.body as { id: string }).id)
-  expect(added).toBeTruthy()
-  await apiSend(request, 'DELETE', `/teams/${(mine.body as { id: string }).id}/members/${(me.body as { id: string }).id}`, {
+  const members = asList((await apiGet(request, `/teams/${teamId}/members`)).body)
+  expect(members.some((row) => String(row.playerId) === playerId)).toBeTruthy()
+  await expect(
+    page.getByText(/только зарегистрир|после подтверждения|из поиска/i),
+    'подсказка, что в состав берутся только зарегистрированные игроки',
+  ).toBeVisible()
+  await apiSend(request, 'DELETE', `/teams/${teamId}/members/${playerId}`, {
     token: captain.accessToken,
   })
 })

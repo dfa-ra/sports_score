@@ -2,44 +2,27 @@ import { expect, test } from '@playwright/test'
 import { apiGet, apiSend, asList, asRecord } from '../src/api'
 import { injectSession, requireRole, skipWithout } from '../src/accounts'
 import { check, title } from '../src/check'
-import {
-  applyTeam,
-  approveTeam,
-  assignReferee,
-  cleanupCreated,
-  createMatch,
-  createTeam,
-  createTournament,
-  emptyIds,
-  idOf,
-} from '../src/entities'
-
-async function prepareAssignedMatch(request: import('@playwright/test').APIRequestContext) {
-  const admin = await requireRole(request, 'ADMIN')
-  const referee = await requireRole(request, 'REFEREE')
-  const ids = emptyIds()
-  const tournament = await createTournament(request, admin, { status: 'ACTIVE' })
-  ids.tournamentId = idOf(tournament.body)
-  const home = await createTeam(request, admin)
-  const away = await createTeam(request, admin)
-  ids.teamIds.push(idOf(home.body), idOf(away.body))
-  for (const teamId of ids.teamIds) {
-    await applyTeam(request, admin, ids.tournamentId, teamId)
-    await approveTeam(request, admin, ids.tournamentId, teamId)
-  }
-  const match = await createMatch(request, admin, {
-    tournamentId: ids.tournamentId,
-    homeTeamId: ids.teamIds[0],
-    awayTeamId: ids.teamIds[1],
-  })
-  ids.matchIds.push(idOf(match.body))
-  const assigned = await assignReferee(request, admin, ids.matchIds[0], String(referee.user.id))
-  expect(assigned.status, JSON.stringify(assigned.body)).toBe(201)
-  return { admin, referee, ids, matchId: ids.matchIds[0], homeId: ids.teamIds[0], awayId: ids.teamIds[1] }
-}
+import { deleteMatch, prepareAssignedMatch, standingRows } from '../src/pool'
+import { waitForApp } from '../src/ui'
 
 function needLiveRoles() {
   return skipWithout('ADMIN') || skipWithout('REFEREE')
+}
+
+async function addPlayerToHome(
+  request: import('@playwright/test').APIRequestContext,
+  adminToken: string,
+  homeId: string,
+) {
+  const player = await requireRole(request, 'PLAYER')
+  const me = await apiGet(request, '/players/me', player.accessToken)
+  const playerId = String((me.body as { id?: string }).id || '')
+  const added = await apiSend(request, 'POST', `/teams/${homeId}/members`, {
+    token: adminToken,
+    data: { playerId },
+  })
+  expect(added.status === 201 || added.status === 409, `состав: ${added.status} ${JSON.stringify(added.body)}`).toBeTruthy()
+  return playerId
 }
 
 test(title({ id: 'M1' }, 'назначенный матч виден в /referee'), check({ id: 'M1' }), async ({ page, request }) => {
@@ -49,9 +32,10 @@ test(title({ id: 'M1' }, 'назначенный матч виден в /referee
   try {
     await injectSession(page, ctx.referee)
     await page.goto('/referee')
+    await waitForApp(page)
     await expect(page.locator(`a[href*="${ctx.matchId}"]`).first()).toBeVisible()
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -78,7 +62,7 @@ test(title({ id: 'M2' }, 'старт → LIVE, часы идут; пауза / �
     const finished = await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/finish`, { token })
     expect(asRecord(finished.body).status).toBe('FINISHED')
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -86,13 +70,7 @@ test(title({ id: 'M3', bugs: [5] }, 'гол с автором: минута = м
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
   const ctx = await prepareAssignedMatch(request)
-  const player = await requireRole(request, 'PLAYER')
-  const me = await apiGet(request, '/players/me', player.accessToken)
-  const playerId = String((me.body as { id?: string }).id || '')
-  await apiSend(request, 'POST', `/teams/${ctx.homeId}/members`, {
-    token: ctx.admin.accessToken,
-    data: { playerId },
-  })
+  const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await new Promise((resolve) => setTimeout(resolve, 2000))
@@ -109,7 +87,7 @@ test(title({ id: 'M3', bugs: [5] }, 'гол с автором: минута = м
     const match = await apiGet(request, `/matches/${ctx.matchId}`)
     expect(Number(asRecord(match.body).homeScore)).toBe(1)
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -133,7 +111,7 @@ test(title({ id: 'M4', bugs: [20, 21, 22, 23, 24, 25] }, 'гол без игро
     })
     expect(own.status, 'автогол не должен отвечать 5xx').toBeLessThan(500)
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -150,7 +128,7 @@ test(title({ id: 'M5', bugs: [20, 21, 22, 23, 24, 25] }, 'гол не стави
     const match = await apiGet(request, `/matches/${ctx.matchId}`)
     expect(asRecord(match.body).status, 'после гола матч не должен тихо уйти в PAUSED').toBe('LIVE')
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -158,13 +136,7 @@ test(title({ id: 'M6' }, 'жёлтая и красная карточка пиш
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
   const ctx = await prepareAssignedMatch(request)
-  const player = await requireRole(request, 'PLAYER')
-  const me = await apiGet(request, '/players/me', player.accessToken)
-  const playerId = String((me.body as { id?: string }).id || '')
-  await apiSend(request, 'POST', `/teams/${ctx.homeId}/members`, {
-    token: ctx.admin.accessToken,
-    data: { playerId },
-  })
+  const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await new Promise((resolve) => setTimeout(resolve, 1200))
@@ -177,7 +149,7 @@ test(title({ id: 'M6' }, 'жёлтая и красная карточка пиш
       expect(Number(asRecord(event.body).gameTime || 0)).toBeGreaterThan(0)
     }
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -185,20 +157,14 @@ test(title({ id: 'M7' }, 'отмена события пересчитывает
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
   const ctx = await prepareAssignedMatch(request)
-  const player = await requireRole(request, 'PLAYER')
-  const me = await apiGet(request, '/players/me', player.accessToken)
-  const playerId = String((me.body as { id?: string }).id || '')
-  await apiSend(request, 'POST', `/teams/${ctx.homeId}/members`, {
-    token: ctx.admin.accessToken,
-    data: { playerId },
-  })
+  const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     const event = await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/events`, {
       token: ctx.referee.accessToken,
       data: { eventType: 'GOAL', teamId: ctx.homeId, playerId },
     })
-    const eventId = idOf(event.body)
+    const eventId = String(asRecord(event.body).id || '')
     const afterGoal = await apiGet(request, `/matches/${ctx.matchId}`)
     expect(Number(asRecord(afterGoal.body).homeScore)).toBe(1)
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/events/${eventId}/void`, {
@@ -207,7 +173,7 @@ test(title({ id: 'M7' }, 'отмена события пересчитывает
     const afterVoid = await apiGet(request, `/matches/${ctx.matchId}`)
     expect(Number(asRecord(afterVoid.body).homeScore)).toBe(0)
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -218,10 +184,10 @@ test(title({ id: 'M8', bugs: [20, 21, 22, 23, 24, 25, 4] }, 'публичная 
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await page.goto(`/matches/${ctx.matchId}`)
+    await waitForApp(page)
     await expect(page.getByText(/live/i).first()).toBeVisible()
-    const publicPage = page
-    const live = await publicPage.context().newPage()
-    const home = await publicPage.context().newPage()
+    const live = await page.context().newPage()
+    const home = await page.context().newPage()
     await live.goto('/live')
     await home.goto('/')
     await expect(live.getByText(/live/i).first()).toBeVisible({ timeout: 8_000 })
@@ -229,11 +195,13 @@ test(title({ id: 'M8', bugs: [20, 21, 22, 23, 24, 25, 4] }, 'публичная 
       token: ctx.referee.accessToken,
       data: { eventType: 'TIMEOUT', teamId: ctx.homeId },
     })
-    await expect(publicPage.getByText(/тайм-аут|timeout|live/i).first()).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/тайм-аут|timeout|live/i).first()).toBeVisible({ timeout: 5_000 })
     const minuteText = await live.locator('body').innerText()
     expect(minuteText, 'на /live не должна висеть нулевая минута у живого матча дольше нормы').not.toMatch(/0:00[\s\S]{0,40}LIVE/i)
+    await live.close()
+    await home.close()
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -248,13 +216,15 @@ test(title({ id: 'M9', bugs: [20, 21, 22, 23, 24, 25] }, 'протокол на 
     const types = asList(events.body).map((row) => String(row.eventType))
     expect(types).toContain('PERIOD_START')
     await page.goto(`/matches/${ctx.matchId}`)
-    await page.getByRole('button', { name: /протокол/i }).click().catch(async () => {
-      await page.getByText(/протокол/i).click()
-    })
-    await expect(page.getByText(/начало тайма|конец тайма/i).first()).toBeVisible()
-    await expect(page.getByText(/\d+'/)).toBeVisible()
+    await waitForApp(page)
+    await page.getByRole('button', { name: 'Протокол' }).click()
+    const protocol = page.locator('.panel').filter({ hasText: /начало тайма|конец тайма/i })
+    await expect(protocol, 'вкладка «Протокол» должна показать начало/конец тайма').toBeVisible()
+    await expect(protocol.getByText('Начало тайма').first()).toBeVisible()
+    const minute = protocol.locator('.t').filter({ hasText: /^\d+'$/ })
+    await expect(minute.first(), 'минута должна быть в строке протокола, не на часах матча').toBeVisible()
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
@@ -273,25 +243,21 @@ test(title({ id: 'M10', bugs: [20, 21, 22, 23, 24, 25] }, 'после финиш
     const match = await apiGet(request, `/matches/${ctx.matchId}`)
     expect(asRecord(match.body).status).toBe('FINISHED')
     await page.goto(`/matches/${ctx.matchId}`)
+    await waitForApp(page)
     await expect(page.getByText(/завершен/i)).toBeVisible()
     const when = String(asRecord(match.body).scheduledAt || '')
     expect(new Date(when).getTime(), 'дата завершённого матча не должна выглядеть будущей').toBeLessThanOrEqual(Date.now() + 60_000)
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 
 test(title({ id: 'M11', bugs: [6] }, 'результат попадает в таблицу, страницы команд и статистику игрока'), check({ id: 'M11', bugs: [6] }), async ({ page, request }) => {
+  test.setTimeout(90_000)
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
   const ctx = await prepareAssignedMatch(request)
-  const player = await requireRole(request, 'PLAYER')
-  const me = await apiGet(request, '/players/me', player.accessToken)
-  const playerId = String((me.body as { id?: string }).id || '')
-  await apiSend(request, 'POST', `/teams/${ctx.homeId}/members`, {
-    token: ctx.admin.accessToken,
-    data: { playerId },
-  })
+  const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/events`, {
@@ -299,19 +265,27 @@ test(title({ id: 'M11', bugs: [6] }, 'результат попадает в т�
       data: { eventType: 'GOAL', teamId: ctx.homeId, playerId },
     })
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/finish`, { token: ctx.referee.accessToken })
-    const table = await apiGet(request, `/tournaments/${ctx.ids.tournamentId}/standings`)
-    const rows = ((asRecord(table.body).tables as { rows?: Record<string, unknown>[] }[] | undefined) ?? [])
-      .flatMap((group) => group.rows ?? [])
-    const homeRow = rows.find((row) => row.teamId === ctx.homeId)
+    const table = await apiGet(request, `/tournaments/${ctx.tournamentId}/standings`)
+    const homeRow = standingRows(table.body).find((row) => String(row.teamId) === ctx.homeId)
     expect(homeRow, 'команда должна появиться в таблице').toBeTruthy()
     expect(Number(homeRow?.played || 0)).toBeGreaterThan(0)
     expect(Number(homeRow?.points || 0)).toBeGreaterThan(0)
-    await page.goto(`/players/${playerId}`)
+
+    await page.goto(`/teams/${ctx.homeId}`)
+    await waitForApp(page)
     await page.getByRole('button', { name: 'Статистика' }).click()
-    const stats = await page.locator('main').innerText()
-    expect(stats, 'вкладка «Статистика» не должна быть пустой').toMatch(/игр|гол/i)
+    await expect(page.locator('main')).toContainText(/игр|очк|в\s|п\s/i)
+
+    await page.goto(`/players/${playerId}`)
+    await waitForApp(page)
+    const statsTab = page.getByRole('button', { name: /статистика|цифры/i })
+    await expect(statsTab, 'на карточке игрока должна быть вкладка статистики').toBeVisible()
+    await statsTab.click()
+    const stats = page.locator('main')
+    await expect(stats, 'вкладка статистики не должна быть пустой (баг 6)').not.toContainText(/пока без цифр|матчей пока нет/i)
+    await expect(stats).toContainText(/игр|гол/i)
   } finally {
-    await cleanupCreated(request, ctx.admin, ctx.ids)
+    await deleteMatch(request, ctx.admin, ctx.matchId)
   }
 })
 

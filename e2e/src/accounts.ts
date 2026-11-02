@@ -24,9 +24,30 @@ const PIXEL_PNG = readFileSync(join(__dirname, '..', 'fixtures', 'pixel.png'))
 
 let cachedFan: Session | undefined
 
+async function retrying<T>(label: string, fn: () => Promise<T>, attempts = 4): Promise<T> {
+  let last: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      last = error
+      const message = error instanceof Error ? error.message : String(error)
+      if (!/\b(429|502|503)\b/.test(message)) throw error
+      await new Promise((resolve) => setTimeout(resolve, 1500 * (i + 1)))
+    }
+  }
+  throw last instanceof Error ? last : new Error(`${label} не удалось после повторов`)
+}
+
 export async function login(request: APIRequestContext, account: RoleAccount): Promise<Session> {
-  const call = await apiSend(request, 'POST', '/auth/login', {
-    data: { email: account.email, password: account.password },
+  const call = await retrying(`логин ${account.role}`, async () => {
+    const response = await apiSend(request, 'POST', '/auth/login', {
+      data: { email: account.email, password: account.password },
+    })
+    if (response.status === 429 || response.status === 502 || response.status === 503) {
+      throw new Error(`Логин ${account.role} не удался: HTTP ${response.status}`)
+    }
+    return response
   })
   if (call.status !== 200) {
     throw new Error(`Логин ${account.role} не удался: HTTP ${call.status} ${JSON.stringify(call.body)}`)
@@ -47,15 +68,21 @@ export async function registerFan(
 ): Promise<Session> {
   const email = uniqueEmail(label)
   const password = generatedPassword()
-  const created = await apiSend(request, 'POST', '/auth/register', {
-    data: {
-      email,
-      password,
-      firstName: 'E2E',
-      lastName: label,
-      roles: ['FAN'],
-      role: 'FAN',
-    },
+  const created = await retrying('регистрация болельщика', async () => {
+    const response = await apiSend(request, 'POST', '/auth/register', {
+      data: {
+        email,
+        password,
+        firstName: 'E2E',
+        lastName: label,
+        roles: ['FAN'],
+        role: 'FAN',
+      },
+    })
+    if (response.status === 429 || response.status === 502 || response.status === 503) {
+      throw new Error(`Регистрация болельщика не удалась: HTTP ${response.status}`)
+    }
+    return response
   })
   if (created.status !== 201) {
     throw new Error(`Регистрация болельщика не удалась: HTTP ${created.status} ${JSON.stringify(created.body)}`)

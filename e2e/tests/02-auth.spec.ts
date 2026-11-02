@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { apiSend, errorMessage } from '../src/api'
-import { fanSession, registerFan } from '../src/accounts'
+import { fanSession } from '../src/accounts'
 import { check, title } from '../src/check'
 import { generatedPassword, uniqueEmail } from '../src/env'
 import { fillRegisterFan, loginViaForm, russianError, waitForApp } from '../src/ui'
@@ -37,7 +37,7 @@ test(title({ id: 'R2' }, 'регистрация игрока: без фото �
 })
 
 test(title({ id: 'R3', bugs: [10, 11, 12, 13, 14] }, 'дубль email → ошибка на русском'), check({ id: 'R3', bugs: [10, 11, 12, 13, 14] }), async ({ page, request }) => {
-  const fan = await registerFan(request, 'dup')
+  const fan = await fanSession(request)
   const again = await apiSend(request, 'POST', '/auth/register', {
     data: {
       email: fan.email,
@@ -85,6 +85,14 @@ test(title({ id: 'R4', bugs: [10, 11, 12, 13, 14] }, 'пустые и кривы
 })
 
 test(title({ id: 'R5', bugs: [10, 11, 12, 13, 14] }, 'на отправке есть индикатор и кнопка блокируется'), check({ id: 'R5', bugs: [10, 11, 12, 13, 14] }), async ({ page }) => {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/v1/auth/register', async (route) => {
+    await held
+    await route.abort()
+  })
   await fillRegisterFan(page, {
     firstName: 'Егор',
     lastName: 'Индикатор',
@@ -95,7 +103,9 @@ test(title({ id: 'R5', bugs: [10, 11, 12, 13, 14] }, 'на отправке ес
   const click = submit.click()
   await expect(submit).toBeDisabled()
   await expect(page.getByText(/создаём/i)).toBeVisible()
-  await click
+  release()
+  await click.catch(() => undefined)
+  await page.unroute('**/api/v1/auth/register')
 })
 
 test(title({ id: 'R6', bugs: [10, 11, 12, 13, 14] }, 'после заявки на роль профиль не показывает «ЗРИТЕЛЬ»'), check({ id: 'R6', bugs: [10, 11, 12, 13, 14] }), async ({ page }) => {

@@ -51,9 +51,10 @@ test(title({ id: 'U2' }, 'смена пароля: старый неверный
 })
 
 test(title({ id: 'U3' }, 'избранное команд/турниров сохраняется после перезахода'), check({ id: 'U3' }), async ({ page, request }) => {
-  const fan = await registerFan(request, 'fav')
+  const fan = await fanSession(request)
   const team = await firstPublicTeam(request)
   expect(team?.id).toBeTruthy()
+  if (!team?.id) throw new Error('нет публичной команды')
   await injectSession(page, fan)
   await page.goto(`/teams/${team.id}`)
   await waitForApp(page)

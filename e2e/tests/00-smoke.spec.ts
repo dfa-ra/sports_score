@@ -32,16 +32,34 @@ test(title({ id: 'S2' }, 'публичные разделы открываютс
   }
 })
 
+function resolveExpectedSha(): { sha?: string; reason?: string } {
+  const fromEnv = (process.env.E2E_EXPECTED_SHA || '').trim()
+  if (fromEnv) return { sha: fromEnv }
+  try {
+    const remote = execSync('git ls-remote origin refs/heads/main', {
+      encoding: 'utf8',
+      timeout: 15_000,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim()
+    const sha = remote.split(/\s+/)[0] || ''
+    if (sha.length > 7) return { sha }
+    return { reason: `git ls-remote origin refs/heads/main не дал SHA: «${remote}»` }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { reason: `нет git remote (${message.split('\n')[0]}) и нет E2E_EXPECTED_SHA` }
+  }
+}
+
 test(title({ id: 'S3' }, 'в футере версия совпадает с последним коммитом main'), check({ id: 'S3' }), async ({ page }) => {
-  const remote = execSync('git ls-remote origin refs/heads/main', { encoding: 'utf8' }).trim()
-  const sha = remote.split(/\s+/)[0] || ''
-  expect(sha.length, `git ls-remote main: ${remote}`).toBeGreaterThan(7)
+  const expected = resolveExpectedSha()
+  test.skip(!expected.sha, expected.reason || 'нет ожидаемого SHA')
+  const sha = expected.sha || ''
   await page.goto('/')
   await waitForApp(page)
   const footer = page.locator('.foot-ver')
   await expect(footer).toBeVisible()
   const label = (await footer.innerText()).trim()
-  expect(label, `футер «${label}» должен содержать короткий SHA main ${sha.slice(0, 7)}`).toContain(sha.slice(0, 7))
+  expect(label, `футер «${label}» должен содержать короткий SHA ${sha.slice(0, 7)}`).toContain(sha.slice(0, 7))
 })
 
 test(title({ id: 'S4', bugs: [2] }, 'HERO и галерея не показывают отключённые фото'), check({ id: 'S4', bugs: [2] }), async ({ page, request }) => {
