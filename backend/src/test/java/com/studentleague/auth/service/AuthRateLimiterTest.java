@@ -78,7 +78,7 @@ class AuthRateLimiterTest {
                 new AppProperties.RateLimit(capacity),
                 new AppProperties.Redis(redis != null),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
-                new AppProperties.Admin("", ""),
+                new AppProperties.Admin("", "", null),
                 new AppProperties.Auth(false),
                 new AppProperties.DemoData(false),
                 new AppProperties.Google(""),

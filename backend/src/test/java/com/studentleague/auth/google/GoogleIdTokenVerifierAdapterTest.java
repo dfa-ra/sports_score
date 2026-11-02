@@ -79,7 +79,7 @@ class GoogleIdTokenVerifierAdapterTest {
                 new AppProperties.RateLimit(30),
                 new AppProperties.Redis(false),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
-                new AppProperties.Admin("", ""),
+                new AppProperties.Admin("", "", null),
                 new AppProperties.Auth(false),
                 new AppProperties.DemoData(false),
                 new AppProperties.Google(clientId),

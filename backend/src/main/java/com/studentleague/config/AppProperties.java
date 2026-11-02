@@ -45,9 +45,6 @@ public record AppProperties(
             String password,
             String e2eEmail
     ) {
-        public Admin(String email, String password) {
-            this(email, password, null);
-        }
     }
 
     public record Auth(boolean autoApproveRoles) {
