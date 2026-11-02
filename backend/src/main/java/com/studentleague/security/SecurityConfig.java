@@ -115,6 +115,13 @@ public class SecurityConfig {
                                 "/api/v1/gallery/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/v1/users",
+                                "/api/v1/users/**",
+                                "/api/v1/referees",
+                                "/api/v1/referees/**"
+                        ).hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(disabledGalleryMediaFilter, JwtAuthenticationFilter.class);
