@@ -87,7 +87,7 @@ public class PlayerService {
     @Transactional
     public PlayerProfileResponse createOrUpdateMyProfile(UUID userId, PlayerProfileRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
 
         PlayerProfile existing = playerProfileRepository.findByUserId(userId).orElse(null);
         boolean alreadyPlayer = roleService.hasApproved(userId, Role.PLAYER)
@@ -130,7 +130,7 @@ public class PlayerService {
     @Transactional(readOnly = true)
     public PlayerProfileResponse getMyProfile(UUID userId) {
         PlayerProfile profile = playerProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> ApiException.notFound("Player profile not found"));
+                .orElseThrow(() -> ApiException.notFound("Профиль игрока не найден"));
         return toResponse(profile);
     }
 
@@ -439,7 +439,7 @@ public class PlayerService {
 
     private PlayerProfile requireProfile(UUID id) {
         return playerProfileRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
     }
 
     private void apply(PlayerProfile profile, PlayerProfileRequest request) {

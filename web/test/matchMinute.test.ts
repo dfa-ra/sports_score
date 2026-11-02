@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute } from '../src/lib/matchMinute.ts'
+import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute, protocolMinuteLimit } from '../src/lib/matchMinute.ts'
 
 test('a period that lasted 26 seconds is the first minute, not 0 and not 15', () => {
   assert.equal(boundaryMinute(26), 1)
@@ -8,6 +8,12 @@ test('a period that lasted 26 seconds is the first minute, not 0 and not 15', ()
   assert.equal(boundaryMinute(15 * 60), 15)
   assert.equal(protocolMinute({ eventType: 'PERIOD_END', gameTime: 26 }), 1)
   assert.equal(protocolMinute({ eventType: 'GOAL', gameTime: 2 * 60 }), 2)
+})
+
+test('protocol minute cap is the match length plus five minutes of added time', () => {
+  assert.equal(protocolMinuteLimit(20 * 60, 1), 25)
+  assert.equal(protocolMinuteLimit(15 * 60, 2), 35)
+  assert.notEqual(protocolMinuteLimit(20 * 60, 1), 200)
 })
 
 test('2x15 kickoff is 1 and six seconds into the second half is 16', () => {

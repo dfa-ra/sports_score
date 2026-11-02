@@ -23,6 +23,8 @@ public record PlayoffSlotResponse(
         String venue,
         String matchStatus,
         Integer homeScore,
-        Integer awayScore
+        Integer awayScore,
+        Integer penaltyHome,
+        Integer penaltyAway
 ) {
 }

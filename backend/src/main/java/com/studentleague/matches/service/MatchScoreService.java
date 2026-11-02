@@ -35,7 +35,7 @@ public class MatchScoreService {
 
     public void apply(Match match) {
         Sport sport = sportRepository.findById(match.getSportId())
-                .orElseThrow(() -> ApiException.notFound("Sport not found"));
+                .orElseThrow(() -> ApiException.notFound("Вид спорта не найден"));
         List<MatchEvent> active = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(match.getId());
         ScoreSnapshot snapshot = scorePolicyRegistry.forSportCode(sport.getCode())
                 .calculate(match.getHomeTeamId(), match.getAwayTeamId(), active);

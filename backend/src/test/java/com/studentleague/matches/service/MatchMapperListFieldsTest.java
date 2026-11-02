@@ -6,6 +6,7 @@ import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.PenaltyKickRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.sports.repository.SportRepository;
@@ -35,6 +36,9 @@ class MatchMapperListFieldsTest {
 
     @Mock
     MatchEventRepository matchEventRepository;
+
+    @Mock
+    PenaltyKickRepository penaltyKickRepository;
 
     @Test
     void responseCarriesLastGoalScorerAndMinute() {
@@ -74,7 +78,12 @@ class MatchMapperListFieldsTest {
         match.setPeriodCount(2);
         match.setPeriodLengthSeconds(20 * 60);
 
-        MatchMapper mapper = new MatchMapper(sportRepository, playerProfileRepository, matchEventRepository);
+        MatchMapper mapper = new MatchMapper(
+                sportRepository,
+                playerProfileRepository,
+                matchEventRepository,
+                penaltyKickRepository
+        );
         MatchResponse response = mapper.toResponse(match);
 
         assertThat(response.lastGoalScorer()).isEqualTo("Соколова Анна");

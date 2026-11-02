@@ -69,7 +69,7 @@ public class UserAdminService {
     @Transactional
     public UserResponse updateUser(UUID userId, UpdateUserRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
 
         if (request.roles() != null) {
             syncAssignableRoles(user, request.roles());
@@ -98,7 +98,7 @@ public class UserAdminService {
     @Transactional
     public UserResponse addOrChangeRole(UUID userId, RequestRoleRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         if (request.role() == Role.ADMIN) {
             throw ApiException.badRequest("Роль ADMIN задаётся только через ADMIN_EMAIL в .env");
         }

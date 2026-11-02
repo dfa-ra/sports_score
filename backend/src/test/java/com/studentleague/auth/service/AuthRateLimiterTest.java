@@ -58,6 +58,34 @@ class AuthRateLimiterTest {
     }
 
     @Test
+    void doesNotLetAClientSpoofTheForwardedAddress() {
+        AuthRateLimiter limiter = limiter(1, null);
+        MockHttpServletRequest direct = request("203.0.113.10");
+        direct.addHeader("X-Forwarded-For", "198.51.100.1");
+        assertThat(AuthRateLimiter.clientKey(direct)).isEqualTo("203.0.113.10");
+
+        limiter.check(direct);
+        MockHttpServletRequest again = request("203.0.113.10");
+        again.addHeader("X-Forwarded-For", "198.51.100.2");
+        assertThatThrownBy(() -> limiter.check(again)).isInstanceOf(ApiException.class);
+        limiter.check(request("203.0.113.11"));
+    }
+
+    @Test
+    void keysTheClientCaddySawBehindNginx() {
+        AuthRateLimiter limiter = limiter(1, null);
+        String chain = "198.51.100.8, 203.0.113.50, 172.18.0.4";
+        assertThat(AuthRateLimiter.clientKey(proxied(chain))).isEqualTo("203.0.113.50");
+        assertThat(AuthRateLimiter.clientKey(proxied("203.0.113.50, 172.18.0.4"))).isEqualTo("203.0.113.50");
+        assertThat(AuthRateLimiter.clientKey(proxied("198.51.100.8, 203.0.113.50"))).isEqualTo("203.0.113.50");
+
+        limiter.check(proxied(chain));
+        assertThatThrownBy(() -> limiter.check(proxied("198.51.100.99, 203.0.113.50, 172.18.0.9")))
+                .isInstanceOf(ApiException.class);
+        limiter.check(proxied("198.51.100.8, 203.0.113.77, 172.18.0.4"));
+    }
+
+    @Test
     void fallsBackToMemoryWhenRedisIsDown() {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> values = mock(ValueOperations.class);
@@ -91,6 +119,12 @@ class AuthRateLimiterTest {
     private static MockHttpServletRequest request(String ip) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRemoteAddr(ip);
+        return request;
+    }
+
+    private static MockHttpServletRequest proxied(String forwardedFor) {
+        MockHttpServletRequest request = request("172.18.0.5");
+        request.addHeader("X-Forwarded-For", forwardedFor);
         return request;
     }
 }

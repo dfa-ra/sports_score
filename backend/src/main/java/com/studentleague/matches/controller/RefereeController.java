@@ -6,9 +6,12 @@ import com.studentleague.matches.dto.AssignAnalystsRequest;
 import com.studentleague.matches.dto.CreateMatchEventRequest;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.dto.PenaltyKickRequest;
+import com.studentleague.matches.dto.PenaltyShootoutResponse;
 import com.studentleague.matches.dto.SetMatchGoalkeeperRequest;
 import com.studentleague.matches.service.AnalystAssignmentService;
 import com.studentleague.matches.service.MatchGoalkeeperService;
+import com.studentleague.matches.service.PenaltyShootoutService;
 import com.studentleague.matches.service.RefereeMatchService;
 import com.studentleague.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,15 +45,18 @@ public class RefereeController {
     private final RefereeMatchService refereeMatchService;
     private final AnalystAssignmentService analystAssignmentService;
     private final MatchGoalkeeperService matchGoalkeeperService;
+    private final PenaltyShootoutService penaltyShootoutService;
 
     public RefereeController(
             RefereeMatchService refereeMatchService,
             AnalystAssignmentService analystAssignmentService,
-            MatchGoalkeeperService matchGoalkeeperService
+            MatchGoalkeeperService matchGoalkeeperService,
+            PenaltyShootoutService penaltyShootoutService
     ) {
         this.refereeMatchService = refereeMatchService;
         this.analystAssignmentService = analystAssignmentService;
         this.matchGoalkeeperService = matchGoalkeeperService;
+        this.penaltyShootoutService = penaltyShootoutService;
     }
 
     @PutMapping("/matches/{id}/goalkeeper")
@@ -111,9 +117,29 @@ public class RefereeController {
     }
 
     @PostMapping("/matches/{id}/finish")
-    @Operation(summary = "Finish assigned match")
+    @Operation(summary = "Finish assigned match. A drawn playoff match needs a decided shootout")
     public MatchResponse finish(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
         return refereeMatchService.finish(principal, id);
+    }
+
+    @PostMapping("/matches/{id}/shootout")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Record one penalty kick, scored or missed, for the team whose turn it is")
+    public PenaltyShootoutResponse recordKick(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody PenaltyKickRequest request
+    ) {
+        return penaltyShootoutService.record(principal, id, request);
+    }
+
+    @DeleteMapping("/matches/{id}/shootout/last")
+    @Operation(summary = "Remove the last penalty kick while the match is still open")
+    public PenaltyShootoutResponse undoLastKick(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id
+    ) {
+        return penaltyShootoutService.undoLast(principal, id);
     }
 
     @PostMapping("/matches/{id}/next-period")

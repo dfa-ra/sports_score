@@ -29,6 +29,9 @@ public record MatchResponse(
         PlayerOfTheMatchResponse playerOfTheMatch,
         PlayerOfTheMatchResponse homeGoalkeeper,
         PlayerOfTheMatchResponse awayGoalkeeper,
-        UUID tableId
+        UUID tableId,
+        Integer bracketRound,
+        Integer penaltyHome,
+        Integer penaltyAway
 ) {
 }

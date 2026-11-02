@@ -81,7 +81,7 @@ public class AdminMatchProtocolService {
             throw ApiException.badRequest("Укажите команду этого матча");
         }
         playerProfileRepository.findById(request.playerId())
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
         if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                 request.teamId(), request.playerId(), TeamMemberStatus.ACTIVE)) {
             throw ApiException.badRequest("Игрок не в заявке этой команды");
@@ -129,7 +129,7 @@ public class AdminMatchProtocolService {
         Match match = requireEditableMatch(matchId);
         MatchEvent event = requireEvent(matchId, eventId);
         if (event.isVoided()) {
-            throw ApiException.conflict("Event already voided");
+            throw ApiException.conflict("Событие уже убрано из протокола");
         }
         event.setVoided(true);
         event.setVoidedAt(Instant.now());
@@ -188,7 +188,7 @@ public class AdminMatchProtocolService {
     /** Scorer or assist must already play for one of the two clubs. The goal's team follows the scorer. */
     private UUID teamOf(Match match, UUID playerId, UUID preferredTeamId) {
         playerProfileRepository.findById(playerId)
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
         boolean home = teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                 match.getHomeTeamId(), playerId, TeamMemberStatus.ACTIVE);
         boolean away = teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
@@ -207,7 +207,14 @@ public class AdminMatchProtocolService {
     private void applyMinute(Match match, MatchEvent event, int minute) {
         // The admin types the match minute from kickoff — the same number the
         // public overview prints. 18 on a 2×15 match is 18:00, not 3:00 left.
-        event.setGameTime(Math.max(0, minute) * 60);
+        // 16' of a 2×15 is the first minute of the second half and stays valid.
+        if (minute < 0) {
+            throw ApiException.badRequest("Минута не может быть отрицательной");
+        }
+        if (minute > MatchClock.maxProtocolMinute(match)) {
+            throw ApiException.badRequest("Минута больше длительности матча");
+        }
+        event.setGameTime(minute * 60);
         event.setPeriod(periodFor(match, minute));
     }
 
@@ -224,7 +231,7 @@ public class AdminMatchProtocolService {
 
     private Match requireEditableMatch(UUID matchId) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         if (!EDITABLE_STATUS.contains(match.getStatus())) {
             throw ApiException.conflict("Протокол этого матча закрыт");
         }
@@ -233,9 +240,9 @@ public class AdminMatchProtocolService {
 
     private MatchEvent requireEvent(UUID matchId, UUID eventId) {
         MatchEvent event = matchEventRepository.findById(eventId)
-                .orElseThrow(() -> ApiException.notFound("Match event not found"));
+                .orElseThrow(() -> ApiException.notFound("Событие матча не найдено"));
         if (!matchId.equals(event.getMatchId())) {
-            throw ApiException.badRequest("Event does not belong to this match");
+            throw ApiException.badRequest("Событие не относится к этому матчу");
         }
         return event;
     }

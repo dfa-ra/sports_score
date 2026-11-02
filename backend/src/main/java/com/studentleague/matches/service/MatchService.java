@@ -107,10 +107,10 @@ public class MatchService {
     @Transactional
     public MatchResponse create(CreateMatchRequest request) {
         if (request.homeTeamId().equals(request.awayTeamId())) {
-            throw ApiException.badRequest("Home and away teams must differ");
+            throw ApiException.badRequest("Хозяева и гости должны быть разными командами");
         }
         Tournament tournament = tournamentRepository.findById(request.tournamentId())
-                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+                .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
 
         requireApproved(request.tournamentId(), request.homeTeamId());
         requireApproved(request.tournamentId(), request.awayTeamId());
@@ -198,14 +198,14 @@ public class MatchService {
     public MatchRefereeResponse assignReferee(UUID matchId, AssignRefereeRequest request) {
         requireMatch(matchId);
         User referee = userRepository.findById(request.refereeId())
-                .orElseThrow(() -> ApiException.notFound("Referee user not found"));
+                .orElseThrow(() -> ApiException.notFound("Судья не найден"));
         if (referee.getRole() != Role.REFEREE && referee.getRole() != Role.ADMIN
                 && !roleService.hasApproved(referee.getId(), Role.REFEREE)
                 && !roleService.hasApproved(referee.getId(), Role.ADMIN)) {
-            throw ApiException.badRequest("User must have REFEREE role");
+            throw ApiException.badRequest("У пользователя должна быть роль судьи");
         }
         if (matchRefereeRepository.existsByMatchIdAndRefereeId(matchId, referee.getId())) {
-            throw ApiException.conflict("Referee already assigned to this match");
+            throw ApiException.conflict("Судья уже назначен на этот матч");
         }
         MatchReferee assignment = new MatchReferee();
         assignment.setMatchId(matchId);
@@ -261,9 +261,9 @@ public class MatchService {
             throw ApiException.badRequest("Турнир уже в плей-офф. Новые матчи появляются из сетки.");
         }
         TournamentTeam home = tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), match.getHomeTeamId())
-                .orElseThrow(() -> ApiException.badRequest("Team is not registered in the tournament"));
+                .orElseThrow(() -> ApiException.badRequest("Команда не заявлена в турнир"));
         TournamentTeam away = tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), match.getAwayTeamId())
-                .orElseThrow(() -> ApiException.badRequest("Team is not registered in the tournament"));
+                .orElseThrow(() -> ApiException.badRequest("Команда не заявлена в турнир"));
         if (tableId != null) {
             boolean ownTable = tournamentTableRepository.findById(tableId)
                     .filter(table -> tournament.getId().equals(table.getTournamentId()))
@@ -288,15 +288,15 @@ public class MatchService {
 
     private void requireApproved(UUID tournamentId, UUID teamId) {
         var entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
-                .orElseThrow(() -> ApiException.badRequest("Team is not registered in the tournament"));
+                .orElseThrow(() -> ApiException.badRequest("Команда не заявлена в турнир"));
         if (entry.getStatus() != TournamentTeamStatus.APPROVED) {
-            throw ApiException.badRequest("Team must be approved before scheduling matches");
+            throw ApiException.badRequest("Команду нужно подтвердить, прежде чем ставить матчи");
         }
     }
 
     private Match requireMatch(UUID id) {
         return matchRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
     }
 
     private MatchResponse toResponse(Match match) {

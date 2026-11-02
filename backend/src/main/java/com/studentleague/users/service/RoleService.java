@@ -128,7 +128,7 @@ public class RoleService {
     @Transactional
     public UserRoleAssignment approve(UUID userId, Role role) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         UserRoleAssignment assignment = assignmentRepository.findByUserIdAndRole(userId, role)
                 .orElseThrow(() -> ApiException.notFound("Заявка на роль не найдена"));
         assignment.setStatus(RoleStatus.APPROVED);
@@ -141,7 +141,7 @@ public class RoleService {
     @Transactional
     public UserRoleAssignment reject(UUID userId, Role role, String note) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         UserRoleAssignment assignment = assignmentRepository.findByUserIdAndRole(userId, role)
                 .orElseThrow(() -> ApiException.notFound("Заявка на роль не найдена"));
         if (role == Role.ADMIN && isBootstrapAdmin(user.getEmail())) {

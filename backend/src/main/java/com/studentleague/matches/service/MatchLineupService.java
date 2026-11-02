@@ -122,7 +122,7 @@ public class MatchLineupService {
     }
 
     private MatchTeamLineupResponse teamLineup(Match match, UUID teamId) {
-        Team team = teamRepository.findById(teamId).orElseThrow(() -> ApiException.notFound("Team not found"));
+        Team team = teamRepository.findById(teamId).orElseThrow(() -> ApiException.notFound("Команда не найдена"));
         boolean confirmed = lineupRepository.existsByMatchIdAndTeamId(match.getId(), teamId);
         List<MatchLineupPlayerResponse> players;
         if (confirmed) {
@@ -214,6 +214,6 @@ public class MatchLineupService {
 
     private Match requireMatch(UUID matchId) {
         return matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
     }
 }

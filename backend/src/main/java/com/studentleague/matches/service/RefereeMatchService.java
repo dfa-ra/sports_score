@@ -54,6 +54,7 @@ public class RefereeMatchService {
     private final StandingsBoardCache standingsBoardCache;
     private final PlayoffService playoffService;
     private final TournamentRepository tournamentRepository;
+    private final PenaltyShootoutService penaltyShootoutService;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -68,7 +69,8 @@ public class RefereeMatchService {
             MatchMapper matchMapper,
             StandingsBoardCache standingsBoardCache,
             PlayoffService playoffService,
-            TournamentRepository tournamentRepository
+            TournamentRepository tournamentRepository,
+            PenaltyShootoutService penaltyShootoutService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -83,6 +85,7 @@ public class RefereeMatchService {
         this.standingsBoardCache = standingsBoardCache;
         this.playoffService = playoffService;
         this.tournamentRepository = tournamentRepository;
+        this.penaltyShootoutService = penaltyShootoutService;
     }
 
     @Transactional(readOnly = true)
@@ -97,7 +100,7 @@ public class RefereeMatchService {
     public MatchResponse start(UserPrincipal principal, UUID matchId) {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() != MatchStatus.SCHEDULED) {
-            throw ApiException.badRequest("Only SCHEDULED matches can be started");
+            throw ApiException.badRequest("Начать можно только запланированный матч");
         }
         Instant now = Instant.now();
         match.setStatus(MatchStatus.LIVE);
@@ -123,7 +126,7 @@ public class RefereeMatchService {
     public MatchResponse pause(UserPrincipal principal, UUID matchId) {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() != MatchStatus.LIVE) {
-            throw ApiException.badRequest("Only LIVE matches can be paused");
+            throw ApiException.badRequest("Паузу можно поставить только в живом матче");
         }
         MatchClock.freeze(match, Instant.now());
         match.setStatus(MatchStatus.PAUSED);
@@ -136,7 +139,7 @@ public class RefereeMatchService {
     public MatchResponse resume(UserPrincipal principal, UUID matchId) {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() != MatchStatus.PAUSED) {
-            throw ApiException.badRequest("Only PAUSED matches can be resumed");
+            throw ApiException.badRequest("Продолжить можно только матч на паузе");
         }
         match.setStatus(MatchStatus.LIVE);
         MatchClock.startRunning(match, Instant.now());
@@ -149,11 +152,12 @@ public class RefereeMatchService {
     public MatchResponse finish(UserPrincipal principal, UUID matchId) {
         Match match = requireAssignedMatch(principal, matchId);
         if (match.getStatus() != MatchStatus.LIVE && match.getStatus() != MatchStatus.PAUSED) {
-            throw ApiException.badRequest("Only LIVE or PAUSED matches can be finished");
+            throw ApiException.badRequest("Завершить можно только живой матч или матч на паузе");
         }
         Instant now = Instant.now();
         MatchClock.freeze(match, now);
         recalculateScore(match);
+        penaltyShootoutService.requireWinner(match);
         match.setStatus(MatchStatus.FINISHED);
         match.setFinishedAt(now);
         matchRepository.save(match);
@@ -203,7 +207,7 @@ public class RefereeMatchService {
                 throw ApiException.forbidden("После окончания матча протокол правит только админ");
             }
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
-            throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
+            throw ApiException.badRequest("События можно добавлять, пока матч идёт или стоит на паузе");
         }
         validateEventMinute(match, request);
         validateEventPayload(match, request);
@@ -268,15 +272,15 @@ public class RefereeMatchService {
                 throw ApiException.forbidden("После окончания матча протокол правит только админ");
             }
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
-            throw ApiException.badRequest("Cannot void events for this match status");
+            throw ApiException.badRequest("В этом статусе матча события убирать нельзя");
         }
         MatchEvent event = matchEventRepository.findById(eventId)
-                .orElseThrow(() -> ApiException.notFound("Match event not found"));
+                .orElseThrow(() -> ApiException.notFound("Событие матча не найдено"));
         if (!event.getMatchId().equals(matchId)) {
-            throw ApiException.badRequest("Event does not belong to this match");
+            throw ApiException.badRequest("Событие не относится к этому матчу");
         }
         if (event.isVoided()) {
-            throw ApiException.conflict("Event already voided");
+            throw ApiException.conflict("Событие уже убрано из протокола");
         }
         event.setVoided(true);
         event.setVoidedAt(Instant.now());
@@ -295,7 +299,7 @@ public class RefereeMatchService {
 
     @Transactional(readOnly = true)
     public List<MatchEventResponse> listEvents(UUID matchId) {
-        matchRepository.findById(matchId).orElseThrow(() -> ApiException.notFound("Match not found"));
+        matchRepository.findById(matchId).orElseThrow(() -> ApiException.notFound("Матч не найден"));
         return matchEventRepository.findByMatchIdOrderByTimestampAsc(matchId).stream()
                 .map(this::toEventResponse)
                 .toList();
@@ -314,8 +318,7 @@ public class RefereeMatchService {
             throw ApiException.badRequest("Время события не может быть отрицательным");
         }
         int length = MatchClock.periodLength(match);
-        int periods = match.getPeriodCount() > 0 ? match.getPeriodCount() : MatchClock.DEFAULT_PERIOD_COUNT;
-        int maxSeconds = periods * length + 5 * 60;
+        int maxSeconds = MatchClock.maxEventSeconds(match);
         int kickoff = MatchClock.toKickoffSeconds(gameTime, MatchClock.periodIndex(match), length);
         if (kickoff > maxSeconds) {
             throw ApiException.badRequest("Время события больше длительности матча");
@@ -326,7 +329,7 @@ public class RefereeMatchService {
         if (request.teamId() != null
                 && !request.teamId().equals(match.getHomeTeamId())
                 && !request.teamId().equals(match.getAwayTeamId())) {
-            throw ApiException.badRequest("teamId must be home or away team of the match");
+            throw ApiException.badRequest("Укажите команду этого матча");
         }
         if ((request.eventType() == MatchEventType.FOUL
                 || request.eventType() == MatchEventType.TIMEOUT
@@ -350,7 +353,7 @@ public class RefereeMatchService {
         }
         if (request.playerId() != null) {
             playerProfileRepository.findById(request.playerId())
-                    .orElseThrow(() -> ApiException.notFound("Player not found"));
+                    .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
             if (request.teamId() != null
                     && !teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                     request.teamId(), request.playerId(), TeamMemberStatus.ACTIVE)) {
@@ -359,7 +362,7 @@ public class RefereeMatchService {
         }
         if (request.secondaryPlayerId() != null) {
             playerProfileRepository.findById(request.secondaryPlayerId())
-                    .orElseThrow(() -> ApiException.notFound("Secondary player not found"));
+                    .orElseThrow(() -> ApiException.notFound("Второй игрок не найден"));
             if (request.teamId() != null
                     && !teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                     request.teamId(), request.secondaryPlayerId(), TeamMemberStatus.ACTIVE)) {
@@ -417,7 +420,7 @@ public class RefereeMatchService {
             return;
         }
         Tournament tournament = tournamentRepository.findById(tournamentId)
-                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+                .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
         TournamentStatus next = statusAfterMatchStarts(tournament.getStatus());
         if (next == tournament.getStatus()) {
             return;
@@ -429,17 +432,17 @@ public class RefereeMatchService {
     private Match requireAssignedMatch(UserPrincipal principal, UUID matchId) {
         assertReferee(principal);
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         boolean assigned = matchRefereeRepository.existsByMatchIdAndRefereeId(matchId, principal.getId());
         if (!assigned && !principal.hasRole(Role.ADMIN)) {
-            throw ApiException.forbidden("Referee is not assigned to this match");
+            throw ApiException.forbidden("Судья не назначен на этот матч");
         }
         return match;
     }
 
     private void assertReferee(UserPrincipal principal) {
         if (!principal.hasAnyRole(Role.REFEREE, Role.ADMIN)) {
-            throw ApiException.forbidden("Referee role required");
+            throw ApiException.forbidden("Нужна роль судьи");
         }
     }
 

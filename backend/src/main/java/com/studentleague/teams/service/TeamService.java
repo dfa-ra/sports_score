@@ -246,7 +246,7 @@ public class TeamService {
         assertCanManageTeam(principal, team);
 
         PlayerProfile player = playerProfileRepository.findById(request.playerId())
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
         if (!roleService.hasApproved(player.getUserId(), Role.PLAYER)
                 && !roleService.hasApproved(player.getUserId(), Role.CAPTAIN)) {
             throw ApiException.badRequest("Игрока можно добавить только после подтверждения роли ИГРОК");
@@ -254,7 +254,7 @@ public class TeamService {
 
         TeamMember existing = teamMemberRepository.findByTeamIdAndPlayerId(teamId, player.getId()).orElse(null);
         if (existing != null && existing.getStatus() == TeamMemberStatus.ACTIVE) {
-            throw ApiException.conflict("Player is already an active member of this team");
+            throw ApiException.conflict("Игрок уже в составе этой команды");
         }
 
         TeamMember member = existing == null ? new TeamMember() : existing;
@@ -280,11 +280,11 @@ public class TeamService {
         assertCanManageTeam(principal, team);
 
         if (playerId.equals(team.getCaptainId())) {
-            throw ApiException.badRequest("Cannot remove the team captain; assign a new captain first");
+            throw ApiException.badRequest("Сначала назначьте другого капитана");
         }
 
         TeamMember member = teamMemberRepository.findByTeamIdAndPlayerId(teamId, playerId)
-                .orElseThrow(() -> ApiException.notFound("Team member not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок в составе не найден"));
         member.setStatus(TeamMemberStatus.REMOVED);
         teamMemberRepository.save(member);
     }
@@ -347,7 +347,7 @@ public class TeamService {
         team.setCaptainId(captain.getId());
         teamRepository.saveAndFlush(team);
         User user = userRepository.findById(captain.getUserId())
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         roleService.grantApproved(user, Role.CAPTAIN, user.getPhotoUrl());
         if (previousCaptainId != null && !previousCaptainId.equals(captain.getId())) {
             releaseCaptainRoleIfUnused(previousCaptainId);
@@ -393,7 +393,7 @@ public class TeamService {
 
     private PlayerProfile requireCaptainCandidate(UUID playerId) {
         return playerProfileRepository.findById(playerId)
-                .orElseThrow(() -> ApiException.notFound("Player not found"));
+                .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
     }
 
     private void assertCanManageTeam(UserPrincipal principal, Team team) {
@@ -401,12 +401,12 @@ public class TeamService {
             return;
         }
         if (!principal.hasRole(Role.CAPTAIN)) {
-            throw ApiException.forbidden("Only the team captain can manage this team");
+            throw ApiException.forbidden("Этой командой управляет только её капитан");
         }
         PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
-                .orElseThrow(() -> ApiException.forbidden("Only the team captain can manage this team"));
+                .orElseThrow(() -> ApiException.forbidden("Этой командой управляет только её капитан"));
         if (!profile.getId().equals(team.getCaptainId())) {
-            throw ApiException.forbidden("Only the team captain can manage this team");
+            throw ApiException.forbidden("Этой командой управляет только её капитан");
         }
     }
 

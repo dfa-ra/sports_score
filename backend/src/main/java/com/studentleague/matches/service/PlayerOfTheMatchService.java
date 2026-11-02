@@ -37,7 +37,7 @@ public class PlayerOfTheMatchService {
     @Transactional
     public MatchResponse set(UUID matchId, UUID playerId) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         if (match.getStatus() != MatchStatus.FINISHED) {
             throw ApiException.badRequest("Игрока матча выбирают после финального свистка");
         }
