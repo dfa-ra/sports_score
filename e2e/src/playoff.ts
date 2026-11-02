@@ -5,16 +5,26 @@ import { applyTeam, approveTeam, createTeam, createTournament, idOf } from './en
 import { findNamed, listPages } from './pool'
 
 export const PLAYOFF_SKIP = 'плей-офф не задеплоен на dev (PR #56)'
+export const PENALTIES_SKIP = 'серия пенальти не задеплоена на dev'
+
+function callText(body: unknown): string {
+  return `${errorMessage(body)} ${typeof body === 'string' ? body : JSON.stringify(body)}`
+}
+
+/** Unmapped API path on the stand: «Адрес не найден» (main) or «Файл не найден» (older builds). */
+export function missingRoute(body: unknown): boolean {
+  const text = callText(body)
+  return /адрес не найден|файл не найден/i.test(text) || /<!doctype html/i.test(text)
+}
 
 export async function playoffDeployed(request: APIRequestContext): Promise<boolean> {
   const list = await apiGet(request, '/tournaments?size=1')
   const sample = asList(list.body)[0]
   const id = String(sample?.id || '00000000-0000-0000-0000-000000000001')
   const call = await apiGet(request, `/tournaments/${id}/playoff`)
+  if (missingRoute(call.body)) return false
   if (call.status === 200 || call.status === 400 || call.status === 401 || call.status === 403) return true
-  const text = `${errorMessage(call.body)} ${typeof call.body === 'string' ? call.body : JSON.stringify(call.body)}`
-  if (/файл не найден/i.test(text) || /<!doctype html/i.test(text)) return false
-  if (call.status === 404 && /not_found|не найден|tournament/i.test(text)) return true
+  if (call.status === 404 && /not_found|не найден|tournament/i.test(callText(call.body))) return true
   return false
 }
 
@@ -197,6 +207,36 @@ export function firstRoundSlots(body: unknown): Record<string, unknown>[] {
   return first?.slots ?? []
 }
 
+export function nextRoundSlot(body: unknown, source: Record<string, unknown>): Record<string, unknown> | undefined {
+  const nextRound = Number(source.round || 1) + 1
+  const nextIndex = Math.floor(Number(source.slotIndex || 0) / 2)
+  const round = playoffRounds(body).find((item) => Number(item.round) === nextRound)
+  return round?.slots.find((slot) => Number(slot.slotIndex) === nextIndex) || round?.slots[0]
+}
+
+export function routeExists(call: { status: number; body: unknown }): boolean {
+  if (missingRoute(call.body)) return false
+  if ([200, 201, 204, 400, 401, 403, 404, 409, 422].includes(call.status)) return true
+  return false
+}
+
+export async function penaltiesDeployed(request: APIRequestContext): Promise<boolean> {
+  if (!(await playoffDeployed(request))) return false
+  const sample = asList((await apiGet(request, '/matches?size=1')).body)[0]
+  const id = String(sample?.id || '00000000-0000-0000-0000-000000000001')
+  const match = await apiGet(request, `/matches/${id}`)
+  const blob = `${JSON.stringify(asRecord(match.body))} ${Object.keys(asRecord(match.body)).join(' ')}`
+  if (/penalt|shootout|пен\./i.test(blob)) return true
+  for (const path of [
+    `/matches/${id}/penalties`,
+    `/matches/${id}/shootout`,
+    `/matches/${id}/penalty-kicks`,
+  ]) {
+    if (routeExists(await apiGet(request, path))) return true
+  }
+  return false
+}
+
 export function placesForSize(teamCount: number): number[] {
   return Array.from({ length: teamCount }, (_, index) => index + 1)
 }
@@ -261,6 +301,54 @@ export async function playWin(
   const finish = await apiSend(request, 'POST', `/referee/matches/${matchId}/finish`, { token: admin.accessToken })
   if (asRecord(finish.body).status !== 'FINISHED') {
     throw new Error(`финиш ${matchId}: ${finish.status} ${JSON.stringify(finish.body)}`)
+  }
+}
+
+export async function startRefereeMatch(
+  request: APIRequestContext,
+  token: string,
+  matchId: string,
+): Promise<{ status: number; body: unknown }> {
+  const current = await apiGet(request, `/matches/${matchId}`)
+  const status = String(asRecord(current.body).status || '')
+  if (status === 'LIVE' || status === 'PAUSED') return current
+  return apiSend(request, 'POST', `/referee/matches/${matchId}/start`, { token })
+}
+
+export async function addRegularGoal(
+  request: APIRequestContext,
+  token: string,
+  matchId: string,
+  teamId: string,
+) {
+  return apiSend(request, 'POST', `/referee/matches/${matchId}/events`, {
+    token,
+    data: { eventType: 'GOAL', teamId },
+  })
+}
+
+/** Regular-time 1:1, without a series. Used for PO16 «1:1 (пен. 4:3)». */
+export async function scoreRegularDraw(
+  request: APIRequestContext,
+  token: string,
+  matchId: string,
+  homeTeamId: string,
+  awayTeamId: string,
+): Promise<void> {
+  await startRefereeMatch(request, token, matchId)
+  const current = asRecord((await apiGet(request, `/matches/${matchId}`)).body)
+  if (Number(current.homeScore || 0) < 1) {
+    const goal = await addRegularGoal(request, token, matchId, homeTeamId)
+    if (goal.status !== 201) {
+      throw new Error(`гол хозяев ${matchId}: ${goal.status} ${JSON.stringify(goal.body)}`)
+    }
+  }
+  const afterHome = asRecord((await apiGet(request, `/matches/${matchId}`)).body)
+  if (Number(afterHome.awayScore || 0) < 1) {
+    const goal = await addRegularGoal(request, token, matchId, awayTeamId)
+    if (goal.status !== 201) {
+      throw new Error(`гол гостей ${matchId}: ${goal.status} ${JSON.stringify(goal.body)}`)
+    }
   }
 }
 

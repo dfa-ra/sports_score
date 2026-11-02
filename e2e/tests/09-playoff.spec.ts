@@ -14,6 +14,7 @@ import {
   goalEventId,
   groupsOf,
   listTables,
+  nextRoundSlot,
   openNamedPlayoff,
   openPlayoff,
   pairList,
@@ -23,6 +24,7 @@ import {
   qualifiedTeams,
   replaceTables,
   setPlaces,
+  startRefereeMatch,
   tryDrawFinish,
   updateSlot,
   viewPlayoff,
@@ -37,6 +39,8 @@ const NAMES = {
   sixteen: 'E2E PO-16',
   snap: 'E2E PO-snap',
   sizes: 'E2E PO-sizes',
+  recalc: 'E2E PO-6b-reset',
+  locked: 'E2E PO-6b-lock',
 }
 
 async function needPlayoff(request: import('@playwright/test').APIRequestContext, needAdmin = true) {
@@ -285,6 +289,61 @@ test(title({ id: 'PO6' }, 'победитель выходит дальше; о�
     String(finalAfter?.homeTeamId || ''),
     'после отмены гола админом финал должен пересчитаться (победитель снят) или API должен вернуть понятную ошибку',
   ).not.toBe(home)
+})
+
+test(title({ id: 'PO6b' }, 'отмена гола: слот сбрасывается, если следующий матч не начат; иначе запрет на русском'), check({ id: 'PO6b' }), async ({ request }) => {
+  test.setTimeout(180_000)
+  await needPlayoff(request)
+  const admin = await requireRole(request, 'ADMIN')
+  const teams = await ensurePoTeams(request, admin, 4)
+
+  const reset = await openNamedPlayoff(request, admin, NAMES.recalc, teams, [teams], placesForSize(4))
+  const resetSlot = firstRoundSlots(reset.body)[0]
+  const resetMatchId = String(resetSlot.matchId || '')
+  const resetHome = String(resetSlot.homeTeamId || '')
+  await ensureWin(request, admin, resetMatchId, resetHome)
+  const afterWin = await viewPlayoff(request, reset.id)
+  const nextOpen = nextRoundSlot(afterWin.body, resetSlot)
+  const nextStatus = String(nextOpen?.matchStatus || '')
+  expect(['LIVE', 'PAUSED', 'FINISHED'].includes(nextStatus), `следующий матч ещё не начат, статус «${nextStatus}»`).toBeFalsy()
+  const alreadyReset = String(nextOpen?.homeTeamId || '') !== resetHome
+  if (!alreadyReset) {
+    expect(String(nextOpen?.homeTeamId || ''), 'победитель должен выйти в следующий слот').toBe(resetHome)
+    const eventId = await goalEventId(request, resetMatchId)
+    expect(eventId, 'в протоколе должен быть гол').toBeTruthy()
+    const voided = await voidEvent(request, admin, resetMatchId, eventId, 'admin')
+    expect(voided.status, `отмена при неначатом следующем: ${voided.status} ${JSON.stringify(voided.body)}`).toBeLessThan(400)
+  }
+  const afterVoid = await viewPlayoff(request, reset.id)
+  const nextCleared = nextRoundSlot(afterVoid.body, resetSlot)
+  expect(
+    String(nextCleared?.homeTeamId || ''),
+    'слот следующего раунда должен сброситься и пересчитаться, пока следующий матч не начат',
+  ).not.toBe(resetHome)
+
+  const locked = await openNamedPlayoff(request, admin, NAMES.locked, teams, [teams], placesForSize(4))
+  const first = firstRoundSlots(locked.body)
+  expect(first.length).toBe(2)
+  for (const slot of first) {
+    await ensureWin(request, admin, String(slot.matchId || ''), String(slot.homeTeamId || ''))
+  }
+  const assembled = await viewPlayoff(request, locked.id)
+  const final = nextRoundSlot(assembled.body, first[0])
+  const finalMatchId = String(final?.matchId || '')
+  expect(finalMatchId, 'финал должен собраться').toBeTruthy()
+  const started = await startRefereeMatch(request, admin.accessToken, finalMatchId)
+  expect(
+    ['LIVE', 'PAUSED'].includes(String(asRecord(started.body).status || '')) || started.status < 400,
+    `старт финала: ${started.status} ${JSON.stringify(started.body)}`,
+  ).toBeTruthy()
+
+  const lockedGoal = await goalEventId(request, String(first[0].matchId || ''))
+  expect(lockedGoal, 'гол полуфинала для запрета').toBeTruthy()
+  const blocked = await voidEvent(request, admin, String(first[0].matchId || ''), lockedGoal, 'admin')
+  expectRussianError(blocked.body, blocked.status, /начался|нельзя|запрещ|состав пары/i)
+  const still = await viewPlayoff(request, locked.id)
+  const finalAfter = nextRoundSlot(still.body, first[0])
+  expect(String(finalAfter?.homeTeamId || ''), 'при начатом следующем матче слот не должен тихо поехать').toBe(String(first[0].homeTeamId || ''))
 })
 
 test(title({ id: 'PO7' }, 'ничья: если следующая пара собрана — нельзя; иначе фиксируем поведение'), check({ id: 'PO7' }), async ({ request }) => {
