@@ -13,6 +13,7 @@ import com.studentleague.auth.google.GoogleTokenVerifier;
 import com.studentleague.auth.service.AuthRateLimiter;
 import com.studentleague.auth.service.AuthService;
 import com.studentleague.auth.service.PasswordResetService;
+import com.studentleague.auth.service.RegistrationUploadTicketService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.storage.ImageUploads;
 import com.studentleague.storage.StorageService;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -45,19 +47,22 @@ public class AuthController {
     private final StorageService storageService;
     private final GoogleTokenVerifier googleTokenVerifier;
     private final PasswordResetService passwordResetService;
+    private final RegistrationUploadTicketService registrationUploadTickets;
 
     public AuthController(
             AuthService authService,
             AuthRateLimiter authRateLimiter,
             StorageService storageService,
             GoogleTokenVerifier googleTokenVerifier,
-            PasswordResetService passwordResetService
+            PasswordResetService passwordResetService,
+            RegistrationUploadTicketService registrationUploadTickets
     ) {
         this.authService = authService;
         this.authRateLimiter = authRateLimiter;
         this.storageService = storageService;
         this.googleTokenVerifier = googleTokenVerifier;
         this.passwordResetService = passwordResetService;
+        this.registrationUploadTickets = registrationUploadTickets;
     }
 
     @PostMapping("/register")
@@ -71,13 +76,29 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(user);
     }
 
+    @PostMapping("/photo-ticket")
+    @Operation(summary = "Одноразовый код загрузки фото до создания аккаунта")
+    public Map<String, String> registrationPhotoTicket(HttpServletRequest httpRequest) {
+        authRateLimiter.check(httpRequest);
+        return Map.of("token", registrationUploadTickets.issue());
+    }
+
     @PostMapping(value = "/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Загрузить фото для регистрации (игрок / капитан / судья)")
     public Map<String, String> uploadRegistrationPhoto(
             @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "token", required = false) String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             HttpServletRequest httpRequest
     ) {
         authRateLimiter.check(httpRequest);
+        if (principal == null) {
+            String presented = token;
+            if (presented == null || presented.isBlank()) {
+                presented = httpRequest.getHeader(RegistrationUploadTicketService.HEADER);
+            }
+            registrationUploadTickets.consume(presented);
+        }
         ImageUploads.requireRasterImage(file);
         return Map.of("url", storageService.store("registration", file));
     }

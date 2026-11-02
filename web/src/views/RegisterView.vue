@@ -91,8 +91,10 @@ async function onPhoto(event: Event) {
   photoUrl.value = ''
   uploadingPhoto.value = true
   try {
+    const { data: ticket } = await api.post('/auth/photo-ticket')
     const form = new FormData()
     form.append('file', file)
+    form.append('token', ticket.token)
     const { data } = await api.post('/auth/photo', form)
     photoUrl.value = data.url
     clearField('photo')
