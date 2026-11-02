@@ -1,6 +1,46 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide } from '../src/lib/matchMinute.ts'
+import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute } from '../src/lib/matchMinute.ts'
+
+test('a period that lasted 26 seconds is the first minute, not 0 and not 15', () => {
+  assert.equal(boundaryMinute(26), 1)
+  assert.equal(boundaryMinute(0), 0)
+  assert.equal(boundaryMinute(15 * 60), 15)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'GOAL', gameTime: 2 * 60 }), 2)
+})
+
+test('period boundaries are part of the public protocol', () => {
+  const blocks = buildPeriodBlocks([
+    {
+      id: 'start',
+      eventType: 'PERIOD_START',
+      period: 1,
+      gameTime: 0,
+      timestamp: '2026-11-02T12:00:00Z',
+    },
+    {
+      id: 'end',
+      eventType: 'PERIOD_END',
+      period: 1,
+      gameTime: 26,
+      timestamp: '2026-11-02T12:00:26Z',
+    },
+    {
+      id: 'next',
+      eventType: 'PERIOD_START',
+      period: 2,
+      gameTime: 26,
+      timestamp: '2026-11-02T12:00:26Z',
+    },
+  ], { homeTeamId: 'home' })
+
+  assert.deepEqual(blocks.map((block) => block.period), [1, 2])
+  assert.deepEqual(blocks[0].items.map((item) => item.id), ['start', 'end'])
+  assert.deepEqual(blocks[1].items.map((item) => item.id), ['next'])
+  assert.equal(protocolMinute(blocks[0].items[1]), 1)
+  assert.equal(protocolMinute(blocks[1].items[0]), 1)
+})
 
 test('13:00 left in a 15:00 first half displays 2 minutes, not 13', () => {
   const stored = 2 * 60

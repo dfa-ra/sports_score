@@ -45,7 +45,16 @@ function tapStar() {
     ><span class="star-glyph" :key="starTap" :class="{ 'star-tap': starTap }">★</span></button>
     <RouterLink class="body" :to="`/matches/${match.id}`">
       <span class="kick-slot">
-        <KickoffWhen :at="match.scheduledAt" :status="match.status" :minute="match.minute" />
+        <KickoffWhen
+          :at="match.scheduledAt"
+          :played-at="match.finishedAt"
+          :status="match.status"
+          :minute="match.minute"
+          :game-time-seconds="match.gameTimeSeconds"
+          :clock-running-since="match.clockRunningSince"
+          :period="match.period"
+          :period-length-seconds="match.periodLengthSeconds"
+        />
         <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
       </span>
       <span class="sides">

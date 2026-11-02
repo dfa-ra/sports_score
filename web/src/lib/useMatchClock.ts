@@ -26,6 +26,10 @@ export function useMatchClock(match: Ref<any>) {
 
   const remaining = computed(() => Math.max(0, cap.value - elapsed.value))
   const expired = computed(() => remaining.value <= 0 && (match.value?.status === 'LIVE' || match.value?.status === 'PAUSED'))
+  const kickoff = computed(() => {
+    const period = Math.max(1, Number(match.value?.period) || 1)
+    return (period - 1) * cap.value + elapsed.value
+  })
 
-  return { elapsed, remaining, expired, cap }
+  return { elapsed, remaining, expired, cap, kickoff }
 }

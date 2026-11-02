@@ -3,6 +3,23 @@ export function eventMinute(gameTime?: number | null) {
   return Math.floor(Math.max(0, gameTime ?? 0) / 60)
 }
 
+/**
+ * Period lines use the same kickoff seconds. A whistle at 0:26 is the first
+ * minute, not `0'` and not the 15:00 still on the countdown.
+ */
+export function boundaryMinute(gameTime?: number | null) {
+  const seconds = Math.max(0, gameTime ?? 0)
+  if (seconds <= 0) return 0
+  return Math.max(1, Math.floor(seconds / 60))
+}
+
+export function protocolMinute(event: { eventType?: string | null; gameTime?: number | null }) {
+  if (event.eventType === 'PERIOD_START' || event.eventType === 'PERIOD_END') {
+    return boundaryMinute(event.gameTime)
+  }
+  return eventMinute(event.gameTime)
+}
+
 export type TimedEvent = {
   id?: string | null
   eventType?: string | null
@@ -23,7 +40,15 @@ export function compareMatchEvents(a: TimedEvent, b: TimedEvent) {
   return String(a.id ?? '').localeCompare(String(b.id ?? ''))
 }
 
-const visibleTypes = new Set(['GOAL', 'YELLOW_CARD', 'RED_CARD', 'SUBSTITUTION', 'OWN_GOAL'])
+const visibleTypes = new Set([
+  'GOAL',
+  'YELLOW_CARD',
+  'RED_CARD',
+  'SUBSTITUTION',
+  'OWN_GOAL',
+  'PERIOD_START',
+  'PERIOD_END',
+])
 
 /**
  * Which touchline the row belongs to. An own goal is filed with the team that

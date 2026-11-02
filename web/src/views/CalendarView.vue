@@ -81,10 +81,23 @@ onMounted(async () => {
     error.value = e.response?.data?.message || 'Календарь не загрузился.'
   } finally {
     loading.value = false
-    refreshTimer = window.setInterval(() => {
-      loadMatches().catch(() => {})
-    }, 12_000)
+    armRefresh()
   }
+})
+
+function armRefresh() {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  const delay = route.name === 'live' ? 4_000 : 12_000
+  refreshTimer = window.setInterval(() => {
+    loadMatches().catch((reason: unknown) => {
+      const message = (reason as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (!items.value.length) error.value = message || 'Календарь не обновился.'
+    })
+  }, delay)
+}
+
+watch(() => route.name, () => {
+  if (!loading.value) armRefresh()
 })
 
 onUnmounted(() => {

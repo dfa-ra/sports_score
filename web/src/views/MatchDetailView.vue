@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as shownMinute } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -72,6 +72,7 @@ const teams = useTeamDirectory()
 const fav = useFavorites()
 const { remaining, expired, cap } = useMatchClock(match)
 let client: Client | null = null
+let pollTimer = 0
 
 const timeline = computed(() =>
   [...events.value]
@@ -260,6 +261,13 @@ watch(protocolPlayers, (players) => {
   }
 })
 
+const assignedReferee = computed(() => {
+  const id = auth.user?.id
+  if (!id) return false
+  return referees.value.some((row) => row.refereeId === id)
+})
+const canUsePad = computed(() => auth.canManageLeague || assignedReferee.value)
+
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
   const side = teamId === match.value?.homeTeamId ? lineups.value?.home : lineups.value?.away
@@ -336,6 +344,25 @@ async function load() {
       )?.refereeId
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
+  }
+}
+
+function eventSignature(list: any[]) {
+  return list.map((ev) => `${ev.id}:${ev.voided}:${ev.gameTime}:${ev.playerId ?? ''}:${ev.secondaryPlayerId ?? ''}`).join('|')
+}
+
+async function refreshLive() {
+  if (pending.value || !route.params.id) return
+  const id = route.params.id
+  const [m, e] = await Promise.all([
+    api.get(`/matches/${id}`),
+    api.get(`/matches/${id}/events`),
+  ])
+  match.value = { ...match.value, ...m.data }
+  const next = e.data ?? []
+  if (eventSignature(next) !== eventSignature(events.value)) {
+    events.value = next
+    syncDrafts()
   }
 }
 
@@ -567,10 +594,16 @@ onMounted(async () => {
     onDisconnect: () => { connected.value = false },
   })
   client.activate()
+  pollTimer = window.setInterval(() => {
+    refreshLive().catch((reason: unknown) => {
+      if (!match.value) error.value = apiError(reason, 'Матч не обновился.')
+    })
+  }, 4_000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', applyCrest)
+  if (pollTimer) window.clearInterval(pollTimer)
   client?.deactivate()
 })
 </script>
@@ -833,7 +866,7 @@ onUnmounted(() => {
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
               <i class="mark" :class="ev.eventType.toLowerCase()" />
-              <em>{{ eventMinute(ev.gameTime) }}'</em>
+              <em>{{ shownMinute(ev) }}'</em>
             </div>
           </section>
         </template>
@@ -897,7 +930,7 @@ onUnmounted(() => {
         <h2>Бригада</h2>
         <p v-for="r in referees" :key="r.id" class="muted">Судья {{ registeredName(r) || r.email || r.refereeId }}</p>
         <p v-if="!referees.length" class="muted">Судья не назначен.</p>
-        <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
+        <RouterLink v-if="canUsePad" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
       </div>
     </div>
 
@@ -909,7 +942,7 @@ onUnmounted(() => {
       <div class="panel">
         <MatchLineupBoard
           :side="lineups?.home"
-          :editable="auth.canManageLeague || auth.canOfficiate || isCaptainOf(match.homeTeamId)"
+          :editable="auth.canManageLeague || assignedReferee || isCaptainOf(match.homeTeamId)"
           :pending="pending"
           @save="saveLineup"
         />
@@ -917,7 +950,7 @@ onUnmounted(() => {
       <div class="panel">
         <MatchLineupBoard
           :side="lineups?.away"
-          :editable="auth.canManageLeague || auth.canOfficiate || isCaptainOf(match.awayTeamId)"
+          :editable="auth.canManageLeague || assignedReferee || isCaptainOf(match.awayTeamId)"
           :pending="pending"
           @save="saveLineup"
         />
@@ -929,7 +962,7 @@ onUnmounted(() => {
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
-          <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
+          <span class="t">{{ shownMinute(ev) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
             <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
