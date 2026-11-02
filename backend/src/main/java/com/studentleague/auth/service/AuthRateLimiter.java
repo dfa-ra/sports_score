@@ -25,7 +25,7 @@ public class AuthRateLimiter {
         String key = clientKey(request);
         Bucket bucket = buckets.computeIfAbsent(key, ignored -> newBucket());
         if (!bucket.tryConsume(1)) {
-            throw ApiException.rateLimited("Too many authentication requests");
+            throw ApiException.rateLimited("Слишком много попыток. Подождите немного.");
         }
     }
 

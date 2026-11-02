@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record ForgotPasswordRequest(
-        @NotBlank @Email @Size(max = 320) String email
+        @NotBlank(message = "Укажите почту")
+        @Email(message = "Укажите корректную почту")
+        @Size(max = 320, message = "Почта не длиннее 320 символов")
+        String email
 ) {
 }

@@ -39,14 +39,24 @@ const playerId = ref('')
 const card = ref<any>(null)
 const allMatches = ref<any[]>([])
 
-const roles = computed(() => {
+const approvedRoles = computed(() => {
   const from = (auth.user?.roles ?? [])
     .filter((item) => item.status === 'APPROVED')
     .map((item) => item.role)
   return from.length ? from : (auth.user?.role ? [auth.user.role] : [])
 })
 
-const isPlayer = computed(() => roles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'ADMIN'))
+const pendingRoles = computed(() =>
+  (auth.user?.roles ?? [])
+    .filter((item) => item.status === 'PENDING')
+    .map((item) => item.role),
+)
+
+const applicationOpen = computed(() =>
+  pendingRoles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'REFEREE'),
+)
+
+const isPlayer = computed(() => approvedRoles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'ADMIN'))
 
 function isUploadedPhoto(url?: string | null) {
   return !!url && url.includes('/media/')
@@ -117,8 +127,13 @@ onMounted(async () => {
 })
 
 async function submit() {
+  if (pending.value) return
   error.value = ''
   ok.value = ''
+  if (!isPlayer.value && applicationOpen.value) {
+    error.value = 'Заявка уже на рассмотрении.'
+    return
+  }
   if (!isPlayer.value) {
     if (!firstName.value.trim() || !lastName.value.trim() || !displayName.value.trim()) {
       error.value = 'Укажите имя, фамилию и как писать на майке.'
@@ -164,7 +179,7 @@ async function submit() {
 async function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file) return
+  if (!file || pending.value) return
   error.value = ''
   ok.value = ''
   pending.value = true
@@ -218,13 +233,19 @@ async function logout() {
       <div>
         <h1>{{ accountName }}</h1>
         <p class="chips">
-          <span v-for="role in roles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
+          <span v-for="role in approvedRoles" :key="role" class="badge">{{ labelOf(roleLabel, role) }}</span>
         </p>
       </div>
       <button v-if="isPlayer" class="pen" type="button" aria-label="Изменить" @click="openForm">✎</button>
     </div>
 
-    <button v-if="!isPlayer" class="btn become" type="button" @click="openForm">Стать игроком</button>
+    <div v-if="pendingRoles.length" class="pending-roles">
+      <p v-for="role in pendingRoles" :key="role">
+        Заявка на роль «{{ labelOf(roleLabel, role) }}» на рассмотрении
+      </p>
+    </div>
+
+    <button v-if="!isPlayer && !applicationOpen" class="btn become" type="button" @click="openForm">Стать игроком</button>
 
     <Teleport to="body">
       <div v-if="editing" class="overlay" @click.self="editing = false" @keydown.esc="editing = false">
@@ -258,7 +279,8 @@ async function logout() {
             <label class="field">О себе<textarea v-model="bio" rows="3" /></label>
             <p v-if="error" class="form-error">{{ error }}</p>
             <p v-if="ok" class="form-ok">{{ ok }}</p>
-            <button class="btn" type="submit" :disabled="pending">
+            <button class="btn" type="submit" :disabled="pending" :aria-busy="pending">
+              <span v-if="pending" class="spinner" aria-hidden="true"></span>
               {{ pending ? 'Сохраняем…' : isPlayer ? 'Сохранить' : 'Стать игроком' }}
             </button>
             <button class="btn ghost" type="button" @click="editing = false">Закрыть</button>
@@ -354,6 +376,15 @@ async function logout() {
   color: var(--navy);
 }
 .become { width: 100%; }
+.pending-roles {
+  display: grid;
+  gap: 0.35rem;
+}
+.pending-roles p {
+  margin: 0;
+  color: var(--navy);
+  font-weight: 700;
+}
 .overlay {
   position: fixed;
   inset: 0;

@@ -28,7 +28,7 @@ public class GlobalExceptionHandler {
         List<ApiError.FieldErrorDetail> details = ex.getBindingResult().getFieldErrors().stream()
                 .map(err -> new ApiError.FieldErrorDetail(err.getField(), err.getDefaultMessage()))
                 .toList();
-        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Validation failed", details, request));
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Проверьте введённые данные", details, request));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -36,19 +36,19 @@ public class GlobalExceptionHandler {
         List<ApiError.FieldErrorDetail> details = ex.getConstraintViolations().stream()
                 .map(v -> new ApiError.FieldErrorDetail(v.getPropertyPath().toString(), v.getMessage()))
                 .toList();
-        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Validation failed", details, request));
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Проверьте введённые данные", details, request));
     }
 
     @ExceptionHandler({BadCredentialsException.class, AuthenticationException.class})
     public ResponseEntity<ApiError> handleAuth(RuntimeException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(error("UNAUTHORIZED", ex.getMessage() == null ? "Unauthorized" : ex.getMessage(), List.of(), request));
+                .body(error("UNAUTHORIZED", "Нужно войти", List.of(), request));
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(error("FORBIDDEN", "Access denied", List.of(), request));
+                .body(error("FORBIDDEN", "Недостаточно прав", List.of(), request));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -60,7 +60,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error("INTERNAL_ERROR", "Unexpected server error", List.of(), request));
+                .body(error("INTERNAL_ERROR", "Внутренняя ошибка сервера", List.of(), request));
     }
 
     private static ApiError error(String code, String message, List<ApiError.FieldErrorDetail> details, HttpServletRequest request) {

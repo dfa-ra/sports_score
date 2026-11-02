@@ -11,6 +11,8 @@ import { googleClientId } from '../lib/googleIdentity'
 
 type Role = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE'
 
+type FieldKey = 'firstName' | 'lastName' | 'email' | 'password' | 'roles' | 'photo'
+
 const email = ref('')
 const password = ref('')
 const roles = ref<Role[]>(['FAN'])
@@ -19,6 +21,7 @@ const lastName = ref('')
 const photoUrl = ref('')
 const uploadingPhoto = ref(false)
 const error = ref('')
+const fieldErrors = ref<Partial<Record<FieldKey, string>>>({})
 const pending = ref(false)
 const showPassword = ref(false)
 const auth = useAuthStore()
@@ -26,6 +29,7 @@ const router = useRouter()
 
 const needsPhoto = computed(() => roles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'REFEREE'))
 const hint = computed(() => passwordHint(password.value))
+const submitLocked = computed(() => pending.value || uploadingPhoto.value)
 
 function hasRole(role: Role) {
   return roles.value.includes(role)
@@ -35,16 +39,55 @@ function toggleRole(role: Role) {
   if (hasRole(role)) {
     if (roles.value.length === 1) return
     roles.value = roles.value.filter((item) => item !== role)
-    return
+  } else {
+    roles.value = [...roles.value, role]
   }
-  roles.value = [...roles.value, role]
+  clearField('roles')
+  if (!needsPhoto.value) clearField('photo')
+}
+
+function clearField(key: FieldKey) {
+  if (!fieldErrors.value[key]) return
+  const next = { ...fieldErrors.value }
+  delete next[key]
+  fieldErrors.value = next
+}
+
+function looksLikeEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function validate() {
+  const next: Partial<Record<FieldKey, string>> = {}
+  const first = firstName.value.trim()
+  const last = lastName.value.trim()
+  const mail = email.value.trim()
+  if (!first) next.firstName = 'Укажите имя'
+  else if (first.length > 100) next.firstName = 'Имя не длиннее 100 символов'
+  if (!last) next.lastName = 'Укажите фамилию'
+  else if (last.length > 100) next.lastName = 'Фамилия не длиннее 100 символов'
+  if (!mail) next.email = 'Укажите почту'
+  else if (mail.length > 320 || !looksLikeEmail(mail)) next.email = 'Укажите корректную почту'
+  if (!password.value) next.password = 'Укажите пароль'
+  else if (password.value.length < 8 || password.value.length > 100) {
+    next.password = 'Пароль должен быть от 8 до 100 символов'
+  }
+  if (!roles.value.length) next.roles = 'Выберите хотя бы одну роль'
+  if (needsPhoto.value && !photoUrl.value) {
+    next.photo = uploadingPhoto.value
+      ? 'Подождите, фото ещё загружается.'
+      : 'Для игрока, капитана и судьи нужна фотография'
+  }
+  fieldErrors.value = next
+  return Object.keys(next).length === 0
 }
 
 async function onPhoto(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file) return
+  if (!file || uploadingPhoto.value || pending.value) return
   error.value = ''
+  clearField('photo')
   photoUrl.value = ''
   uploadingPhoto.value = true
   try {
@@ -52,7 +95,8 @@ async function onPhoto(event: Event) {
     form.append('file', file)
     const { data } = await api.post('/auth/photo', form)
     photoUrl.value = data.url
-  } catch (e: any) {
+    clearField('photo')
+  } catch (e: unknown) {
     error.value = apiError(e, 'Фото не загрузилось. Нужны JPEG, PNG, WebP или GIF, до 8 МБ.')
   } finally {
     uploadingPhoto.value = false
@@ -60,27 +104,23 @@ async function onPhoto(event: Event) {
 }
 
 async function submit() {
+  if (pending.value || uploadingPhoto.value) return
   error.value = ''
-  if (needsPhoto.value && !photoUrl.value) {
-    error.value = uploadingPhoto.value
-      ? 'Подождите, фото ещё загружается.'
-      : 'Для игрока, капитана и судьи нужно фото.'
-    return
-  }
+  if (!validate()) return
   pending.value = true
   try {
     await auth.register({
-      email: email.value,
+      email: email.value.trim(),
       password: password.value,
-      firstName: firstName.value,
-      lastName: lastName.value,
+      firstName: firstName.value.trim(),
+      lastName: lastName.value.trim(),
       roles: roles.value,
       role: roles.value[0],
       photoUrl: needsPhoto.value ? photoUrl.value : undefined,
     })
     router.push('/')
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Не удалось зарегистрироваться. Проверьте данные.'
+  } catch (e: unknown) {
+    error.value = apiError(e, 'Не удалось зарегистрироваться. Проверьте данные.')
   } finally {
     pending.value = false
   }
@@ -92,8 +132,8 @@ async function onGoogle(idToken: string) {
   try {
     await auth.loginWithGoogle(idToken)
     router.push('/')
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Не удалось войти через Google.'
+  } catch (e: unknown) {
+    error.value = apiError(e, 'Не удалось войти через Google.')
   } finally {
     pending.value = false
   }
@@ -109,33 +149,38 @@ async function onGoogle(idToken: string) {
       </div>
       <GoogleSignInButton @success="onGoogle" @error="error = $event" />
       <p v-if="googleClientId" class="muted">Войти через Google. Новый аккаунт будет болельщиком. Игрок, капитан и судья регистрируются формой ниже — для них нужно фото.</p>
-      <form class="stack" @submit.prevent="submit">
-        <label class="field">Имя
-          <input v-model="firstName" required maxlength="100" />
+      <form class="stack" novalidate @submit.prevent="submit">
+        <label class="field" :class="{ invalid: fieldErrors.firstName }">Имя
+          <input v-model="firstName" maxlength="100" autocomplete="given-name" @input="clearField('firstName')" />
+          <span v-if="fieldErrors.firstName" class="field-error">{{ fieldErrors.firstName }}</span>
         </label>
-        <label class="field">Фамилия
-          <input v-model="lastName" required maxlength="100" />
+        <label class="field" :class="{ invalid: fieldErrors.lastName }">Фамилия
+          <input v-model="lastName" maxlength="100" autocomplete="family-name" @input="clearField('lastName')" />
+          <span v-if="fieldErrors.lastName" class="field-error">{{ fieldErrors.lastName }}</span>
         </label>
-        <label class="field">Email
-          <input v-model="email" type="email" required autocomplete="username" placeholder="you@league.local" />
+        <label class="field" :class="{ invalid: fieldErrors.email }">Email
+          <input v-model="email" type="email" maxlength="320" autocomplete="username" placeholder="you@league.local" @input="clearField('email')" />
+          <span v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</span>
         </label>
-        <label class="field">Пароль
+        <label class="field" :class="{ invalid: fieldErrors.password }">Пароль
           <span class="pass-row">
             <input
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
-              required
-              minlength="8"
+              maxlength="100"
               autocomplete="new-password"
+              @input="clearField('password')"
             />
             <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
               {{ showPassword ? 'Скрыть' : 'Показать' }}
             </button>
           </span>
-          <span class="field-hint">{{ hint }}</span>
+          <span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
+          <span v-else class="field-hint">{{ hint }}</span>
         </label>
 
         <p class="field-hint">Выберите одну или несколько ролей</p>
+        <span v-if="fieldErrors.roles" class="field-error">{{ fieldErrors.roles }}</span>
         <div class="role-pick" role="group" aria-label="Роли">
           <button type="button" class="role-card" :class="{ active: hasRole('FAN') }" :aria-pressed="hasRole('FAN')" @click="toggleRole('FAN')">
             <strong>Болельщик</strong>
@@ -155,7 +200,7 @@ async function onGoogle(idToken: string) {
           </button>
         </div>
 
-        <label v-if="needsPhoto" class="field">Фото
+        <label v-if="needsPhoto" class="field" :class="{ invalid: fieldErrors.photo }">Фото
           <span class="photo-row">
             <PlayerAvatar
               v-if="photoUrl"
@@ -165,15 +210,17 @@ async function onGoogle(idToken: string) {
               tile
             />
             <span class="grow">
-              <input type="file" accept="image/*" @change="onPhoto" />
-              <span class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" :disabled="submitLocked" @change="onPhoto" />
+              <span v-if="fieldErrors.photo" class="field-error">{{ fieldErrors.photo }}</span>
+              <span v-else class="field-hint">{{ photoUrl ? 'Фото загружено' : uploadingPhoto ? 'Загружаем…' : 'JPEG, PNG, WebP или GIF, до 8 МБ' }}</span>
             </span>
           </span>
         </label>
 
         <p v-if="error" class="form-error">{{ error }}</p>
-        <button class="btn success" type="submit" :disabled="pending">
-          {{ pending ? 'Создаём…' : 'Создать аккаунт' }}
+        <button class="btn success" type="submit" :disabled="submitLocked" :aria-busy="submitLocked">
+          <span v-if="submitLocked" class="spinner" aria-hidden="true"></span>
+          {{ pending ? 'Создаём…' : uploadingPhoto ? 'Загружаем фото…' : 'Создать аккаунт' }}
         </button>
       </form>
       <p class="muted">Уже есть аккаунт? <RouterLink to="/login">Войти</RouterLink></p>
