@@ -56,13 +56,13 @@ public class MatchGoalkeeperService {
     @Transactional
     public MatchResponse setByReferee(UserPrincipal principal, UUID matchId, SetMatchGoalkeeperRequest request) {
         if (!principal.hasAnyRole(Role.REFEREE, Role.ADMIN)) {
-            throw ApiException.forbidden("Referee role required");
+            throw ApiException.forbidden("Нужна роль судьи");
         }
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         boolean assigned = matchRefereeRepository.existsByMatchIdAndRefereeId(matchId, principal.getId());
         if (!assigned && !principal.hasRole(Role.ADMIN)) {
-            throw ApiException.forbidden("Referee is not assigned to this match");
+            throw ApiException.forbidden("Судья не назначен на этот матч");
         }
         requireTeam(request);
         return apply(match, request);
@@ -71,7 +71,7 @@ public class MatchGoalkeeperService {
     @Transactional
     public MatchResponse setByAdmin(UUID matchId, SetMatchGoalkeeperRequest request) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         requireTeam(request);
         return apply(match, request);
     }

@@ -41,6 +41,15 @@ export function boundaryMinute(gameTime?: number | null, periodLengthSeconds?: n
   return matchMinute({ gameTime, eventType: 'PERIOD_END', periodLengthSeconds })
 }
 
+/** Stoppage beyond periodLength × periodCount. The API uses the same five minutes. */
+export const ADDED_TIME_ALLOWANCE_MINUTES = 5
+
+export function protocolMinuteLimit(periodLengthSeconds?: number | null, periodCount?: number | null) {
+  const seconds = periodLengthSeconds && periodLengthSeconds > 0 ? periodLengthSeconds : 15 * 60
+  const periods = periodCount && periodCount > 0 ? periodCount : 2
+  return Math.floor((periods * seconds) / 60) + ADDED_TIME_ALLOWANCE_MINUTES
+}
+
 export function protocolMinute(
   event: { eventType?: string | null; gameTime?: number | null; period?: number | null },
   periodLengthSeconds?: number | null,

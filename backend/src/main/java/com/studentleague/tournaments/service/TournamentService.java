@@ -107,7 +107,7 @@ public class TournamentService {
     @Transactional
     public TournamentResponse create(CreateTournamentRequest request) {
         sportRepository.findById(request.sportId())
-                .orElseThrow(() -> ApiException.notFound("Sport not found"));
+                .orElseThrow(() -> ApiException.notFound("Вид спорта не найден"));
         requireChronologicalDates(request.startDate(), request.endDate());
         Tournament tournament = new Tournament();
         tournament.setName(request.name().trim());
@@ -183,24 +183,24 @@ public class TournamentService {
     public TournamentTeamResponse registerTeam(UserPrincipal principal, UUID tournamentId, RegisterTeamRequest request) {
         Tournament tournament = requireTournament(tournamentId);
         if (tournament.getStatus() != TournamentStatus.REGISTRATION && tournament.getStatus() != TournamentStatus.DRAFT) {
-            throw ApiException.badRequest("Tournament is not open for registration");
+            throw ApiException.badRequest("Запись на турнир закрыта");
         }
         Team team = teamRepository.findById(request.teamId())
-                .orElseThrow(() -> ApiException.notFound("Team not found"));
+                .orElseThrow(() -> ApiException.notFound("Команда не найдена"));
         if (team.isDisbanded()) {
             throw ApiException.badRequest("Нельзя заявить расформированную команду");
         }
 
         if (!principal.hasRole(Role.ADMIN)) {
             var profile = playerProfileRepository.findByUserId(principal.getId())
-                    .orElseThrow(() -> ApiException.forbidden("Only the team captain can register the team"));
+                    .orElseThrow(() -> ApiException.forbidden("Команду заявляет только её капитан"));
             if (!profile.getId().equals(team.getCaptainId())) {
-                throw ApiException.forbidden("Only the team captain can register the team");
+                throw ApiException.forbidden("Команду заявляет только её капитан");
             }
         }
 
         if (tournamentTeamRepository.existsByTournamentIdAndTeamId(tournamentId, team.getId())) {
-            throw ApiException.conflict("Team already registered for this tournament");
+            throw ApiException.conflict("Команда уже заявлена на этот турнир");
         }
 
         TournamentTeam entry = new TournamentTeam();
@@ -224,7 +224,7 @@ public class TournamentService {
     @Transactional
     public TournamentTeamResponse approveTeam(UUID tournamentId, UUID teamId) {
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
-                .orElseThrow(() -> ApiException.notFound("Tournament registration not found"));
+                .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
@@ -237,7 +237,7 @@ public class TournamentService {
     public void excludeTeam(UUID tournamentId, UUID teamId) {
         requireTournament(tournamentId);
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
-                .orElseThrow(() -> ApiException.notFound("Tournament registration not found"));
+                .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
         List<Match> fixtures = matchRepository.findByTournamentIdAndTeamId(tournamentId, teamId);
         for (Match match : fixtures) {
             if (match.getBracketRound() != null) {
@@ -422,7 +422,7 @@ public class TournamentService {
 
     private Tournament requireTournament(UUID id) {
         return tournamentRepository.findById(id)
-                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+                .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
     }
 
     private TournamentResponse toResponse(Tournament t) {

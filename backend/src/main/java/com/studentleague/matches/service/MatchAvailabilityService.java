@@ -123,6 +123,6 @@ public class MatchAvailabilityService {
 
     private Match requireMatch(UUID matchId) {
         return matchRepository.findById(matchId)
-                .orElseThrow(() -> ApiException.notFound("Match not found"));
+                .orElseThrow(() -> ApiException.notFound("Матч не найден"));
     }
 }

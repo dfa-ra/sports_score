@@ -58,7 +58,7 @@ public class UploadController {
     ) {
         validateImage(file);
         User user = userRepository.findById(principal.getId())
-                .orElseThrow(() -> ApiException.notFound("User not found"));
+                .orElseThrow(() -> ApiException.notFound("Пользователь не найден"));
         String url = storageService.store("avatars", file);
         user.setPhotoUrl(url);
         userRepository.save(user);
@@ -78,12 +78,12 @@ public class UploadController {
     ) {
         validateImage(file);
         Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> ApiException.notFound("Team not found"));
+                .orElseThrow(() -> ApiException.notFound("Команда не найдена"));
         if (!principal.hasRole(Role.ADMIN)) {
             PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId())
-                    .orElseThrow(() -> ApiException.forbidden("Only the team captain can upload a logo"));
+                    .orElseThrow(() -> ApiException.forbidden("Логотип загружает только капитан команды"));
             if (!profile.getId().equals(team.getCaptainId())) {
-                throw ApiException.forbidden("Only the team captain can upload a logo");
+                throw ApiException.forbidden("Логотип загружает только капитан команды");
             }
         }
         String url = storageService.store("logos", file);

@@ -1,26 +1,36 @@
 package com.studentleague.common.exception;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.validation.BindException;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 
@@ -28,6 +38,12 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private final ObjectMapper objectMapper;
+
+    public GlobalExceptionHandler(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex, HttpServletRequest request) {
@@ -66,6 +82,68 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleMethod(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(error("METHOD_NOT_ALLOWED", "Метод не поддерживается", List.of(), request));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMedia(
+            HttpMediaTypeNotSupportedException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(error("UNSUPPORTED_MEDIA_TYPE", "Нужен запрос в формате JSON", List.of(), request));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
+    public void handleNotAcceptable(
+            HttpMediaTypeNotAcceptableException ex,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        // The client asked for a type Jackson cannot write. A ResponseEntity would
+        // be negotiated again and fall through to the generic 500.
+        response.setStatus(HttpStatus.NOT_ACCEPTABLE.value());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                error("NOT_ACCEPTABLE", "Этот формат ответа не поддерживается", List.of(), request)
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(
+            MissingServletRequestPartException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest().body(error(
+                "BAD_REQUEST",
+                "Не хватает части запроса",
+                List.of(new ApiError.FieldErrorDetail(ex.getRequestPartName(), "Обязательная часть")),
+                request
+        ));
+    }
+
+    @ExceptionHandler(ServletRequestBindingException.class)
+    public ResponseEntity<ApiError> handleBinding(ServletRequestBindingException ex, HttpServletRequest request) {
+        return ResponseEntity.badRequest()
+                .body(error("BAD_REQUEST", "Некорректный запрос", List.of(), request));
+    }
+
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<ApiError> handleBind(BindException ex, HttpServletRequest request) {
+        List<ApiError.FieldErrorDetail> details = ex.getFieldErrors().stream()
+                .map(err -> new ApiError.FieldErrorDetail(err.getField(), err.getDefaultMessage()))
+                .toList();
+        return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "Проверьте введённые данные", details, request));
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ApiError> handleMethodValidation(
+            HandlerMethodValidationException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.badRequest()
+                .body(error("VALIDATION_ERROR", "Проверьте введённые данные", List.of(), request));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

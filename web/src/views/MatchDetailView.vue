@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as protocolMinuteOf } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as protocolMinuteOf, protocolMinuteLimit } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -105,6 +105,9 @@ function formSide(row: any, side: 'home' | 'away') {
     logo: apiLogo || teams.logo(id),
   }
 }
+const protocolMinuteMax = computed(() =>
+  protocolMinuteLimit(match.value?.periodLengthSeconds, match.value?.periodCount),
+)
 const periodBlocks = computed(() => {
   if (!match.value) return []
   return buildPeriodBlocks(events.value, match.value).map((block) => ({
@@ -787,7 +790,7 @@ onUnmounted(() => {
           </select>
         </label>
         <label class="field">Минута от начала
-          <input v-model.number="protocolMinute" type="number" min="0" max="200" required />
+          <input v-model.number="protocolMinute" type="number" min="0" :max="protocolMinuteMax" required />
         </label>
         <label v-if="protocolType === 'GOAL'" class="check-line">
           <input v-model="protocolOwnGoal" type="checkbox" />
@@ -830,7 +833,7 @@ onUnmounted(() => {
           </span>
         </template>
         <label class="field minute">Минута от начала
-          <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" max="200" />
+          <input v-model.number="minuteDrafts[ev.id]" type="number" min="0" :max="protocolMinuteMax" />
         </label>
         <button
           v-if="ev.eventType === 'GOAL'"
