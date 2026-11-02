@@ -51,7 +51,8 @@ Auth: `Authorization: Bearer <access_token>`
 | Метод | Путь | Auth | Описание |
 |---|---|---|---|
 | POST | `/auth/register` | Публичный | Создать аккаунт. `FAN` сразу активен, `PLAYER` / `CAPTAIN` / `REFEREE` — заявка |
-| POST | `/auth/photo` | Публичный | Фото для регистрации: multipart, поле `file`. Ответ `{ "url" }` |
+| POST | `/auth/photo-ticket` | Публичный | Одноразовый код загрузки фото до создания аккаунта. Ответ `{ "token" }`, живёт 10 минут |
+| POST | `/auth/photo` | Код или Bearer | Фото регистрации: multipart, поле `file`. Без входа и без кода — `401`. Код передаётся полем `token` или заголовком `X-Registration-Upload` и сгорает после одной загрузки. Ответ `{ "url" }` |
 | POST | `/auth/login` | Публичный | Access + refresh токены |
 | POST | `/auth/google` | Публичный | Вход по Google ID token, те же access/refresh |
 | POST | `/auth/forgot-password` | Публичный | Письмо со ссылкой сброса. Ответ одинаковый, есть аккаунт или нет |
@@ -67,7 +68,7 @@ Auth: `Authorization: Bearer <access_token>`
 
 Обязательны `email`, `password` (от 8 до 100 символов), `firstName` и `lastName` — в том числе для болельщика. Роль передаётся в `role`, `accountType` или массиве `roles`. Значения: `FAN`, `PLAYER`, `CAPTAIN`, `REFEREE`. Нужна хотя бы одна. `ADMIN` так не выдаётся.
 
-`photoUrl` обязателен, если среди ролей есть `PLAYER`, `CAPTAIN` или `REFEREE`. Это `url` из `POST /auth/photo` (JPEG, PNG, WebP или GIF, до 8 МБ). Для `FAN` фото не нужно.
+`photoUrl` обязателен, если среди ролей есть `PLAYER`, `CAPTAIN` или `REFEREE`. Это `url` из `POST /auth/photo` (JPEG, PNG, WebP или GIF, до 8 МБ, проверка по сигнатуре файла). Форма регистрации запрашивает фото до создания аккаунта: сначала `POST /auth/photo-ticket`, затем загрузка с одноразовым `token`. Анонимный `POST /auth/photo` без этого кода отвечает `401`. Уже вошедший пользователь может загрузить файл без кода. Для `FAN` фото не нужно.
 
 `FAN` подтверждается сразу, и активная роль в поле `role` — `FAN`. Игрок, капитан и судья без автоподтверждения остаются `PENDING`: `role` не меняется, пока заявку не подтвердят, а в `roles` видны роль и статус.
 

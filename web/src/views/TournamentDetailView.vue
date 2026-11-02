@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -44,6 +44,7 @@ const pending = ref(false)
 const showMatchForm = ref(false)
 const applying = ref(false)
 const applyNote = ref('')
+const missing = ref(false)
 
 const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
 const playedWhileRecruiting = computed(() =>
@@ -56,41 +57,77 @@ const showApply = computed(() =>
 )
 
 onMounted(load)
+watch(() => route.params.id, () => {
+  load()
+})
 
 async function load() {
   const id = route.params.id
-  await names.load()
-  const [t, teamRes, standingRes, matchRes, tableRes, playoffRes] = await Promise.all([
-    api.get(`/tournaments/${id}`),
-    api.get(`/tournaments/${id}/teams`),
-    api.get(`/tournaments/${id}/standings`),
-    api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
-    api.get(`/tournaments/${id}/tables`),
-    api.get(`/tournaments/${id}/playoff`),
-  ])
-  tournament.value = t.data
+  if (!tournament.value || tournament.value.id !== id) {
+    tournament.value = null
+    missing.value = false
+    error.value = ''
+  }
+  let detail: any
+  try {
+    await names.load()
+    detail = (await api.get(`/tournaments/${id}`)).data
+  } catch (e: any) {
+    if (route.params.id !== id) return
+    const status = e?.response?.status
+    if (status === 400 || status === 404) {
+      tournament.value = null
+      missing.value = true
+      setPageMeta({
+        title: 'Турнир не найден',
+        description: 'Такого турнира нет.',
+        path: `/tournaments/${id}`,
+      })
+      return
+    }
+    error.value = apiError(e, 'Турнир не загрузился.')
+    return
+  }
+  if (route.params.id !== id) return
+  try {
+    const [teamRes, standingRes, matchRes, tableRes, playoffRes] = await Promise.all([
+      api.get(`/tournaments/${id}/teams`),
+      api.get(`/tournaments/${id}/standings`),
+      api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
+      api.get(`/tournaments/${id}/tables`),
+      api.get(`/tournaments/${id}/playoff`),
+    ])
+    if (route.params.id !== id) return
+    teams.value = teamRes.data
+    standings.value = parseStandings(standingRes.data)
+    playoff.value = playoffRes.data
+    tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      teamIds: (row.teamIds ?? []).map(String),
+    }))
+    matches.value = matchRes.data.content ?? []
+    error.value = ''
+  } catch (e: any) {
+    if (route.params.id !== id) return
+    error.value = apiError(e, 'Турнир не загрузился.')
+  }
+  if (route.params.id !== id) return
+  missing.value = false
+  tournament.value = detail
   setPageMeta({
-    title: t.data?.name || 'Турнир',
-    description: `${t.data?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
+    title: detail?.name || 'Турнир',
+    description: `${detail?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
     path: `/tournaments/${id}`,
   })
-  teams.value = teamRes.data
-  standings.value = parseStandings(standingRes.data)
-  playoff.value = playoffRes.data
-  tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    teamIds: (row.teamIds ?? []).map(String),
-  }))
-  matches.value = matchRes.data.content ?? []
-  name.value = t.data.name
-  description.value = t.data.description || ''
-  status.value = t.data.status
-  format.value = t.data.format
-  regulations.value = t.data.regulations || ''
-  seasonYear.value = t.data.seasonYear
-  startDate.value = t.data.startDate || ''
-  endDate.value = t.data.endDate || ''
+  name.value = detail.name
+  description.value = detail.description || ''
+  status.value = detail.status
+  format.value = detail.format
+  regulations.value = detail.regulations || ''
+  seasonYear.value = detail.seasonYear
+  startDate.value = detail.startDate || ''
+  endDate.value = detail.endDate || ''
 }
 
 function onApplied(message: string) {
@@ -414,6 +451,10 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
+  <section v-else-if="missing" class="stack">
+    <h1>Турнир не найден</h1>
+  </section>
+  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>
