@@ -109,6 +109,14 @@ public class TournamentController {
         return tournamentService.update(id, request);
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a tournament that has no played matches (ADMIN)")
+    public void delete(@PathVariable UUID id) {
+        tournamentService.delete(id);
+    }
+
     @PostMapping("/{id}/teams")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Register a team (captain of that team or ADMIN)")
