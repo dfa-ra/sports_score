@@ -4,6 +4,7 @@ import com.studentleague.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,7 +41,7 @@ class FanDirectoryAccessTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/users").header("Authorization", auth(adminToken)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
-        mockMvc.perform(get("/api/v1/admin/matches").header("Authorization", auth(adminToken)))
+        mockMvc.perform(post("/api/v1/admin/users").header("Authorization", auth(adminToken)))
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
     }
