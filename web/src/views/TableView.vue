@@ -9,6 +9,7 @@ import StandingTable from '../components/StandingTable.vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
+import { setPageMeta } from '../lib/pageMeta'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
@@ -27,6 +28,9 @@ const keepers = ref<any[]>([])
 const tournament = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
+const loadError = ref('')
+const statsLoading = ref(false)
+const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
 const tab = computed<Tab>(() => {
@@ -55,6 +59,12 @@ const fullList = computed(() => String(route.query.list || '') === 'all')
 function shown(rows: any[], key: keyof typeof expanded.value) {
   if (fullList.value || expanded.value[key]) return rows
   return rows.slice(0, TOP)
+}
+
+function topNote(rows: any[], key: keyof typeof expanded.value) {
+  const visible = shown(rows, key)
+  if (!rows.length || visible.length >= rows.length) return ''
+  return `Топ-${visible.length} из ${rows.length}`
 }
 
 const season = computed(() => {
@@ -113,18 +123,39 @@ function setTab(next: Tab, list?: 'all') {
   if (next !== 'table') query.tab = next
   if (list === 'all') query.list = 'all'
   router.replace({ query })
-  if (next === 'scorers' || next === 'assists' || next === 'keepers') loadStats()
+  if (next === 'scorers' || next === 'assists' || next === 'keepers') {
+    if (statsLoadedFor.value !== tournamentId.value) {
+      statsLoading.value = true
+      statsError.value = ''
+    }
+    void loadStats()
+  }
 }
 
 async function loadStats() {
-  if (!tournamentId.value || statsLoadedFor.value === tournamentId.value) return
+  if (!tournamentId.value || statsLoadedFor.value === tournamentId.value) {
+    statsLoading.value = false
+    return
+  }
   const id = tournamentId.value
-  const { data } = await api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } })
-  if (tournamentId.value !== id) return
-  scorers.value = data.scorers ?? []
-  assists.value = data.assists ?? []
-  keepers.value = data.goalkeepers ?? []
-  statsLoadedFor.value = id
+  statsLoading.value = true
+  statsError.value = ''
+  try {
+    const { data } = await api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } })
+    if (tournamentId.value !== id) return
+    scorers.value = data.scorers ?? []
+    assists.value = data.assists ?? []
+    keepers.value = data.goalkeepers ?? []
+    statsLoadedFor.value = id
+  } catch {
+    if (tournamentId.value !== id) return
+    scorers.value = []
+    assists.value = []
+    keepers.value = []
+    statsError.value = 'Статистика не загрузилась.'
+  } finally {
+    if (tournamentId.value === id) statsLoading.value = false
+  }
 }
 
 async function load() {
@@ -133,20 +164,34 @@ async function load() {
     return
   }
   loading.value = true
+  loadError.value = ''
   statsLoadedFor.value = ''
   scorers.value = []
   assists.value = []
   keepers.value = []
+  const id = tournamentId.value
   try {
     const [t, s] = await Promise.all([
-      api.get(`/tournaments/${tournamentId.value}`),
-      api.get(`/tournaments/${tournamentId.value}/standings`),
+      api.get(`/tournaments/${id}`),
+      api.get(`/tournaments/${id}/standings`),
     ])
+    if (tournamentId.value !== id) return
     tournament.value = t.data
     standings.value = parseStandings(s.data)
+    const name = t.data?.name || 'Таблица'
+    setPageMeta({
+      title: name,
+      description: `Таблица, результаты и бомбардиры: ${name}.`,
+      path: '/table',
+    })
     if (tab.value === 'scorers' || tab.value === 'assists' || tab.value === 'keepers') await loadStats()
+  } catch {
+    if (tournamentId.value !== id) return
+    tournament.value = null
+    standings.value = []
+    loadError.value = 'Таблица не загрузилась.'
   } finally {
-    loading.value = false
+    if (tournamentId.value === id) loading.value = false
   }
 }
 </script>
@@ -182,6 +227,7 @@ async function load() {
     </div>
 
     <div :key="tab" class="tab-panel">
+    <p v-if="loadError" class="form-error">{{ loadError }}</p>
     <div v-if="loading" class="skeleton" />
 
     <template v-else-if="tab === 'table'">
@@ -218,9 +264,11 @@ async function load() {
       <div class="panel">
         <div class="stat-head">
           <h2>Бомбардиры</h2>
-          <p v-if="!fullList && scorers.length > TOP" class="muted">Топ-{{ TOP }} из {{ scorers.length }}</p>
+          <p v-if="topNote(scorers, 'scorers')" class="muted">{{ topNote(scorers, 'scorers') }}</p>
         </div>
-        <EmptyState v-if="!scorers.length" title="Голов ещё нет" />
+        <div v-if="statsLoading" class="skeleton" />
+        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <EmptyState v-else-if="!scorers.length" title="Голов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
@@ -247,9 +295,11 @@ async function load() {
       <div class="panel">
         <div class="stat-head">
           <h2>Вратари</h2>
-          <p v-if="!fullList && keepers.length > TOP" class="muted">Топ-{{ TOP }} из {{ keepers.length }}</p>
+          <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
-        <EmptyState v-if="!keepers.length" title="Сухих матчей ещё нет" />
+        <div v-if="statsLoading" class="skeleton" />
+        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <EmptyState v-else-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
@@ -276,9 +326,11 @@ async function load() {
       <div class="panel">
         <div class="stat-head">
           <h2>Ассистенты</h2>
-          <p v-if="!fullList && assists.length > TOP" class="muted">Топ-{{ TOP }} из {{ assists.length }}</p>
+          <p v-if="topNote(assists, 'assists')" class="muted">{{ topNote(assists, 'assists') }}</p>
         </div>
-        <EmptyState v-if="!assists.length" title="Ассистов ещё нет" />
+        <div v-if="statsLoading" class="skeleton" />
+        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <EmptyState v-else-if="!assists.length" title="Ассистов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Ассисты</th><th class="num">Игры</th></tr></thead>

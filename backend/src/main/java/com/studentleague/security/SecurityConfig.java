@@ -77,6 +77,7 @@ public class SecurityConfig {
                                 "/actuator/**",
                                 "/h2-console/**"
                         ).denyAll()
+                        .requestMatchers(HttpMethod.GET, "/robots.txt", "/sitemap.xml", "/api/v1/link-preview").permitAll()
                         .requestMatchers(
                                 "/api/v1/health",
                                 "/api/v1/auth/register",

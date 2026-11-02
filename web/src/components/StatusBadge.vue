@@ -2,7 +2,11 @@
 import { computed } from 'vue'
 import { labelOf, statusLabel } from '../lib/format'
 
-const props = defineProps<{ status?: string | null }>()
+const props = defineProps<{ status?: string | null; scope?: 'tournament' | 'match' }>()
+const text = computed(() => {
+  if (props.scope === 'tournament' && props.status === 'FINISHED') return 'Завершён'
+  return labelOf(statusLabel, props.status)
+})
 const klass = computed(() => {
   if (props.status === 'LIVE' || props.status === 'PAUSED' || props.status === 'ACTIVE') return 'badge live'
   if (props.status === 'FINISHED') return 'badge done'
@@ -12,5 +16,5 @@ const klass = computed(() => {
 </script>
 
 <template>
-  <span :class="klass">{{ labelOf(statusLabel, status) }}</span>
+  <span :class="klass">{{ text }}</span>
 </template>

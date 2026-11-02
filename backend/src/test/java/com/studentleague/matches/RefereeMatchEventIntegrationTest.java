@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -191,7 +192,41 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                                 """.formatted(referee.getId())))
                 .andExpect(status().isCreated());
 
-        return new Fixture(matchId, homeTeamId, homePlayerId, refereeToken);
+        return new Fixture(matchId, homeTeamId, homePlayerId, refereeToken, refereeEmail);
+    }
+
+    @Test
+    void publicRefereeListHidesEmailFromGuests() throws Exception {
+        String adminToken = createAdminAndLogin("radmin-mail-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(nullValue()))
+                .andExpect(jsonPath("$[0].firstName").isNotEmpty())
+                .andExpect(jsonPath("$[0].lastName").isNotEmpty())
+                .andExpect(jsonPath("$[0].refereeId").isNotEmpty());
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(fx.refereeEmail));
+
+        String analystEmail = "analyst-mail-" + System.nanoTime() + "@example.com";
+        registerAndLogin(analystEmail, "Str0ngPass!");
+        var analyst = userRepository.findByEmailIgnoreCase(analystEmail).orElseThrow();
+        analyst.setRole(Role.ANALYST);
+        userRepository.save(analyst);
+        String analystToken = reLogin(analystEmail, "Str0ngPass!");
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
+                        .header("Authorization", auth(analystToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(fx.refereeEmail));
+
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].email").value(nullValue()));
     }
 
     private void registerAndApprove(String adminToken, String captainToken, String tournamentId, String teamId) throws Exception {
@@ -228,6 +263,12 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
         return objectMapper.readTree(login.getResponse().getContentAsString()).get("accessToken").asText();
     }
 
-    private record Fixture(String matchId, String homeTeamId, String homePlayerId, String refereeToken) {
+    private record Fixture(
+            String matchId,
+            String homeTeamId,
+            String homePlayerId,
+            String refereeToken,
+            String refereeEmail
+    ) {
     }
 }

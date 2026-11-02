@@ -14,6 +14,7 @@ import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
+import { setPageMeta } from '../lib/pageMeta'
 import { registeredName } from '../lib/playerTitle'
 
 const route = useRoute()
@@ -57,6 +58,11 @@ async function load() {
     api.get(`/teams/${id}/player-stats`),
   ])
   team.value = t.data
+  setPageMeta({
+    title: t.data?.name || 'Команда',
+    description: `${t.data?.name || 'Команда'} — состав и матчи Лиги ИТМО.`,
+    path: `/teams/${id}`,
+  })
   members.value = m.data
   stats.value = squadStats.data ?? []
   matches.value = (games.data.content ?? []).filter((row: any) =>

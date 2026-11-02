@@ -2,12 +2,16 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
+import BrandMark from '../components/BrandMark.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import StandingGroups from '../components/StandingGroups.vue'
 import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { SITE_NAME } from '../lib/brand'
+import { formatDateRange } from '../lib/format'
+import { longKickoff } from '../lib/match'
+import { setPageMeta } from '../lib/pageMeta'
 import { registeredName } from '../lib/playerTitle'
 
 type Slide = {
@@ -22,6 +26,7 @@ type Slide = {
 const feed = ref<any>(null)
 const matches = ref<any[]>([])
 const loaded = ref(false)
+const loadError = ref('')
 const slide = ref(0)
 const storyRail = ref<HTMLElement | null>(null)
 const teams = useTeamDirectory()
@@ -41,6 +46,16 @@ const tape = computed(() =>
     .slice(0, 8)
 )
 const homeTables = computed(() => parseStandings(feed.value?.standings))
+const tournamentDates = computed(() =>
+  formatDateRange(feed.value?.tournament?.startDate, feed.value?.tournament?.endDate)
+)
+const nextMatch = computed(() => {
+  const upcoming = matches.value
+    .filter((match) => match.status === 'SCHEDULED' || match.status === 'LIVE' || match.status === 'PAUSED')
+    .slice()
+    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+  return upcoming[0] || null
+})
 
 onMounted(async () => {
   try {
@@ -51,9 +66,17 @@ onMounted(async () => {
     ])
     feed.value = data
     matches.value = games.data.content ?? []
+    const name = data?.tournament?.name || SITE_NAME
+    setPageMeta({
+      title: 'Главная',
+      description: `${name}: таблица, ближайшие матчи и бомбардиры.`,
+      path: '/',
+    })
     start()
   } catch {
     feed.value = null
+    matches.value = []
+    loadError.value = 'Главная не загрузилась.'
   } finally {
     loaded.value = true
   }
@@ -136,20 +159,27 @@ function heroHeading(slide: Slide | null | undefined) {
               class="story"
               @click="openStory(Number(index))"
             >
-              <img :src="item.url" :alt="item.title || item.caption || 'Сюжет'" />
+              <img :src="item.url" width="72" height="72" :alt="item.title || item.caption || 'Сюжет'" />
               <span>{{ item.title || item.caption || 'Сюжет' }}</span>
             </button>
           </div>
           <button class="nudge" type="button" aria-label="Сюжеты вперёд" @click="nudgeStories(1)">›</button>
         </div>
 
-        <div class="hero" :class="{ photo: !!current?.url }">
-          <img v-if="current?.url" :src="current.url" :alt="current.title || 'Главный кадр'" />
+        <div v-if="!loaded" class="hero hero-pending" />
+        <div v-else class="hero" :class="{ photo: !!current?.url }">
+          <img v-if="current?.url" :src="current.url" width="1200" height="280" :alt="current.title || 'Главный кадр'" />
           <div v-if="current?.url" class="hero-shade" />
           <div class="hero-copy">
+            <BrandMark :size="64" />
             <p class="eyebrow">{{ feed?.tournament?.name || SITE_NAME }}</p>
             <h1>{{ heroHeading(current) }}</h1>
+            <p v-if="tournamentDates">{{ tournamentDates }}</p>
             <p v-if="current?.caption">{{ current.caption }}</p>
+            <p v-if="nextMatch">
+              Ближайший матч: {{ teams.fullName(nextMatch.homeTeamId) }} — {{ teams.fullName(nextMatch.awayTeamId) }}
+              · {{ longKickoff(nextMatch.scheduledAt) }}
+            </p>
             <a
               v-if="isExternal(hrefOf(current, '/calendar'))"
               class="btn hero-cta"
@@ -162,6 +192,13 @@ function heroHeading(slide: Slide | null | undefined) {
             <RouterLink v-else class="btn hero-cta" :to="hrefOf(current, '/calendar')">
               {{ current?.linkLabel || 'Смотреть календарь' }}
             </RouterLink>
+            <a
+              v-if="feed?.vkAlbumUrl && !feed?.photos?.length"
+              class="album"
+              :href="feed.vkAlbumUrl"
+              target="_blank"
+              rel="noreferrer"
+            >Кадры во ВКонтакте</a>
           </div>
           <div v-if="heroes.length > 1" class="dots">
             <button
@@ -178,7 +215,9 @@ function heroHeading(slide: Slide | null | undefined) {
     </div>
 
     <div class="container blocks">
-      <div v-if="tape.length" class="sheet">
+      <p v-if="loadError" class="form-error">{{ loadError }}</p>
+      <div v-if="!loaded" class="sheet skeleton home-skel" />
+      <div v-else-if="tape.length" class="sheet">
         <div class="league-head">
           <div>
             {{ feed?.tournament?.name || 'Матчи' }}
@@ -201,14 +240,16 @@ function heroHeading(slide: Slide | null | undefined) {
             <p class="eyebrow">Таблица</p>
             <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
           </div>
-          <EmptyState v-if="loaded && !standingGroupsHaveRows(homeTables)" title="Таблицы пока нет" />
-          <StandingGroups v-else-if="standingGroupsHaveRows(homeTables)" :tables="homeTables" compact />
+          <div v-if="!loaded" class="skeleton home-skel" />
+          <EmptyState v-else-if="!standingGroupsHaveRows(homeTables)" title="Таблицы пока нет" />
+          <StandingGroups v-else :tables="homeTables" compact />
         </div>
 
         <aside class="panel leaders" aria-label="Бомбардиры и ассистенты">
           <section class="leaders-section">
             <h2>Бомбардиры</h2>
-            <EmptyState v-if="loaded && !feed?.scorers?.length" title="Голов пока нет" />
+            <div v-if="!loaded" class="skeleton home-skel" />
+            <EmptyState v-else-if="!feed?.scorers?.length" title="Голов пока нет" />
             <ol v-else class="leaders-list">
               <li v-for="(p, index) in feed?.scorers" :key="p.playerId">
                 <RouterLink class="leader" :to="`/players/${p.playerId}`">
@@ -221,7 +262,8 @@ function heroHeading(slide: Slide | null | undefined) {
           </section>
           <section class="leaders-section">
             <h2>Ассистенты</h2>
-            <ol v-if="feed?.assists?.length" class="leaders-list">
+            <div v-if="!loaded" class="skeleton" />
+            <ol v-else-if="feed?.assists?.length" class="leaders-list">
               <li v-for="(p, index) in feed.assists" :key="'a-' + p.playerId">
                 <RouterLink class="leader" :to="`/players/${p.playerId}`">
                   <span class="place">{{ Number(index) + 1 }}</span>
@@ -234,13 +276,12 @@ function heroHeading(slide: Slide | null | undefined) {
         </aside>
       </div>
 
-      <div class="panel stack moments">
+      <div v-if="feed?.photos?.length" class="panel stack moments">
         <div class="moments-head">
           <h2>Моменты</h2>
           <a v-if="feed?.vkAlbumUrl" :href="feed.vkAlbumUrl" target="_blank" rel="noreferrer">Все кадры →</a>
         </div>
-        <EmptyState v-if="loaded && !feed?.photos?.length" title="Фото пока нет" />
-        <div v-else class="photos">
+        <div class="photos">
           <figure v-for="photo in feed?.photos" :key="photo.id">
             <img :src="photo.url" :alt="photo.caption || photo.title || 'Момент'" />
             <figcaption v-if="photo.title || photo.caption">{{ photo.title || photo.caption }}</figcaption>
@@ -367,8 +408,13 @@ function heroHeading(slide: Slide | null | undefined) {
   position: relative;
   border-radius: 18px;
   overflow: hidden;
+  min-height: 280px;
   background: #001433;
 }
+.hero-pending { min-height: 280px; }
+.album { color: #fff; font-weight: 700; width: fit-content; }
+.album:hover { color: #fff; }
+.home-skel { min-height: 220px; }
 .hero img { width: 100%; height: 280px; object-fit: cover; display: block; }
 .hero-shade {
   position: absolute;
@@ -609,6 +655,7 @@ function heroHeading(slide: Slide | null | undefined) {
   .nudge { width: 28px; height: 28px; }
   .story { width: 72px; }
   .story img { width: 60px; height: 60px; }
+  .hero, .hero-pending { min-height: 240px; }
   .hero img { height: 148px; }
   .hero-copy h1 { font-size: 1.25rem; }
   .hero-cta { display: none; }

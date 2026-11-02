@@ -75,7 +75,9 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <template v-else>
               <RouterLink class="login-pill wide-only" to="/login">Войти</RouterLink>
               <RouterLink class="avatar-link phone-only" to="/login" aria-label="Войти">
-                <span class="user-ico">○</span>
+                <span class="user-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3.2 3.8-4.6 7-4.6S17.6 15.8 19 19"/></svg>
+                </span>
               </RouterLink>
             </template>
           </div>
@@ -194,15 +196,15 @@ nav a.on { color: var(--navy); background: var(--ice); }
 .avatar-link { display: grid; place-items: center; }
 .phone-only { display: none; }
 .user-ico {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   border: 1.5px solid rgba(255,255,255,0.55);
   color: #fff;
-  font-size: 1rem;
 }
+.user-ico svg { width: 22px; height: 22px; }
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
@@ -214,9 +216,8 @@ nav a.on { color: var(--navy); background: var(--ice); }
   flex-wrap: wrap;
 }
 .foot-ver {
-  font-size: 0.68rem;
-  color: var(--muted);
-  opacity: 0.65;
+  font-size: 0.75rem;
+  color: #3a4c63;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }

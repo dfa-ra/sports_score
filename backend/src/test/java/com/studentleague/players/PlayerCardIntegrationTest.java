@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -100,6 +101,40 @@ class PlayerCardIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.team.id").value(alphaId))
                 .andExpect(jsonPath("$.team.captain").value(false))
                 .andExpect(jsonPath("$.captainTeams").isEmpty());
+    }
+
+    @Test
+    void publicPlayerSurfacesOmitDateOfBirth() throws Exception {
+        String email = "dob-" + System.nanoTime() + "@example.com";
+        String token = registerAndLogin(email, "Str0ngPass!", "PLAYER", "https://example.com/dob.jpg");
+        MvcResult saved = mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Иван","lastName":"Петров","dateOfBirth":"2005-04-03","jerseyNumber":9,"position":"FW"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value("2005-04-03"))
+                .andReturn();
+        String id = objectMapper.readTree(saved.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(get("/api/v1/players/" + id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Иван"))
+                .andExpect(jsonPath("$.dateOfBirth").value(nullValue()));
+        mockMvc.perform(get("/api/v1/players/" + id + "/card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value(nullValue()));
+        mockMvc.perform(get("/api/v1/players?q=Петров"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].dateOfBirth").value(nullValue()));
+
+        mockMvc.perform(get("/api/v1/players/me").header("Authorization", auth(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value("2005-04-03"));
+        mockMvc.perform(get("/api/v1/players/" + id + "/card").header("Authorization", auth(token)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dateOfBirth").value("2005-04-03"));
     }
 
     private Fixture setupFinishedMatch(String adminToken) throws Exception {

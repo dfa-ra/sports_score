@@ -82,7 +82,7 @@ async function submit() {
         <option value="DRAFT">Черновик</option>
         <option value="REGISTRATION">Набор команд</option>
         <option value="ACTIVE">Идёт</option>
-        <option value="FINISHED">Финал</option>
+        <option value="FINISHED">Завершён</option>
         <option value="CANCELLED">Отменён</option>
       </select>
     </label>

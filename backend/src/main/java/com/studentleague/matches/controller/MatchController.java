@@ -127,8 +127,11 @@ public class MatchController {
 
     @GetMapping("/{id}/referees")
     @Operation(summary = "List referees assigned to match")
-    public List<MatchRefereeResponse> listReferees(@PathVariable UUID id) {
-        return matchService.listReferees(id);
+    public List<MatchRefereeResponse> listReferees(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return matchService.listReferees(id, principal);
     }
 
     @GetMapping("/{id}/events")

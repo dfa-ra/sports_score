@@ -34,6 +34,8 @@ const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
     :class="{ 'crest-enter': enterOnce }"
     :src="src!"
     :alt="name || 'Эмблема'"
+    :width="size"
+    :height="size"
     :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, padding: `${inset}px` }"
     @error="broken = true"
   />

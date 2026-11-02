@@ -18,14 +18,12 @@ const showForm = ref(false)
 const applying = ref<any | null>(null)
 
 const sorted = computed(() => {
-  const rank: Record<string, number> = {
-    REGISTRATION: 0,
-    DRAFT: 1,
-    ACTIVE: 2,
-    FINISHED: 3,
-    CANCELLED: 4,
-  }
-  return [...items.value].sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9))
+  return [...items.value].sort((a, b) => {
+    const ad = a.startDate || a.endDate || '9999-99-99'
+    const bd = b.startDate || b.endDate || '9999-99-99'
+    if (ad !== bd) return ad < bd ? -1 : 1
+    return String(a.name || '').localeCompare(String(b.name || ''), 'ru')
+  })
 })
 
 function sportName(tournament: any) {

@@ -22,6 +22,7 @@ import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.security.UserPrincipal;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -117,8 +119,9 @@ public class PlayerService {
     }
 
     @Transactional(readOnly = true)
-    public PlayerProfileResponse getById(UUID id) {
-        return toResponse(requireProfile(id));
+    public PlayerProfileResponse getById(UUID id, UserPrincipal principal) {
+        PlayerProfile profile = requireProfile(id);
+        return toResponse(profile, null, false, viewerMaySeeBirthDate(profile, principal));
     }
 
     @Transactional(readOnly = true)
@@ -165,7 +168,7 @@ public class PlayerService {
     }
 
     @Transactional(readOnly = true)
-    public PlayerCardResponse getPublicCard(UUID playerId) {
+    public PlayerCardResponse getPublicCard(UUID playerId, UserPrincipal principal) {
         PlayerProfile profile = requireProfile(playerId);
         List<TeamMember> memberships = teamMemberRepository.findByPlayerIdAndStatus(playerId, TeamMemberStatus.ACTIVE);
         List<PlayerCardResponse.TeamSummary> captainTeams = teamRepository
@@ -196,7 +199,7 @@ public class PlayerService {
                 avatarOf(profile),
                 profile.getJerseyNumber(),
                 profile.getPosition(),
-                profile.getDateOfBirth(),
+                birthDateForViewer(profile, principal),
                 teamSummary,
                 captainTeams,
                 statistics,
@@ -475,15 +478,20 @@ public class PlayerService {
                         .filter(user -> hasText(user.getPhotoUrl()))
                         .collect(Collectors.toMap(User::getId, User::getPhotoUrl, (a, b) -> a));
         return profiles.stream()
-                .map(profile -> toResponse(profile, photos.get(profile.getUserId()), true))
+                .map(profile -> toResponse(profile, photos.get(profile.getUserId()), true, false))
                 .toList();
     }
 
     private PlayerProfileResponse toResponse(PlayerProfile profile) {
-        return toResponse(profile, null, false);
+        return toResponse(profile, null, false, true);
     }
 
-    private PlayerProfileResponse toResponse(PlayerProfile profile, String fallbackPhoto, boolean photoResolved) {
+    private PlayerProfileResponse toResponse(
+            PlayerProfile profile,
+            String fallbackPhoto,
+            boolean photoResolved,
+            boolean includeBirthDate
+    ) {
         String avatar = hasText(profile.getAvatarUrl()) ? profile.getAvatarUrl() : fallbackPhoto;
         if (!photoResolved && !hasText(avatar)) {
             avatar = avatarOf(profile);
@@ -494,12 +502,30 @@ public class PlayerService {
                 profile.getFirstName(),
                 profile.getLastName(),
                 profile.getDisplayName(),
-                profile.getDateOfBirth(),
+                includeBirthDate ? profile.getDateOfBirth() : null,
                 avatar,
                 profile.getJerseyNumber(),
                 profile.getPosition(),
                 profile.getBio()
         );
+    }
+
+    private static LocalDate birthDateForViewer(PlayerProfile profile, UserPrincipal principal) {
+        if (!viewerMaySeeBirthDate(profile, principal)) {
+            return null;
+        }
+        return profile.getDateOfBirth();
+    }
+
+    /** Full birth date stays with the player and admins. The public card and directory do not publish it. */
+    private static boolean viewerMaySeeBirthDate(PlayerProfile profile, UserPrincipal principal) {
+        if (principal == null || profile.getDateOfBirth() == null) {
+            return false;
+        }
+        if (principal.hasRole(Role.ADMIN)) {
+            return true;
+        }
+        return profile.getUserId() != null && profile.getUserId().equals(principal.getId());
     }
 
     private String avatarOf(PlayerProfile profile) {

@@ -5,6 +5,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { isTournamentOpenForApply } from '../lib/format'
+import { setPageMeta } from '../lib/pageMeta'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
@@ -60,6 +61,11 @@ async function load() {
     api.get(`/tournaments/${id}/playoff`),
   ])
   tournament.value = t.data
+  setPageMeta({
+    title: t.data?.name || 'Турнир',
+    description: `${t.data?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
+    path: `/tournaments/${id}`,
+  })
   teams.value = teamRes.data
   standings.value = parseStandings(standingRes.data)
   playoff.value = playoffRes.data
@@ -200,7 +206,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 <template>
   <section v-if="tournament" class="stack">
     <div class="page-title">
-      <StatusBadge :status="tournament.status" />
+      <StatusBadge :status="tournament.status" scope="tournament" />
       <h1>{{ tournament.name }}</h1>
       <p v-if="tournament.description">{{ tournament.description }}</p>
     </div>
@@ -284,7 +290,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
             <option value="DRAFT">Черновик</option>
             <option value="REGISTRATION">Набор</option>
             <option value="ACTIVE">Идёт</option>
-            <option value="FINISHED">Финал</option>
+            <option value="FINISHED">Завершён</option>
             <option value="CANCELLED">Отменён</option>
           </select>
         </label>

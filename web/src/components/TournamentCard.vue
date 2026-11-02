@@ -14,6 +14,7 @@ const props = defineProps<{
     seasonYear?: number
     startDate?: string | null
     endDate?: string | null
+    competitionStage?: string | null
   }
   sportName?: string
 }>()
@@ -29,10 +30,13 @@ const showApply = computed(() =>
   && (!auth.isAuthenticated || auth.hasRole('CAPTAIN') || auth.canManageLeague)
 )
 const meta = computed(() => {
+  const stage = props.tournament.competitionStage === 'PLAYOFF'
+    ? 'Плей-офф'
+    : labelOf(formatLabel, props.tournament.format, '')
   const parts = [
     props.sportName,
     props.tournament.seasonYear ? `сезон ${props.tournament.seasonYear}` : '',
-    labelOf(formatLabel, props.tournament.format, ''),
+    stage,
   ].filter(Boolean)
   return parts.join(' · ')
 })
@@ -52,7 +56,7 @@ function apply(event: Event) {
 <template>
   <article class="panel tournament-card rise">
     <RouterLink class="body" :to="`/tournaments/${tournament.id}`">
-      <StatusBadge :status="tournament.status" />
+      <StatusBadge :status="tournament.status" scope="tournament" />
       <h2>{{ tournament.name }}</h2>
       <p v-if="meta">{{ meta }}</p>
       <p v-if="dates" class="dates">{{ dates }}</p>

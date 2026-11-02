@@ -3,6 +3,8 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api/client'
 import PlayerCardPanel from '../components/PlayerCardPanel.vue'
+import { setPageMeta } from '../lib/pageMeta'
+import { playerHeader } from '../lib/playerTitle'
 import { useAuthStore } from '../stores/auth'
 import AdminOnly from '../components/AdminOnly.vue'
 import CopyChip from '../components/CopyChip.vue'
@@ -14,6 +16,12 @@ const card = ref<any>(null)
 async function load() {
   const { data } = await api.get(`/players/${route.params.id}/card`)
   card.value = data
+  const name = playerHeader(data).title
+  setPageMeta({
+    title: name,
+    description: `${name} — игрок Лиги ИТМО.`,
+    path: `/players/${route.params.id}`,
+  })
 }
 
 onMounted(load)

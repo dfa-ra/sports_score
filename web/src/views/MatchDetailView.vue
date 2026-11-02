@@ -9,6 +9,7 @@ import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, p
 import { registeredName } from '../lib/playerTitle'
 import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel } from '../lib/match'
 import { apiError } from '../lib/errors'
+import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -276,6 +277,13 @@ async function load() {
     api.get(`/matches/${id}/lineups`),
   ])
   match.value = m.data
+  const homeName = teams.fullName(m.data.homeTeamId)
+  const awayName = teams.fullName(m.data.awayTeamId)
+  setPageMeta({
+    title: `${homeName} — ${awayName}`,
+    description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
+    path: `/matches/${id}`,
+  })
   motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
   homeKeeperId.value = m.data.homeGoalkeeper?.playerId || ''
   awayKeeperId.value = m.data.awayGoalkeeper?.playerId || ''
@@ -582,6 +590,8 @@ onUnmounted(() => {
       {{ tournament?.name || 'Матч' }}
       <span>›</span>
     </RouterLink>
+
+    <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
       <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
@@ -969,6 +979,11 @@ onUnmounted(() => {
   margin: 0;
   color: var(--muted);
   font-size: 0.85rem;
+}
+.match-title {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(1.15rem, 2.6vw, 1.6rem);
 }
 .board {
   --crest: 96px;

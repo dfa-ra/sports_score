@@ -28,6 +28,7 @@ import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
+import com.studentleague.security.UserPrincipal;
 import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
@@ -210,7 +211,7 @@ public class MatchService {
                 "You were assigned to a match",
                 Map.of("matchId", matchId.toString(), "refereeId", referee.getId().toString())
         );
-        return toRefereeResponse(assignment);
+        return toRefereeResponse(assignment, true);
     }
 
     @Transactional(readOnly = true)
@@ -225,14 +226,15 @@ public class MatchService {
     }
 
     @Transactional(readOnly = true)
-    public List<MatchRefereeResponse> listReferees(UUID matchId) {
+    public List<MatchRefereeResponse> listReferees(UUID matchId, UserPrincipal principal) {
         requireMatch(matchId);
+        boolean includeEmail = principal != null && principal.hasAnyRole(Role.ADMIN, Role.ANALYST);
         return matchRefereeRepository.findByMatchId(matchId).stream()
-                .map(this::toRefereeResponse)
+                .map(assignment -> toRefereeResponse(assignment, includeEmail))
                 .toList();
     }
 
-    private MatchRefereeResponse toRefereeResponse(MatchReferee assignment) {
+    private MatchRefereeResponse toRefereeResponse(MatchReferee assignment, boolean includeEmail) {
         User referee = assignment.getRefereeId() == null
                 ? null
                 : userRepository.findById(assignment.getRefereeId()).orElse(null);
@@ -243,7 +245,7 @@ public class MatchService {
                 assignment.getAssignedAt(),
                 referee == null ? null : referee.getFirstName(),
                 referee == null ? null : referee.getLastName(),
-                referee == null ? null : referee.getEmail()
+                includeEmail && referee != null ? referee.getEmail() : null
         );
     }
 

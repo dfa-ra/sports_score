@@ -428,7 +428,7 @@ async function deleteTeam(team: any) {
         <h2>Уже идут</h2>
         <div v-for="t in tournaments" :key="t.id" class="row">
           <RouterLink :to="`/tournaments/${t.id}`">{{ t.name }}</RouterLink>
-          <StatusBadge :status="t.status" />
+          <StatusBadge :status="t.status" scope="tournament" />
         </div>
       </div>
     </div>

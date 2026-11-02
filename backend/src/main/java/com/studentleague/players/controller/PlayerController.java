@@ -66,13 +66,19 @@ public class PlayerController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get player profile by id")
-    public PlayerProfileResponse get(@PathVariable UUID id) {
-        return playerService.getById(id);
+    public PlayerProfileResponse get(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return playerService.getById(id, principal);
     }
 
     @GetMapping("/{id}/card")
     @Operation(summary = "Public player card")
-    public PlayerCardResponse card(@PathVariable UUID id) {
-        return playerService.getPublicCard(id);
+    public PlayerCardResponse card(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return playerService.getPublicCard(id, principal);
     }
 }
