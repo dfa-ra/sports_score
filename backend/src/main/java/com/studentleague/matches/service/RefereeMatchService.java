@@ -169,13 +169,14 @@ public class RefereeMatchService {
         }
         Instant now = Instant.now();
         MatchClock.freeze(match, now);
-        recordPeriodEvent(match, MatchEventType.PERIOD_END, now);
+        int boundary = MatchClock.kickoffSeconds(match, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_END, now, boundary);
         match.setPeriod(current + 1);
         match.setGameTimeSeconds(0);
         if (match.getStatus() == MatchStatus.LIVE) {
             MatchClock.startRunning(match, now);
         }
-        recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_START, now, boundary);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "PERIOD_CHANGED");
         return response;
@@ -286,14 +287,18 @@ public class RefereeMatchService {
                 && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("teamId must be home or away team of the match");
         }
-        if ((request.eventType() == MatchEventType.FOUL || request.eventType() == MatchEventType.TIMEOUT)
+        if ((request.eventType() == MatchEventType.FOUL
+                || request.eventType() == MatchEventType.TIMEOUT
+                || request.eventType() == MatchEventType.GOAL)
                 && request.teamId() == null) {
             throw ApiException.badRequest("Укажите команду");
         }
-        boolean needsPlayer = request.eventType() == MatchEventType.GOAL
-                || request.eventType() == MatchEventType.ASSIST
-                || request.eventType() == MatchEventType.YELLOW_CARD
-                || request.eventType() == MatchEventType.RED_CARD
+        boolean card = request.eventType() == MatchEventType.YELLOW_CARD
+                || request.eventType() == MatchEventType.RED_CARD;
+        if (card && request.playerId() == null && request.teamId() == null) {
+            throw ApiException.badRequest("Укажите команду или игрока");
+        }
+        boolean needsPlayer = request.eventType() == MatchEventType.ASSIST
                 || request.eventType() == MatchEventType.SUBSTITUTION
                 || request.eventType() == MatchEventType.POINT;
         if (needsPlayer && request.playerId() == null) {
@@ -340,11 +345,15 @@ public class RefereeMatchService {
     }
 
     private void recordPeriodEvent(Match match, MatchEventType type, Instant now) {
+        recordPeriodEvent(match, type, now, MatchClock.kickoffSeconds(match, now));
+    }
+
+    private void recordPeriodEvent(Match match, MatchEventType type, Instant now, int gameTime) {
         MatchEvent event = new MatchEvent();
         event.setMatchId(match.getId());
         event.setEventType(type);
         event.setTimestamp(now);
-        event.setGameTime(MatchClock.kickoffSeconds(match, now));
+        event.setGameTime(gameTime);
         event.setPeriod(match.getPeriod());
         event.setVoided(false);
         matchEventRepository.save(event);

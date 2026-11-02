@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -44,13 +45,19 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.periodLengthSeconds").value(900))
                 .andExpect(jsonPath("$.clockRunningSince").isNotEmpty());
 
-        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+        MvcResult teamGoal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
                         .header("Authorization", auth(fx.refereeToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"eventType":"GOAL","teamId":"%s"}
                                 """.formatted(fx.homeTeamId)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.playerId").value(nullValue()))
+                .andReturn();
+        String teamGoalId = objectMapper.readTree(teamGoal.getResponse().getContentAsString()).get("id").asText();
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + teamGoalId + "/void")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
 
         MvcResult goal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
                         .header("Authorization", auth(fx.refereeToken))
