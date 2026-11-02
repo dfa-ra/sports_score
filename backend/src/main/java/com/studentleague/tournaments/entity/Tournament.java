@@ -1,5 +1,6 @@
 package com.studentleague.tournaments.entity;
 
+import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -52,6 +53,10 @@ public class Tournament {
     @Column(name = "max_squad_size")
     private Integer maxSquadSize;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "competition_stage", nullable = false, length = 16)
+    private CompetitionStage competitionStage = CompetitionStage.GROUPS;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -62,6 +67,9 @@ public class Tournament {
     void onCreate() {
         if (id == null) {
             id = UUID.randomUUID();
+        }
+        if (competitionStage == null) {
+            competitionStage = CompetitionStage.GROUPS;
         }
         Instant now = Instant.now();
         createdAt = now;
@@ -159,6 +167,14 @@ public class Tournament {
 
     public void setMaxSquadSize(Integer maxSquadSize) {
         this.maxSquadSize = maxSquadSize;
+    }
+
+    public CompetitionStage getCompetitionStage() {
+        return competitionStage;
+    }
+
+    public void setCompetitionStage(CompetitionStage competitionStage) {
+        this.competitionStage = competitionStage;
     }
 
     public Instant getCreatedAt() {

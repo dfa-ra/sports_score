@@ -5,6 +5,7 @@ import StandingTable from './StandingTable.vue'
 defineProps<{
   tables: StandingGroup[]
   compact?: boolean
+  markedPlaces?: number[]
 }>()
 </script>
 
@@ -12,7 +13,7 @@ defineProps<{
   <div class="groups">
     <section v-for="(table, i) in tables" :key="table.id || i" class="group">
       <h3 v-if="table.name">{{ table.name }}</h3>
-      <StandingTable :rows="table.rows" :compact="compact" />
+      <StandingTable :rows="table.rows" :compact="compact" :marked-places="markedPlaces" />
     </section>
   </div>
 </template>

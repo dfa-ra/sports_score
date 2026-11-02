@@ -3,17 +3,23 @@ import { RouterLink } from 'vue-router'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
-defineProps<{
+const props = defineProps<{
   rows: any[]
   compact?: boolean
+  markedPlaces?: number[]
 }>()
 
 const teams = useTeamDirectory()
 
 function rankClass(index: number) {
+  if ((props.markedPlaces ?? []).includes(index + 1)) return 'ice'
   if (index < 2) return 'ice'
   if (index < 4) return 'navy'
   return ''
+}
+
+function advances(index: number) {
+  return (props.markedPlaces ?? []).includes(index + 1)
 }
 </script>
 
@@ -33,6 +39,7 @@ function rankClass(index: number) {
       v-for="(row, i) in rows"
       :key="row.teamId"
       class="line"
+      :class="{ advances: advances(i) }"
       :to="`/teams/${row.teamId}`"
     >
       <span>
@@ -72,6 +79,7 @@ function rankClass(index: number) {
   font-variant-numeric: tabular-nums;
 }
 .line:not(.head):hover { background: rgba(76, 180, 229, 0.08); }
+.line.advances { background: var(--accent-soft); }
 .team-label { text-align: left; }
 .head {
   min-height: 2.15rem;

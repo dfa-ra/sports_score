@@ -21,6 +21,7 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.users.domain.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,7 @@ public class RefereeMatchService {
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
     private final StandingsBoardCache standingsBoardCache;
+    private final PlayoffService playoffService;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -60,7 +62,8 @@ public class RefereeMatchService {
             LiveMatchPublisher liveMatchPublisher,
             NotificationService notificationService,
             MatchMapper matchMapper,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            PlayoffService playoffService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -73,6 +76,7 @@ public class RefereeMatchService {
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
         this.standingsBoardCache = standingsBoardCache;
+        this.playoffService = playoffService;
     }
 
     @Transactional(readOnly = true)
@@ -145,7 +149,9 @@ public class RefereeMatchService {
         recalculateScore(match);
         match.setStatus(MatchStatus.FINISHED);
         match.setFinishedAt(now);
-        MatchResponse response = toResponse(matchRepository.save(match));
+        matchRepository.save(match);
+        playoffService.advance(match);
+        MatchResponse response = toResponse(match);
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_FINISHED");
         notificationService.publishToUser(
                 principal.getId(),
@@ -224,7 +230,11 @@ public class RefereeMatchService {
         matchEventRepository.save(event);
 
         recalculateScore(match);
-        MatchResponse matchResponse = toResponse(matchRepository.save(match));
+        matchRepository.save(match);
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            playoffService.advance(match);
+        }
+        MatchResponse matchResponse = toResponse(match);
         MatchEventResponse eventResponse = toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT");
         if (request.eventType() == com.studentleague.matches.domain.MatchEventType.GOAL) {
@@ -262,7 +272,11 @@ public class RefereeMatchService {
         matchEventRepository.save(event);
 
         recalculateScore(match);
-        MatchResponse matchResponse = toResponse(matchRepository.save(match));
+        matchRepository.save(match);
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            playoffService.advance(match);
+        }
+        MatchResponse matchResponse = toResponse(match);
         MatchEventResponse eventResponse = toEventResponse(event);
         liveMatchPublisher.publishMatchUpdate(matchResponse, eventResponse, "MATCH_EVENT_VOIDED");
         return eventResponse;

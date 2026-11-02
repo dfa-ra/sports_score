@@ -1,5 +1,6 @@
 package com.studentleague.tournaments.dto;
 
+import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentStatus;
 
 import java.time.Instant;
@@ -19,6 +20,7 @@ public record TournamentResponse(
         String format,
         Integer maxSquadSize,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        CompetitionStage competitionStage
 ) {
 }

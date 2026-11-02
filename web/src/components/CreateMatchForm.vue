@@ -10,6 +10,7 @@ const emit = defineEmits<{ created: [match: any] }>()
 const router = useRouter()
 const tournaments = ref<any[]>([])
 const teams = ref<any[]>([])
+const tables = ref<{ id: string; name: string; teamIds: string[] }[]>([])
 const tournamentId = ref(props.tournamentId || '')
 const homeTeamId = ref('')
 const awayTeamId = ref('')
@@ -39,6 +40,9 @@ function applyPreset(id: string) {
 }
 
 const approved = computed(() => teams.value.filter((t) => !t.status || t.status === 'APPROVED'))
+const sharedTable = computed(() =>
+  tables.value.find((table) => table.teamIds.includes(homeTeamId.value) && table.teamIds.includes(awayTeamId.value))
+)
 
 onMounted(async () => {
   if (!props.tournamentId) {
@@ -56,8 +60,16 @@ async function loadTeams() {
     teams.value = []
     return
   }
-  const { data } = await api.get(`/tournaments/${tournamentId.value}/teams`)
-  teams.value = data
+  const [teamRes, tableRes] = await Promise.all([
+    api.get(`/tournaments/${tournamentId.value}/teams`),
+    api.get(`/tournaments/${tournamentId.value}/tables`),
+  ])
+  teams.value = teamRes.data
+  tables.value = (tableRes.data ?? []).map((table: any) => ({
+    id: table.id,
+    name: table.name,
+    teamIds: (table.teamIds ?? []).map(String),
+  }))
   homeTeamId.value = approved.value[0]?.teamId || ''
   awayTeamId.value = approved.value[1]?.teamId || ''
 }
@@ -79,6 +91,7 @@ async function submit() {
       periodCount: Number(periodCount.value),
       periodLengthMinutes: Number(periodLengthMinutes.value),
       ...(hall ? { venue: hall } : {}),
+      ...(sharedTable.value ? { tableId: sharedTable.value.id } : {}),
     })
     emit('created', data)
     router.push(`/matches/${data.id}`)
@@ -107,6 +120,7 @@ async function submit() {
         <option v-for="t in approved" :key="t.teamId" :value="t.teamId">{{ t.teamName }}</option>
       </select>
     </label>
+    <p v-if="sharedTable" class="muted">Матч группы «{{ sharedTable.name }}».</p>
     <label class="field">Когда
       <input v-model="scheduledAt" type="datetime-local" required />
     </label>

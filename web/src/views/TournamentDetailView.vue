@@ -9,6 +9,8 @@ import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
+import PlayoffAdmin from '../components/PlayoffAdmin.vue'
+import PlayoffBracket from '../components/PlayoffBracket.vue'
 import StandingGroups from '../components/StandingGroups.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TeamCrest from '../components/TeamCrest.vue'
@@ -21,8 +23,9 @@ const names = useTeamDirectory()
 const tournament = ref<any>(null)
 const teams = ref<any[]>([])
 const standings = ref<StandingGroup[]>([])
-const tableDraft = ref<{ name: string; teamIds: string[] }[]>([])
+const tableDraft = ref<{ id?: string; name: string; teamIds: string[] }[]>([])
 const matches = ref<any[]>([])
+const playoff = ref<any>(null)
 const name = ref('')
 const description = ref('')
 const status = ref('REGISTRATION')
@@ -48,17 +51,20 @@ onMounted(load)
 async function load() {
   const id = route.params.id
   await names.load()
-  const [t, teamRes, standingRes, matchRes, tableRes] = await Promise.all([
+  const [t, teamRes, standingRes, matchRes, tableRes, playoffRes] = await Promise.all([
     api.get(`/tournaments/${id}`),
     api.get(`/tournaments/${id}/teams`),
     api.get(`/tournaments/${id}/standings`),
     api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
     api.get(`/tournaments/${id}/tables`),
+    api.get(`/tournaments/${id}/playoff`),
   ])
   tournament.value = t.data
   teams.value = teamRes.data
   standings.value = parseStandings(standingRes.data)
+  playoff.value = playoffRes.data
   tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
+    id: row.id,
     name: row.name,
     teamIds: (row.teamIds ?? []).map(String),
   }))
@@ -152,6 +158,7 @@ async function saveTables() {
   try {
     await api.put(`/tournaments/${tournament.value.id}/tables`, {
       tables: tableDraft.value.map((table) => ({
+        id: table.id,
         name: table.name.trim(),
         teamIds: table.teamIds,
       })),
@@ -165,6 +172,11 @@ async function saveTables() {
   }
 }
 
+const savedTables = computed(() =>
+  tableDraft.value
+    .filter((table) => table.id)
+    .map((table) => ({ id: table.id as string, name: table.name, teamIds: table.teamIds }))
+)
 const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 const listedTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 
@@ -213,7 +225,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     <div v-if="tab === 'table'" class="panel">
       <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
       <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Результатов пока нет" />
-      <StandingGroups v-else :tables="standings" />
+      <StandingGroups v-else :tables="standings" :marked-places="playoff?.advancingPlaces ?? []" />
     </div>
 
     <div class="panel stack">
@@ -228,11 +240,26 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </div>
     </div>
 
+    <div v-if="playoff?.rounds?.length" class="panel stack">
+      <h2>Сетка плей-офф</h2>
+      <PlayoffBracket
+        :tournament-id="tournament.id"
+        :rounds="playoff.rounds"
+        :editable="auth.canManageLeague && playoff.competitionStage === 'PLAYOFF'"
+        @saved="load"
+      />
+    </div>
+
     <div class="panel stack">
       <h2>Матчи</h2>
       <EmptyState v-if="!matches.length" title="Матчей нет" />
       <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-        <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
+        <span class="club">
+          <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="18" />
+          {{ names.fullName(m.homeTeamId) }}
+          {{ m.homeScore }}:{{ m.awayScore }}
+          {{ names.fullName(m.awayTeamId) }}
+        </span>
         <StatusBadge :status="m.status" />
       </RouterLink>
     </div>
@@ -277,7 +304,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </form>
 
       <h2>Таблицы и группы</h2>
-      <p class="muted">Сколько таблиц показать и какие команды в какой. Матчи между разными таблицами в зачёт группы не идут.</p>
+      <p class="muted">Сколько групп показать и какие команды в какой. Матчи между разными группами в зачёт не идут.</p>
       <label class="field">Количество таблиц
         <input
           type="number"
@@ -308,6 +335,13 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         {{ assignableTeams.filter((team) => teamInTable(team.teamId) < 0).map((team) => team.teamName).join(', ') }}
       </p>
       <button class="btn secondary" type="button" :disabled="pending" @click="saveTables">Сохранить таблицы</button>
+
+      <PlayoffAdmin
+        :tournament-id="tournament.id"
+        :tables="savedTables"
+        :playoff="playoff"
+        @changed="load"
+      />
 
       <h2>Заявки</h2>
       <div v-for="team in teams" :key="`admin-${team.id}`" class="row">

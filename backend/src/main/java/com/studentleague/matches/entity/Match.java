@@ -77,6 +77,12 @@ public class Match {
     @Column(name = "away_goalkeeper_id")
     private UUID awayGoalkeeperId;
 
+    @Column(name = "table_id")
+    private UUID tableId;
+
+    @Column(name = "bracket_round")
+    private Integer bracketRound;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -242,5 +248,21 @@ public class Match {
 
     public void setAwayGoalkeeperId(UUID awayGoalkeeperId) {
         this.awayGoalkeeperId = awayGoalkeeperId;
+    }
+
+    public UUID getTableId() {
+        return tableId;
+    }
+
+    public void setTableId(UUID tableId) {
+        this.tableId = tableId;
+    }
+
+    public Integer getBracketRound() {
+        return bracketRound;
+    }
+
+    public void setBracketRound(Integer bracketRound) {
+        this.bracketRound = bracketRound;
     }
 }

@@ -15,6 +15,7 @@ public record CreateMatchRequest(
         @NotNull Instant scheduledAt,
         @Min(1) @Max(8) Integer periodCount,
         @Min(1) @Max(90) Integer periodLengthMinutes,
-        @Size(max = 120) String venue
+        @Size(max = 120) String venue,
+        UUID tableId
 ) {
 }

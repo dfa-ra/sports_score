@@ -15,6 +15,7 @@ import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentFormat;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
@@ -234,6 +235,9 @@ public class TournamentService {
                 .orElseThrow(() -> ApiException.notFound("Tournament registration not found"));
         List<Match> fixtures = matchRepository.findByTournamentIdAndTeamId(tournamentId, teamId);
         for (Match match : fixtures) {
+            if (match.getBracketRound() != null) {
+                throw ApiException.badRequest("Команда уже стоит в сетке плей-офф");
+            }
             if (match.getStatus() != MatchStatus.SCHEDULED && match.getStatus() != MatchStatus.CANCELLED) {
                 continue;
             }
@@ -286,7 +290,10 @@ public class TournamentService {
 
     @Transactional
     public List<TournamentTableResponse> replaceTables(UUID tournamentId, ReplaceTournamentTablesRequest request) {
-        requireTournament(tournamentId);
+        Tournament tournament = requireTournament(tournamentId);
+        if (tournament.getCompetitionStage() == CompetitionStage.PLAYOFF) {
+            throw ApiException.badRequest("Группы закрыты: турнир уже в плей-офф");
+        }
         List<TournamentTableWriteRequest> specs = request.tables() == null ? List.of() : request.tables();
         if (specs.size() > 16) {
             throw ApiException.badRequest("Не больше 16 таблиц в турнире");
@@ -312,20 +319,35 @@ public class TournamentService {
             }
         }
 
+        Map<UUID, TournamentTable> existingById = tournamentTableRepository
+                .findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId).stream()
+                .collect(Collectors.toMap(TournamentTable::getId, Function.identity()));
+        Set<UUID> keep = new HashSet<>();
+        for (TournamentTableWriteRequest spec : specs) {
+            if (spec.id() != null && existingById.containsKey(spec.id())) {
+                keep.add(spec.id());
+            }
+        }
         for (TournamentTeam entry : entries) {
             entry.setTableId(null);
         }
         tournamentTeamRepository.saveAll(entries);
-        tournamentTableRepository.deleteAll(
-                tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId)
-        );
-        tournamentTableRepository.flush();
+        List<TournamentTable> removed = existingById.values().stream()
+                .filter(table -> !keep.contains(table.getId()))
+                .toList();
+        if (!removed.isEmpty()) {
+            tournamentTableRepository.deleteAll(removed);
+            tournamentTableRepository.flush();
+        }
 
         List<TournamentTable> created = new ArrayList<>();
         for (int i = 0; i < specs.size(); i++) {
             TournamentTableWriteRequest spec = specs.get(i);
-            TournamentTable table = new TournamentTable();
-            table.setTournamentId(tournamentId);
+            TournamentTable table = spec.id() != null ? existingById.get(spec.id()) : null;
+            if (table == null || !keep.contains(table.getId())) {
+                table = new TournamentTable();
+                table.setTournamentId(tournamentId);
+            }
             table.setName(spec.name().trim());
             table.setSortOrder(i);
             created.add(tournamentTableRepository.save(table));
@@ -347,7 +369,9 @@ public class TournamentService {
     private TournamentStandingsResponse loadStandings(UUID tournamentId) {
         Tournament tournament = requireTournament(tournamentId);
         List<TournamentTeam> entries = tournamentTeamRepository.findByTournamentId(tournamentId);
-        List<Match> finished = matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+        List<Match> finished = matchRepository.findByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED).stream()
+                .filter(match -> match.getBracketRound() == null)
+                .toList();
         Map<UUID, Team> teams = teamRepository.findAllById(
                 entries.stream().map(TournamentTeam::getTeamId).toList()
         ).stream().collect(Collectors.toMap(Team::getId, Function.identity()));
@@ -373,8 +397,10 @@ public class TournamentService {
                     .map(TournamentTeam::getTeamId)
                     .collect(Collectors.toSet());
             List<Match> intra = finished.stream()
-                    .filter(match -> groupTeamIds.contains(match.getHomeTeamId())
-                            && groupTeamIds.contains(match.getAwayTeamId()))
+                    .filter(match -> table.getId().equals(match.getTableId())
+                            || (match.getTableId() == null
+                            && groupTeamIds.contains(match.getHomeTeamId())
+                            && groupTeamIds.contains(match.getAwayTeamId())))
                     .toList();
             List<StandingRow> rows = formatRegistry.handler(tournament.getFormat())
                     .standings(new StandingsContext(tournament, groupEntries, intra, teams));
@@ -392,7 +418,7 @@ public class TournamentService {
         return new TournamentResponse(
                 t.getId(), t.getName(), t.getDescription(), t.getRegulations(), t.getSportId(), t.getSeasonYear(),
                 t.getStartDate(), t.getEndDate(), t.getStatus(), t.getFormat(), t.getMaxSquadSize(),
-                t.getCreatedAt(), t.getUpdatedAt()
+                t.getCreatedAt(), t.getUpdatedAt(), t.getCompetitionStage()
         );
     }
 

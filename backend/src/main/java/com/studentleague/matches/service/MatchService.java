@@ -21,10 +21,14 @@ import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
+import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
+import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
@@ -50,6 +54,8 @@ public class MatchService {
     private final MatchAnalystAssignmentRepository matchAnalystAssignmentRepository;
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
+    private final TournamentTableRepository tournamentTableRepository;
+    private final PlayoffService playoffService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
@@ -66,6 +72,8 @@ public class MatchService {
             MatchAnalystAssignmentRepository matchAnalystAssignmentRepository,
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
+            TournamentTableRepository tournamentTableRepository,
+            PlayoffService playoffService,
             UserRepository userRepository,
             NotificationService notificationService,
             MatchMapper matchMapper,
@@ -81,6 +89,8 @@ public class MatchService {
         this.matchAnalystAssignmentRepository = matchAnalystAssignmentRepository;
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
+        this.tournamentTableRepository = tournamentTableRepository;
+        this.playoffService = playoffService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
@@ -114,6 +124,7 @@ public class MatchService {
                 : request.periodLengthMinutes();
         match.setPeriodLengthSeconds(minutes * 60);
         match.setVenue(blankToNull(request.venue()));
+        attachGroup(tournament, match, request.tableId());
         Match saved = matchRepository.save(match);
         notificationService.publishToUser(
                 null,
@@ -136,6 +147,9 @@ public class MatchService {
     @Transactional
     public void delete(UUID id) {
         Match match = requireMatch(id);
+        if (match.getBracketRound() != null) {
+            throw ApiException.badRequest("Матч плей-офф удалять нельзя: пара зафиксирована в сетке");
+        }
         UUID tournamentId = match.getTournamentId();
         matchEventRepository.deleteByMatchId(id);
         matchLineupPlayerRepository.deleteByMatchId(id);
@@ -152,7 +166,9 @@ public class MatchService {
     public MatchResponse update(UUID id, UpdateMatchRequest request) {
         Match match = requireMatch(id);
         match.setVenue(blankToNull(request.venue()));
-        return toResponse(matchRepository.save(match));
+        Match saved = matchRepository.save(match);
+        playoffService.syncVenue(saved);
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -229,6 +245,36 @@ public class MatchService {
                 referee == null ? null : referee.getLastName(),
                 referee == null ? null : referee.getEmail()
         );
+    }
+
+    private void attachGroup(Tournament tournament, Match match, UUID tableId) {
+        if (tournament.getCompetitionStage() == CompetitionStage.PLAYOFF) {
+            throw ApiException.badRequest("Турнир уже в плей-офф. Новые матчи появляются из сетки.");
+        }
+        TournamentTeam home = tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), match.getHomeTeamId())
+                .orElseThrow(() -> ApiException.badRequest("Team is not registered in the tournament"));
+        TournamentTeam away = tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), match.getAwayTeamId())
+                .orElseThrow(() -> ApiException.badRequest("Team is not registered in the tournament"));
+        if (tableId != null) {
+            boolean ownTable = tournamentTableRepository.findById(tableId)
+                    .filter(table -> tournament.getId().equals(table.getTournamentId()))
+                    .isPresent();
+            if (!ownTable) {
+                throw ApiException.badRequest("Группа не относится к этому турниру");
+            }
+            if (!tableId.equals(home.getTableId()) || !tableId.equals(away.getTableId())) {
+                throw ApiException.badRequest("Обе команды матча должны стоять в этой группе");
+            }
+            match.setTableId(tableId);
+            return;
+        }
+        if (home.getTableId() != null && home.getTableId().equals(away.getTableId())) {
+            match.setTableId(home.getTableId());
+            return;
+        }
+        if (home.getTableId() != null || away.getTableId() != null) {
+            throw ApiException.badRequest("Матч группового этапа можно назначить только внутри одной группы");
+        }
     }
 
     private void requireApproved(UUID tournamentId, UUID teamId) {
