@@ -78,8 +78,11 @@ watch(() => props.matchId, () => {
 </script>
 
 <template>
-  <section v-if="visible" class="panel analyst">
+  <section class="panel analyst">
     <h2>Статистика</h2>
+    <p v-if="!ready" class="muted quiet">Загрузка…</p>
+    <p v-else-if="!visible" class="muted quiet">Статистики пока нет.</p>
+    <template v-else>
     <div v-for="row in rows" :key="row.label" class="line">
       <strong>{{ row.home }}</strong>
       <span>
@@ -99,9 +102,7 @@ watch(() => props.matchId, () => {
         <b>{{ stats.awayPossessionPercent ?? 0 }}%</b>
       </div>
     </div>
-  </section>
-  <section v-else-if="ready" class="panel">
-    <p class="muted quiet">Статистики пока нет.</p>
+    </template>
   </section>
 </template>
 

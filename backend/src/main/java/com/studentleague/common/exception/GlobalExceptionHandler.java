@@ -10,7 +10,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.List;
@@ -55,6 +57,23 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleTooLarge(MaxUploadSizeExceededException ex, HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(error("PAYLOAD_TOO_LARGE", "Файл больше 8 МБ. Нужны JPEG, PNG, WebP или GIF.", List.of(), request));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        String name = ex.getName() == null ? "id" : ex.getName();
+        return ResponseEntity.badRequest().body(error(
+                "BAD_REQUEST",
+                "Некорректный идентификатор",
+                List.of(new ApiError.FieldErrorDetail(name, "Ожидается корректный идентификатор")),
+                request
+        ));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleMissingResource(NoResourceFoundException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("NOT_FOUND", "Файл не найден", List.of(), request));
     }
 
     @ExceptionHandler(Exception.class)

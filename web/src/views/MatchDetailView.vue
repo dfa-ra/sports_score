@@ -49,7 +49,7 @@ const protocolMinute = ref(1)
 const protocolOwnGoal = ref(false)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
-const minuteDrafts = ref<Record<string, number>>({})
+const minuteDrafts = ref<Record<string, number | null>>({})
 const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
 const ownGoalDrafts = ref<Record<string, boolean>>({})
@@ -68,9 +68,10 @@ const connected = ref(false)
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
+const missing = ref(false)
 const teams = useTeamDirectory()
 const fav = useFavorites()
-const { remaining, expired, cap } = useMatchClock(match)
+const { minute, expired, cap } = useMatchClock(match)
 let client: Client | null = null
 let pollTimer = 0
 
@@ -162,12 +163,13 @@ const editableEvents = computed(() =>
 )
 
 function syncDrafts() {
-  const minutes: Record<string, number> = {}
+  const minutes: Record<string, number | null> = {}
   const players: Record<string, string> = {}
   const assists: Record<string, string> = {}
   const ownGoals: Record<string, boolean> = {}
   for (const event of events.value) {
-    minutes[event.id] = eventMinute(event.gameTime)
+    const fromApi = event.minute
+    minutes[event.id] = fromApi == null ? eventMinute(event.gameTime) : Number(fromApi)
     players[event.id] = event.playerId || ''
     const ownGoal = isOwnGoal(event)
     ownGoals[event.id] = ownGoal
@@ -274,8 +276,16 @@ function isCaptainOf(teamId?: string) {
   return side?.captainId === me.value.id
 }
 
+function typedMinute(eventId: string) {
+  const value = minuteDrafts.value[eventId]
+  if (value == null || Number.isNaN(Number(value))) return null
+  return Number(value)
+}
+
 async function load() {
   const id = route.params.id
+  missing.value = false
+  try {
   await teams.load()
   const [m, e, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
@@ -344,6 +354,15 @@ async function load() {
       )?.refereeId
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
+  }
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 400 || status === 404) {
+      match.value = null
+      missing.value = true
+      return
+    }
+    error.value = apiError(e, 'Матч не загрузился.')
   }
 }
 
@@ -447,10 +466,15 @@ async function saveGoal(event: any) {
     return
   }
   const ownGoal = !!ownGoalDrafts.value[event.id]
+  const minute = typedMinute(event.id)
+  if (minute == null) {
+    error.value = 'Укажите минуту.'
+    return
+  }
   pending.value = true
   try {
     await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
-      minute: Number(minuteDrafts.value[event.id] ?? 0),
+      minute,
       playerId,
       secondaryPlayerId: ownGoal ? null : (assistDrafts.value[event.id] || null),
       updatePlayers: true,
@@ -468,10 +492,15 @@ async function saveGoal(event: any) {
 async function saveMinute(event: any) {
   error.value = ''
   ok.value = ''
+  const minute = typedMinute(event.id)
+  if (minute == null) {
+    error.value = 'Укажите минуту.'
+    return
+  }
   pending.value = true
   try {
     await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
-      minute: Number(minuteDrafts.value[event.id] ?? 0),
+      minute,
     })
     ok.value = 'Минута обновлена.'
     await load()
@@ -638,7 +667,7 @@ onUnmounted(() => {
           <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
         </p>
         <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
-          {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
+          <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
         </p>
         <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
           {{ match.periodCount }} × {{ formatClock(cap) }}
@@ -866,7 +895,7 @@ onUnmounted(() => {
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
               <i class="mark" :class="ev.eventType.toLowerCase()" />
-              <em>{{ shownMinute(ev) }}'</em>
+              <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
             </div>
           </section>
         </template>
@@ -962,7 +991,7 @@ onUnmounted(() => {
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
-          <span class="t">{{ shownMinute(ev) }}'</span>
+          <span v-if="shownMinute(ev) != null" class="t">{{ shownMinute(ev) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
             <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
@@ -982,6 +1011,10 @@ onUnmounted(() => {
     </div>
 
   </section>
+  <section v-else-if="missing" class="stack">
+    <h1>Матч не найден</h1>
+  </section>
+  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>

@@ -1,5 +1,6 @@
 package com.studentleague.matches.service;
 
+import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
@@ -148,8 +149,16 @@ public class MatchMapper {
                 player == null ? null : player.getFirstName(),
                 player == null ? null : player.getLastName(),
                 secondary == null ? null : secondary.getFirstName(),
-                secondary == null ? null : secondary.getLastName()
+                secondary == null ? null : secondary.getLastName(),
+                minuteOf(event.getGameTime())
         );
+    }
+
+    private static Integer minuteOf(Integer gameTime) {
+        if (gameTime == null) {
+            return null;
+        }
+        return MatchClock.displayMinute(gameTime);
     }
 
     /** Shirt nickname, kept for clients that still read it. Not the name shown in lineups. */

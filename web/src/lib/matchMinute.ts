@@ -1,6 +1,7 @@
-/** Goal and card time stored as elapsed seconds from kickoff. `2:00` is `2'`. */
-export function eventMinute(gameTime?: number | null) {
-  return Math.floor(Math.max(0, gameTime ?? 0) / 60)
+/** Goal and card time stored as elapsed seconds from kickoff. `2:00` is `2'`. No stored time means no minute. */
+export function eventMinute(gameTime?: number | null): number | null {
+  if (gameTime == null || Number.isNaN(Number(gameTime))) return null
+  return Math.floor(Math.max(0, Number(gameTime)) / 60)
 }
 
 /**

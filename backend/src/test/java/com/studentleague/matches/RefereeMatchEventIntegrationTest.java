@@ -94,7 +94,9 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"eventType":"GOAL","teamId":"%s","playerId":"%s"}
                                 """.formatted(fx.homeTeamId, fx.homePlayerId)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").isNumber())
+                .andExpect(jsonPath("$.minute").isNumber());
 
         mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
                         .header("Authorization", auth(fx.refereeToken))

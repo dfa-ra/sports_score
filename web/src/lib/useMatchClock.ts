@@ -12,7 +12,10 @@ export function useMatchClock(match: Ref<any>) {
 
   onUnmounted(() => window.clearInterval(timer))
 
-  const cap = computed(() => match.value?.periodLengthSeconds ?? 900)
+  const cap = computed(() => {
+    const value = match.value?.periodLengthSeconds
+    return value > 0 ? value : 900
+  })
 
   const elapsed = computed(() => {
     const current = match.value
@@ -31,5 +34,15 @@ export function useMatchClock(match: Ref<any>) {
     return (period - 1) * cap.value + elapsed.value
   })
 
-  return { elapsed, remaining, expired, cap, kickoff }
+  /** Same kickoff minute as the match list. The pad still uses the hall countdown. */
+  const minute = computed(() => {
+    const current = match.value
+    if (!current) return null
+    if (current.status !== 'LIVE' && current.status !== 'PAUSED') return null
+    if (current.period == null && current.gameTimeSeconds == null && current.clockRunningSince == null) return null
+    const period = Math.max(1, Number(current.period) || 1)
+    return Math.floor(((period - 1) * cap.value + elapsed.value) / 60)
+  })
+
+  return { elapsed, remaining, expired, cap, kickoff, minute }
 }

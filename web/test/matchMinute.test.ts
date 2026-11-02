@@ -59,6 +59,11 @@ test('admin minute 18 is the minute a logged-out viewer sees', () => {
   assert.equal(eventMinute(18 * 60), 18)
 })
 
+test('a goal with no stored time does not print 0 minutes', () => {
+  assert.equal(eventMinute(null), null)
+  assert.equal(eventMinute(undefined), null)
+})
+
 test('protocol order follows the match minute, earlier first', () => {
   const home = 'home'
   const away = 'away'

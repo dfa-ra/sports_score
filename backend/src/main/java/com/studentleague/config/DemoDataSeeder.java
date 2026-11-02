@@ -321,8 +321,9 @@ public class DemoDataSeeder implements ApplicationRunner {
             MatchEvent event = new MatchEvent();
             event.setMatchId(match.getId());
             event.setEventType(MatchEventType.GOAL);
-            event.setTimestamp(match.getScheduledAt().plus(startMinute + i * 8L, ChronoUnit.MINUTES));
-            event.setGameTime(startMinute + i * 8);
+            int minute = startMinute + i * 8;
+            event.setTimestamp(match.getScheduledAt().plus(minute, ChronoUnit.MINUTES));
+            event.setGameTime(minute * 60);
             event.setPeriod(startMinute + i * 8 > 45 ? 2 : 1);
             event.setTeamId(squad.team.getId());
             event.setPlayerId(scorer.getId());
