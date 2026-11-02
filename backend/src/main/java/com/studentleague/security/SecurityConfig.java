@@ -115,12 +115,15 @@ public class SecurityConfig {
                                 "/api/v1/gallery/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers(
-                                "/api/v1/admin/gallery",
-                                "/api/v1/admin/gallery/**"
+                                "/api/v1/users",
+                                "/api/v1/users/**",
+                                "/api/v1/referees",
+                                "/api/v1/referees/**"
                         ).hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/matches/*/goalkeeper").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/uploads/admin/gallery").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/admin/matches/*/goalkeeper").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/referee/matches/*/goalkeeper")
                         .hasAnyRole("REFEREE", "ADMIN")
                         .anyRequest().authenticated())

@@ -267,6 +267,17 @@ p { color: var(--muted); margin: 0; }
   cursor: wait;
   transform: none;
 }
+.btn .spinner {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-right: 0.45rem;
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: -0.15em;
+  animation: btn-spin 0.7s linear infinite;
+}
 .btn.secondary {
   background: var(--white);
   color: var(--navy);
@@ -380,6 +391,7 @@ a.panel:hover {
   box-shadow: 0 0 0 4px var(--danger-soft);
 }
 .field-hint { font-size: 0.78rem; color: var(--muted); min-height: 1.15em; }
+.field-error { color: var(--danger); font-size: 0.78rem; }
 .form-error {
   color: var(--danger);
   background: var(--danger-soft);
@@ -479,6 +491,9 @@ a.panel:hover {
 .copy-chip:active { transform: scale(0.98); }
 .copy-chip.done { color: var(--navy); border-color: rgba(76, 180, 229, 0.5); background: color-mix(in srgb, var(--ice) 28%, white); }
 
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
 @keyframes rise {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
@@ -572,6 +587,7 @@ a.panel:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .btn .spinner,
   .score-pop.is-on,
   .goal-enter,
   .live-dot,

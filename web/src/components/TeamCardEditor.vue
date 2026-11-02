@@ -11,11 +11,21 @@ const props = defineProps<{
 const emit = defineEmits<{ saved: [] }>()
 const teams = useTeamDirectory()
 
+const nameMax = 150
 const name = ref('')
 const shortName = ref('')
 const pending = ref(false)
 const error = ref('')
 const ok = ref('')
+
+function saveError(e: any) {
+  const details = e?.response?.data?.details
+  if (Array.isArray(details)) {
+    const nameError = details.find((item) => item?.field === 'name' && typeof item?.message === 'string' && item.message)
+    if (nameError) return nameError.message as string
+  }
+  return apiError(e, 'Не удалось сохранить карточку.')
+}
 
 watch(
   () => props.team,
@@ -39,7 +49,7 @@ async function save() {
     await teams.load(true)
     emit('saved')
   } catch (e: any) {
-    error.value = apiError(e, 'Не удалось сохранить карточку.')
+    error.value = saveError(e)
   } finally {
     pending.value = false
   }
@@ -80,7 +90,8 @@ async function onLogo(event: Event) {
     </div>
     <form class="stack" @submit.prevent="save">
       <label class="field">Название
-        <input v-model="name" required maxlength="200" />
+        <input v-model="name" required :maxlength="nameMax" />
+        <span class="field-hint">{{ name.length }}/{{ nameMax }}</span>
       </label>
       <label class="field">Короткое имя
         <input v-model="shortName" maxlength="32" placeholder="ЛП" />
