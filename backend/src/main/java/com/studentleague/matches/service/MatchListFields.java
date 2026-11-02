@@ -27,7 +27,7 @@ public final class MatchListFields {
         if (match.getPeriod() == null && match.getGameTimeSeconds() == null && match.getClockRunningSince() == null) {
             return null;
         }
-        return MatchClock.displayMinute(MatchClock.kickoffSeconds(match, now));
+        return MatchClock.liveMinute(match, now);
     }
 
     public static Map<UUID, String> lastGoalScorers(List<MatchEvent> goalsNewestFirst, Map<UUID, PlayerProfile> players) {

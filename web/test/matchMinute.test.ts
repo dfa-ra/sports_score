@@ -4,10 +4,24 @@ import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eve
 
 test('a period that lasted 26 seconds is the first minute, not 0 and not 15', () => {
   assert.equal(boundaryMinute(26), 1)
-  assert.equal(boundaryMinute(0), 0)
+  assert.equal(boundaryMinute(0), 1)
   assert.equal(boundaryMinute(15 * 60), 15)
   assert.equal(protocolMinute({ eventType: 'PERIOD_END', gameTime: 26 }), 1)
   assert.equal(protocolMinute({ eventType: 'GOAL', gameTime: 2 * 60 }), 2)
+})
+
+test('2x15 kickoff is 1 and six seconds into the second half is 16', () => {
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 1, gameTime: 0 }), 1)
+  assert.equal(eventMinute(2 * 60), 2)
+  assert.equal(eventMinute(15 * 60 + 6), 16)
+  assert.equal(eventMinute(15 * 60 + 6, 2, 15 * 60), 16)
+  assert.equal(eventMinute(15 * 60, 1, 15 * 60), 15)
+  assert.equal(eventMinute(15 * 60, 2, 15 * 60), 16)
+  assert.equal(eventMinute(18 * 60), 18)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', period: 1, gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 2, gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', period: 1, gameTime: 15 * 60 }), 15)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 2, gameTime: 15 * 60 }), 16)
 })
 
 test('period boundaries are part of the public protocol', () => {

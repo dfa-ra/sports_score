@@ -85,10 +85,23 @@ bool eventOnHomeSide({
   return own ? !byHome : byHome;
 }
 
-int eventMinute(int? gameTime) {
-  final raw = gameTime ?? 0;
-  if (raw < 0) return 0;
-  return raw ~/ 60;
+/// `2:00` is `2'`. Kickoff on a period line is `1'`. Six seconds into the
+/// second half of a 2×15 is `16'`.
+int eventMinute(
+  int? gameTime, {
+  int? period,
+  int? periodLengthSeconds,
+  String? eventType,
+}) {
+  final seconds = gameTime == null || gameTime < 0 ? 0 : gameTime;
+  final length = periodLengthSeconds != null && periodLengthSeconds > 0 ? periodLengthSeconds : 15 * 60;
+  final boundary = eventType == 'PERIOD_START' || eventType == 'PERIOD_END';
+  if (boundary && seconds < 60) return 1;
+  final minute = seconds ~/ 60;
+  final intoPeriod = seconds % length;
+  if (seconds >= length && intoPeriod > 0 && intoPeriod < 60) return minute + 1;
+  if (period != null && period > 1 && seconds == (period - 1) * length) return minute + 1;
+  return minute;
 }
 
 String weekdayShort(DateTime date) {

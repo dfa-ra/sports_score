@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as shownMinute } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as protocolMinuteOf } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -112,6 +112,10 @@ const periodBlocks = computed(() => {
   }))
 })
 
+function shownMinute(ev: { eventType?: string | null; gameTime?: number | null; period?: number | null }) {
+  return protocolMinuteOf(ev, match.value?.periodLengthSeconds)
+}
+
 function playersOf(teamId: string) {
   if (!match.value || !teamId) return []
   const home = teamId === match.value.homeTeamId
@@ -168,8 +172,7 @@ function syncDrafts() {
   const assists: Record<string, string> = {}
   const ownGoals: Record<string, boolean> = {}
   for (const event of events.value) {
-    const fromApi = event.minute
-    minutes[event.id] = fromApi == null ? eventMinute(event.gameTime) : Number(fromApi)
+    minutes[event.id] = eventMinute(event.gameTime, event.period, match.value?.periodLengthSeconds)
     players[event.id] = event.playerId || ''
     const ownGoal = isOwnGoal(event)
     ownGoals[event.id] = ownGoal

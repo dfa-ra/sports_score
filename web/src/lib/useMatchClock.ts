@@ -1,4 +1,5 @@
 import { computed, onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { eventMinute } from './matchMinute'
 
 export function useMatchClock(match: Ref<any>) {
   const now = ref(Date.now())
@@ -41,7 +42,7 @@ export function useMatchClock(match: Ref<any>) {
     if (current.status !== 'LIVE' && current.status !== 'PAUSED') return null
     if (current.period == null && current.gameTimeSeconds == null && current.clockRunningSince == null) return null
     const period = Math.max(1, Number(current.period) || 1)
-    return Math.floor(((period - 1) * cap.value + elapsed.value) / 60)
+    return eventMinute((period - 1) * cap.value + elapsed.value, period, cap.value)
   })
 
   return { elapsed, remaining, expired, cap, kickoff, minute }

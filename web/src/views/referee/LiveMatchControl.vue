@@ -176,6 +176,14 @@ async function closeSheet() {
 }
 
 async function action(path: string) {
+  if (path === 'finish') {
+    const current = match.value
+    const halfStillOpen = remaining.value > 0 || (current?.period ?? 1) < (current?.periodCount ?? 1)
+    const question = halfStillOpen
+      ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
+      : 'Завершить матч?'
+    if (!confirm(question)) return
+  }
   message.value = ''
   error.value = ''
   pending.value = true
@@ -185,6 +193,28 @@ async function action(path: string) {
     message.value = path === 'finish' ? 'Матч завершён.' : 'Готово.'
   } catch (e: any) {
     error.value = apiError(e, 'Действие не прошло.')
+  } finally {
+    pending.value = false
+  }
+}
+
+function canUndo(ev: { voided?: boolean; eventType?: string }) {
+  if (!live.value || ev.voided) return false
+  return ev.eventType !== 'PERIOD_START' && ev.eventType !== 'PERIOD_END'
+}
+
+async function undoEvent(ev: { id: string; eventType?: string }) {
+  const label = labelOf(eventLabel, ev.eventType)
+  if (!confirm(`Убрать «${label}» из протокола? Счёт пересчитается по оставшимся голам.`)) return
+  message.value = ''
+  error.value = ''
+  pending.value = true
+  try {
+    await api.post(`/referee/matches/${route.params.id}/events/${ev.id}/void`)
+    message.value = 'Событие убрано из протокола.'
+    await reload()
+  } catch (e: any) {
+    error.value = apiError(e, 'Событие не убралось.')
   } finally {
     pending.value = false
   }
@@ -460,9 +490,10 @@ onUnmounted(() => {
       <h2>Протокол</h2>
       <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
-        <span v-if="protocolMinute(ev) != null" class="t">{{ protocolMinute(ev) }}'</span>
+        <span v-if="protocolMinute(ev, match.periodLengthSeconds) != null" class="t">{{ protocolMinute(ev, match.periodLengthSeconds) }}'</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
         <span>{{ eventDetail(ev) || '—' }}</span>
+        <button v-if="canUndo(ev)" class="btn ghost" type="button" :disabled="pending" @click="undoEvent(ev)">Убрать</button>
       </div>
     </div>
     <p v-if="message" class="form-ok">{{ message }}</p>
@@ -586,8 +617,9 @@ onUnmounted(() => {
 h2 { font-size: 1.15rem; margin: 0 0 0.35rem; }
 .proto {
   display: grid;
-  grid-template-columns: 64px 90px 1fr;
+  grid-template-columns: 64px 90px 1fr auto;
   gap: 0.6rem;
+  align-items: center;
   padding: 0.45rem 0;
   border-bottom: 1px solid var(--line);
 }

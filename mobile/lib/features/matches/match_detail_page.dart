@@ -470,7 +470,10 @@ class _EventRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mark = _Mark(type: item.event.eventType);
-    final minute = Text("${eventMinute(item.event.gameTime)}'", style: const TextStyle(color: AppColors.muted));
+    final minute = Text(
+      "${eventMinute(item.event.gameTime, period: item.event.period, eventType: item.event.eventType)}'",
+      style: const TextStyle(color: AppColors.muted),
+    );
     final name = Text(item.event.label, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy));
     final playerId = item.event.playerId;
     final who = Column(
@@ -625,7 +628,7 @@ class _ProtocolRow extends StatelessWidget {
     final minute = SizedBox(
       width: 56,
       child: Text(
-        "${eventMinute(event.gameTime)}'",
+        "${eventMinute(event.gameTime, period: event.period, periodLengthSeconds: match.periodLengthSeconds, eventType: event.eventType)}'",
         textAlign: onHome ? TextAlign.right : TextAlign.left,
         style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w800),
       ),
