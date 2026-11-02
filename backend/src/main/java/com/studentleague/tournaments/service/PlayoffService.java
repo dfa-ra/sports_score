@@ -5,13 +5,19 @@ import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchAnalystAssignmentRepository;
+import com.studentleague.matches.repository.MatchAnalystStatsRepository;
+import com.studentleague.matches.repository.MatchAvailabilityRepository;
 import com.studentleague.matches.repository.MatchEventRepository;
+import com.studentleague.matches.repository.MatchLineupPlayerRepository;
+import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.domain.CompetitionStage;
+import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.AssignGroupMatchRequest;
 import com.studentleague.tournaments.dto.OpenPlayoffRequest;
@@ -60,6 +66,11 @@ public class PlayoffService {
     private final PlayoffSlotRepository playoffSlotRepository;
     private final MatchRepository matchRepository;
     private final MatchEventRepository matchEventRepository;
+    private final MatchLineupPlayerRepository matchLineupPlayerRepository;
+    private final MatchRefereeRepository matchRefereeRepository;
+    private final MatchAvailabilityRepository matchAvailabilityRepository;
+    private final MatchAnalystStatsRepository matchAnalystStatsRepository;
+    private final MatchAnalystAssignmentRepository matchAnalystAssignmentRepository;
     private final TeamRepository teamRepository;
     private final TournamentService tournamentService;
     private final NotificationService notificationService;
@@ -73,6 +84,11 @@ public class PlayoffService {
             PlayoffSlotRepository playoffSlotRepository,
             MatchRepository matchRepository,
             MatchEventRepository matchEventRepository,
+            MatchLineupPlayerRepository matchLineupPlayerRepository,
+            MatchRefereeRepository matchRefereeRepository,
+            MatchAvailabilityRepository matchAvailabilityRepository,
+            MatchAnalystStatsRepository matchAnalystStatsRepository,
+            MatchAnalystAssignmentRepository matchAnalystAssignmentRepository,
             TeamRepository teamRepository,
             TournamentService tournamentService,
             NotificationService notificationService,
@@ -85,6 +101,11 @@ public class PlayoffService {
         this.playoffSlotRepository = playoffSlotRepository;
         this.matchRepository = matchRepository;
         this.matchEventRepository = matchEventRepository;
+        this.matchLineupPlayerRepository = matchLineupPlayerRepository;
+        this.matchRefereeRepository = matchRefereeRepository;
+        this.matchAvailabilityRepository = matchAvailabilityRepository;
+        this.matchAnalystStatsRepository = matchAnalystStatsRepository;
+        this.matchAnalystAssignmentRepository = matchAnalystAssignmentRepository;
         this.teamRepository = teamRepository;
         this.tournamentService = tournamentService;
         this.notificationService = notificationService;
@@ -195,6 +216,9 @@ public class PlayoffService {
             }
         }
         tournament.setCompetitionStage(CompetitionStage.PLAYOFF);
+        if (tournament.getStatus() == TournamentStatus.REGISTRATION) {
+            tournament.setStatus(TournamentStatus.ACTIVE);
+        }
         tournamentRepository.save(tournament);
         standingsBoardCache.invalidateTournament(tournamentId);
         return toView(tournament);
@@ -268,20 +292,59 @@ public class PlayoffService {
                 ? null
                 : matchRepository.findById(next.getMatchId()).orElse(null);
         if (nextMatch != null && nextPairLocked(nextMatch)) {
-            throw ApiException.conflict("Следующий матч плей-офф уже начался, состав пары не меняется");
-        }
-        if (winner == null && nextMatch != null) {
-            throw ApiException.badRequest(
-                    "Матч плей-офф закончился вничью, а следующая пара уже собрана. Победитель не определён."
+            throw ApiException.conflict(
+                    "Следующий матч плей-офф уже начался, состав пары не меняется. "
+                            + "Нельзя убрать или изменить событие, которое меняет победителя."
             );
         }
-        if (homeSide) {
+        if (winner == null) {
+            clearSidesFromThisMatch(next, current);
+            if (nextMatch != null) {
+                dropUnstartedNextMatch(next, nextMatch);
+            }
+        } else if (homeSide) {
             next.setHomeTeamId(winner);
         } else {
             next.setAwayTeamId(winner);
         }
         playoffSlotRepository.save(next);
         ensureMatch(next);
+    }
+
+    /**
+     * The feeder no longer has a winner. Drop that team from every side of the
+     * next slot it had filled. The other semifinalist, if any, stays.
+     */
+    private void clearSidesFromThisMatch(PlayoffSlot next, UUID previousWinner) {
+        if (previousWinner == null) {
+            return;
+        }
+        if (previousWinner.equals(next.getHomeTeamId())) {
+            next.setHomeTeamId(null);
+        }
+        if (previousWinner.equals(next.getAwayTeamId())) {
+            next.setAwayTeamId(null);
+        }
+    }
+
+    /**
+     * A match row cannot store a missing team. The fixture has not started, so
+     * remove it and keep the slot's time, venue, and the other finalist.
+     */
+    private void dropUnstartedNextMatch(PlayoffSlot next, Match nextMatch) {
+        next.setMatchId(null);
+        playoffSlotRepository.saveAndFlush(next);
+        UUID matchId = nextMatch.getId();
+        matchEventRepository.deleteByMatchId(matchId);
+        matchLineupPlayerRepository.deleteByMatchId(matchId);
+        matchRefereeRepository.deleteByMatchId(matchId);
+        matchAvailabilityRepository.deleteByMatchId(matchId);
+        matchAnalystStatsRepository.deleteByMatchId(matchId);
+        matchAnalystAssignmentRepository.deleteByMatchId(matchId);
+        matchRepository.flush();
+        matchRepository.delete(nextMatch);
+        matchRepository.flush();
+        standingsBoardCache.invalidateTournament(nextMatch.getTournamentId());
     }
 
     /**

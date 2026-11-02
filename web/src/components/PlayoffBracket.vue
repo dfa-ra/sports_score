@@ -16,6 +16,7 @@ const emit = defineEmits<{ saved: [] }>()
 
 const names = useTeamDirectory()
 const drafts = reactive<Record<string, { scheduledAt: string; venue: string }>>({})
+const timeError = reactive<Record<string, string>>({})
 const error = ref('')
 const pending = reactive<Record<string, boolean>>({})
 
@@ -45,9 +46,14 @@ function showScore(slot: any) {
 
 async function save(slot: any) {
   error.value = ''
+  const draft = drafts[slot.id]
+  if (!draft?.scheduledAt) {
+    timeError[slot.id] = 'Укажите время пары.'
+    return
+  }
+  timeError[slot.id] = ''
   pending[slot.id] = true
   try {
-    const draft = drafts[slot.id]
     await api.put(`/tournaments/${props.tournamentId}/playoff/slots/${slot.id}`, {
       scheduledAt: draft.scheduledAt ? fromLocalInput(draft.scheduledAt) : undefined,
       venue: draft.venue,
@@ -63,7 +69,7 @@ async function save(slot: any) {
 
 <template>
   <div class="bracket-wrap">
-    <div class="bracket">
+    <div class="bracket" :class="{ admin: editable }">
       <section v-for="round in rounds" :key="round.round" class="round">
         <h3>{{ round.title }}</h3>
         <article v-for="slot in round.slots" :key="slot.id" class="slot">
@@ -100,9 +106,14 @@ async function save(slot: any) {
           <p v-if="showScore(slot)" class="score">{{ slot.homeScore }}:{{ slot.awayScore }}</p>
           <p v-else-if="slot.venue" class="meta">{{ slot.venue }}</p>
           <form v-if="editable && drafts[slot.id]" class="edit" @submit.prevent="save(slot)">
-            <label class="field">Время
-              <input v-model="drafts[slot.id].scheduledAt" type="datetime-local" required />
+            <label class="field" :class="{ invalid: timeError[slot.id] }">Время
+              <input
+                v-model="drafts[slot.id].scheduledAt"
+                type="datetime-local"
+                @input="timeError[slot.id] = ''"
+              />
             </label>
+            <p v-if="timeError[slot.id]" class="field-error">{{ timeError[slot.id] }}</p>
             <label class="field">Место проведения
               <input v-model="drafts[slot.id].venue" maxlength="120" placeholder="Зал" />
             </label>
@@ -177,7 +188,21 @@ async function save(slot: any) {
 }
 .meta { margin: 0.3rem 0 0; }
 .edit { display: grid; gap: 0.45rem; margin-top: 0.55rem; }
+/* Admin forms make a card taller than a public row. Keep each round wide
+   enough for the time field and stack cards from the top so the final
+   cannot sit across the semifinals. */
+.bracket.admin { align-items: flex-start; }
+.bracket.admin .round {
+  flex: 0 0 23rem;
+  min-width: 23rem;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.bracket.admin .slot { width: 100%; }
+.bracket.admin .edit,
+.bracket.admin .edit input { min-width: 0; max-width: 100%; }
 @media (max-width: 640px) {
   .round { flex-basis: 78vw; }
+  .bracket.admin .round { flex-basis: min(100%, 23rem); min-width: min(100%, 23rem); }
 }
 </style>

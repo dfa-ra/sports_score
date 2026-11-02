@@ -159,6 +159,9 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[0].slots[0].homeTeamId").value(north.teamId))
                 .andExpect(jsonPath("$.rounds[0].slots[0].awayTeamId").value(east.teamId))
                 .andReturn();
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
         String slotId = objectMapper.readTree(opened.getResponse().getContentAsString())
                 .get("rounds").get(0).get("slots").get(0).get("id").asText();
 
@@ -316,6 +319,65 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId));
         mockMvc.perform(get("/api/v1/matches/" + firstMatch))
                 .andExpect(jsonPath("$.homeScore").value(1));
+    }
+
+    @Test
+    void voidingTheOnlyGoalClearsAnUnstartedFinal() throws Exception {
+        String admin = createAdminAndLogin("po-d-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        Squad alpha = register(admin, tournamentId, "Альфа");
+        Squad beta = register(admin, tournamentId, "Бета");
+        Squad gamma = register(admin, tournamentId, "Гамма");
+        Squad delta = register(admin, tournamentId, "Дельта");
+        join(admin, tournamentId, "Группа A", alpha.teamId, beta.teamId, gamma.teamId, delta.teamId);
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/places")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"places\":[1,2,3,4]}"))
+                .andExpect(status().isOk());
+        MvcResult opened = mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pairsJson(
+                                pair(alpha.teamId, beta.teamId, "Зал 1"),
+                                pair(gamma.teamId, delta.teamId, "Зал 2"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+        JsonNode body = objectMapper.readTree(opened.getResponse().getContentAsString());
+        String firstMatch = body.get("rounds").get(0).get("slots").get(0).get("matchId").asText();
+        String secondMatch = body.get("rounds").get(0).get("slots").get(1).get("matchId").asText();
+
+        String eventId = scoreAndFinish(admin, firstMatch, alpha);
+        scoreAndFinish(admin, secondMatch, gamma);
+        MvcResult assembled = mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value("Альфа"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId))
+                .andExpect(jsonPath("$.rounds[1].slots[0].matchStatus").value("SCHEDULED"))
+                .andReturn();
+        String finalMatch = objectMapper.readTree(assembled.getResponse().getContentAsString())
+                .get("rounds").get(1).get("slots").get(0).get("matchId").asText();
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + firstMatch + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/matches/" + firstMatch))
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.homeScore").value(0))
+                .andExpect(jsonPath("$.awayScore").value(0));
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(nullValue()))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value(nullValue()))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId))
+                .andExpect(jsonPath("$.rounds[1].slots[0].matchId").value(nullValue()));
+        mockMvc.perform(get("/api/v1/matches/" + finalMatch))
+                .andExpect(status().isNotFound());
     }
 
     @Test

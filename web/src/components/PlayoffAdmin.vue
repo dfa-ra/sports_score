@@ -21,6 +21,7 @@ const assignTable = ref<Record<string, string>>({})
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
+const timeErrors = ref<Record<number, string>>({})
 
 const playoffOpen = computed(() => props.playoff?.competitionStage === 'PLAYOFF')
 const qualified = computed(() => props.playoff?.qualified ?? [])
@@ -99,6 +100,12 @@ async function attach(matchId: string) {
 async function openPlayoff() {
   error.value = ''
   ok.value = ''
+  const missing: Record<number, string> = {}
+  pairRows.value.forEach((pair, index) => {
+    if (!pair.scheduledAt) missing[index] = 'Укажите время пары.'
+  })
+  timeErrors.value = missing
+  if (Object.keys(missing).length) return
   pending.value = true
   try {
     await api.post(`/tournaments/${props.tournamentId}/playoff`, {
@@ -200,9 +207,14 @@ async function openPlayoff() {
               </option>
             </select>
           </label>
-          <label class="field">Время
-            <input v-model="pair.scheduledAt" type="datetime-local" required />
+          <label class="field" :class="{ invalid: timeErrors[index] }">Время
+            <input
+              v-model="pair.scheduledAt"
+              type="datetime-local"
+              @input="timeErrors[index] = ''"
+            />
           </label>
+          <p v-if="timeErrors[index]" class="field-error">{{ timeErrors[index] }}</p>
           <label class="field">Место проведения
             <input v-model="pair.venue" maxlength="120" placeholder="Зал" />
           </label>
