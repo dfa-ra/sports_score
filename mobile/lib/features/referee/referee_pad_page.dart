@@ -159,7 +159,67 @@ class _RefereePadPageState extends State<RefereePadPage> {
     await _releaseClock();
   }
 
+  Future<bool> _confirmFinish() async {
+    final current = match;
+    if (current == null) return false;
+    final cap = current.periodLengthSeconds;
+    final elapsed = matchElapsedSeconds(
+      status: current.status,
+      gameTimeSeconds: current.gameTimeSeconds ?? 0,
+      clockRunningSince: current.clockRunningSince,
+      cap: cap,
+      now: now,
+    );
+    final halfStillOpen = cap - elapsed > 0 || (current.period ?? 1) < current.periodCount;
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text(halfStillOpen
+            ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
+            : 'Завершить матч?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Финиш')),
+        ],
+      ),
+    );
+    return answer == true;
+  }
+
+  Future<void> _undoEvent(MatchEvent ev) async {
+    final current = match;
+    if (current == null || !current.isLive || ev.voided) return;
+    if (ev.eventType == 'PERIOD_START' || ev.eventType == 'PERIOD_END') return;
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        content: Text('Убрать «${eventLabel(ev.eventType)}» из протокола? Счёт пересчитается по оставшимся голам.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Убрать')),
+        ],
+      ),
+    );
+    if (answer != true || !mounted) return;
+    setState(() {
+      pending = true;
+      error = null;
+      ok = null;
+    });
+    try {
+      await context.read<AuthController>().api.post('/referee/matches/${widget.matchId}/events/${ev.id}/void');
+      await _load();
+      if (mounted) setState(() => ok = 'Событие убрано из протокола.');
+    } catch (e) {
+      if (mounted) setState(() => error = e is ApiException ? e.message : 'Событие не убралось.');
+    } finally {
+      if (mounted) setState(() => pending = false);
+    }
+  }
+
   Future<void> _action(String path) async {
+    if (path == 'finish' && !await _confirmFinish()) return;
+    if (!mounted) return;
     setState(() {
       pending = true;
       error = null;
@@ -482,7 +542,10 @@ class _RefereePadPageState extends State<RefereePadPage> {
                               children: [
                                 SizedBox(
                                   width: 48,
-                                  child: Text("${eventMinute(ev.gameTime)}'", style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w700)),
+                                  child: Text(
+                                    "${eventMinute(ev.gameTime, period: ev.period, periodLengthSeconds: current.periodLengthSeconds, eventType: ev.eventType)}'",
+                                    style: const TextStyle(color: AppColors.ice, fontWeight: FontWeight.w700),
+                                  ),
                                 ),
                                 SizedBox(
                                   width: 90,
@@ -503,6 +566,11 @@ class _RefereePadPageState extends State<RefereePadPage> {
                                     style: const TextStyle(color: AppColors.text),
                                   ),
                                 ),
+                                if (live && !ev.voided && ev.eventType != 'PERIOD_START' && ev.eventType != 'PERIOD_END')
+                                  TextButton(
+                                    onPressed: pending ? null : () => _undoEvent(ev),
+                                    child: const Text('Убрать'),
+                                  ),
                               ],
                             ),
                           ),

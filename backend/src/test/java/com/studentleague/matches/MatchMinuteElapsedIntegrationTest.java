@@ -144,6 +144,74 @@ class MatchMinuteElapsedIntegrationTest extends AbstractIntegrationTest {
         assertEquals(2, goal.get("period").asInt());
     }
 
+    @Test
+    void twoByFifteenKickoffIsOneAndSixSecondsIntoTheSecondHalfIsSixteen() throws Exception {
+        String adminToken = createAdminAndLogin("min-215-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+
+        JsonNode started = events(fx.matchId);
+        JsonNode kickoff = findEvent(started, "PERIOD_START", 1);
+        assertEquals(0, kickoff.get("gameTime").asInt());
+        assertEquals(1, kickoff.get("minute").asInt());
+
+        parkClock(fx.matchId, 1, 2 * 60);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(2 * 60))
+                .andExpect(jsonPath("$.minute").value(2));
+        assertEquals(2, MatchClock.displayMinute(2 * 60));
+
+        parkClock(fx.matchId, 1, 15 * 60);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/next-period")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.period").value(2));
+
+        JsonNode boundary = events(fx.matchId);
+        JsonNode periodEnd = findEvent(boundary, "PERIOD_END", 1);
+        JsonNode periodStart = findEvent(boundary, "PERIOD_START", 2);
+        assertEquals(periodEnd.get("gameTime").asInt(), periodStart.get("gameTime").asInt());
+        assertEquals(15 * 60, periodEnd.get("gameTime").asInt());
+        assertEquals(15, periodEnd.get("minute").asInt());
+        assertEquals(16, periodStart.get("minute").asInt());
+
+        parkClock(fx.matchId, 2, 6);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(15 * 60 + 6))
+                .andExpect(jsonPath("$.minute").value(16))
+                .andExpect(jsonPath("$.period").value(2));
+        assertEquals(16, MatchClock.displayMinute(15 * 60 + 6, 15 * 60));
+        assertEquals(2, MatchClock.displayMinute(2 * 60));
+    }
+
+    private JsonNode events(String matchId) throws Exception {
+        return objectMapper.readTree(
+                mockMvc.perform(get("/api/v1/matches/" + matchId + "/events"))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString()
+        );
+    }
+
+    private static JsonNode findEvent(JsonNode events, String type, int period) {
+        for (JsonNode event : events) {
+            if (type.equals(event.path("eventType").asText()) && event.path("period").asInt() == period) {
+                return event;
+            }
+        }
+        throw new AssertionError("missing " + type + " in period " + period);
+    }
+
     private void parkClock(String matchId, int period, int elapsedInPeriod) {
         Match match = matchRepository.findById(UUID.fromString(matchId)).orElseThrow();
         match.setStatus(MatchStatus.PAUSED);

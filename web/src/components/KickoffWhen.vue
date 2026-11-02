@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatClock } from '../lib/format'
-import { kickoffClock, kickoffDayMonth } from '../lib/match'
+import { eventMinute, kickoffClock, kickoffDayMonth } from '../lib/match'
 import { useMatchClock } from '../lib/useMatchClock'
 
 const props = withDefaults(defineProps<{
@@ -35,7 +35,7 @@ const dateLabel = computed(() => kickoffDayMonth(props.status === 'FINISHED' ? (
 const timeLabel = computed(() => {
   if (props.status === 'FINISHED') return 'Завершён'
   if (!isLive.value) return kickoffClock(props.at) || '—'
-  const fromClock = Math.floor(Math.max(0, kickoff.value) / 60)
+  const fromClock = eventMinute(kickoff.value, props.period, props.periodLengthSeconds)
   const minute = hasClock.value ? fromClock : props.minute
   if (minute != null && minute > 0) return `${minute}'`
   if (hasClock.value && (elapsed.value > 0 || kickoff.value > 0)) return formatClock(kickoff.value)

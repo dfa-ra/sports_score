@@ -122,6 +122,70 @@ class RefereePadAccessIntegrationTest extends AbstractIntegrationTest {
         assertEquals(periodEnd, periodStart, "the next period starts at the same kickoff second, not at 15:00");
     }
 
+    @Test
+    void assignedRefereeVoidsAnEventUntilTheMatchIsFinished() throws Exception {
+        String adminToken = createAdminAndLogin("void-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + UUID.randomUUID() + "/void")
+                        .header("Authorization", auth(fx.unassignedToken)))
+                .andExpect(status().isForbidden());
+
+        MvcResult started = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk())
+                .andReturn();
+        String tournamentId = objectMapper.readTree(started.getResponse().getContentAsString()).get("tournamentId").asText();
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+
+        MvcResult goal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s","playerId":"%s"}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String eventId = objectMapper.readTree(goal.getResponse().getContentAsString()).get("id").asText();
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(jsonPath("$.homeScore").value(1));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(fx.unassignedToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + eventId + "/void")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.voided").value(true));
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(jsonPath("$.homeScore").value(0));
+
+        MvcResult second = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"eventType":"GOAL","teamId":"%s","playerId":"%s"}
+                                """.formatted(fx.homeTeamId, fx.homePlayerId)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String secondId = objectMapper.readTree(second.getResponse().getContentAsString()).get("id").asText();
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/finish")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + secondId + "/void")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + secondId + "/void")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.voided").value(true));
+        mockMvc.perform(get("/api/v1/matches/" + fx.matchId))
+                .andExpect(jsonPath("$.homeScore").value(0));
+    }
+
     private static Integer gameTimeOf(JsonNode events, String type) {
         return gameTimeOf(events, type, null);
     }

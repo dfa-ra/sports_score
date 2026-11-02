@@ -21,6 +21,9 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.domain.TournamentStatus;
+import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.users.domain.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +51,7 @@ public class RefereeMatchService {
     private final NotificationService notificationService;
     private final MatchMapper matchMapper;
     private final StandingsBoardCache standingsBoardCache;
+    private final TournamentRepository tournamentRepository;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -60,7 +64,8 @@ public class RefereeMatchService {
             LiveMatchPublisher liveMatchPublisher,
             NotificationService notificationService,
             MatchMapper matchMapper,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            TournamentRepository tournamentRepository
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -73,6 +78,7 @@ public class RefereeMatchService {
         this.notificationService = notificationService;
         this.matchMapper = matchMapper;
         this.standingsBoardCache = standingsBoardCache;
+        this.tournamentRepository = tournamentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -96,6 +102,7 @@ public class RefereeMatchService {
         match.setPeriod(1);
         MatchClock.startRunning(match, now);
         recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
+        openTournamentIfRecruiting(match.getTournamentId());
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_STARTED");
         notificationService.publishToUser(
@@ -358,6 +365,31 @@ public class RefereeMatchService {
         event.setVoided(false);
         matchEventRepository.save(event);
         standingsBoardCache.invalidateTournament(match.getTournamentId());
+    }
+
+    /**
+     * A recruiting tournament becomes «Идёт» when its first match starts.
+     * Finished, cancelled, draft, and already active tournaments stay as they are.
+     */
+    static TournamentStatus statusAfterMatchStarts(TournamentStatus status) {
+        if (status == TournamentStatus.REGISTRATION) {
+            return TournamentStatus.ACTIVE;
+        }
+        return status;
+    }
+
+    private void openTournamentIfRecruiting(UUID tournamentId) {
+        if (tournamentId == null) {
+            return;
+        }
+        Tournament tournament = tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+        TournamentStatus next = statusAfterMatchStarts(tournament.getStatus());
+        if (next == tournament.getStatus()) {
+            return;
+        }
+        tournament.setStatus(next);
+        tournamentRepository.save(tournament);
     }
 
     private Match requireAssignedMatch(UserPrincipal principal, UUID matchId) {

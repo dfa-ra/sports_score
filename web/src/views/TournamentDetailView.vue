@@ -39,6 +39,10 @@ const showMatchForm = ref(false)
 const applying = ref(false)
 
 const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
+const playedWhileRecruiting = computed(() =>
+  tournament.value?.status === 'REGISTRATION'
+  && matches.value.some((match) => match.status === 'LIVE' || match.status === 'PAUSED' || match.status === 'FINISHED'),
+)
 const showApply = computed(() =>
   registrationOpen.value
   && (auth.hasRole('CAPTAIN') || auth.canManageLeague || !auth.isAuthenticated)
@@ -273,6 +277,9 @@ async function exclude(team: { teamId: string; teamName?: string }) {
             <option value="CANCELLED">Отменён</option>
           </select>
         </label>
+        <p v-if="playedWhileRecruiting" class="form-error">
+          Матчи уже сыграны или идут, а статус всё ещё «Набор». Поставьте «Идёт» и сохраните. Завершённый турнир это само не переписывает.
+        </p>
         <label class="field">Формат
           <select v-model="format">
             <option value="ROUND_ROBIN">Круговой турнир</option>

@@ -1,5 +1,6 @@
 package com.studentleague.matches.clock;
 
+import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 
@@ -85,9 +86,61 @@ public final class MatchClock {
         return time;
     }
 
-    /** Match minute shown to viewers: {@code 2:00} from kickoff is {@code 2}. */
+    /**
+     * Match minute from kickoff seconds. {@code 2:00} is {@code 2}.
+     * The opening of a later period is the next minute: six seconds into the
+     * second half of a 2×15 ({@code 15:06}) is {@code 16'}, while an exact
+     * {@code 15:00} stays {@code 15'} unless {@link #protocolMinute} is marking
+     * the start of that period.
+     */
     public static int displayMinute(int kickoffSeconds) {
-        return Math.max(0, kickoffSeconds) / 60;
+        return displayMinute(kickoffSeconds, DEFAULT_PERIOD_LENGTH_SECONDS);
+    }
+
+    /** Live list minute: same labels as the protocol, using this match's period length. */
+    public static int liveMinute(Match match, Instant now) {
+        int length = periodLength(match);
+        int seconds = kickoffSeconds(match, now);
+        int period = periodIndex(match);
+        int minute = displayMinute(seconds, length);
+        if (period > 1 && seconds == (period - 1L) * length) {
+            return minute + 1;
+        }
+        return minute;
+    }
+
+    public static int displayMinute(int kickoffSeconds, int periodLengthSeconds) {
+        int seconds = Math.max(0, kickoffSeconds);
+        int length = periodLengthSeconds > 0 ? periodLengthSeconds : DEFAULT_PERIOD_LENGTH_SECONDS;
+        int minute = seconds / 60;
+        int intoPeriod = seconds % length;
+        if (seconds >= length && intoPeriod > 0 && intoPeriod < 60) {
+            return minute + 1;
+        }
+        return minute;
+    }
+
+    /**
+     * Minute printed on a protocol row. Kickoff ({@code 0}) is {@code 1'}.
+     * A period that ended after 26 seconds is {@code 1'} on both the end and
+     * the next start. A full 2×15 whistle is {@code 15'} for the end of the
+     * first half and {@code 16'} for the start of the second.
+     */
+    public static int protocolMinute(int gameTime, Integer period, MatchEventType type, int periodLengthSeconds) {
+        int seconds = Math.max(0, gameTime);
+        int length = periodLengthSeconds > 0 ? periodLengthSeconds : DEFAULT_PERIOD_LENGTH_SECONDS;
+        boolean boundary = type == MatchEventType.PERIOD_START || type == MatchEventType.PERIOD_END;
+        if (boundary && seconds < 60) {
+            return 1;
+        }
+        int minute = displayMinute(seconds, length);
+        if (type == MatchEventType.PERIOD_START && period != null && period > 1) {
+            int offset = (period - 1) * length;
+            if (seconds == offset) {
+                return minute + 1;
+            }
+        }
+        return minute;
     }
 
     public static void freeze(Match match, Instant now) {

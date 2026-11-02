@@ -150,15 +150,20 @@ public class MatchMapper {
                 player == null ? null : player.getLastName(),
                 secondary == null ? null : secondary.getFirstName(),
                 secondary == null ? null : secondary.getLastName(),
-                minuteOf(event.getGameTime())
+                minuteOf(event)
         );
     }
 
-    private static Integer minuteOf(Integer gameTime) {
-        if (gameTime == null) {
+    private static Integer minuteOf(MatchEvent event) {
+        if (event.getGameTime() == null) {
             return null;
         }
-        return MatchClock.displayMinute(gameTime);
+        return MatchClock.protocolMinute(
+                event.getGameTime(),
+                event.getPeriod(),
+                event.getEventType(),
+                MatchClock.DEFAULT_PERIOD_LENGTH_SECONDS
+        );
     }
 
     /** Shirt nickname, kept for clients that still read it. Not the name shown in lineups. */
