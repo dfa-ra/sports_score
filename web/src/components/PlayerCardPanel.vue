@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ageLine, formatMatchDay, outcomeMark } from '../lib/format'
 import { playerHeader } from '../lib/playerTitle'
+import { useAuthStore } from '../stores/auth'
 import PlayerAvatar from './PlayerAvatar.vue'
 import TeamCrest from './TeamCrest.vue'
 
@@ -40,6 +41,8 @@ const props = defineProps<{
   editable?: boolean
 }>()
 
+const auth = useAuthStore()
+
 defineEmits<{
   edit: []
 }>()
@@ -52,6 +55,12 @@ const captainTeams = computed(() => {
   const raw = props.card?.captainTeams
   if (!Array.isArray(raw)) return []
   return raw.filter((team) => team?.id && team?.name)
+})
+const subtitle = computed(() => {
+  const captain = Boolean(props.card?.team?.captain)
+    || captainTeams.value.length > 0
+    || (props.editable && auth.hasRole('CAPTAIN'))
+  return captain ? 'Капитан' : (props.card?.position || 'Игрок')
 })
 const history = computed<MatchRow[]>(() => props.card.matchHistory ?? [])
 const stats = computed(() => {
@@ -85,7 +94,7 @@ function marks(row: MatchRow) {
           <span v-if="card.jerseyNumber != null">№{{ card.jerseyNumber }}</span>
           <template v-if="!card.team">
             <span v-if="card.jerseyNumber != null"> · </span>
-            {{ card.position || 'Игрок' }}
+            {{ subtitle }}
           </template>
         </p>
         <p v-for="team in captainTeams" :key="team.id" class="captain-line">
@@ -99,7 +108,7 @@ function marks(row: MatchRow) {
     <RouterLink v-if="card.team" class="club-bar" :to="`/teams/${card.team.id}`">
       <TeamCrest :src="card.team.logoUrl" :name="card.team.name" :size="22" />
       <b>{{ card.team.name }}</b>
-      <span>{{ card.position || 'Игрок' }}</span>
+      <span>{{ subtitle }}</span>
     </RouterLink>
 
     <div class="fs-tabs">

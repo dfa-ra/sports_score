@@ -35,6 +35,12 @@ export function isTournamentOpenForApply(status?: string | null) {
   return status === 'REGISTRATION' || status === 'DRAFT'
 }
 
+export function tournamentDatesError(start?: string | null, end?: string | null) {
+  if (!start || !end) return ''
+  if (end < start) return 'Дата финиша не может быть раньше даты старта.'
+  return ''
+}
+
 export function formatDateRange(start?: string | null, end?: string | null) {
   const from = formatIsoDate(start)
   const to = formatIsoDate(end)

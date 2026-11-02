@@ -30,6 +30,7 @@ const router = createRouter({
     { path: '/referee/matches/:id', name: 'referee-match', component: () => import('../views/referee/LiveMatchControl.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'] } },
     { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'] } },
     { path: '/analyst/matches/:id', name: 'analyst-match', component: () => import('../views/analyst/AnalystPad.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'] } },
+    { path: '/forbidden', name: 'forbidden', component: () => import('../views/ForbiddenView.vue') },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue') },
   ],
   scrollBehavior: () => ({ top: 0 }),
@@ -44,7 +45,12 @@ router.beforeEach(async (to) => {
   if (to.meta.guest && auth.isAuthenticated) return { name: 'home' }
   if (to.meta.myTeam && !auth.canAccessMyTeam) return { name: 'home' }
   const roles = to.meta.roles as string[] | undefined
-  if (roles && !roles.some((role) => auth.hasRole(role as any))) return { name: 'home' }
+  if (roles && !roles.some((role) => auth.hasRole(role as any))) {
+    if (to.path === '/admin' || to.path.startsWith('/referee')) {
+      return { name: 'forbidden', replace: true }
+    }
+    return { name: 'home' }
+  }
   return true
 })
 

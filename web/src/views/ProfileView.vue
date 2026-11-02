@@ -57,6 +57,7 @@ const applicationOpen = computed(() =>
 )
 
 const isPlayer = computed(() => approvedRoles.value.some((role) => role === 'PLAYER' || role === 'CAPTAIN' || role === 'ADMIN'))
+const isCaptain = computed(() => approvedRoles.value.includes('CAPTAIN'))
 
 function isUploadedPhoto(url?: string | null) {
   return !!url && url.includes('/media/')
@@ -299,7 +300,8 @@ async function logout() {
         <TeamCrest :src="team.logo" :name="team.name" :size="22" />
         {{ team.name }}
       </RouterLink>
-      <p v-if="!card?.team && !favTeams.length" class="empty-line">Избранных команд нет.</p>
+      <p v-if="isCaptain && !card?.team" class="empty-line">Команду назначает администратор</p>
+      <p v-else-if="!card?.team && !favTeams.length" class="empty-line">Избранных команд нет.</p>
     </div>
 
     <div v-if="favMatches.length" class="sheet">
