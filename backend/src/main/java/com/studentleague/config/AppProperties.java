@@ -36,11 +36,18 @@ public record AppProperties(
     ) {
     }
 
-    /** Единственный админ, создаётся при старте из .env */
+    /**
+     * Админ из ADMIN_EMAIL. {@code e2eEmail} — необязательный E2E_ADMIN_EMAIL:
+     * на production не применяется, см. {@code AdminBootstrapRunner}.
+     */
     public record Admin(
             String email,
-            String password
+            String password,
+            String e2eEmail
     ) {
+        public Admin(String email, String password) {
+            this(email, password, null);
+        }
     }
 
     public record Auth(boolean autoApproveRoles) {

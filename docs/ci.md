@@ -108,7 +108,8 @@ Dev: шаблон `deploy/.env.example`. Prod: `deploy/.env.prod.example` (**д�
 | Переменная | Зачем |
 |---|---|
 | `JWT_SECRET` | ≥32 символа, свой на каждый стенд |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Админ при первом старте |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Единственный админ при старте. Один адрес: все прочие ADMIN снимаются |
+| `E2E_ADMIN_EMAIL` | Дополнительный админ для e2e, например `e2e-admin@example.com`. Учитывается на dev-стенде (`studentleague-dev` или публичный IP стенда) и при Spring-профиле `dev`. На production игнорируется. В уже лежащий `.env` деплой эту строку не пишет |
 | `DATABASE_PASSWORD` | Postgres внутри Docker |
 | `CORS_ORIGINS` | Публичный URL, для prod `https://itmoliga.ru,https://www.itmoliga.ru` |
 | `CADDY_FILE` | Prod: `Caddyfile.prod` (itmoliga.ru + www) |

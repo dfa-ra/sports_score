@@ -54,6 +54,8 @@ app:
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}
+    # Ignored on production (compose project *prod* or public host itmoliga.ru).
+    e2e-email: ${E2E_ADMIN_EMAIL:}
   auth:
     auto-approve-roles: ${AUTH_AUTO_APPROVE_ROLES:false}
   demo-data:
