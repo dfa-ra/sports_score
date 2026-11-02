@@ -21,6 +21,9 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.domain.TournamentStatus;
+import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.users.domain.Role;
 import org.springframework.stereotype.Service;
@@ -50,6 +53,7 @@ public class RefereeMatchService {
     private final MatchMapper matchMapper;
     private final StandingsBoardCache standingsBoardCache;
     private final PlayoffService playoffService;
+    private final TournamentRepository tournamentRepository;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -63,7 +67,8 @@ public class RefereeMatchService {
             NotificationService notificationService,
             MatchMapper matchMapper,
             StandingsBoardCache standingsBoardCache,
-            PlayoffService playoffService
+            PlayoffService playoffService,
+            TournamentRepository tournamentRepository
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -77,6 +82,7 @@ public class RefereeMatchService {
         this.matchMapper = matchMapper;
         this.standingsBoardCache = standingsBoardCache;
         this.playoffService = playoffService;
+        this.tournamentRepository = tournamentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +106,7 @@ public class RefereeMatchService {
         match.setPeriod(1);
         MatchClock.startRunning(match, now);
         recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
+        openTournamentIfRecruiting(match.getTournamentId());
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "MATCH_STARTED");
         notificationService.publishToUser(
@@ -175,13 +182,14 @@ public class RefereeMatchService {
         }
         Instant now = Instant.now();
         MatchClock.freeze(match, now);
-        recordPeriodEvent(match, MatchEventType.PERIOD_END, now);
+        int boundary = MatchClock.kickoffSeconds(match, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_END, now, boundary);
         match.setPeriod(current + 1);
         match.setGameTimeSeconds(0);
         if (match.getStatus() == MatchStatus.LIVE) {
             MatchClock.startRunning(match, now);
         }
-        recordPeriodEvent(match, MatchEventType.PERIOD_START, now);
+        recordPeriodEvent(match, MatchEventType.PERIOD_START, now, boundary);
         MatchResponse response = toResponse(matchRepository.save(match));
         liveMatchPublisher.publishMatchUpdate(response, null, "PERIOD_CHANGED");
         return response;
@@ -197,6 +205,7 @@ public class RefereeMatchService {
         } else if (!EVENT_ALLOWED.contains(match.getStatus())) {
             throw ApiException.badRequest("Events can only be added while match is LIVE or PAUSED");
         }
+        validateEventMinute(match, request);
         validateEventPayload(match, request);
         boolean ownGoal = OwnGoals.is(request.metadata());
         if (ownGoal && request.eventType() != MatchEventType.GOAL) {
@@ -294,20 +303,41 @@ public class RefereeMatchService {
         matchScoreService.apply(match);
     }
 
+    private void validateEventMinute(Match match, CreateMatchEventRequest request) {
+        Integer gameTime = request.gameTime();
+        if (gameTime == null) {
+            return;
+        }
+        if (gameTime < 0) {
+            throw ApiException.badRequest("Время события не может быть отрицательным");
+        }
+        int length = MatchClock.periodLength(match);
+        int periods = match.getPeriodCount() > 0 ? match.getPeriodCount() : MatchClock.DEFAULT_PERIOD_COUNT;
+        int maxSeconds = periods * length + 5 * 60;
+        int kickoff = MatchClock.toKickoffSeconds(gameTime, MatchClock.periodIndex(match), length);
+        if (kickoff > maxSeconds) {
+            throw ApiException.badRequest("Время события больше длительности матча");
+        }
+    }
+
     private void validateEventPayload(Match match, CreateMatchEventRequest request) {
         if (request.teamId() != null
                 && !request.teamId().equals(match.getHomeTeamId())
                 && !request.teamId().equals(match.getAwayTeamId())) {
             throw ApiException.badRequest("teamId must be home or away team of the match");
         }
-        if ((request.eventType() == MatchEventType.FOUL || request.eventType() == MatchEventType.TIMEOUT)
+        if ((request.eventType() == MatchEventType.FOUL
+                || request.eventType() == MatchEventType.TIMEOUT
+                || request.eventType() == MatchEventType.GOAL)
                 && request.teamId() == null) {
             throw ApiException.badRequest("Укажите команду");
         }
-        boolean needsPlayer = request.eventType() == MatchEventType.GOAL
-                || request.eventType() == MatchEventType.ASSIST
-                || request.eventType() == MatchEventType.YELLOW_CARD
-                || request.eventType() == MatchEventType.RED_CARD
+        boolean card = request.eventType() == MatchEventType.YELLOW_CARD
+                || request.eventType() == MatchEventType.RED_CARD;
+        if (card && request.playerId() == null && request.teamId() == null) {
+            throw ApiException.badRequest("Укажите команду или игрока");
+        }
+        boolean needsPlayer = request.eventType() == MatchEventType.ASSIST
                 || request.eventType() == MatchEventType.SUBSTITUTION
                 || request.eventType() == MatchEventType.POINT;
         if (needsPlayer && request.playerId() == null) {
@@ -354,15 +384,44 @@ public class RefereeMatchService {
     }
 
     private void recordPeriodEvent(Match match, MatchEventType type, Instant now) {
+        recordPeriodEvent(match, type, now, MatchClock.kickoffSeconds(match, now));
+    }
+
+    private void recordPeriodEvent(Match match, MatchEventType type, Instant now, int gameTime) {
         MatchEvent event = new MatchEvent();
         event.setMatchId(match.getId());
         event.setEventType(type);
         event.setTimestamp(now);
-        event.setGameTime(MatchClock.kickoffSeconds(match, now));
+        event.setGameTime(gameTime);
         event.setPeriod(match.getPeriod());
         event.setVoided(false);
         matchEventRepository.save(event);
         standingsBoardCache.invalidateTournament(match.getTournamentId());
+    }
+
+    /**
+     * A recruiting tournament becomes «Идёт» when its first match starts.
+     * Finished, cancelled, draft, and already active tournaments stay as they are.
+     */
+    static TournamentStatus statusAfterMatchStarts(TournamentStatus status) {
+        if (status == TournamentStatus.REGISTRATION) {
+            return TournamentStatus.ACTIVE;
+        }
+        return status;
+    }
+
+    private void openTournamentIfRecruiting(UUID tournamentId) {
+        if (tournamentId == null) {
+            return;
+        }
+        Tournament tournament = tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> ApiException.notFound("Tournament not found"));
+        TournamentStatus next = statusAfterMatchStarts(tournament.getStatus());
+        if (next == tournament.getStatus()) {
+            return;
+        }
+        tournament.setStatus(next);
+        tournamentRepository.save(tournament);
     }
 
     private Match requireAssignedMatch(UserPrincipal principal, UUID matchId) {

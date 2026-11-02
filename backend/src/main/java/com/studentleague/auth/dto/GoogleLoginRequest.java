@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record GoogleLoginRequest(
-        @NotBlank @Size(max = 8192) String idToken
+        @NotBlank(message = "Не удалось войти через Google")
+        @Size(max = 8192, message = "Не удалось войти через Google")
+        String idToken
 ) {
 }

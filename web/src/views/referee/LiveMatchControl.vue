@@ -4,17 +4,18 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
 import { registeredName } from '../../lib/playerTitle'
-import { eventMinute } from '../../lib/match'
+import { protocolMinute } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
+import { useAuthStore } from '../../stores/auth'
 import AnalystAssignForm from '../../components/AnalystAssignForm.vue'
 import FutsalBoard from '../../components/FutsalBoard.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import TeamCrest from '../../components/TeamCrest.vue'
 
-type EventKind = 'GOAL' | 'YELLOW_CARD' | 'RED_CARD'
-type Step = 'team' | 'player' | 'assist'
+type EventKind = 'GOAL' | 'YELLOW_CARD' | 'RED_CARD' | 'SUBSTITUTION'
+type Step = 'team' | 'player' | 'assist' | 'incoming'
 
 type Sheet = {
   kind: EventKind
@@ -25,8 +26,10 @@ type Sheet = {
 }
 
 const route = useRoute()
+const auth = useAuthStore()
 const match = ref<any>(null)
 const events = ref<any[]>([])
+const referees = ref<any[]>([])
 const lineups = ref<any>(null)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
@@ -42,6 +45,12 @@ const homeLabel = computed(() => teams.fullName(match.value?.homeTeamId, 'Хоз
 const awayLabel = computed(() => teams.fullName(match.value?.awayTeamId, 'Гости'))
 const live = computed(() => match.value?.status === 'LIVE' || match.value?.status === 'PAUSED')
 const protocol = computed(() => [...events.value].reverse())
+const canControl = computed(() => {
+  if (auth.canManageLeague) return true
+  const id = auth.user?.id
+  if (!id) return false
+  return referees.value.some((row) => row.refereeId === id)
+})
 
 function nameOf(player: any) {
   return playerTag(registeredName(player), player.jerseyNumber)
@@ -61,11 +70,30 @@ const sheetTitle = computed(() => {
     if (current.step === 'player') return 'Кто забил гол?'
     return 'Кто отдал передачу?'
   }
+  if (current.kind === 'SUBSTITUTION') {
+    if (current.step === 'team') return 'Замена: какая команда?'
+    if (current.step === 'player') return 'Кто уходит?'
+    return 'Кто выходит?'
+  }
   if (current.kind === 'YELLOW_CARD') {
     return current.step === 'team' ? 'Кому жёлтая?' : 'Кому показать жёлтую?'
   }
   return current.step === 'team' ? 'Кому красная?' : 'Кому показать красную?'
 })
+
+const stepCount = computed(() => {
+  const current = sheet.value
+  if (!current) return 2
+  if (current.kind === 'SUBSTITUTION') return 3
+  if (current.kind === 'GOAL' && !current.ownGoal) return 3
+  return 2
+})
+
+function stepIndex(step: Step) {
+  if (step === 'team') return 1
+  if (step === 'player') return 2
+  return 3
+}
 
 const sheetHint = computed(() => {
   const current = sheet.value
@@ -83,12 +111,21 @@ const sheetHint = computed(() => {
 async function reload() {
   await teams.load()
   const id = route.params.id
-  const [m, e, l] = await Promise.all([
+  const [m, e, l, r] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/lineups`),
+    api.get(`/matches/${id}/referees`),
   ])
+  referees.value = r.data
   match.value = m.data
+  if (!canControl.value) {
+    events.value = []
+    lineups.value = null
+    homeRoster.value = []
+    awayRoster.value = []
+    return
+  }
   events.value = e.data
   lineups.value = l.data
   const [home, away] = await Promise.all([
@@ -109,9 +146,16 @@ async function holdClock() {
   try {
     await api.post(`/referee/matches/${route.params.id}/pause`)
     heldClock.value = true
-    await refreshMatch()
-  } catch {
+    if (match.value) match.value = { ...match.value, status: 'PAUSED' }
+  } catch (reason) {
     heldClock.value = false
+    error.value = apiError(reason, 'Не удалось остановить часы.')
+    return
+  }
+  try {
+    await refreshMatch()
+  } catch (reason) {
+    error.value = apiError(reason, 'Часы остановлены, но табло не обновилось.')
   }
 }
 
@@ -119,12 +163,10 @@ async function releaseClock() {
   if (!heldClock.value) return
   heldClock.value = false
   try {
-    if (match.value?.status === 'PAUSED') {
-      await api.post(`/referee/matches/${route.params.id}/resume`)
-    }
+    await api.post(`/referee/matches/${route.params.id}/resume`)
     await refreshMatch()
-  } catch {
-    /* keep going — the referee can hit Продолжить */
+  } catch (reason) {
+    error.value = apiError(reason, 'Часы не запустились. Нажмите «Продолжить».')
   }
 }
 
@@ -134,6 +176,14 @@ async function closeSheet() {
 }
 
 async function action(path: string) {
+  if (path === 'finish') {
+    const current = match.value
+    const halfStillOpen = remaining.value > 0 || (current?.period ?? 1) < (current?.periodCount ?? 1)
+    const question = halfStillOpen
+      ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
+      : 'Завершить матч?'
+    if (!confirm(question)) return
+  }
   message.value = ''
   error.value = ''
   pending.value = true
@@ -148,12 +198,37 @@ async function action(path: string) {
   }
 }
 
+function canUndo(ev: { voided?: boolean; eventType?: string }) {
+  if (!live.value || ev.voided) return false
+  return ev.eventType !== 'PERIOD_START' && ev.eventType !== 'PERIOD_END'
+}
+
+async function undoEvent(ev: { id: string; eventType?: string }) {
+  const label = labelOf(eventLabel, ev.eventType)
+  if (!confirm(`Убрать «${label}» из протокола? Счёт пересчитается по оставшимся голам.`)) return
+  message.value = ''
+  error.value = ''
+  pending.value = true
+  try {
+    await api.post(`/referee/matches/${route.params.id}/events/${ev.id}/void`)
+    message.value = 'Событие убрано из протокола.'
+    await reload()
+  } catch (e: any) {
+    error.value = apiError(e, 'Событие не убралось.')
+  } finally {
+    pending.value = false
+  }
+}
+
 async function addEvent(payload: Record<string, unknown>) {
   message.value = ''
   error.value = ''
   pending.value = true
   try {
-    await api.post(`/referee/matches/${route.params.id}/events`, payload)
+    await api.post(`/referee/matches/${route.params.id}/events`, {
+      ...payload,
+      gameTime: elapsed.value,
+    })
     sheet.value = null
     message.value = 'В протоколе.'
     await releaseClock()
@@ -171,8 +246,26 @@ async function openSheet(kind: EventKind) {
     error.value = 'Сначала стартуйте матч.'
     return
   }
-  await holdClock()
+  if (kind === 'YELLOW_CARD' || kind === 'RED_CARD') {
+    await holdClock()
+  }
   sheet.value = { kind, step: 'team' }
+}
+
+function recordTeamGoal(ownGoal: boolean) {
+  const current = sheet.value
+  if (!current?.teamId || pending.value) return
+  addEvent({
+    eventType: 'GOAL',
+    teamId: current.teamId,
+    metadata: ownGoal ? { ownGoal: true } : undefined,
+  })
+}
+
+function recordTeamCard() {
+  const current = sheet.value
+  if (!current?.teamId || pending.value || current.kind === 'GOAL' || current.kind === 'SUBSTITUTION') return
+  addEvent({ eventType: current.kind, teamId: current.teamId })
 }
 
 function pickTeam(teamId: string) {
@@ -196,13 +289,17 @@ function chosenKeeperId(teamId?: string) {
 
 function toggleOwnGoal() {
   const current = sheet.value
-  if (!current) return
+  if (!current || pending.value) return
+  if (!rosterOf(current.teamId).length) {
+    recordTeamGoal(true)
+    return
+  }
   sheet.value = { ...current, ownGoal: !current.ownGoal }
 }
 
 function pickPlayer(player: any) {
   const current = sheet.value
-  if (!current?.teamId) return
+  if (!current?.teamId || pending.value) return
   if (current.kind === 'GOAL') {
     if (current.ownGoal) {
       addEvent({
@@ -216,7 +313,22 @@ function pickPlayer(player: any) {
     sheet.value = { ...current, player, step: 'assist' }
     return
   }
+  if (current.kind === 'SUBSTITUTION') {
+    sheet.value = { ...current, player, step: 'incoming' }
+    return
+  }
   addEvent({ eventType: current.kind, teamId: current.teamId, playerId: player.playerId })
+}
+
+function confirmSubstitution(incomingId: string) {
+  const current = sheet.value
+  if (!current?.teamId || !current.player || !incomingId || pending.value) return
+  addEvent({
+    eventType: 'SUBSTITUTION',
+    teamId: current.teamId,
+    playerId: current.player.playerId,
+    secondaryPlayerId: incomingId,
+  })
 }
 
 function confirmGoal(assistPlayerId?: string | null, ownGoal = false) {
@@ -251,7 +363,7 @@ async function setKeeper(teamId: string, playerId: string) {
 function backSheet() {
   const current = sheet.value
   if (!current) return
-  if (current.step === 'assist') {
+  if (current.step === 'incoming' || current.step === 'assist') {
     sheet.value = { ...current, step: 'player', player: undefined }
     return
   }
@@ -264,15 +376,23 @@ function backSheet() {
 
 onMounted(reload)
 onUnmounted(() => {
-  if (heldClock.value) {
-    heldClock.value = false
-    api.post(`/referee/matches/${route.params.id}/resume`).catch(() => {})
-  }
+  if (!heldClock.value) return
+  heldClock.value = false
+  api.post(`/referee/matches/${route.params.id}/resume`).catch((reason) => {
+    error.value = apiError(reason, 'Часы не запустились. Нажмите «Продолжить».')
+  })
 })
 </script>
 
 <template>
-  <section v-if="match" class="stack pad">
+  <section v-if="match && !canControl" class="stack pad">
+    <div class="page-title">
+      <RouterLink class="back" to="/referee">← К матчам</RouterLink>
+      <h1>Пульт</h1>
+    </div>
+    <p class="form-error">Этот пульт только для судьи, назначенного на матч.</p>
+  </section>
+  <section v-else-if="match" class="stack pad">
     <div class="page-title">
       <RouterLink class="back" to="/referee">← К матчам</RouterLink>
       <h1>Пульт</h1>
@@ -283,6 +403,7 @@ onUnmounted(() => {
       <p class="period">{{ periodLabel(match.period, match.sportCode, match.periodCount) }}</p>
       <div class="clock" :class="{ expired }">{{ formatClock(remaining) }}</div>
       <p class="muted">осталось из {{ formatClock(cap) }} · прошло {{ formatClock(elapsed) }}</p>
+      <p v-if="heldClock" class="form-ok">Матч на паузе, часы стоят.</p>
       <div class="sides">
         <strong class="club">
           <TeamCrest :src="teams.logo(match.homeTeamId)" :name="homeLabel" :size="28" />
@@ -362,15 +483,17 @@ onUnmounted(() => {
       <button class="btn large goal" :disabled="pending || !live" @click="openSheet('GOAL')">Гол</button>
       <button class="btn large yellow" :disabled="pending || !live" @click="openSheet('YELLOW_CARD')">Жёлтая</button>
       <button class="btn large danger" :disabled="pending || !live" @click="openSheet('RED_CARD')">Красная</button>
+      <button class="btn large secondary" :disabled="pending || !live" @click="openSheet('SUBSTITUTION')">Замена</button>
     </div>
 
     <div class="panel stack">
       <h2>Протокол</h2>
       <p v-if="!protocol.length" class="muted">Событий нет.</p>
       <div v-for="ev in protocol" :key="ev.id" class="proto" :class="{ voided: ev.voided }">
-        <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
+        <span v-if="protocolMinute(ev, match.periodLengthSeconds) != null" class="t">{{ protocolMinute(ev, match.periodLengthSeconds) }}'</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
         <span>{{ eventDetail(ev) || '—' }}</span>
+        <button v-if="canUndo(ev)" class="btn ghost" type="button" :disabled="pending" @click="undoEvent(ev)">Убрать</button>
       </div>
     </div>
     <p v-if="message" class="form-ok">{{ message }}</p>
@@ -378,12 +501,9 @@ onUnmounted(() => {
 
     <div v-if="sheet" class="overlay" @click.self="closeSheet">
       <div class="popover" role="dialog" aria-modal="true">
-        <p class="step">
-          {{ sheet.step === 'team' ? '1' : sheet.step === 'player' ? '2' : '3' }}
-          /
-          {{ sheet.kind === 'GOAL' && !sheet.ownGoal ? '3' : '2' }}
-        </p>
+        <p class="step">{{ stepIndex(sheet.step) }} / {{ stepCount }}</p>
         <h2>{{ sheetTitle }}</h2>
+        <p v-if="heldClock" class="form-ok">Матч на паузе, часы стоят.</p>
         <p class="muted">{{ sheetHint }}</p>
 
         <div v-if="sheet.step === 'team'" class="pick-grid">
@@ -392,21 +512,48 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="sheet.step === 'player'" class="chip-col">
+          <template v-if="sheet.kind === 'GOAL' && !rosterOf(sheet.teamId).length">
+            <p class="muted">В заявке никого. Гол запишется на команду.</p>
+            <button class="btn large" type="button" :disabled="pending" @click="recordTeamGoal(false)">Гол команды</button>
+            <button class="btn large" type="button" :disabled="pending" @click="recordTeamGoal(true)">Автогол</button>
+          </template>
+          <template v-else-if="sheet.kind === 'SUBSTITUTION' && rosterOf(sheet.teamId).length < 2">
+            <p class="muted">Для замены нужны два игрока в заявке.</p>
+          </template>
+          <template v-else>
+            <button
+              v-if="sheet.kind === 'GOAL'"
+              class="btn large"
+              :class="{ on: sheet.ownGoal }"
+              type="button"
+              :disabled="pending"
+              @click="toggleOwnGoal"
+            >Автогол</button>
+            <p v-if="!rosterOf(sheet.teamId).length" class="muted">В заявке никого.</p>
+            <button
+              v-if="sheet.kind !== 'GOAL' && sheet.kind !== 'SUBSTITUTION' && !rosterOf(sheet.teamId).length"
+              class="btn large"
+              type="button"
+              :disabled="pending"
+              @click="recordTeamCard"
+            >Карточка команде</button>
+            <button
+              v-for="p in rosterOf(sheet.teamId)"
+              :key="p.playerId"
+              class="btn secondary pick"
+              :disabled="pending"
+              @click="pickPlayer(p)"
+            >{{ nameOf(p) }}</button>
+          </template>
+        </div>
+
+        <div v-else-if="sheet.step === 'incoming'" class="chip-col">
           <button
-            v-if="sheet.kind === 'GOAL'"
-            class="btn large"
-            :class="{ on: sheet.ownGoal }"
-            type="button"
-            :disabled="pending"
-            @click="toggleOwnGoal"
-          >Автогол</button>
-          <p v-if="!rosterOf(sheet.teamId).length" class="muted">В заявке никого.</p>
-          <button
-            v-for="p in rosterOf(sheet.teamId)"
+            v-for="p in rosterOf(sheet.teamId).filter((x: any) => x.playerId !== sheet?.player?.playerId)"
             :key="p.playerId"
             class="btn secondary pick"
             :disabled="pending"
-            @click="pickPlayer(p)"
+            @click="confirmSubstitution(p.playerId)"
           >{{ nameOf(p) }}</button>
         </div>
 
@@ -470,8 +617,9 @@ onUnmounted(() => {
 h2 { font-size: 1.15rem; margin: 0 0 0.35rem; }
 .proto {
   display: grid;
-  grid-template-columns: 64px 90px 1fr;
+  grid-template-columns: 64px 90px 1fr auto;
   gap: 0.6rem;
+  align-items: center;
   padding: 0.45rem 0;
   border-bottom: 1px solid var(--line);
 }

@@ -7,7 +7,7 @@ import { useTournamentApply } from '../lib/useTournamentApply'
 const props = defineProps<{
   tournament: { id: string, name: string, status?: string } | null
 }>()
-const emit = defineEmits<{ close: [], applied: [] }>()
+const emit = defineEmits<{ close: [], applied: [message: string] }>()
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -46,9 +46,11 @@ watch(() => props.tournament?.id, async (id) => {
 }, { immediate: true })
 
 async function submit() {
-  if (!props.tournament) return
+  if (!props.tournament || pending.value) return
   const done = await apply(props.tournament.id)
-  if (done) emit('applied')
+  if (!done) return
+  emit('applied', ok.value)
+  emit('close')
 }
 
 function onKey(event: KeyboardEvent) {

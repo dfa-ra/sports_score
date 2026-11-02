@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -77,7 +78,8 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"refreshToken":"%s"}
                                 """.formatted(refreshToken)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Сессия истекла. Войдите снова."));
 
         mockMvc.perform(post("/api/v1/auth/logout")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +117,8 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"email":"%s","password":"bad-password"}
                                 """.formatted(email)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Неверный email или пароль"));
     }
 
     @Test
@@ -131,7 +134,21 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Эта почта уже зарегистрирована"));
+    }
+
+    @Test
+    void fanRegistrationRequiresName() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"noname-%s@example.com","password":"Str0ngPass!","role":"FAN"}
+                                """.formatted(System.nanoTime())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Проверьте введённые данные"))
+                .andExpect(jsonPath("$.details[?(@.field=='firstName')].message", hasItem("Укажите имя")))
+                .andExpect(jsonPath("$.details[?(@.field=='lastName')].message", hasItem("Укажите фамилию")));
     }
 
     @Test
@@ -155,7 +172,9 @@ class AuthIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"email":"nophoto-%s@example.com","password":"Str0ngPass!","firstName":"Иван","lastName":"Иванов","roles":["PLAYER","CAPTAIN"]}
                                 """.formatted(System.nanoTime())))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Проверьте введённые данные"))
+                .andExpect(jsonPath("$.details[?(@.message=='Для игрока, капитана и судьи нужна фотография')]").exists());
     }
 
     @Test

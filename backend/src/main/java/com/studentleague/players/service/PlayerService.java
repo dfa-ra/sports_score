@@ -1,6 +1,7 @@
 package com.studentleague.players.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.clock.PlayingTime;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
@@ -35,6 +36,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -93,6 +95,7 @@ public class PlayerService {
                 || roleService.hasApproved(userId, Role.ADMIN);
         boolean promote = false;
         if (!alreadyPlayer && (existing == null || completeRegistration(request))) {
+            roleService.requireNoPending(userId, Role.PLAYER);
             requirePlayerRegistration(request, existing, user);
             promote = true;
         }
@@ -318,11 +321,7 @@ public class PlayerService {
             int assists = 0;
             int yellowCards = 0;
             int redCards = 0;
-            Integer lastMinute = null;
             for (MatchEvent event : events) {
-                if (event.getGameTime() != null) {
-                    lastMinute = event.getGameTime();
-                }
                 if (playerId.equals(event.getPlayerId())) {
                     switch (event.getEventType()) {
                         case GOAL -> {
@@ -369,7 +368,13 @@ public class PlayerService {
                     assists,
                     yellowCards,
                     redCards,
-                    minutesPlayed(match, lineup, lastMinute)
+                    PlayingTime.minutesPlayed(
+                            match,
+                            lineup != null && lineup.isStarter(),
+                            playerId,
+                            events,
+                            Instant.now()
+                    )
             ));
         }
         return history;
@@ -413,21 +418,6 @@ public class PlayerService {
             return "LOSS";
         }
         return "DRAW";
-    }
-
-    private static Integer minutesPlayed(Match match, MatchLineupPlayer lineup, Integer lastEventMinute) {
-        if (lineup != null && lineup.isStarter() && match.getGameTimeSeconds() != null) {
-            return Math.max(1, match.getGameTimeSeconds() / 60);
-        }
-        if (lineup != null && lineup.isStarter()) {
-            return 40;
-        }
-        if (lastEventMinute == null) {
-            return null;
-        }
-        // Stored game time is seconds from kickoff once it reaches two minutes.
-        // Smaller legacy values were sometimes a bare minute and stay as typed.
-        return lastEventMinute >= 120 ? lastEventMinute / 60 : lastEventMinute;
     }
 
     private static final class CleanSheetTally {

@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
+import { labelOfSport } from '../lib/format'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import { ymd } from '../lib/match'
@@ -18,6 +19,9 @@ const tournaments = ref<Record<string, string>>({})
 const error = ref('')
 const loading = ref(true)
 const mineOnly = ref(false)
+const sports = ref<any[]>([])
+const sportId = ref('')
+const historyFloor = ref('')
 const teams = useTeamDirectory()
 const fav = useFavorites()
 const stripEl = ref<HTMLElement | null>(null)
@@ -51,8 +55,13 @@ function oldestKey(batch: any[]) {
   return oldest
 }
 
+function monthStart(key: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return ''
+  return `${key.slice(0, 8)}01`
+}
+
 async function loadMatches() {
-  const fromKey = ymd(addDays(atNoon(), -PAST_DAYS))
+  const fromKey = historyFloor.value || ymd(addDays(atNoon(), -PAST_DAYS))
   const collected: any[] = []
   for (let page = 0; page < 30; page += 1) {
     const { data } = await api.get('/matches', {
@@ -70,21 +79,36 @@ async function loadMatches() {
 onMounted(async () => {
   try {
     await teams.load()
-    const [, t] = await Promise.all([
+    const [, t, s] = await Promise.all([
       loadMatches(),
       api.get('/tournaments', { params: { size: 50 } }),
+      api.get('/sports'),
     ])
     const names: Record<string, string> = {}
     for (const item of t.data.content ?? []) names[item.id] = item.name
     tournaments.value = names
+    sports.value = s.data ?? []
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Календарь не загрузился.'
   } finally {
     loading.value = false
-    refreshTimer = window.setInterval(() => {
-      loadMatches().catch(() => {})
-    }, 12_000)
+    armRefresh()
   }
+})
+
+function armRefresh() {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+  const delay = route.name === 'live' ? 4_000 : 12_000
+  refreshTimer = window.setInterval(() => {
+    loadMatches().catch((reason: unknown) => {
+      const message = (reason as { response?: { data?: { message?: string } } })?.response?.data?.message
+      if (!items.value.length) error.value = message || 'Календарь не обновился.'
+    })
+  }, delay)
+}
+
+watch(() => route.name, () => {
+  if (!loading.value) armRefresh()
 })
 
 onUnmounted(() => {
@@ -114,28 +138,39 @@ function weekday(date: Date) {
   return date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '').toUpperCase()
 }
 
+function selectDay(key: string) {
+  if (!key) return
+  day.value = key
+  const floor = monthStart(key)
+  const loadedFrom = historyFloor.value || ymd(addDays(atNoon(), -PAST_DAYS))
+  nextTick(alignStrip)
+  if (!floor || (floor >= loadedFrom && key >= loadedFrom)) return
+  historyFloor.value = floor < loadedFrom ? floor : loadedFrom
+  loadMatches().catch((e: any) => {
+    error.value = e.response?.data?.message || 'Календарь не загрузился.'
+  })
+}
+
 const strip = computed(() => {
-  const today = atNoon()
-  const current = ymd(today)
-  const fromKey = ymd(addDays(today, -PAST_DAYS))
-  const keys = new Set<string>([current])
-  for (const match of items.value) {
-    const key = ymd(match.scheduledAt)
-    if (!key || key < fromKey) continue
-    keys.add(key)
-  }
-  return [...keys].sort().map((key) => {
-    const [, monthText, dateText] = key.split('-')
-    const month = Number(monthText)
-    const date = Number(dateText)
-    const parsed = new Date(Number(key.slice(0, 4)), month - 1, date, 12)
-    return {
+  const current = todayKey.value
+  const selected = day.value || current
+  const [yearText, monthText] = selected.split('-')
+  const year = Number(yearText)
+  const month = Number(monthText)
+  if (!year || !month) return []
+  const last = new Date(year, month, 0).getDate()
+  const days: { key: string; label: string }[] = []
+  for (let date = 1; date <= last; date += 1) {
+    const key = `${yearText}-${pad(month)}-${pad(date)}`
+    const parsed = new Date(year, month - 1, date, 12)
+    days.push({
       key,
       label: key === current
         ? `Сегодня ${pad(date)}.${pad(month)}.`
         : `${weekday(parsed)} ${pad(date)}.${pad(month)}.`,
-    }
-  })
+    })
+  }
+  return days
 })
 
 function isMine(match: any) {
@@ -152,6 +187,7 @@ const visible = computed(() => {
       .slice()
       .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
   }
+  if (sportId.value) rows = rows.filter((m) => m.sportId === sportId.value)
   return mineOnly.value ? rows.filter(isMine) : rows
 })
 
@@ -177,6 +213,19 @@ const grouped = computed(() => {
       <h1>Live</h1>
       <MatchGoalAlerts />
     </div>
+    <div class="calendar-tools">
+      <label v-if="!liveOnly" class="tool">Дата
+        <input type="date" :value="day" @change="selectDay(($event.target as HTMLInputElement).value)" />
+      </label>
+      <label class="tool">Вид спорта
+        <select v-model="sportId">
+          <option value="">Все виды</option>
+          <option v-for="sport in sports" :key="sport.id" :value="sport.id">
+            {{ sport.name || labelOfSport(sport.code) }}
+          </option>
+        </select>
+      </label>
+    </div>
     <div class="calendar-bar">
       <button
         type="button"
@@ -191,7 +240,7 @@ const grouped = computed(() => {
           :key="item.key"
           type="button"
           :class="{ on: day === item.key }"
-          @click="day = item.key"
+          @click="selectDay(item.key)"
         >{{ item.label }}</button>
       </div>
     </div>
@@ -226,6 +275,33 @@ const grouped = computed(() => {
   gap: 0;
   min-width: 0;
   max-width: 100%;
+}
+.calendar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0.35rem 0 0.45rem;
+}
+.tool {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tool input,
+.tool select {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--navy);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.35rem 0.5rem;
+  background: #fff;
 }
 .calendar-bar {
   display: flex;

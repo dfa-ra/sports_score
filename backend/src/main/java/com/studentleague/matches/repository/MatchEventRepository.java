@@ -8,10 +8,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface MatchEventRepository extends JpaRepository<MatchEvent, UUID> {
     List<MatchEvent> findByMatchIdOrderByTimestampAsc(UUID matchId);
+    Optional<MatchEvent> findFirstByMatchIdOrderByTimestampDesc(UUID matchId);
     void deleteByMatchId(UUID matchId);
     boolean existsByTeamId(UUID teamId);
     List<MatchEvent> findByMatchIdAndVoidedFalseOrderByTimestampAsc(UUID matchId);

@@ -21,6 +21,7 @@ type Slide = {
   caption?: string
   linkUrl?: string
   linkLabel?: string
+  enabled?: boolean
 }
 
 const feed = ref<any>(null)
@@ -32,8 +33,13 @@ const storyRail = ref<HTMLElement | null>(null)
 const teams = useTeamDirectory()
 let timer: number | undefined
 
-const heroes = computed<Slide[]>(() => feed.value?.heroes ?? [])
-const stories = computed<Slide[]>(() => feed.value?.stories ?? [])
+function shownSlides(list: Slide[] | null | undefined): Slide[] {
+  return (list ?? []).filter((item) => item?.enabled !== false && !!item?.url)
+}
+
+const heroes = computed<Slide[]>(() => shownSlides(feed.value?.heroes))
+const stories = computed<Slide[]>(() => shownSlides(feed.value?.stories))
+const moments = computed<Slide[]>(() => shownSlides(feed.value?.photos))
 const current = computed(() => heroes.value[slide.value] || null)
 const storyIndex = ref<number | null>(null)
 const openedStory = computed(() =>
@@ -281,8 +287,9 @@ function heroHeading(slide: Slide | null | undefined) {
           <h2>Моменты</h2>
           <a v-if="feed?.vkAlbumUrl" :href="feed.vkAlbumUrl" target="_blank" rel="noreferrer">Все кадры →</a>
         </div>
-        <div class="photos">
-          <figure v-for="photo in feed?.photos" :key="photo.id">
+        <EmptyState v-if="loaded && !moments.length" title="Фото пока нет" />
+        <div v-else class="photos">
+          <figure v-for="photo in moments" :key="photo.id">
             <img :src="photo.url" :alt="photo.caption || photo.title || 'Момент'" />
             <figcaption v-if="photo.title || photo.caption">{{ photo.title || photo.caption }}</figcaption>
           </figure>

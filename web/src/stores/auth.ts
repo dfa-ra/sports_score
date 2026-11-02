@@ -99,7 +99,10 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   function hasRole(candidate: Role) {
-    return approvedRoles.value.includes(candidate) || role.value === candidate
+    if ((user.value?.roles ?? []).length) {
+      return approvedRoles.value.includes(candidate)
+    }
+    return role.value === candidate
   }
 
   function persist() {

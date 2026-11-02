@@ -4,7 +4,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
-import { isTournamentOpenForApply } from '../lib/format'
+import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
+import { matchStateLabel } from '../lib/match'
 import { setPageMeta } from '../lib/pageMeta'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -33,6 +34,8 @@ const status = ref('REGISTRATION')
 const format = ref('ROUND_ROBIN')
 const regulations = ref('')
 const seasonYear = ref(2026)
+const startDate = ref('')
+const endDate = ref('')
 const tab = ref<'table' | 'rules'>('table')
 const calendarFile = ref<File | null>(null)
 const error = ref('')
@@ -40,8 +43,13 @@ const ok = ref('')
 const pending = ref(false)
 const showMatchForm = ref(false)
 const applying = ref(false)
+const applyNote = ref('')
 
 const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
+const playedWhileRecruiting = computed(() =>
+  tournament.value?.status === 'REGISTRATION'
+  && matches.value.some((match) => match.status === 'LIVE' || match.status === 'PAUSED' || match.status === 'FINISHED'),
+)
 const showApply = computed(() =>
   registrationOpen.value
   && (auth.hasRole('CAPTAIN') || auth.canManageLeague || !auth.isAuthenticated)
@@ -81,10 +89,22 @@ async function load() {
   format.value = t.data.format
   regulations.value = t.data.regulations || ''
   seasonYear.value = t.data.seasonYear
+  startDate.value = t.data.startDate || ''
+  endDate.value = t.data.endDate || ''
+}
+
+function onApplied(message: string) {
+  applyNote.value = message
+  load()
 }
 
 async function save() {
   error.value = ''
+  const dateError = tournamentDatesError(startDate.value, endDate.value)
+  if (dateError) {
+    error.value = dateError
+    return
+  }
   pending.value = true
   try {
     await api.put(`/tournaments/${tournament.value.id}`, {
@@ -94,6 +114,8 @@ async function save() {
       format: format.value,
       regulations: regulations.value || undefined,
       seasonYear: Number(seasonYear.value),
+      startDate: startDate.value || undefined,
+      endDate: endDate.value || undefined,
     })
     ok.value = 'Турнир обновлён.'
     await load()
@@ -214,6 +236,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     <div v-if="showApply" class="panel stack">
       <h2>Заявить команду</h2>
       <p>Пока идёт набор, капитан и админ могут подать заявку. В сетку команду всё равно допускает админ.</p>
+      <p v-if="applyNote" class="form-ok">{{ applyNote }}</p>
       <button v-if="auth.isAuthenticated" class="btn" type="button" @click="applying = true">Заявиться</button>
       <RouterLink v-else class="btn" :to="{ name: 'login', query: { redirect: route.fullPath } }">
         Войти и заявиться
@@ -259,14 +282,20 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     <div class="panel stack">
       <h2>Матчи</h2>
       <EmptyState v-if="!matches.length" title="Матчей нет" />
-      <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-        <span class="club">
-          <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="18" />
-          {{ names.fullName(m.homeTeamId) }}
-          {{ m.homeScore }}:{{ m.awayScore }}
-          {{ names.fullName(m.awayTeamId) }}
+      <RouterLink v-for="m in matches" :key="m.id" class="row match-row" :to="`/matches/${m.id}`">
+        <span class="match-side">
+          <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="22" />
+          <span>{{ names.fullName(m.homeTeamId) }}</span>
         </span>
-        <StatusBadge :status="m.status" />
+        <span class="match-score">{{ m.homeScore }}:{{ m.awayScore }}</span>
+        <span class="match-side away">
+          <span>{{ names.fullName(m.awayTeamId) }}</span>
+          <TeamCrest :src="names.logo(m.awayTeamId)" :name="names.fullName(m.awayTeamId)" :size="22" />
+        </span>
+        <span class="match-meta">
+          <span>{{ formatWhen(m.scheduledAt) }}</span>
+          <span v-if="m.status !== 'FINISHED'">{{ matchStateLabel(m.status) }}</span>
+        </span>
       </RouterLink>
     </div>
     <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
@@ -276,15 +305,19 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       v-if="applying && tournament"
       :tournament="tournament"
       @close="applying = false"
-      @applied="load"
+      @applied="onApplied"
     />
 
     <AdminOnly v-if="auth.canManageLeague" title="Для админа">
+      <p v-if="error" class="form-error">{{ error }}</p>
+      <p v-if="ok" class="form-ok">{{ ok }}</p>
       <h2>Настройки турнира</h2>
       <form class="stack" @submit.prevent="save">
         <label class="field">Название<input v-model="name" required /></label>
         <label class="field">Описание<textarea v-model="description" rows="2" /></label>
         <label class="field">Сезон<input v-model.number="seasonYear" type="number" /></label>
+        <label class="field">Старт<input v-model="startDate" type="date" /></label>
+        <label class="field">Финиш<input v-model="endDate" type="date" /></label>
         <label class="field">Статус
           <select v-model="status">
             <option value="DRAFT">Черновик</option>
@@ -294,6 +327,9 @@ async function exclude(team: { teamId: string; teamName?: string }) {
             <option value="CANCELLED">Отменён</option>
           </select>
         </label>
+        <p v-if="playedWhileRecruiting" class="form-error">
+          Матчи уже сыграны или идут, а статус всё ещё «Набор». Поставьте «Идёт» и сохраните. Завершённый турнир это само не переписывает.
+        </p>
         <label class="field">Формат
           <select v-model="format">
             <option value="ROUND_ROBIN">Круговой турнир</option>
@@ -394,6 +430,39 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   text-decoration: none;
 }
 .row:hover { color: var(--accent); }
+.row.match-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+.match-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.match-side.away { justify-content: flex-end; }
+.match-score {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.match-meta {
+  display: grid;
+  justify-items: end;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .row.match-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+  .match-meta {
+    grid-column: 1 / -1;
+    justify-items: start;
+    white-space: normal;
+  }
+}
 .actions { display: flex; gap: 0.45rem; }
 .club {
   display: inline-flex;

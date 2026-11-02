@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +40,22 @@ public class GalleryController {
     @Operation(summary = "Public match photo gallery")
     public GalleryFeedResponse feed() {
         return galleryService.feed();
+    }
+
+    @GetMapping("/admin/gallery")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Gallery slides including disabled ones (admin)")
+    public GalleryFeedResponse adminFeed() {
+        return galleryService.adminFeed();
+    }
+
+    @GetMapping("/admin/gallery/{id}/file")
+    @PreAuthorize("hasRole('ADMIN')")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Bytes of a gallery file, including a disabled slide (admin)")
+    public ResponseEntity<Resource> file(@PathVariable UUID id) {
+        return galleryService.openFile(id);
     }
 
     @PostMapping("/admin/gallery")

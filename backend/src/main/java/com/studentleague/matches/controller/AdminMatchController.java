@@ -51,7 +51,7 @@ public class AdminMatchController {
     @Operation(summary = "Set or clear who stood in goal for one team (ADMIN)")
     public MatchResponse setGoalkeeper(
             @PathVariable UUID id,
-            @Valid @RequestBody SetMatchGoalkeeperRequest request
+            @RequestBody SetMatchGoalkeeperRequest request
     ) {
         return matchGoalkeeperService.setByAdmin(id, request);
     }

@@ -67,17 +67,19 @@ export function useTournamentApply() {
   }
 
   async function apply(tournamentId: string, chosenTeamId?: string) {
+    if (pending.value) return false
+    pending.value = true
     error.value = ''
     ok.value = ''
     const id = chosenTeamId || teamId.value
     if (!id) {
       error.value = 'Выберите команду.'
+      pending.value = false
       return false
     }
-    pending.value = true
     try {
       await api.post(`/tournaments/${tournamentId}/teams`, { teamId: id })
-      ok.value = 'Заявка ушла. Ждём допуск админа.'
+      ok.value = 'Заявка отправлена. Ждём, пока админ допустит команду.'
       registeredTeamIds.value = new Set([...registeredTeamIds.value, id])
       const next = teams.value.find((item) => !registeredTeamIds.value.has(item.id))
       teamId.value = next?.id || id

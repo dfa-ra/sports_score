@@ -33,7 +33,7 @@ class MatchListFieldsTest {
         paused.setPeriod(2);
         paused.setGameTimeSeconds(60);
         paused.setPeriodLengthSeconds(20 * 60);
-        assertThat(MatchListFields.minute(paused, now)).isEqualTo(1);
+        assertThat(MatchListFields.minute(paused, now)).isEqualTo(21);
 
         Match scheduled = new Match();
         scheduled.setStatus(MatchStatus.SCHEDULED);

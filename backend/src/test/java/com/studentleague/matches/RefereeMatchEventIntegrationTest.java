@@ -45,13 +45,19 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.periodLengthSeconds").value(900))
                 .andExpect(jsonPath("$.clockRunningSince").isNotEmpty());
 
-        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+        MvcResult teamGoal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
                         .header("Authorization", auth(fx.refereeToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"eventType":"GOAL","teamId":"%s"}
                                 """.formatted(fx.homeTeamId)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.playerId").value(nullValue()))
+                .andReturn();
+        String teamGoalId = objectMapper.readTree(teamGoal.getResponse().getContentAsString()).get("id").asText();
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events/" + teamGoalId + "/void")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
 
         MvcResult goal = mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
                         .header("Authorization", auth(fx.refereeToken))
@@ -88,7 +94,9 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"eventType":"GOAL","teamId":"%s","playerId":"%s"}
                                 """.formatted(fx.homeTeamId, fx.homePlayerId)))
-                .andExpect(status().isCreated());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").isNumber())
+                .andExpect(jsonPath("$.minute").isNumber());
 
         mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
                         .header("Authorization", auth(fx.refereeToken))
@@ -196,37 +204,99 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void publicRefereeListHidesEmailFromGuests() throws Exception {
-        String adminToken = createAdminAndLogin("radmin-mail-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+    void publicRefereeListOmitsEmailWhileAdminStillReceivesIt() throws Exception {
+        String adminToken = createAdminAndLogin("mail-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         Fixture fx = setupMatch(adminToken);
 
         mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value(nullValue()))
+                .andExpect(jsonPath("$[0].email").doesNotExist())
                 .andExpect(jsonPath("$[0].firstName").isNotEmpty())
-                .andExpect(jsonPath("$[0].lastName").isNotEmpty())
-                .andExpect(jsonPath("$[0].refereeId").isNotEmpty());
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().string(
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString(fx.refereeEmail))));
 
         mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
                         .header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].email").value(fx.refereeEmail));
 
-        String analystEmail = "analyst-mail-" + System.nanoTime() + "@example.com";
-        registerAndLogin(analystEmail, "Str0ngPass!");
-        var analyst = userRepository.findByEmailIgnoreCase(analystEmail).orElseThrow();
-        analyst.setRole(Role.ANALYST);
-        userRepository.save(analyst);
-        String analystToken = reLogin(analystEmail, "Str0ngPass!");
-        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
-                        .header("Authorization", auth(analystToken)))
+        mockMvc.perform(get("/api/v1/admin/referees")
+                        .param("q", fx.refereeEmail)
+                        .header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value(fx.refereeEmail));
+                .andExpect(jsonPath("$.content[0].email").value(fx.refereeEmail));
+    }
 
-        mockMvc.perform(get("/api/v1/matches/" + fx.matchId + "/referees")
-                        .header("Authorization", auth(fx.refereeToken)))
+    @Test
+    void secondLineupSaveReplacesTheFirstForRefereeAndAdmin() throws Exception {
+        String adminToken = createAdminAndLogin("line-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+        String body = """
+                {"teamId":"%s","starterPlayerIds":["%s"]}
+                """.formatted(fx.homeTeamId, fx.homePlayerId);
+
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value(nullValue()));
+                .andExpect(jsonPath("$.home.confirmed").value(true))
+                .andExpect(jsonPath("$.home.starters[0].playerId").value(fx.homePlayerId));
+
+        mockMvc.perform(put("/api/v1/matches/" + fx.matchId + "/lineups")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.home.starters[0].playerId").value(fx.homePlayerId));
+    }
+
+    @Test
+    void eventMinuteMustFitTheMatchIncludingSecondHalf() throws Exception {
+        String adminToken = createAdminAndLogin("min-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Fixture fx = setupMatch(adminToken);
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/start")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, -5)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Время события не может быть отрицательным"));
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 99999)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Время события больше длительности матча"));
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/next-period")
+                        .header("Authorization", auth(fx.refereeToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 16)))
+                .andExpect(status().isCreated());
+        mockMvc.perform(post("/api/v1/referee/matches/" + fx.matchId + "/events")
+                        .header("Authorization", auth(fx.refereeToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(goal(fx, 16 * 60)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.gameTime").value(16 * 60));
+    }
+
+    private static String goal(Fixture fx, int gameTime) {
+        return """
+                {"eventType":"GOAL","teamId":"%s","playerId":"%s","gameTime":%d}
+                """.formatted(fx.homeTeamId, fx.homePlayerId, gameTime);
     }
 
     private void registerAndApprove(String adminToken, String captainToken, String tournamentId, String teamId) throws Exception {

@@ -49,6 +49,23 @@ public class RoleService {
                 || userRepository.findById(userId).map(user -> user.getRole() == role).orElse(false);
     }
 
+    public void requireNoPending(UUID userId, Role role) {
+        if (assignmentRepository.existsByUserIdAndRoleAndStatus(userId, role, RoleStatus.PENDING)) {
+            throw ApiException.conflict("Заявка на роль «" + roleTitle(role) + "» уже на рассмотрении");
+        }
+    }
+
+    public static String roleTitle(Role role) {
+        return switch (role) {
+            case FAN -> "Зритель";
+            case PLAYER -> "Игрок";
+            case CAPTAIN -> "Капитан";
+            case REFEREE -> "Судья";
+            case ANALYST -> "Аналитик";
+            case ADMIN -> "Админ";
+        };
+    }
+
     public List<UserRoleAssignment> assignmentsOf(UUID userId) {
         return assignmentRepository.findByUserId(userId);
     }
@@ -56,14 +73,15 @@ public class RoleService {
     @Transactional
     public UserRoleAssignment requestRole(User user, Role role, String photoUrl) {
         if (role == Role.ADMIN) {
-            throw ApiException.badRequest("Роль ADMIN задаётся только через ADMIN_EMAIL");
+            throw ApiException.badRequest("Роль администратора задаётся только через ADMIN_EMAIL");
         }
         if (!SELF_REQUESTABLE.contains(role)) {
             throw ApiException.badRequest("Эту роль нельзя запросить");
         }
         if (PHOTO_REQUIRED.contains(role) && (photoUrl == null || photoUrl.isBlank())) {
-            throw ApiException.badRequest("Для роли " + role.name() + " нужна фотография");
+            throw ApiException.badRequest("Для роли «" + roleTitle(role) + "» нужна фотография");
         }
+        requireNoPending(user.getId(), role);
 
         RoleStatus status = (role == Role.FAN || autoApprove()) ? RoleStatus.APPROVED : RoleStatus.PENDING;
         UserRoleAssignment assignment = assignmentRepository.findByUserIdAndRole(user.getId(), role)
@@ -149,13 +167,19 @@ public class RoleService {
     }
 
     public UserResponse toUserResponse(User user) {
-        List<RoleAssignmentResponse> roles = assignmentRepository.findByUserId(user.getId()).stream()
+        List<UserRoleAssignment> assignments = assignmentRepository.findByUserId(user.getId());
+        List<RoleAssignmentResponse> roles = assignments.stream()
                 .map(RoleService::toAssignmentResponse)
                 .toList();
+        Role primary = assignments.stream()
+                .filter(assignment -> assignment.getStatus() == RoleStatus.APPROVED)
+                .map(UserRoleAssignment::getRole)
+                .max(Comparator.comparingInt(RoleService::rank))
+                .orElse(user.getRole() == null ? Role.FAN : user.getRole());
         return new UserResponse(
                 user.getId(),
                 user.getEmail(),
-                user.getRole(),
+                primary,
                 user.isEnabled(),
                 user.getFirstName(),
                 user.getLastName(),

@@ -46,6 +46,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -107,6 +108,7 @@ public class TournamentService {
     public TournamentResponse create(CreateTournamentRequest request) {
         sportRepository.findById(request.sportId())
                 .orElseThrow(() -> ApiException.notFound("Sport not found"));
+        requireChronologicalDates(request.startDate(), request.endDate());
         Tournament tournament = new Tournament();
         tournament.setName(request.name().trim());
         tournament.setDescription(request.description());
@@ -124,6 +126,9 @@ public class TournamentService {
     @Transactional
     public TournamentResponse update(UUID id, UpdateTournamentRequest request) {
         Tournament tournament = requireTournament(id);
+        LocalDate startDate = request.startDate() != null ? request.startDate() : tournament.getStartDate();
+        LocalDate endDate = request.endDate() != null ? request.endDate() : tournament.getEndDate();
+        requireChronologicalDates(startDate, endDate);
         if (request.name() != null && !request.name().isBlank()) {
             tournament.setName(request.name().trim());
         }
@@ -407,6 +412,12 @@ public class TournamentService {
             result.add(new StandingTableResponse(table.getId(), table.getName(), table.getSortOrder(), rows));
         }
         return new TournamentStandingsResponse(result);
+    }
+
+    private void requireChronologicalDates(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && endDate.isBefore(startDate)) {
+            throw ApiException.badRequest("Дата финиша не может быть раньше даты старта.");
+        }
     }
 
     private Tournament requireTournament(UUID id) {

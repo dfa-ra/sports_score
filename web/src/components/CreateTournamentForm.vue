@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
-import { labelOfSport } from '../lib/format'
+import { labelOfSport, tournamentDatesError } from '../lib/format'
 
 const emit = defineEmits<{ created: [tournament: any] }>()
 const router = useRouter()
@@ -31,6 +31,11 @@ onMounted(async () => {
 
 async function submit() {
   error.value = ''
+  const dateError = tournamentDatesError(startDate.value, endDate.value)
+  if (dateError) {
+    error.value = dateError
+    return
+  }
   pending.value = true
   try {
     const { data } = await api.post('/tournaments', {

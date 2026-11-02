@@ -1,5 +1,6 @@
 package com.studentleague.matches.clock;
 
+import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,18 @@ class MatchClockKickoffTest {
         assertEquals(18 * 60, MatchClock.toKickoffSeconds(3 * 60, 2, 15 * 60));
         assertEquals(18 * 60, MatchClock.toKickoffSeconds(18 * 60, 2, 15 * 60));
         assertEquals(30 * 60, MatchClock.toKickoffSeconds(15 * 60, 2, 15 * 60));
+    }
+
+    @Test
+    void twoByFifteenKickoffIsOneAndSixSecondsIntoTheSecondHalfIsSixteen() {
+        assertEquals(1, MatchClock.protocolMinute(0, 1, MatchEventType.PERIOD_START, 15 * 60));
+        assertEquals(2, MatchClock.displayMinute(2 * 60));
+        assertEquals(16, MatchClock.displayMinute(15 * 60 + 6, 15 * 60));
+        assertEquals(18, MatchClock.displayMinute(18 * 60));
+        assertEquals(1, MatchClock.protocolMinute(26, 1, MatchEventType.PERIOD_END, 15 * 60));
+        assertEquals(1, MatchClock.protocolMinute(26, 2, MatchEventType.PERIOD_START, 15 * 60));
+        assertEquals(15, MatchClock.protocolMinute(15 * 60, 1, MatchEventType.PERIOD_END, 15 * 60));
+        assertEquals(16, MatchClock.protocolMinute(15 * 60, 2, MatchEventType.PERIOD_START, 15 * 60));
     }
 
     @Test

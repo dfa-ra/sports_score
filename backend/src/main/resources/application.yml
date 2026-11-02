@@ -23,6 +23,9 @@ spring:
   data:
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
+    web:
+      pageable:
+        max-page-size: 500
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -42,7 +45,7 @@ app:
     access-expiration-ms: ${JWT_ACCESS_EXPIRATION:900000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
   rate-limit:
-    auth-requests-per-minute: ${AUTH_RATE_LIMIT:30}
+    auth-requests-per-minute: ${AUTH_RATE_LIMIT:10}
   redis:
     enabled: ${APP_REDIS_ENABLED:false}
   local-storage:

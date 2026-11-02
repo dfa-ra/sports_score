@@ -20,6 +20,7 @@ import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRefereeRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
+import com.studentleague.security.CurrentUser;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
@@ -39,6 +40,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,6 +64,7 @@ public class MatchService {
     private final MatchMapper matchMapper;
     private final RoleService roleService;
     private final StandingsBoardCache standingsBoardCache;
+    private final AbandonedLiveMatchService abandonedLiveMatchService;
 
     public MatchService(
             MatchRepository matchRepository,
@@ -79,7 +82,8 @@ public class MatchService {
             NotificationService notificationService,
             MatchMapper matchMapper,
             RoleService roleService,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            AbandonedLiveMatchService abandonedLiveMatchService
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -97,6 +101,7 @@ public class MatchService {
         this.matchMapper = matchMapper;
         this.roleService = roleService;
         this.standingsBoardCache = standingsBoardCache;
+        this.abandonedLiveMatchService = abandonedLiveMatchService;
     }
 
     @Transactional
@@ -142,6 +147,7 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public MatchResponse get(UUID id) {
+        abandonedLiveMatchService.closeIdle(Instant.now());
         return toResponse(requireMatch(id));
     }
 
@@ -174,6 +180,7 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public Page<MatchResponse> list(UUID tournamentId, MatchStatus status, Pageable pageable) {
+        abandonedLiveMatchService.closeIdle(Instant.now());
         Page<Match> page;
         if (tournamentId != null && status != null) {
             page = matchRepository.findByTournamentIdAndStatus(tournamentId, status, pageable);
@@ -228,7 +235,7 @@ public class MatchService {
     @Transactional(readOnly = true)
     public List<MatchRefereeResponse> listReferees(UUID matchId, UserPrincipal principal) {
         requireMatch(matchId);
-        boolean includeEmail = principal != null && principal.hasAnyRole(Role.ADMIN, Role.ANALYST);
+        boolean includeEmail = CurrentUser.isAdmin();
         return matchRefereeRepository.findByMatchId(matchId).stream()
                 .map(assignment -> toRefereeResponse(assignment, includeEmail))
                 .toList();

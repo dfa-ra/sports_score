@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, protocolMinute as protocolMinuteOf } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -50,7 +50,7 @@ const protocolMinute = ref(1)
 const protocolOwnGoal = ref(false)
 const homeRoster = ref<any[]>([])
 const awayRoster = ref<any[]>([])
-const minuteDrafts = ref<Record<string, number>>({})
+const minuteDrafts = ref<Record<string, number | null>>({})
 const playerDrafts = ref<Record<string, string>>({})
 const assistDrafts = ref<Record<string, string>>({})
 const ownGoalDrafts = ref<Record<string, boolean>>({})
@@ -69,10 +69,12 @@ const connected = ref(false)
 const error = ref('')
 const ok = ref('')
 const pending = ref(false)
+const missing = ref(false)
 const teams = useTeamDirectory()
 const fav = useFavorites()
-const { remaining, expired, cap } = useMatchClock(match)
+const { minute, expired, cap } = useMatchClock(match)
 let client: Client | null = null
+let pollTimer = 0
 
 const timeline = computed(() =>
   [...events.value]
@@ -110,6 +112,10 @@ const periodBlocks = computed(() => {
     label: periodLabel(block.period, match.value.sportCode, match.value.periodCount),
   }))
 })
+
+function shownMinute(ev: { eventType?: string | null; gameTime?: number | null; period?: number | null }) {
+  return protocolMinuteOf(ev, match.value?.periodLengthSeconds)
+}
 
 function playersOf(teamId: string) {
   if (!match.value || !teamId) return []
@@ -162,12 +168,12 @@ const editableEvents = computed(() =>
 )
 
 function syncDrafts() {
-  const minutes: Record<string, number> = {}
+  const minutes: Record<string, number | null> = {}
   const players: Record<string, string> = {}
   const assists: Record<string, string> = {}
   const ownGoals: Record<string, boolean> = {}
   for (const event of events.value) {
-    minutes[event.id] = eventMinute(event.gameTime)
+    minutes[event.id] = eventMinute(event.gameTime, event.period, match.value?.periodLengthSeconds)
     players[event.id] = event.playerId || ''
     const ownGoal = isOwnGoal(event)
     ownGoals[event.id] = ownGoal
@@ -261,14 +267,29 @@ watch(protocolPlayers, (players) => {
   }
 })
 
+const assignedReferee = computed(() => {
+  const id = auth.user?.id
+  if (!id) return false
+  return referees.value.some((row) => row.refereeId === id)
+})
+const canUsePad = computed(() => auth.canManageLeague || assignedReferee.value)
+
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
   const side = teamId === match.value?.homeTeamId ? lineups.value?.home : lineups.value?.away
   return side?.captainId === me.value.id
 }
 
+function typedMinute(eventId: string) {
+  const value = minuteDrafts.value[eventId]
+  if (value == null || Number.isNaN(Number(value))) return null
+  return Number(value)
+}
+
 async function load() {
   const id = route.params.id
+  missing.value = false
+  try {
   await teams.load()
   const [m, e, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
@@ -344,6 +365,34 @@ async function load() {
       )?.refereeId
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
+  }
+  } catch (e: any) {
+    const status = e?.response?.status
+    if (status === 400 || status === 404) {
+      match.value = null
+      missing.value = true
+      return
+    }
+    error.value = apiError(e, 'Матч не загрузился.')
+  }
+}
+
+function eventSignature(list: any[]) {
+  return list.map((ev) => `${ev.id}:${ev.voided}:${ev.gameTime}:${ev.playerId ?? ''}:${ev.secondaryPlayerId ?? ''}`).join('|')
+}
+
+async function refreshLive() {
+  if (pending.value || !route.params.id) return
+  const id = route.params.id
+  const [m, e] = await Promise.all([
+    api.get(`/matches/${id}`),
+    api.get(`/matches/${id}/events`),
+  ])
+  match.value = { ...match.value, ...m.data }
+  const next = e.data ?? []
+  if (eventSignature(next) !== eventSignature(events.value)) {
+    events.value = next
+    syncDrafts()
   }
 }
 
@@ -428,10 +477,15 @@ async function saveGoal(event: any) {
     return
   }
   const ownGoal = !!ownGoalDrafts.value[event.id]
+  const minute = typedMinute(event.id)
+  if (minute == null) {
+    error.value = 'Укажите минуту.'
+    return
+  }
   pending.value = true
   try {
     await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
-      minute: Number(minuteDrafts.value[event.id] ?? 0),
+      minute,
       playerId,
       secondaryPlayerId: ownGoal ? null : (assistDrafts.value[event.id] || null),
       updatePlayers: true,
@@ -449,10 +503,15 @@ async function saveGoal(event: any) {
 async function saveMinute(event: any) {
   error.value = ''
   ok.value = ''
+  const minute = typedMinute(event.id)
+  if (minute == null) {
+    error.value = 'Укажите минуту.'
+    return
+  }
   pending.value = true
   try {
     await api.patch(`/admin/matches/${match.value.id}/events/${event.id}`, {
-      minute: Number(minuteDrafts.value[event.id] ?? 0),
+      minute,
     })
     ok.value = 'Минута обновлена.'
     await load()
@@ -575,10 +634,16 @@ onMounted(async () => {
     onDisconnect: () => { connected.value = false },
   })
   client.activate()
+  pollTimer = window.setInterval(() => {
+    refreshLive().catch((reason: unknown) => {
+      if (!match.value) error.value = apiError(reason, 'Матч не обновился.')
+    })
+  }, 4_000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', applyCrest)
+  if (pollTimer) window.clearInterval(pollTimer)
   client?.deactivate()
 })
 </script>
@@ -615,7 +680,7 @@ onUnmounted(() => {
           <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
         </p>
         <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
-          {{ formatClock(remaining) }} · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}
+          <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
         </p>
         <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
           {{ match.periodCount }} × {{ formatClock(cap) }}
@@ -843,7 +908,7 @@ onUnmounted(() => {
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
               <i class="mark" :class="ev.eventType.toLowerCase()" />
-              <em>{{ eventMinute(ev.gameTime) }}'</em>
+              <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
             </div>
           </section>
         </template>
@@ -907,7 +972,7 @@ onUnmounted(() => {
         <h2>Бригада</h2>
         <p v-for="r in referees" :key="r.id" class="muted">Судья {{ registeredName(r) || r.email || r.refereeId }}</p>
         <p v-if="!referees.length" class="muted">Судья не назначен.</p>
-        <RouterLink v-if="auth.canOfficiate" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
+        <RouterLink v-if="canUsePad" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
       </div>
     </div>
 
@@ -919,7 +984,7 @@ onUnmounted(() => {
       <div class="panel">
         <MatchLineupBoard
           :side="lineups?.home"
-          :editable="auth.canManageLeague || auth.canOfficiate || isCaptainOf(match.homeTeamId)"
+          :editable="auth.canManageLeague || assignedReferee || isCaptainOf(match.homeTeamId)"
           :pending="pending"
           @save="saveLineup"
         />
@@ -927,7 +992,7 @@ onUnmounted(() => {
       <div class="panel">
         <MatchLineupBoard
           :side="lineups?.away"
-          :editable="auth.canManageLeague || auth.canOfficiate || isCaptainOf(match.awayTeamId)"
+          :editable="auth.canManageLeague || assignedReferee || isCaptainOf(match.awayTeamId)"
           :pending="pending"
           @save="saveLineup"
         />
@@ -939,7 +1004,7 @@ onUnmounted(() => {
       <p v-if="!timeline.length" class="muted">Событий нет.</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
-          <span class="t">{{ eventMinute(ev.gameTime) }}'</span>
+          <span v-if="shownMinute(ev) != null" class="t">{{ shownMinute(ev) }}'</span>
           <div>
             <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
             <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
@@ -959,6 +1024,10 @@ onUnmounted(() => {
     </div>
 
   </section>
+  <section v-else-if="missing" class="stack">
+    <h1>Матч не найден</h1>
+  </section>
+  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>

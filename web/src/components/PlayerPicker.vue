@@ -6,6 +6,8 @@ import { registeredName } from '../lib/playerTitle'
 const playerId = defineModel<string>({ default: '' })
 const props = defineProps<{
   excludeIds?: string[]
+  hint?: string
+  emptyText?: string
 }>()
 
 const query = ref('')
@@ -62,6 +64,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
 
 <template>
   <div class="picker">
+    <p v-if="hint" class="muted">{{ hint }}</p>
     <input
       v-model="query"
       type="search"
@@ -72,7 +75,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
     />
     <p v-if="pending" class="muted">Ищем…</p>
     <div v-else-if="open && query.trim().length >= 2" class="hints">
-      <p v-if="!players.length" class="muted">Никого не нашли</p>
+      <p v-if="!players.length" class="muted">{{ emptyText || 'Никого не нашли' }}</p>
       <button
         v-for="player in players"
         :key="player.id"

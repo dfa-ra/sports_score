@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public record CreateTeamRequest(
-        @NotBlank @Size(max = 150) String name,
+        @NotBlank @Size(max = 150, message = "Название не длиннее 150 символов") String name,
         @Size(max = 32) String shortName,
         String logoUrl,
         UUID captainPlayerId,

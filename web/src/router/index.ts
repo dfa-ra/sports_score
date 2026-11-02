@@ -33,6 +33,7 @@ const router = createRouter({
     { path: '/referee/matches/:id', name: 'referee-match', component: () => import('../views/referee/LiveMatchControl.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Пульт судьи', description: 'Протокол матча.' } },
     { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Аналитик', description: 'Матчи аналитика.' } },
     { path: '/analyst/matches/:id', name: 'analyst-match', component: () => import('../views/analyst/AnalystPad.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Пульт аналитика', description: 'Статистика матча.' } },
+    { path: '/forbidden', name: 'forbidden', component: () => import('../views/ForbiddenView.vue'), meta: { title: 'Недостаточно прав', description: 'Этот раздел закрыт для вашей роли.' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Такой страницы нет', description: 'Страница не найдена.' } },
   ],
   scrollBehavior: () => ({ top: 0 }),
@@ -47,7 +48,12 @@ router.beforeEach(async (to) => {
   if (to.meta.guest && auth.isAuthenticated) return { name: 'home' }
   if (to.meta.myTeam && !auth.canAccessMyTeam) return { name: 'home' }
   const roles = to.meta.roles as string[] | undefined
-  if (roles && !roles.some((role) => auth.hasRole(role as any))) return { name: 'home' }
+  if (roles && !roles.some((role) => auth.hasRole(role as any))) {
+    if (to.path === '/admin' || to.path.startsWith('/referee')) {
+      return { name: 'forbidden', replace: true }
+    }
+    return { name: 'home' }
+  }
   return true
 })
 

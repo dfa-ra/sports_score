@@ -171,7 +171,7 @@ public class MatchController {
     public MatchLineupsResponse setLineup(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id,
-            @Valid @RequestBody SetMatchLineupRequest request
+            @RequestBody SetMatchLineupRequest request
     ) {
         return matchLineupService.setLineup(principal, id, request);
     }

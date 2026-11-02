@@ -1,6 +1,60 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide } from '../src/lib/matchMinute.ts'
+import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute } from '../src/lib/matchMinute.ts'
+
+test('a period that lasted 26 seconds is the first minute, not 0 and not 15', () => {
+  assert.equal(boundaryMinute(26), 1)
+  assert.equal(boundaryMinute(0), 1)
+  assert.equal(boundaryMinute(15 * 60), 15)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'GOAL', gameTime: 2 * 60 }), 2)
+})
+
+test('2x15 kickoff is 1 and six seconds into the second half is 16', () => {
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 1, gameTime: 0 }), 1)
+  assert.equal(eventMinute(2 * 60), 2)
+  assert.equal(eventMinute(15 * 60 + 6), 16)
+  assert.equal(eventMinute(15 * 60 + 6, 2, 15 * 60), 16)
+  assert.equal(eventMinute(15 * 60, 1, 15 * 60), 15)
+  assert.equal(eventMinute(15 * 60, 2, 15 * 60), 16)
+  assert.equal(eventMinute(18 * 60), 18)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', period: 1, gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 2, gameTime: 26 }), 1)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_END', period: 1, gameTime: 15 * 60 }), 15)
+  assert.equal(protocolMinute({ eventType: 'PERIOD_START', period: 2, gameTime: 15 * 60 }), 16)
+})
+
+test('period boundaries are part of the public protocol', () => {
+  const blocks = buildPeriodBlocks([
+    {
+      id: 'start',
+      eventType: 'PERIOD_START',
+      period: 1,
+      gameTime: 0,
+      timestamp: '2026-11-02T12:00:00Z',
+    },
+    {
+      id: 'end',
+      eventType: 'PERIOD_END',
+      period: 1,
+      gameTime: 26,
+      timestamp: '2026-11-02T12:00:26Z',
+    },
+    {
+      id: 'next',
+      eventType: 'PERIOD_START',
+      period: 2,
+      gameTime: 26,
+      timestamp: '2026-11-02T12:00:26Z',
+    },
+  ], { homeTeamId: 'home' })
+
+  assert.deepEqual(blocks.map((block) => block.period), [1, 2])
+  assert.deepEqual(blocks[0].items.map((item) => item.id), ['start', 'end'])
+  assert.deepEqual(blocks[1].items.map((item) => item.id), ['next'])
+  assert.equal(protocolMinute(blocks[0].items[1]), 1)
+  assert.equal(protocolMinute(blocks[1].items[0]), 1)
+})
 
 test('13:00 left in a 15:00 first half displays 2 minutes, not 13', () => {
   const stored = 2 * 60
@@ -17,6 +71,11 @@ test('12:00 left in the second half of a 2x15 match displays 18', () => {
 
 test('admin minute 18 is the minute a logged-out viewer sees', () => {
   assert.equal(eventMinute(18 * 60), 18)
+})
+
+test('a goal with no stored time does not print 0 minutes', () => {
+  assert.equal(eventMinute(null), null)
+  assert.equal(eventMinute(undefined), null)
 })
 
 test('protocol order follows the match minute, earlier first', () => {

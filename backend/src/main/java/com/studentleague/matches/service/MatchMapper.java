@@ -1,5 +1,6 @@
 package com.studentleague.matches.service;
 
+import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
@@ -148,7 +149,20 @@ public class MatchMapper {
                 player == null ? null : player.getFirstName(),
                 player == null ? null : player.getLastName(),
                 secondary == null ? null : secondary.getFirstName(),
-                secondary == null ? null : secondary.getLastName()
+                secondary == null ? null : secondary.getLastName(),
+                minuteOf(event)
+        );
+    }
+
+    private static Integer minuteOf(MatchEvent event) {
+        if (event.getGameTime() == null) {
+            return null;
+        }
+        return MatchClock.protocolMinute(
+                event.getGameTime(),
+                event.getPeriod(),
+                event.getEventType(),
+                MatchClock.DEFAULT_PERIOD_LENGTH_SECONDS
         );
     }
 

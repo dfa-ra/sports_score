@@ -26,6 +26,7 @@ const memberIds = computed(() => members.value.map((item) => item.playerId))
 const rosterIds = computed(() => new Set(memberIds.value))
 const error = ref('')
 const ok = ref('')
+const unassigned = ref(false)
 const rsvpError = ref('')
 const pending = ref(false)
 const rsvpPending = ref(false)
@@ -51,6 +52,8 @@ const canRsvp = computed(() => !!nextMatch.value && !!myPlayerId.value && roster
 onMounted(load)
 
 async function load() {
+  unassigned.value = false
+  error.value = ''
   try {
     const { data } = await api.get('/teams/mine')
     team.value = data
@@ -80,7 +83,13 @@ async function load() {
       opponentName.value = ''
     }
   } catch (e: any) {
-    error.value = apiError(e, 'Команда ещё не назначена.')
+    team.value = null
+    const message = apiError(e, '')
+    if (e?.response?.status === 404 && message === 'Вы ещё не в команде') {
+      unassigned.value = true
+      return
+    }
+    error.value = message || 'Команда ещё не назначена.'
   }
 }
 
@@ -123,7 +132,11 @@ async function addMember() {
 }
 
 async function removeMember(id: string) {
+  const member = members.value.find((item) => item.playerId === id)
+  const name = registeredName(member) || 'игрока'
+  if (!confirm(`Убрать «${name}» из состава?`)) return
   pending.value = true
+  error.value = ''
   try {
     await api.delete(`/teams/${team.value.id}/members/${id}`)
     await load()
@@ -146,7 +159,11 @@ async function removeMember(id: string) {
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
-    <EmptyState v-if="!team && !error" title="Команды нет" text="Админ создаёт команду и назначает капитана." />
+    <EmptyState
+      v-if="unassigned"
+      title="Вы ещё не в команде"
+      text="Команду назначает администратор"
+    />
     <template v-if="team">
       <div v-if="canEditRoster" class="panel stack">
         <h2>Карточка</h2>
@@ -162,11 +179,16 @@ async function removeMember(id: string) {
         <ul class="stack">
           <li v-for="m in members" :key="m.id">
             <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>
-            <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" @click="removeMember(m.playerId)">Убрать</button>
+            <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" type="button" :disabled="pending" @click="removeMember(m.playerId)">Убрать</button>
           </li>
         </ul>
         <form v-if="canEditRoster" class="toolbar" @submit.prevent="addMember">
-          <PlayerPicker v-model="playerId" :exclude-ids="memberIds" />
+          <PlayerPicker
+            v-model="playerId"
+            :exclude-ids="memberIds"
+            hint="Добавить можно только уже зарегистрированного игрока"
+            empty-text="Игрок не найден, он должен сначала зарегистрироваться"
+          />
           <button class="btn" :disabled="pending || !playerId">Добавить игрока</button>
         </form>
       </div>
