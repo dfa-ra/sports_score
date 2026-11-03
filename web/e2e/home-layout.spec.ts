@@ -180,7 +180,7 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
   await page.goto('/')
   await expect(page.locator('.eyebrow', { hasText: 'Ближайший матч' })).toBeVisible()
   expect(await columns(page, '.hero-match')).toBe(2)
-  expect(await columns(page, '.tgrid')).toBe(2)
+  expect(await columns(page, '.tgrid')).toBe(1)
   const actsBox = await page.locator('.hero-match .acts').boundingBox()
   const liveBox = await page.locator('.hero-match .livebar').boundingBox()
   expect(liveBox!.x).toBeGreaterThan(actsBox!.x + 40)
