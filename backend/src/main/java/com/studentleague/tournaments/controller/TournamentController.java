@@ -10,6 +10,7 @@ import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
 import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
+import com.studentleague.tournaments.dto.TournamentOverviewResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentStandingsResponse;
 import com.studentleague.tournaments.dto.TournamentTableResponse;
@@ -100,6 +101,12 @@ public class TournamentController {
     @Operation(summary = "Get tournament")
     public TournamentResponse get(@PathVariable UUID id) {
         return tournamentService.get(id);
+    }
+
+    @GetMapping("/{id}/overview")
+    @Operation(summary = "Tournament header: format, team count, stage, and tab counts")
+    public TournamentOverviewResponse overview(@PathVariable UUID id) {
+        return tournamentService.overview(id);
     }
 
     @PutMapping("/{id}")

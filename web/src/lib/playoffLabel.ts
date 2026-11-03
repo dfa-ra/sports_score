@@ -5,8 +5,8 @@ export function shortSourceRound(title?: string | null) {
   return text.replace(/\s*финала\s*$/i, '').trim()
 }
 
-/** «Победитель 1/2 #1» — source round plus that pair's index, starting at 1. */
+/** «Победитель 1/2 №1» — source round plus that pair's index, starting at 1. */
 export function winnerSlotLabel(sourceRoundTitle: string | null | undefined, feeder: number) {
   const title = shortSourceRound(sourceRoundTitle) || 'пары'
-  return `Победитель ${title} #${feeder}`
+  return `Победитель ${title} №${feeder}`
 }

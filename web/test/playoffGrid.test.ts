@@ -1,0 +1,87 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  arrivalLine,
+  bracketIsEmpty,
+  defaultRoundIndex,
+  emptySideLabel,
+  footerView,
+  formatRoundSpan,
+  overviewMeta,
+  pairWhen,
+  scoreView,
+  sideKind,
+  tournamentHasPlayoff,
+  useRoundTabs,
+  winnerSide,
+} from '../src/lib/playoffGrid.ts'
+
+test('round tabs follow team count and width', () => {
+  assert.equal(useRoundTabs(2, 375), false)
+  assert.equal(useRoundTabs(4, 375), true)
+  assert.equal(useRoundTabs(4, 721), false)
+  assert.equal(useRoundTabs(8, 720), true)
+  assert.equal(useRoundTabs(8, 900), false)
+  assert.equal(useRoundTabs(16, 1180), true)
+  assert.equal(useRoundTabs(16, 1181), false)
+  assert.equal(useRoundTabs(16, 1440), false)
+})
+
+test('empty slot keeps the source pair number', () => {
+  assert.equal(emptySideLabel({ slotIndex: 0 }, true, '1/4 финала'), 'Победитель 1/4 №1')
+  assert.equal(emptySideLabel({ slotIndex: 0 }, false, '1/4 финала'), 'Победитель 1/4 №2')
+  assert.equal(emptySideLabel({ slotIndex: 1, awayWaitingLabel: 'Победитель 1/2 №2' }, false, '1/2 финала'), 'Победитель 1/2 №2')
+})
+
+test('scores, penalties and an unplayed dash', () => {
+  assert.deepEqual(scoreView({ matchStatus: 'SCHEDULED', homeScore: 0, awayScore: 0 }, true), { text: '–', pens: null, dash: true })
+  assert.equal(sideKind({ matchStatus: 'FINISHED', homeTeamId: 'a', awayTeamId: 'b', homeScore: 3, awayScore: 1 }, true), 'win')
+  assert.equal(sideKind({ matchStatus: 'FINISHED', homeTeamId: 'a', awayTeamId: 'b', homeScore: 3, awayScore: 1 }, false), 'lose')
+  assert.equal(sideKind({ matchStatus: 'LIVE', homeTeamId: 'a', awayTeamId: 'b', homeScore: 2, awayScore: 1 }, true), 'open')
+  assert.equal(winnerSide({ matchStatus: 'FINISHED', homeScore: 2, awayScore: 2, penaltyHome: 4, penaltyAway: 3 }), 'home')
+  assert.equal(winnerSide({ matchStatus: 'FINISHED', homeScore: 2, awayScore: 2 }), null)
+  assert.equal(footerView({ matchStatus: 'LIVE', minute: 24, venue: 'Зал' }).label, 'Live 24′')
+  assert.equal(footerView({ matchStatus: 'LIVE' }).label, 'Live')
+  assert.equal(footerView({ matchStatus: 'FINISHED', homeScore: 2, awayScore: 2, penaltyHome: 4, penaltyAway: 3 }).label, 'По пен. 4:3')
+  assert.equal(footerView({ matchStatus: 'SCHEDULED' }).right, 'Дата уточняется')
+  assert.equal(pairWhen('2026-11-05T16:00:00Z'), '05/11 · 19:00')
+  assert.equal(pairWhen('2026-11-04T22:30:00Z'), '05/11 · 01:30')
+})
+
+test('round span, default tab and arrival line', () => {
+  assert.equal(formatRoundSpan(['2026-10-28T15:00:00Z', '2026-10-31T15:00:00Z']), '28–31 окт')
+  const rounds = [
+    { slots: [{ matchStatus: 'FINISHED' }, { matchStatus: 'FINISHED' }] },
+    { slots: [{ matchStatus: 'LIVE' }, { matchStatus: 'SCHEDULED' }] },
+    { slots: [{ matchStatus: null }] },
+  ]
+  assert.equal(defaultRoundIndex(rounds), 1)
+  assert.equal(defaultRoundIndex([{ slots: [{ matchStatus: 'FINISHED' }] }]), 0)
+  const line = arrivalLine({
+    matchStatus: 'FINISHED',
+    homeTeamName: 'Юристы',
+    awayTeamName: 'Медики',
+    homeScore: 2,
+    awayScore: 2,
+    penaltyHome: 4,
+    penaltyAway: 3,
+  }, '1/4 финала')
+  assert.deepEqual(line, { name: 'Юристы', detail: '1/4: 2:2 (пен. 4:3), Медики' })
+})
+
+test('empty bracket, playoff tab and header meta skip blanks', () => {
+  assert.equal(bracketIsEmpty([]), true)
+  assert.equal(bracketIsEmpty([{ slots: [{ homeWaitingLabel: 'Победитель 1/4 №1' }] }]), false)
+  assert.equal(tournamentHasPlayoff({ format: 'GROUPS_PLAYOFF', stage: 'GROUPS' }), true)
+  assert.equal(tournamentHasPlayoff({ format: 'ROUND_ROBIN', stage: 'GROUPS' }), false)
+  assert.equal(tournamentHasPlayoff({ format: 'ROUND_ROBIN', hasPlayoff: false, rounds: [{ slots: [] }] }), true)
+  assert.deepEqual(overviewMeta({
+    seasonYear: 2026,
+    format: 'GROUPS_PLAYOFF',
+    teamsCount: 8,
+    startDate: '2026-08-01',
+    endDate: '2026-12-15',
+    stage: 'PLAYOFF',
+  }), ['Сезон 2026', 'Группы + плей-офф', '8 команд', '01.08 – 15.12.2026', 'Стадия: плей-офф'])
+  assert.deepEqual(overviewMeta({ format: 'CUP', teamsCount: 1 }), ['Кубок / плей-офф', '1 команда'])
+})

@@ -39,10 +39,10 @@ test('empty slot label uses the source round and pair index', () => {
   assert.equal(shortSourceRound('1/4 финала'), '1/4')
   assert.equal(shortSourceRound('1/8 финала'), '1/8')
   assert.equal(shortSourceRound('Финал'), 'финала')
-  assert.equal(winnerSlotLabel('1/2 финала', 1), 'Победитель 1/2 #1')
-  assert.equal(winnerSlotLabel('1/2 финала', 2), 'Победитель 1/2 #2')
-  assert.equal(winnerSlotLabel('1/4 финала', 3), 'Победитель 1/4 #3')
-  assert.equal(winnerSlotLabel('Финал', 1), 'Победитель финала #1')
+  assert.equal(winnerSlotLabel('1/2 финала', 1), 'Победитель 1/2 №1')
+  assert.equal(winnerSlotLabel('1/2 финала', 2), 'Победитель 1/2 №2')
+  assert.equal(winnerSlotLabel('1/4 финала', 3), 'Победитель 1/4 №3')
+  assert.equal(winnerSlotLabel('Финал', 1), 'Победитель финала №1')
 })
 
 test('a dead playoff tab is dropped and other tabs stay', () => {
