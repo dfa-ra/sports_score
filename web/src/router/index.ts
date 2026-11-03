@@ -26,7 +26,7 @@ const router = createRouter({
     { path: '/players', name: 'players', component: () => import('../views/PlayersView.vue'), meta: { title: 'Игроки', description: 'Поиск игроков Лиги ИТМО.' } },
     { path: '/players/:id', name: 'player', component: () => import('../views/PlayerDetailView.vue'), meta: { title: 'Игрок', description: 'Карточка игрока Лиги ИТМО.' } },
     { path: '/statistics', redirect: { path: '/table', query: { tab: 'scorers' } } },
-    { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, myTeam: true, title: 'Моя команда', description: 'Заявка и матчи вашей команды.' } },
+    { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, title: 'Моя команда', description: 'Заявка и матчи вашей команды.' } },
     { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { auth: true, title: 'Профиль', description: 'Профиль участника Лиги ИТМО.' } },
     { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboard.vue'), meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Управление лигой.' } },
     { path: '/referee', name: 'referee', component: () => import('../views/referee/RefereeDashboard.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Судья', description: 'Матчи судьи.' } },
@@ -46,7 +46,7 @@ router.beforeEach(async (to) => {
   await auth.restoreSession()
   if (to.meta.auth && !auth.isAuthenticated) return { name: 'login', query: { redirect: to.fullPath } }
   if (to.meta.guest && auth.isAuthenticated) return { name: 'home' }
-  if (to.meta.myTeam && !auth.canAccessMyTeam) return { name: 'home' }
+  // Signed-in visitors can open /my-team. The page shows a stub unless they are a player or captain.
   const roles = to.meta.roles as string[] | undefined
   if (roles && !roles.some((role) => auth.hasRole(role as any))) {
     if (to.path === '/admin' || to.path.startsWith('/referee')) {

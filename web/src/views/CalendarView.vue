@@ -4,6 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
+import { moscowWeekdayShort, shiftYmd } from '../lib/moscowTime'
 import { matchInstant, ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
@@ -26,19 +27,7 @@ let alignedStrip = false
 
 const liveOnly = computed(() => route.name === 'live')
 
-function atNoon(date = new Date()) {
-  const next = new Date(date)
-  next.setHours(12, 0, 0, 0)
-  return next
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-const todayKey = computed(() => ymd(atNoon()))
+const todayKey = computed(() => ymd(new Date()))
 const day = ref(todayKey.value)
 
 function oldestKey(batch: any[]) {
@@ -52,7 +41,7 @@ function oldestKey(batch: any[]) {
 }
 
 async function loadMatches() {
-  const fromKey = ymd(addDays(atNoon(), -PAST_DAYS))
+  const fromKey = shiftYmd(ymd(new Date()), -PAST_DAYS)
   const collected: any[] = []
   for (let page = 0; page < 30; page += 1) {
     const { data } = await api.get('/matches', {
@@ -123,12 +112,12 @@ function pad(n: number) {
   return String(n).padStart(2, '0')
 }
 
-function weekday(date: Date) {
-  return date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '').toUpperCase()
+function weekday(key: string) {
+  return moscowWeekdayShort(key)
 }
 
 function windowStartKey() {
-  return ymd(addDays(atNoon(), -PAST_DAYS))
+  return shiftYmd(ymd(new Date()), -PAST_DAYS)
 }
 
 function inWindow(match: any) {
@@ -174,16 +163,14 @@ watch(matchDates, (keys) => {
 const strip = computed(() => {
   const current = todayKey.value
   return matchDates.value.map((key) => {
-    const [yearText, monthText, dateText] = key.split('-')
-    const year = Number(yearText)
+    const [, monthText, dateText] = key.split('-')
     const month = Number(monthText)
     const date = Number(dateText)
-    const parsed = new Date(year, month - 1, date, 12)
     return {
       key,
       label: key === current
         ? `Сегодня ${pad(date)}.${pad(month)}.`
-        : `${weekday(parsed)} ${pad(date)}.${pad(month)}.`,
+        : `${weekday(key)} ${pad(date)}.${pad(month)}.`,
     }
   })
 })

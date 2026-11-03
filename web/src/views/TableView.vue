@@ -11,6 +11,7 @@ import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { setPageMeta } from '../lib/pageMeta'
+import { civilYear } from '../lib/moscowTime'
 import { matchInstant } from '../lib/match'
 import { tableRouteQuery } from '../lib/tableQuery'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -87,8 +88,8 @@ function topNote(rows: any[], key: keyof typeof expanded.value) {
 
 const season = computed(() => {
   const start = tournament.value?.startsOn || tournament.value?.startDate
-  if (!start) return ''
-  const year = new Date(start).getFullYear()
+  const year = civilYear(start)
+  if (year == null) return ''
   return `${year}/${year + 1}`
 })
 

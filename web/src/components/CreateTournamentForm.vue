@@ -4,13 +4,14 @@ import { useRouter } from 'vue-router'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
 import { tournamentDatesError } from '../lib/format'
+import { moscowYear } from '../lib/moscowTime'
 
 const emit = defineEmits<{ created: [tournament: any] }>()
 const router = useRouter()
 const name = ref('')
 const description = ref('')
 const sportId = ref('')
-const seasonYear = ref(new Date().getFullYear())
+const seasonYear = ref(moscowYear(new Date()) ?? 2026)
 const startDate = ref('')
 const endDate = ref('')
 const status = ref('REGISTRATION')

@@ -1,4 +1,5 @@
-import { registeredName } from './playerTitle'
+import { ageOnMoscowDate, civilDateParts, formatCivilDate, formatMoscowWhen, moscowParts } from './moscowTime.ts'
+import { registeredName } from './playerTitle.ts'
 
 export const statusLabel: Record<string, string> = {
   SCHEDULED: 'Скоро',
@@ -50,11 +51,7 @@ export function formatDateRange(start?: string | null, end?: string | null) {
 }
 
 function formatIsoDate(value?: string | null) {
-  if (!value) return ''
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (match) return `${match[3]}.${match[2]}.${match[1]}`
-  const formatted = formatMatchDay(value)
-  return formatted === '—' ? '' : formatted
+  return formatCivilDate(value)
 }
 
 export function labelOfSport(code?: string | null, fallback?: string | null) {
@@ -92,36 +89,25 @@ export function labelOf(map: Record<string, string>, value?: string | null, fall
 
 export function formatWhen(value?: string | number | Date | null) {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatMoscowWhen(value) || '—'
 }
 
 export function ageLine(value?: string | number | Date | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const now = new Date()
-  let age = now.getFullYear() - date.getFullYear()
-  const monthDiff = now.getMonth() - date.getMonth()
-  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < date.getDate())) age -= 1
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  return `Возр: ${age} (${day}.${month}.${date.getFullYear()})`
+  const born = civilDateParts(value)
+  const age = ageOnMoscowDate(value)
+  if (!born || age == null) return ''
+  const day = String(born.day).padStart(2, '0')
+  const month = String(born.month).padStart(2, '0')
+  return `Возр: ${age} (${day}.${month}.${born.year})`
 }
 
 export function formatMatchDay(value?: string | number | Date | null) {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = String(date.getFullYear()).slice(-2)
+  const parts = moscowParts(value)
+  if (!parts) return '—'
+  const day = String(parts.day).padStart(2, '0')
+  const month = String(parts.month).padStart(2, '0')
+  const year = String(parts.year).slice(-2)
   return `${day}.${month}.${year}`
 }
 

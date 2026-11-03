@@ -1,3 +1,5 @@
+import { moscowClock, moscowDateTimeLabel, moscowDayMonth, moscowYmd } from './moscowTime.ts'
+
 export function matchOutcome(match: {
   status?: string
   homeTeamId?: string
@@ -49,25 +51,11 @@ export function publicScore(match: {
 }
 
 export function kickoffDayMonth(value?: string | number | Date | null) {
-  const date = kickoffDate(value)
-  if (!date) return ''
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  return `${day}/${month}`
+  return moscowDayMonth(value)
 }
 
 export function kickoffClock(value?: string | number | Date | null) {
-  const date = kickoffDate(value)
-  if (!date) return ''
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  return `${hours}:${minutes}`
-}
-
-function kickoffDate(value?: string | number | Date | null) {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
+  return moscowClock(value)
 }
 
 export function shortKickoff(value?: string | number | Date | null, status?: string) {
@@ -81,13 +69,7 @@ export function shortKickoff(value?: string | number | Date | null, status?: str
 
 export function longKickoff(value?: string | number | Date | null) {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const year = date.getFullYear()
-  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  return `${day}.${month}.${year} ${time}`
+  return moscowDateTimeLabel(value) || '—'
 }
 
 export function matchStateLabel(status?: string | null) {
@@ -99,15 +81,10 @@ export function matchStateLabel(status?: string | null) {
   return status || ''
 }
 
-export { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute, protocolMinuteLimit } from './matchMinute'
+export { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute, protocolMinuteLimit } from './matchMinute.ts'
 
 export function ymd(value?: string | number | Date | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const day = String(date.getDate()).padStart(2, '0')
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
+  return moscowYmd(value)
 }
 
-export { matchInstant, type MatchDateSource } from './matchDate'
+export { matchInstant, type MatchDateSource } from './matchDate.ts'
