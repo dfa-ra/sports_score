@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useFavorites } from './stores/favorites'
@@ -40,6 +40,38 @@ async function logout() {
 }
 
 const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
+const menuOpen = ref(false)
+const moreRoot = ref<HTMLElement | null>(null)
+const showAnalystLink = computed(() => auth.hasRole('ANALYST'))
+
+watch(() => route.fullPath, () => {
+  menuOpen.value = false
+})
+
+watch(showAnalystLink, (visible) => {
+  if (!visible) menuOpen.value = false
+})
+
+function onDocumentPointer(event: Event) {
+  const root = moreRoot.value
+  if (!root || !menuOpen.value) return
+  if (event.target instanceof Node && root.contains(event.target)) return
+  menuOpen.value = false
+}
+
+function onDocumentKey(event: KeyboardEvent) {
+  if (event.key === 'Escape') menuOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointer)
+  document.addEventListener('keydown', onDocumentKey)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointer)
+  document.removeEventListener('keydown', onDocumentKey)
+})
 </script>
 
 <template>
@@ -62,8 +94,25 @@ const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
             <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
             <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
             <RouterLink v-if="auth.canOfficiate" to="/referee" active-class="on">Судья</RouterLink>
-            <RouterLink v-if="auth.canAnalyze" to="/analyst" active-class="on">Аналитик</RouterLink>
           </nav>
+
+          <div v-if="showAnalystLink" ref="moreRoot" class="nav-more">
+            <button
+              class="burger"
+              type="button"
+              :aria-expanded="menuOpen"
+              aria-controls="nav-more-panel"
+              aria-label="Меню"
+              @click="menuOpen = !menuOpen"
+            >
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
+            <div v-if="menuOpen" id="nav-more-panel" class="nav-more-panel" role="menu">
+              <RouterLink role="menuitem" to="/analyst" active-class="on" @click="menuOpen = false">Аналитик</RouterLink>
+            </div>
+          </div>
 
           <div class="auth">
             <template v-if="auth.isAuthenticated">
@@ -192,6 +241,51 @@ nav a.on { color: var(--navy); background: var(--ice); }
 }
 .login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
+.nav-more { position: relative; flex: none; }
+.burger {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 999px;
+  background: transparent;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  cursor: pointer;
+}
+.burger span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: #fff;
+}
+.burger[aria-expanded="true"] { background: rgba(255,255,255,0.12); }
+.nav-more-panel {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  min-width: 11rem;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(8, 20, 40, 0.18);
+  padding: 0.35rem;
+  z-index: 50;
+}
+.nav-more-panel a {
+  display: block;
+  color: var(--navy);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+}
+.nav-more-panel a:hover,
+.nav-more-panel a.on { background: var(--ice); color: var(--navy); }
 .auth { display: flex; gap: 0.4rem; align-items: center; }
 .avatar-link { display: grid; place-items: center; }
 .phone-only { display: none; }
