@@ -84,7 +84,7 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
             join Team away on away.id = m.awayTeamId
             where (m.homeTeamId = :teamId or m.awayTeamId = :teamId)
               and m.status = :status
-            order by m.scheduledAt desc
+            order by coalesce(m.startedAt, m.scheduledAt) desc
             """)
     List<RecentFormResponse> findRecentForm(
             @Param("teamId") UUID teamId,

@@ -283,7 +283,7 @@ public class PlayerService {
 
         List<Match> matches = matchRepository.findAllById(matchIds).stream()
                 .filter(match -> match.getStatus() == MatchStatus.FINISHED || match.getStatus() == MatchStatus.LIVE)
-                .sorted(Comparator.comparing(Match::getScheduledAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(Comparator.comparing(PlayerService::publicMatchInstant, Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(50)
                 .toList();
 
@@ -536,6 +536,19 @@ public class PlayerService {
                 && hasText(request.displayName())
                 && request.jerseyNumber() != null
                 && hasText(request.position());
+    }
+
+    /**
+     * Same public match date as the site: actual start once the match has started, otherwise the schedule.
+     */
+    private static Instant publicMatchInstant(Match match) {
+        if (match.getStartedAt() != null && (match.getStatus() == MatchStatus.LIVE
+                || match.getStatus() == MatchStatus.PAUSED
+                || match.getStatus() == MatchStatus.FINISHED
+                || match.getStatus() == MatchStatus.CANCELLED)) {
+            return match.getStartedAt();
+        }
+        return match.getScheduledAt();
     }
 
     private static void requirePlayerRegistration(PlayerProfileRequest request, PlayerProfile existing, User user) {
