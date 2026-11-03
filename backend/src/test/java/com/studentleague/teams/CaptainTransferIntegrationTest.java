@@ -116,7 +116,7 @@ class CaptainTransferIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void secondClubRejectsACaptainWhoAlreadyHasATeam() throws Exception {
+    void secondClubAllowsACaptainWhenTheClubsDoNotShareATournament() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String adminToken = createAdminAndLogin("capy-admin-" + suffix + "@example.com", "Str0ngPass!");
         String captainEmail = "capy-cap-" + suffix + "@example.com";
@@ -134,8 +134,8 @@ class CaptainTransferIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"name":"Beta %s","shortName":"BE","captainPlayerId":"%s"}
                                 """.formatted(suffix, captainId)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «" + alphaName + "»"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.captainId").value(captainId));
 
         mockMvc.perform(get("/api/v1/teams/" + alphaId))
                 .andExpect(status().isOk())
@@ -150,14 +150,16 @@ class CaptainTransferIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"name":"East %s","shortName":"EA","captainPlayerId":"%s"}
                                 """.formatted(suffix, playerId)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «" + alphaName + "»"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.captainId").value(playerId));
         mockMvc.perform(put("/api/v1/teams/" + alphaId + "/captain")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(captainBody(playerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.captainId").value(playerId));
+        assertCaptain(playerEmail);
+        assertCaptain(captainEmail);
     }
 
     private void assertCaptain(String email) {

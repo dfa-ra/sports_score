@@ -28,6 +28,7 @@ import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import com.studentleague.users.domain.Role;
 import com.studentleague.users.domain.RoleStatus;
 import com.studentleague.users.entity.User;
@@ -60,6 +61,7 @@ public class TeamService {
     private final UserRepository userRepository;
     private final RoleService roleService;
     private final NotificationService notificationService;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public TeamService(
             TeamRepository teamRepository,
@@ -71,7 +73,8 @@ public class TeamService {
             PlayerProfileRepository playerProfileRepository,
             UserRepository userRepository,
             RoleService roleService,
-            NotificationService notificationService
+            NotificationService notificationService,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
@@ -83,6 +86,7 @@ public class TeamService {
         this.userRepository = userRepository;
         this.roleService = roleService;
         this.notificationService = notificationService;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -256,7 +260,7 @@ public class TeamService {
         if (existing != null && existing.getStatus() == TeamMemberStatus.ACTIVE) {
             throw ApiException.conflict("Игрок уже в составе этой команды");
         }
-        rejectIfActiveOnAnotherTeam(player.getId(), teamId);
+        tournamentRosterGuard.rejectSecondClubInSharedTournament(player.getId(), teamId);
 
         TeamMember member = existing == null ? new TeamMember() : existing;
         member.setTeamId(teamId);
@@ -341,6 +345,7 @@ public class TeamService {
 
     private void bindCaptain(Team team, UUID playerId) {
         PlayerProfile captain = requireCaptainCandidate(playerId);
+        tournamentRosterGuard.rejectSecondClubInSharedTournament(captain.getId(), team.getId());
         if (!teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(team.getId(), captain.getId(), TeamMemberStatus.ACTIVE)) {
             ensureActiveMembership(team.getId(), captain.getId());
         }
@@ -412,30 +417,12 @@ public class TeamService {
     }
 
     private void ensureActiveMembership(UUID teamId, UUID playerId) {
-        rejectIfActiveOnAnotherTeam(playerId, teamId);
+        tournamentRosterGuard.rejectSecondClubInSharedTournament(playerId, teamId);
         TeamMember membership = teamMemberRepository.findByTeamIdAndPlayerId(teamId, playerId).orElseGet(TeamMember::new);
         membership.setTeamId(teamId);
         membership.setPlayerId(playerId);
         membership.setStatus(TeamMemberStatus.ACTIVE);
         teamMemberRepository.save(membership);
-    }
-
-    /**
-     * Squad membership is global: {@code teams} has no tournament id and
-     * {@code team_members} is only team + player + status. A player therefore
-     * stays on one live team. A disbanded club does not hold the player.
-     */
-    private void rejectIfActiveOnAnotherTeam(UUID playerId, UUID teamId) {
-        for (TeamMember membership : teamMemberRepository.findByPlayerIdAndStatus(playerId, TeamMemberStatus.ACTIVE)) {
-            if (teamId.equals(membership.getTeamId())) {
-                continue;
-            }
-            Team other = teamRepository.findById(membership.getTeamId()).orElse(null);
-            if (other == null || other.isDisbanded()) {
-                continue;
-            }
-            throw ApiException.conflict("Игрок уже в составе команды «" + other.getName() + "»");
-        }
     }
 
     private Team requireTeam(UUID teamId) {

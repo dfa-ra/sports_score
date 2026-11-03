@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
 
     @Test
-    void membersEndpointRejectsPlayerWhoAlreadyHasATeam() throws Exception {
+    void sameClubStillConflictsAndASecondClubWithoutASharedTournamentDoesNot() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String admin = createAdminAndLogin("mem-admin-" + suffix + "@example.com", "Str0ngPass!");
         String playerId = player("mem-pl-" + suffix + "@example.com", "PLAYER");
@@ -35,19 +36,20 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.playerId").value(playerId));
 
         mockMvc.perform(post("/api/v1/teams/" + southId + "/members")
+                        .header("Authorization", auth(southToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(memberBody(playerId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.teamId").value(southId))
+                .andExpect(jsonPath("$.playerId").value(playerId));
+
+        mockMvc.perform(post("/api/v1/teams/" + southId + "/members")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(memberBody(playerId)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CONFLICT"))
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «Север»"));
-
-        mockMvc.perform(post("/api/v1/teams/" + southId + "/members")
-                        .header("Authorization", auth(southToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(memberBody(playerId)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «Север»"));
+                .andExpect(jsonPath("$.message").value("Игрок уже в составе этой команды"));
 
         mockMvc.perform(post("/api/v1/teams/" + northId + "/members")
                         .header("Authorization", auth(admin))
@@ -60,16 +62,13 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/teams/" + southId + "/members")
-                        .header("Authorization", auth(southToken))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(memberBody(playerId)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.teamId").value(southId));
+        mockMvc.perform(get("/api/v1/teams/" + southId + "/members"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].playerId", hasItem(playerId)));
     }
 
     @Test
-    void captainBindAndDisbandFollowTheSameRule() throws Exception {
+    void captainOfASecondClubIsAllowedAndADisbandedClubDoesNotHoldThePlayer() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String admin = createAdminAndLogin("bind-admin-" + suffix + "@example.com", "Str0ngPass!");
         String playerId = player("bind-pl-" + suffix + "@example.com", "PLAYER");
@@ -89,30 +88,27 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
                         .content("""
                                 {"name":"Запад","shortName":"ЗА","captainPlayerId":"%s"}
                                 """.formatted(playerId)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «Север»"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.captainId").value(playerId));
 
         String eastId = createTeam(admin, "Восток", eastCaptainId);
         mockMvc.perform(put("/api/v1/teams/" + eastId + "/captain")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(memberBody(playerId)))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «Север»"));
-        mockMvc.perform(get("/api/v1/teams/" + eastId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.captainId").value(eastCaptainId));
+                .andExpect(jsonPath("$.captainId").value(playerId));
 
         mockMvc.perform(delete("/api/v1/teams/" + northId)
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(post("/api/v1/teams/" + eastId + "/members")
-                        .header("Authorization", auth(admin))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(memberBody(playerId)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.teamId").value(eastId));
+        mockMvc.perform(get("/api/v1/teams/" + northId + "/members"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(get("/api/v1/teams/" + eastId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.captainId").value(playerId));
     }
 
     private String player(String email, String role) throws Exception {

@@ -21,6 +21,7 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
@@ -55,6 +56,7 @@ public class RefereeMatchService {
     private final PlayoffService playoffService;
     private final TournamentRepository tournamentRepository;
     private final PenaltyShootoutService penaltyShootoutService;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public RefereeMatchService(
             MatchRepository matchRepository,
@@ -70,7 +72,8 @@ public class RefereeMatchService {
             StandingsBoardCache standingsBoardCache,
             PlayoffService playoffService,
             TournamentRepository tournamentRepository,
-            PenaltyShootoutService penaltyShootoutService
+            PenaltyShootoutService penaltyShootoutService,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -86,6 +89,7 @@ public class RefereeMatchService {
         this.playoffService = playoffService;
         this.tournamentRepository = tournamentRepository;
         this.penaltyShootoutService = penaltyShootoutService;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional(readOnly = true)
@@ -359,6 +363,10 @@ public class RefereeMatchService {
                     request.teamId(), request.playerId(), TeamMemberStatus.ACTIVE)) {
                 throw ApiException.badRequest("Игрок не в заявке этой команды");
             }
+            if (request.teamId() != null) {
+                tournamentRosterGuard.rejectAppearanceForSecondClub(
+                        match.getTournamentId(), request.teamId(), request.playerId());
+            }
         }
         if (request.secondaryPlayerId() != null) {
             playerProfileRepository.findById(request.secondaryPlayerId())
@@ -367,6 +375,10 @@ public class RefereeMatchService {
                     && !teamMemberRepository.existsByTeamIdAndPlayerIdAndStatus(
                     request.teamId(), request.secondaryPlayerId(), TeamMemberStatus.ACTIVE)) {
                 throw ApiException.badRequest("Второй игрок не в заявке этой команды");
+            }
+            if (request.teamId() != null) {
+                tournamentRosterGuard.rejectAppearanceForSecondClub(
+                        match.getTournamentId(), request.teamId(), request.secondaryPlayerId());
             }
             if (request.playerId() != null && request.playerId().equals(request.secondaryPlayerId())) {
                 throw ApiException.badRequest("Это должен быть другой человек");

@@ -18,6 +18,7 @@ import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.tournaments.service.PlayoffService;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,6 +51,7 @@ public class AdminMatchProtocolService {
     private final MatchMapper matchMapper;
     private final LiveMatchPublisher liveMatchPublisher;
     private final PlayoffService playoffService;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public AdminMatchProtocolService(
             MatchRepository matchRepository,
@@ -59,7 +61,8 @@ public class AdminMatchProtocolService {
             MatchScoreService matchScoreService,
             MatchMapper matchMapper,
             LiveMatchPublisher liveMatchPublisher,
-            PlayoffService playoffService
+            PlayoffService playoffService,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.matchRepository = matchRepository;
         this.matchEventRepository = matchEventRepository;
@@ -69,6 +72,7 @@ public class AdminMatchProtocolService {
         this.matchMapper = matchMapper;
         this.liveMatchPublisher = liveMatchPublisher;
         this.playoffService = playoffService;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -86,6 +90,7 @@ public class AdminMatchProtocolService {
                 request.teamId(), request.playerId(), TeamMemberStatus.ACTIVE)) {
             throw ApiException.badRequest("Игрок не в заявке этой команды");
         }
+        tournamentRosterGuard.rejectAppearanceForSecondClub(match.getTournamentId(), request.teamId(), request.playerId());
 
         MatchEvent event = new MatchEvent();
         event.setMatchId(matchId);
@@ -196,12 +201,16 @@ public class AdminMatchProtocolService {
         if (!home && !away) {
             throw ApiException.badRequest("Игрок не в заявке команд этого матча");
         }
+        UUID side;
         if (home && away
                 && preferredTeamId != null
                 && (preferredTeamId.equals(match.getHomeTeamId()) || preferredTeamId.equals(match.getAwayTeamId()))) {
-            return preferredTeamId;
+            side = preferredTeamId;
+        } else {
+            side = home ? match.getHomeTeamId() : match.getAwayTeamId();
         }
-        return home ? match.getHomeTeamId() : match.getAwayTeamId();
+        tournamentRosterGuard.rejectAppearanceForSecondClub(match.getTournamentId(), side, playerId);
+        return side;
     }
 
     private void applyMinute(Match match, MatchEvent event, int minute) {

@@ -76,6 +76,7 @@ public class TournamentService {
     private final NotificationService notificationService;
     private final TournamentFormatRegistry formatRegistry;
     private final StandingsBoardCache standingsBoardCache;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public TournamentService(
             TournamentRepository tournamentRepository,
@@ -91,7 +92,8 @@ public class TournamentService {
             MatchRefereeRepository matchRefereeRepository,
             NotificationService notificationService,
             TournamentFormatRegistry formatRegistry,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
@@ -107,6 +109,7 @@ public class TournamentService {
         this.notificationService = notificationService;
         this.formatRegistry = formatRegistry;
         this.standingsBoardCache = standingsBoardCache;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -252,6 +255,7 @@ public class TournamentService {
         if (tournamentTeamRepository.existsByTournamentIdAndTeamId(tournamentId, team.getId())) {
             throw ApiException.conflict("Команда уже заявлена на этот турнир");
         }
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, team.getId());
 
         TournamentTeam entry = new TournamentTeam();
         entry.setTournamentId(tournamentId);
