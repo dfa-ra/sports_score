@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
-import { ymd } from '../lib/match'
+import { matchInstant, ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchRow from '../components/MatchRow.vue'
@@ -132,7 +132,7 @@ function windowStartKey() {
 }
 
 function inWindow(match: any) {
-  const key = ymd(match?.scheduledAt)
+  const key = ymd(matchInstant(match))
   const floor = windowStartKey()
   return !!key && !!floor && key >= floor
 }
@@ -159,7 +159,7 @@ const calendarMatches = computed(() => {
 const matchDates = computed(() => {
   const keys = new Set<string>()
   for (const match of calendarMatches.value) {
-    const key = ymd(match.scheduledAt)
+    const key = ymd(matchInstant(match))
     if (key) keys.add(key)
   }
   return [...keys].sort()
@@ -198,9 +198,9 @@ const visible = computed(() => {
     return mineOnly.value ? rows.filter(isMine) : rows
   }
   return calendarMatches.value
-    .filter((m) => ymd(m.scheduledAt) === day.value)
+    .filter((m) => ymd(matchInstant(m)) === day.value)
     .slice()
-    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+    .sort((a, b) => String(matchInstant(a) || '').localeCompare(String(matchInstant(b) || '')))
 })
 
 const grouped = computed(() => {

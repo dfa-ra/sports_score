@@ -5,7 +5,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
-import { matchStateLabel, publicScore } from '../lib/match'
+import { matchInstant, matchStateLabel, publicScore } from '../lib/match'
 import { setPageMeta } from '../lib/pageMeta'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -336,7 +336,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <TeamCrest :src="names.logo(m.awayTeamId)" :name="names.fullName(m.awayTeamId)" :size="22" />
         </span>
         <span class="match-meta">
-          <span>{{ formatWhen(m.scheduledAt) }}</span>
+          <span>{{ formatWhen(matchInstant(m)) }}</span>
           <span v-if="m.status !== 'FINISHED'">{{ matchStateLabel(m.status) }}</span>
         </span>
       </RouterLink>

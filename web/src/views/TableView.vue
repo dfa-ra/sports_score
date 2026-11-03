@@ -11,6 +11,7 @@ import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { setPageMeta } from '../lib/pageMeta'
+import { matchInstant } from '../lib/match'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'playoff' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
@@ -94,7 +95,7 @@ const results = computed(() =>
   matches.value
     .filter((m) => m.tournamentId === tournamentId.value && (m.status === 'FINISHED' || m.status === 'CANCELLED'))
     .slice()
-    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+    .sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
 )
 
 onMounted(async () => {

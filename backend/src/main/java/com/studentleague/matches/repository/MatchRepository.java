@@ -76,7 +76,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
                 m.homeScore,
                 m.awayScore,
                 m.scheduledAt,
-                m.status
+                m.status,
+                m.startedAt
             )
             from Match m
             join Team home on home.id = m.homeTeamId

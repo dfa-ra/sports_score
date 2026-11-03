@@ -9,7 +9,7 @@ import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import { formatDateRange } from '../lib/format'
-import { longKickoff } from '../lib/match'
+import { longKickoff, matchInstant } from '../lib/match'
 import { setPageMeta } from '../lib/pageMeta'
 import { registeredName } from '../lib/playerTitle'
 
@@ -48,13 +48,22 @@ const openedStory = computed(() =>
 const tape = computed(() =>
   matches.value
     .slice()
-    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+    .sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
     .slice(0, 8)
 )
 const homeTables = computed(() => parseStandings(feed.value?.standings))
 const tournamentDates = computed(() =>
   formatDateRange(feed.value?.tournament?.startDate, feed.value?.tournament?.endDate)
 )
+const openTournament = computed(() => feed.value?.tournament?.id ? feed.value.tournament : null)
+
+function readNextMatch(response: { status?: number; data?: unknown } | null) {
+  if (!response || response.status === 204) return null
+  const data = response.data
+  if (!data || typeof data !== 'object') return null
+  const row = data as { id?: unknown }
+  return row.id ? data : null
+}
 
 onMounted(async () => {
   try {
@@ -62,7 +71,7 @@ onMounted(async () => {
     const [{ data }, games, upcoming] = await Promise.all([
       api.get('/home'),
       api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
-      api.get('/matches/next').then((response) => response.data?.id ? response.data : null).catch(() => null),
+      api.get('/matches/next').then(readNextMatch).catch(() => null),
     ])
     feed.value = data
     matches.value = games.data.content ?? []
@@ -145,6 +154,8 @@ function heroHeading(slide: Slide | null | undefined) {
   if (!title || /живой сезон/i.test(title)) return SITE_NAME
   return title
 }
+
+const bannerTitle = computed(() => openTournament.value ? heroHeading(current.value) : SITE_NAME)
 </script>
 
 <template>
@@ -170,31 +181,37 @@ function heroHeading(slide: Slide | null | undefined) {
 
         <div v-if="!loaded" class="hero hero-pending" />
         <div v-else class="hero">
-          <img class="league-photo" :src="BRAND_MARK_SRC" width="512" height="512" alt="" />
           <div class="hero-copy">
-            <p class="eyebrow">
-              <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name || SITE_NAME }}</RouterLink>
-              <template v-else>{{ SITE_NAME }}</template>
+            <p v-if="openTournament" class="eyebrow">
+              <RouterLink :to="`/tournaments/${openTournament.id}`">{{ openTournament.name || SITE_NAME }}</RouterLink>
             </p>
-            <h1>{{ heroHeading(current) }}</h1>
+            <h1>{{ bannerTitle }}</h1>
             <p v-if="tournamentDates">{{ tournamentDates }}</p>
-            <p v-if="current?.caption">{{ current.caption }}</p>
-            <p v-if="nextMatch">
+            <p v-if="openTournament && current?.caption">{{ current.caption }}</p>
+            <p v-if="nextMatch?.id">
               Ближайший матч: {{ teams.fullName(nextMatch.homeTeamId) }} — {{ teams.fullName(nextMatch.awayTeamId) }}
-              · {{ longKickoff(nextMatch.scheduledAt) }}
+              · {{ longKickoff(matchInstant(nextMatch)) }}
             </p>
-            <a
-              v-if="isExternal(hrefOf(current, '/calendar'))"
-              class="btn hero-cta"
-              :href="hrefOf(current, '/calendar')"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {{ current?.linkLabel || 'Смотреть календарь' }}
-            </a>
-            <RouterLink v-else class="btn hero-cta" :to="hrefOf(current, '/calendar')">
-              {{ current?.linkLabel || 'Смотреть календарь' }}
-            </RouterLink>
+            <div class="hero-actions">
+              <template v-if="openTournament">
+                <a
+                  v-if="isExternal(hrefOf(current, '/calendar'))"
+                  class="btn hero-cta"
+                  :href="hrefOf(current, '/calendar')"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {{ current?.linkLabel || 'Смотреть календарь' }}
+                </a>
+                <RouterLink v-else class="btn hero-cta" :to="hrefOf(current, '/calendar')">
+                  {{ current?.linkLabel || 'Смотреть календарь' }}
+                </RouterLink>
+              </template>
+              <template v-else>
+                <RouterLink class="btn hero-cta" to="/calendar">Игры</RouterLink>
+                <RouterLink class="btn hero-cta secondary" to="/tournaments">Турниры</RouterLink>
+              </template>
+            </div>
             <a
               v-if="feed?.vkAlbumUrl && !feed?.photos?.length"
               class="album"
@@ -202,6 +219,9 @@ function heroHeading(slide: Slide | null | undefined) {
               target="_blank"
               rel="noreferrer"
             >Кадры во ВКонтакте</a>
+          </div>
+          <div class="league-badge">
+            <img class="league-photo" :src="BRAND_MARK_SRC" width="512" height="512" alt="" />
           </div>
           <div v-if="heroes.length > 1" class="dots">
             <button
@@ -414,51 +434,55 @@ function heroHeading(slide: Slide | null | undefined) {
 }
 .hero {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
   border-radius: 18px;
   overflow: hidden;
   min-height: 280px;
-  background: #001433;
+  padding: 1.25rem 1.35rem 1.35rem 1.5rem;
+  background:
+    radial-gradient(280px 280px at 100% 50%, rgba(255, 255, 255, 0.14), transparent 68%),
+    #001433;
 }
-.hero-pending { min-height: 280px; }
+.hero-pending { min-height: 280px; display: block; }
 .album { color: #fff; font-weight: 700; width: fit-content; }
 .album:hover { color: #fff; }
 .home-skel { min-height: 220px; }
-.hero img.league-photo {
-  position: absolute;
-  top: 50%;
-  right: 4%;
-  width: min(240px, 34%);
-  height: auto;
+.league-badge {
+  width: min(220px, 34vw);
   aspect-ratio: 1;
-  object-fit: contain;
-  transform: translateY(-50%);
-  pointer-events: none;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  padding: 0.4rem;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
-.hero-shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(0, 20, 51, 0.82) 0%, rgba(0, 20, 51, 0.2) 70%);
+.league-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .hero-copy {
   position: relative;
   z-index: 1;
   display: grid;
   gap: 0.55rem;
-  padding: 1.25rem min(38%, 16rem) 1.35rem 1.5rem;
+  align-content: center;
+  min-width: 0;
   color: #fff;
 }
-.hero.photo .hero-copy {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-width: 560px;
-  padding: 1.2rem 1.5rem 1.35rem;
-}
-.hero-copy h1 { color: #fff; font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
+.hero-copy h1,
+.hero-copy .eyebrow,
+.hero-copy p { color: #fff; }
+.hero-copy h1 { font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
 .hero-copy p { color: rgba(255,255,255,0.86); }
 .hero-copy a,
 .hero-copy a:hover { color: #fff; text-decoration: none; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .table-block h2 a,
 .league-head a { color: inherit; text-decoration: none; }
 .hero-cta,
@@ -467,6 +491,11 @@ function heroHeading(slide: Slide | null | undefined) {
   border-radius: 999px;
   padding: 0.58rem 1.15rem;
   color: #fff;
+}
+a.hero-cta.secondary,
+a.hero-cta.secondary:hover {
+  background: #fff;
+  color: var(--navy);
 }
 .dots {
   position: absolute;
@@ -674,17 +703,18 @@ function heroHeading(slide: Slide | null | undefined) {
 }
 @media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; padding-right: 38%; }
+  .hero { grid-template-columns: minmax(0, 1fr) 96px; min-height: 220px; padding: 1rem; }
   .hero-copy a,
   .hero-copy a:hover { color: #fff; }
+  a.hero-cta.secondary,
+  a.hero-cta.secondary:hover { color: var(--navy); }
   .stories-wrap { gap: 0.2rem; }
   .nudge { width: 28px; height: 28px; }
   .story { width: 72px; }
   .story img { width: 60px; height: 60px; }
-  .hero, .hero-pending { min-height: 240px; }
-  .hero img.league-photo { width: min(120px, 32%); height: auto; right: 0.6rem; }
+  .hero-pending { min-height: 220px; }
+  .league-badge { width: 96px; }
   .hero-copy h1 { font-size: 1.25rem; }
-  .hero-cta { display: none; }
   .blocks { padding-top: 0.75rem; gap: 0.7rem; }
   .table-block { padding: 0.85rem; }
   .leaders { padding: 0.95rem 0.8rem 0.7rem; gap: 1.05rem; }

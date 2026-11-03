@@ -197,7 +197,7 @@ async function removeMember(id: string) {
         <h2>Ближайший матч</h2>
         <p>
           <RouterLink :to="`/matches/${nextMatch.id}`">
-            <KickoffWhen :at="nextMatch.scheduledAt" :status="nextMatch.status" align="start" />
+            <KickoffWhen :at="nextMatch.scheduledAt" :started-at="nextMatch.startedAt" :status="nextMatch.status" align="start" />
           </RouterLink>
           <span v-if="opponentName"> · против {{ opponentName }}</span>
         </p>
@@ -244,7 +244,7 @@ async function removeMember(id: string) {
         <EmptyState v-if="!matches.length" title="Матчей нет" />
         <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
           <StatusBadge :status="m.status" />
-          <KickoffWhen :at="m.scheduledAt" :status="m.status" align="start" />
+          <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" align="start" />
           <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         </RouterLink>
       </div>

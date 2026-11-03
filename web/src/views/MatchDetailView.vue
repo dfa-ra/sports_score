@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -93,7 +93,7 @@ const headToHead = computed(() => {
       && ((row.homeTeamId === a && row.awayTeamId === b) || (row.homeTeamId === b && row.awayTeamId === a))
     )
     .slice()
-    .sort((x, y) => String(y.scheduledAt || '').localeCompare(String(x.scheduledAt || '')))
+    .sort((x, y) => String(matchInstant(y) || '').localeCompare(String(matchInstant(x) || '')))
     .slice(0, 5)
 })
 
@@ -339,8 +339,8 @@ async function load() {
       api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
       api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
     ])
-    homeForm.value = hf.data
-    awayForm.value = af.data
+    homeForm.value = [...(hf.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
+    awayForm.value = [...(af.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
     allMatches.value = games.data.content ?? []
   } catch {
     homeForm.value = []
@@ -665,7 +665,7 @@ onUnmounted(() => {
     <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
+      <p class="when">{{ longKickoff(matchInstant(match)) }}</p>
       <div class="club">
         <button
           class="star"
@@ -952,7 +952,7 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
           </RouterLink>
           <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
@@ -973,7 +973,7 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
           </RouterLink>
           <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
@@ -983,7 +983,7 @@ onUnmounted(() => {
             <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
             {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
             <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
-            · {{ formatWhen(f.scheduledAt) }}
+            · {{ formatWhen(matchInstant(f)) }}
           </RouterLink>
           <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
         </div>

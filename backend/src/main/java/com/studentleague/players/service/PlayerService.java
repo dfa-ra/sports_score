@@ -353,6 +353,7 @@ public class PlayerService {
             history.add(new PlayerCardResponse.MatchHistoryItem(
                     match.getId(),
                     match.getScheduledAt(),
+                    match.getStartedAt(),
                     tournament == null ? null : tournament.getName(),
                     homeName,
                     awayName,

@@ -15,6 +15,7 @@ import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { setPageMeta } from '../lib/pageMeta'
+import { matchInstant } from '../lib/match'
 import { registeredName } from '../lib/playerTitle'
 
 const route = useRoute()
@@ -27,8 +28,14 @@ const members = ref<any[]>([])
 const stats = ref<any[]>([])
 const matches = ref<any[]>([])
 const tab = ref<'results' | 'calendar' | 'squad' | 'stats'>('results')
-const played = computed(() => matches.value.filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED'))
-const upcoming = computed(() => matches.value.filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED'))
+const played = computed(() => matches.value
+  .filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED')
+  .slice()
+  .sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || ''))))
+const upcoming = computed(() => matches.value
+  .filter((m) => m.status === 'SCHEDULED' || m.status === 'LIVE' || m.status === 'PAUSED')
+  .slice()
+  .sort((a, b) => String(matchInstant(a) || '').localeCompare(String(matchInstant(b) || ''))))
 const me = ref<any>(null)
 const memberIds = computed(() => members.value.map((item) => item.playerId))
 const playerId = ref('')

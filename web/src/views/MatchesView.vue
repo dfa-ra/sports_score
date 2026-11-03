@@ -59,7 +59,7 @@ const visible = computed(() => {
         <StatusBadge :status="m.status" />
         <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
         <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
-        <KickoffWhen :at="m.scheduledAt" :status="m.status" :minute="m.minute" align="start" />
+        <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" :minute="m.minute" align="start" />
       </RouterLink>
     </div>
   </section>

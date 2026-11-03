@@ -109,3 +109,5 @@ export function ymd(value?: string | number | Date | null) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   return `${date.getFullYear()}-${month}-${day}`
 }
+
+export { matchInstant, type MatchDateSource } from './matchDate'
