@@ -18,6 +18,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -112,6 +113,12 @@ public class CalendarImportService {
                         tournament.getId(), homeTeam.getId(), awayTeam.getId(), kickoff, null, null, null, null
                 ));
                 created.add(match.id());
+            } catch (ApiException ex) {
+                if (rosterConflict(ex)) {
+                    throw ex;
+                }
+                skipped++;
+                warnings.add("Строка " + (i + 1) + ": " + ex.getMessage());
             } catch (RuntimeException ex) {
                 skipped++;
                 warnings.add("Строка " + (i + 1) + ": " + ex.getMessage());
@@ -130,19 +137,16 @@ public class CalendarImportService {
         if (team.isDisbanded()) {
             throw ApiException.badRequest("Команда «" + team.getName() + "» расформирована");
         }
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
         tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), team.getId())
                 .ifPresentOrElse(entry -> {
                     if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
                         return;
                     }
-                    if (!TournamentRosterGuard.isEntered(entry.getStatus())) {
-                        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
-                    }
                     entry.setStatus(TournamentTeamStatus.APPROVED);
                     entry.setApprovedAt(Instant.now());
                     tournamentTeamRepository.save(entry);
                 }, () -> {
-                    tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
                     TournamentTeam entry = new TournamentTeam();
                     entry.setTournamentId(tournament.getId());
                     entry.setTeamId(team.getId());
@@ -150,6 +154,13 @@ public class CalendarImportService {
                     entry.setApprovedAt(Instant.now());
                     tournamentTeamRepository.save(entry);
                 });
+    }
+
+    private static boolean rosterConflict(ApiException ex) {
+        String message = ex.getMessage();
+        return ex.getStatus() == HttpStatus.CONFLICT
+                && message != null
+                && message.contains("уже играет за");
     }
 
     private Team resolveTeam(String raw) {

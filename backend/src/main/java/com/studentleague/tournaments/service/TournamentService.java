@@ -54,6 +54,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -252,15 +253,19 @@ public class TournamentService {
             }
         }
 
-        if (tournamentTeamRepository.existsByTournamentIdAndTeamId(tournamentId, team.getId())) {
+        Optional<TournamentTeam> existing = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, team.getId());
+        if (existing.isPresent() && TournamentRosterGuard.isEntered(existing.get().getStatus())) {
             throw ApiException.conflict("Команда уже заявлена на этот турнир");
         }
         tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, team.getId());
 
-        TournamentTeam entry = new TournamentTeam();
-        entry.setTournamentId(tournamentId);
-        entry.setTeamId(team.getId());
+        TournamentTeam entry = existing.orElseGet(TournamentTeam::new);
+        if (entry.getId() == null) {
+            entry.setTournamentId(tournamentId);
+            entry.setTeamId(team.getId());
+        }
         entry.setStatus(TournamentTeamStatus.PENDING);
+        entry.setApprovedAt(null);
         tournamentTeamRepository.save(entry);
         notificationService.publishToUser(
                 principal.getId(),
@@ -279,6 +284,7 @@ public class TournamentService {
     public TournamentTeamResponse approveTeam(UUID tournamentId, UUID teamId) {
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
                 .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, teamId);
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
@@ -305,7 +311,10 @@ public class TournamentService {
             matchRefereeRepository.deleteByMatchId(match.getId());
             matchRepository.delete(match);
         }
-        tournamentTeamRepository.delete(entry);
+        entry.setStatus(TournamentTeamStatus.WITHDRAWN);
+        entry.setApprovedAt(null);
+        entry.setTableId(null);
+        tournamentTeamRepository.save(entry);
         standingsBoardCache.invalidateTournament(tournamentId);
     }
 

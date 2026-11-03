@@ -2,21 +2,33 @@ package com.studentleague.tournaments;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.studentleague.support.AbstractIntegrationTest;
+import com.studentleague.tournaments.domain.TournamentTeamStatus;
+import com.studentleague.tournaments.entity.TournamentTeam;
+import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private TournamentTeamRepository tournamentTeamRepository;
 
     @Test
     void playerJoinsTwoClubsInDifferentTournamentsAndCanAppearForEach() throws Exception {
@@ -178,6 +190,182 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.teamId").value(spareId))
                 .andExpect(jsonPath("$.playerId").value(playerId));
+    }
+
+    @Test
+    void approvingAPendingEntrySucceedsWhenNobodyElseHoldsThePlayer() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("appr-ok-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("appr-ok-pl-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String southCaptain = player("appr-ok-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, southId);
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.teamId").value(southId));
+    }
+
+    @Test
+    void approvingAPendingEntryConflictsWhenAPlayerJoinedAnotherEnteredClub() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("appr-no-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("appr-no-pl-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String northCaptain = player("appr-no-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("appr-no-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northName = "Север " + suffix;
+        String northId = createTeam(admin, northName, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, southId);
+        addMember(admin, northId, orlovId);
+        // North is entered without the register check: that is the hole approve must close.
+        forceEntered(springId, northId);
+
+        String conflict = "Орлов Илья уже играет за «" + northName + "»";
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value(conflict));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')].status", contains("PENDING")));
+    }
+
+    @Test
+    void calendarImportFailsWhenAnActivePlayerAlreadyPlaysForAnEnteredClub() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("imp-no-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("imp-no-pl-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String northCaptain = player("imp-no-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("imp-no-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String westCaptain = player("imp-no-w-" + suffix + "@example.com", "CAPTAIN", "Запад", "Капитан");
+        String northName = "Север " + suffix;
+        String southName = "Юг " + suffix;
+        String westName = "Запад " + suffix;
+        String northId = createTeam(admin, northName, northCaptain);
+        String southId = createTeam(admin, southName, southCaptain);
+        String westId = createTeam(admin, westName, westCaptain);
+        addMember(admin, northId, orlovId);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, northId);
+        approve(admin, springId, northId);
+
+        String csv = """
+                date,time,home,away
+                2026-09-12,18:00,%s,%s
+                2026-09-13,19:00,%s,%s
+                """.formatted(southName, westName, westName, northName);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "calendar.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+        String conflict = "Орлов Илья уже играет за «" + northName + "»";
+        mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
+                        .file(file)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value(conflict));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "' && @.status=='APPROVED')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + westId + "' && @.status=='APPROVED')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("APPROVED")));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/matches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void calendarImportDoesNotApproveAPendingClubThatNowConflicts() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("imp-pend-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("imp-pend-pl-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String northCaptain = player("imp-pend-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("imp-pend-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String westCaptain = player("imp-pend-w-" + suffix + "@example.com", "CAPTAIN", "Запад", "Капитан");
+        String northName = "Север " + suffix;
+        String southName = "Юг " + suffix;
+        String northId = createTeam(admin, northName, northCaptain);
+        String southId = createTeam(admin, southName, southCaptain);
+        createTeam(admin, "Запад " + suffix, westCaptain);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, southId);
+        addMember(admin, northId, orlovId);
+        forceEntered(springId, northId);
+
+        String csv = """
+                date,time,home,away
+                2026-09-12,18:00,%s,Запад %s
+                """.formatted(southName, suffix);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "calendar.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+        mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
+                        .file(file)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Орлов Илья уже играет за «" + northName + "»"));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')].status", contains("PENDING")));
+    }
+
+    @Test
+    void withdrawingAClubKeepsTheRowAndLetsThePlayerEnterWithAnotherClub() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("wd-admin-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("wd-pl-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String northCaptain = player("wd-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("wd-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northId = createTeam(admin, "Север " + suffix, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        addMember(admin, northId, orlovId);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, northId);
+        approve(admin, springId, northId);
+
+        mockMvc.perform(delete("/api/v1/tournaments/" + springId + "/teams/" + northId)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("WITHDRAWN")))
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].id").isNotEmpty());
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"teamId":"%s"}
+                                """.formatted(southId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.teamId").value(southId));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("WITHDRAWN")));
+    }
+
+    private void forceEntered(String tournamentId, String teamId) {
+        TournamentTeam entry = new TournamentTeam();
+        entry.setTournamentId(UUID.fromString(tournamentId));
+        entry.setTeamId(UUID.fromString(teamId));
+        entry.setStatus(TournamentTeamStatus.APPROVED);
+        entry.setApprovedAt(Instant.now());
+        tournamentTeamRepository.saveAndFlush(entry);
     }
 
     private String player(String email, String role, String first, String last) throws Exception {

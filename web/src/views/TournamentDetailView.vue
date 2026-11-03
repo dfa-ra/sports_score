@@ -574,7 +574,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       />
 
       <h2>Заявки</h2>
-      <div v-for="team in teams" :key="`admin-${team.id}`" class="row">
+      <div v-for="team in listedTeams" :key="`admin-${team.id}`" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
           {{ team.teamName }}
