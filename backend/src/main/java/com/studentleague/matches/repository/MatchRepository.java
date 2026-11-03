@@ -6,6 +6,7 @@ import com.studentleague.matches.entity.Match;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,7 +15,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-public interface MatchRepository extends JpaRepository<Match, UUID> {
+public interface MatchRepository extends JpaRepository<Match, UUID>, JpaSpecificationExecutor<Match> {
     Page<Match> findByTournamentId(UUID tournamentId, Pageable pageable);
     List<Match> findByTournamentId(UUID tournamentId);
 
@@ -128,4 +129,43 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
             where m.homeTeamId = :teamId or m.awayTeamId = :teamId
             """)
     Page<Match> findByTeamId(@Param("teamId") UUID teamId, Pageable pageable);
+
+    @Query("""
+            select m from Match m
+            where m.status = :status and m.scheduledAt >= :from
+            order by m.scheduledAt asc, m.id asc
+            """)
+    List<Match> findScheduledFrom(
+            @Param("status") MatchStatus status,
+            @Param("from") Instant from,
+            Pageable pageable
+    );
+
+    @Query("""
+            select m from Match m
+            where m.status = :status
+            order by coalesce(m.finishedAt, m.startedAt, m.scheduledAt) desc, m.id desc
+            """)
+    List<Match> findRecentByStatus(@Param("status") MatchStatus status, Pageable pageable);
+
+    long countByStatus(MatchStatus status);
+
+    long countByTournamentIdAndStatus(UUID tournamentId, MatchStatus status);
+
+    @Query("""
+            select coalesce(sum(m.homeScore + m.awayScore), 0)
+            from Match m
+            where m.status = :status
+            """)
+    long sumScoresByStatus(@Param("status") MatchStatus status);
+
+    @Query("""
+            select coalesce(sum(m.homeScore + m.awayScore), 0)
+            from Match m
+            where m.status = :status and m.tournamentId = :tournamentId
+            """)
+    long sumScoresByTournamentAndStatus(
+            @Param("tournamentId") UUID tournamentId,
+            @Param("status") MatchStatus status
+    );
 }

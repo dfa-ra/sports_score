@@ -54,6 +54,8 @@ class PublicSurfaceSecurityTest extends AbstractIntegrationTest {
             "/api/v1/statistics/teams",
             "/api/v1/statistics/scorers",
             "/api/v1/home",
+            "/api/v1/home/overview",
+            "/api/v1/statistics/summary",
             "/api/v1/gallery",
             "/api/v1/tournaments/formats"
     })

@@ -1,736 +1,726 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { Client } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 import api from '../api/client'
-import EmptyState from '../components/EmptyState.vue'
-import MatchRow from '../components/MatchRow.vue'
-import StandingGroups from '../components/StandingGroups.vue'
-import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
-import { useTeamDirectory } from '../lib/useTeamDirectory'
+import HomeAvatar from '../components/home/HomeAvatar.vue'
+import HomeCrest from '../components/home/HomeCrest.vue'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
-import { formatDateRange } from '../lib/format'
-import { longKickoff, matchInstant } from '../lib/match'
-import { pickNextMatch } from '../lib/nextMatch'
+import {
+  badgeClass,
+  badgeIndex,
+  countdown,
+  emptyOverview,
+  feedRecent,
+  feedUpcoming,
+  goalsPerMatchLabel,
+  heroWhen,
+  leaderLine,
+  matchClockLabel,
+  matchDayLabel,
+  progressWidth,
+  registrationEmpty,
+  registrationHeadline,
+  stageText,
+  statusChip,
+  statusText,
+  withLiveMinute,
+  countLabel,
+  type HomeMatch,
+  type HomeOverview,
+  type HomeTournament,
+} from '../lib/homeOverview'
 import { setPageMeta } from '../lib/pageMeta'
-import { registeredName } from '../lib/playerTitle'
+import { tableRouteQuery } from '../lib/tableQuery'
 
-type Slide = {
-  id: string
-  url?: string
-  title?: string
-  caption?: string
-  linkUrl?: string
-  linkLabel?: string
-  enabled?: boolean
-}
-
-const feed = ref<any>(null)
-const matches = ref<any[]>([])
-const nextMatch = ref<any>(null)
 const loaded = ref(false)
-const loadError = ref('')
-const slide = ref(0)
-const storyRail = ref<HTMLElement | null>(null)
-const teams = useTeamDirectory()
-let timer: number | undefined
+const failed = ref(false)
+const overview = ref<HomeOverview>(emptyOverview())
+const chip = ref<string | null>(null)
+const scorerTab = ref('')
+const nowMs = ref(Date.now())
+let clockTimer = 0
+let refreshTimer = 0
+let client: Client | null = null
+let subscribedKey = ''
 
-function shownSlides(list: Slide[] | null | undefined): Slide[] {
-  return (list ?? []).filter((item) => item?.enabled !== false && !!item?.url)
-}
+const now = computed(() => new Date(nowMs.value))
+const nextMatch = computed(() => overview.value.next?.id ? withLiveMinute(overview.value.next, nowMs.value) : null)
+const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
+const livePreview = computed(() => liveRows.value.slice(0, 3))
+const tournaments = computed(() => overview.value.tournaments)
+const offseason = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length === 0)
+const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length > 0)
+const showStats = computed(() => !failed.value && (!loaded.value || !!overview.value.summary))
+const showTournaments = computed(() => !loaded.value || failed.value || tournaments.value.length > 0)
+const scorerGroups = computed(() => overview.value.scorersByTournament)
+const showScorers = computed(() => !loaded.value || failed.value || scorerGroups.value.length > 0)
+const liveKey = computed(() => overview.value.live.slice(0, 5).map((match) => match.id).join(','))
+const upcoming = computed(() => feedUpcoming(overview.value, chip.value, nextMatch.value?.id))
+const recent = computed(() => feedRecent(overview.value, chip.value))
+const activeScorers = computed(() => scorerGroups.value.find((group) => group.tournamentId === scorerTab.value) || scorerGroups.value[0] || null)
+const heroStage = computed(() => {
+  if (!nextMatch.value) return ''
+  const stage = stageText(nextMatch.value)
+  const left = countdown(nextMatch.value.scheduledAt, nowMs.value)
+  if (stage && left) return `${stage} · ${left}`
+  return stage || left
+})
 
-const heroes = computed<Slide[]>(() => shownSlides(feed.value?.heroes))
-const stories = computed<Slide[]>(() => shownSlides(feed.value?.stories))
-const moments = computed<Slide[]>(() => shownSlides(feed.value?.photos))
-const current = computed(() => heroes.value[slide.value] || null)
-const storyIndex = ref<number | null>(null)
-const openedStory = computed(() =>
-  storyIndex.value == null ? null : stories.value[storyIndex.value] || null
-)
-const tape = computed(() =>
-  matches.value
-    .slice()
-    .sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
-    .slice(0, 8)
-)
-const homeTables = computed(() => parseStandings(feed.value?.standings))
-const tournamentDates = computed(() =>
-  formatDateRange(feed.value?.tournament?.startDate, feed.value?.tournament?.endDate)
-)
-const openTournament = computed(() => feed.value?.tournament?.id ? feed.value.tournament : null)
-
-function readNextMatch(response: { status?: number; data?: unknown } | null) {
-  if (!response || response.status === 204) return null
-  const data = response.data
-  if (!data || typeof data !== 'object') return null
-  const row = data as { id?: unknown; tournamentId?: unknown }
-  return row.id ? data as { id: string; tournamentId?: string } : null
-}
-
-async function loadNextMatch(tournamentId: string, rows: any[]) {
-  try {
-    const response = await api.get('/matches/next', { params: { tournamentId } })
-    const row = readNextMatch(response)
-    if (row?.id && (!row.tournamentId || row.tournamentId === tournamentId)) return row
-  } catch {
-    // The list below still applies the same nearest-match rule.
+function normalize(data: HomeOverview | null | undefined): HomeOverview {
+  return {
+    generatedAt: data?.generatedAt,
+    next: data?.next ?? null,
+    live: data?.live ?? [],
+    upcoming: data?.upcoming ?? [],
+    recent: data?.recent ?? [],
+    tournaments: data?.tournaments ?? [],
+    scorersByTournament: data?.scorersByTournament ?? [],
+    summary: data?.summary ?? null,
   }
-  return pickNextMatch(rows, Date.now(), tournamentId)
 }
 
-onMounted(async () => {
+async function load(silent = false) {
   try {
-    await teams.load()
-    const [{ data }, games] = await Promise.all([
-      api.get('/home'),
-      api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
-    ])
-    feed.value = data
-    matches.value = games.data.content ?? []
-    const openId = data?.tournament?.id as string | undefined
-    nextMatch.value = openId ? await loadNextMatch(openId, matches.value) : null
-    const name = data?.tournament?.name || SITE_NAME
-    setPageMeta({
-      title: 'Главная',
-      description: `${name}: таблица, ближайшие матчи и бомбардиры.`,
-      path: '/',
-    })
-    start()
+    const { data } = await api.get<HomeOverview>('/home/overview')
+    overview.value = normalize(data)
+    failed.value = false
+    if (chip.value && !overview.value.tournaments.some((item) => item.id === chip.value)) chip.value = null
+    if (!scorerTab.value || !overview.value.scorersByTournament.some((item) => item.tournamentId === scorerTab.value)) {
+      scorerTab.value = overview.value.scorersByTournament[0]?.tournamentId || ''
+    }
   } catch {
-    feed.value = null
-    matches.value = []
-    nextMatch.value = null
-    loadError.value = 'Главная не загрузилась.'
+    if (!silent || !loaded.value) failed.value = true
   } finally {
     loaded.value = true
   }
+}
+
+function badgeOf(tournamentId?: string | null) {
+  return badgeClass(badgeIndex(tournaments.value, tournamentId))
+}
+
+function scoreText(match: HomeMatch, side: 'home' | 'away') {
+  if (match.status === 'SCHEDULED' || match.status === 'CANCELLED') return '–'
+  return String(side === 'home' ? match.homeScore : match.awayScore)
+}
+
+function teamCount(tournament: HomeTournament) {
+  const word = countLabel(tournament.teamsCount, 'команда', 'команды', 'команд')
+  return `${tournament.teamsCount} ${word}`
+}
+
+function cardMatches(tournament: HomeTournament) {
+  return [tournament.lastMatch, tournament.nextMatch].filter((match): match is HomeMatch => !!match?.id)
+}
+
+function statsLink(tournamentId?: string, full = false) {
+  return { path: '/table', query: tableRouteQuery({ tournamentId, tab: 'scorers', listAll: full }) }
+}
+
+function connectLive() {
+  const ids = liveKey.value ? liveKey.value.split(',') : []
+  const key = liveKey.value
+  if (key === subscribedKey && client?.active) return
+  subscribedKey = key
+  client?.deactivate()
+  client = null
+  if (!ids.length) return
+  const next = new Client({
+    webSocketFactory: () => new SockJS('/ws') as WebSocket,
+    reconnectDelay: 5000,
+    onConnect: () => {
+      ids.forEach((id) => {
+        next.subscribe(`/topic/matches/${id}`, (message) => {
+          const frame = JSON.parse(message.body) as {
+            matchId?: string
+            status?: string
+            homeScore?: number
+            awayScore?: number
+            gameTimeSeconds?: number | null
+            period?: number | null
+            periodCount?: number
+            periodLengthSeconds?: number
+            clockRunningSince?: string | null
+          }
+          if (!frame.matchId) return
+          if (frame.status === 'FINISHED') {
+            void load(true)
+            return
+          }
+          const patch = (match: HomeMatch): HomeMatch => match.id === frame.matchId
+            ? {
+                ...match,
+                status: frame.status || match.status,
+                homeScore: frame.homeScore ?? match.homeScore,
+                awayScore: frame.awayScore ?? match.awayScore,
+                gameTimeSeconds: frame.gameTimeSeconds ?? match.gameTimeSeconds,
+                period: frame.period ?? match.period,
+                periodCount: frame.periodCount ?? match.periodCount,
+                periodLengthSeconds: frame.periodLengthSeconds ?? match.periodLengthSeconds,
+                clockRunningSince: frame.clockRunningSince ?? match.clockRunningSince,
+              }
+            : match
+          overview.value = {
+            ...overview.value,
+            next: overview.value.next ? patch(overview.value.next) : null,
+            live: overview.value.live.map(patch).filter((match) => match.status === 'LIVE' || match.status === 'PAUSED'),
+            upcoming: overview.value.upcoming.map(patch),
+            recent: overview.value.recent.map(patch),
+          }
+        })
+      })
+    },
+  })
+  next.activate()
+  client = next
+}
+
+watch(liveKey, () => connectLive())
+
+onMounted(() => {
+  setPageMeta({
+    title: 'Главная',
+    description: `${SITE_NAME}: ближайшие матчи, идущие турниры и бомбардиры.`,
+    path: '/',
+  })
+  void load()
+  clockTimer = window.setInterval(() => { nowMs.value = Date.now() }, 1000)
+  refreshTimer = window.setInterval(() => {
+    if (document.visibilityState === 'visible') void load(true)
+  }, 60_000)
 })
 
 onUnmounted(() => {
-  if (timer) window.clearInterval(timer)
-  window.removeEventListener('keydown', onStoryKeys)
+  window.clearInterval(clockTimer)
+  window.clearInterval(refreshTimer)
+  client?.deactivate()
 })
-
-function start() {
-  if (timer) window.clearInterval(timer)
-  if (heroes.value.length < 2 || openedStory.value) return
-  timer = window.setInterval(() => {
-    slide.value = (slide.value + 1) % heroes.value.length
-  }, 6500)
-}
-
-function openStory(index: number) {
-  storyIndex.value = index
-  if (timer) window.clearInterval(timer)
-  window.addEventListener('keydown', onStoryKeys)
-}
-
-function closeStory() {
-  storyIndex.value = null
-  window.removeEventListener('keydown', onStoryKeys)
-  start()
-}
-
-function stepStory(dir: number) {
-  if (storyIndex.value == null || !stories.value.length) return
-  const next = storyIndex.value + dir
-  if (next < 0 || next >= stories.value.length) return
-  storyIndex.value = next
-}
-
-function onStoryKeys(event: KeyboardEvent) {
-  if (storyIndex.value == null) return
-  if (event.key === 'Escape') closeStory()
-  if (event.key === 'ArrowLeft') stepStory(-1)
-  if (event.key === 'ArrowRight') stepStory(1)
-}
-
-function go(index: number | string) {
-  slide.value = Number(index)
-  start()
-}
-
-function hrefOf(item: Slide | null | undefined, fallback = '/') {
-  return item?.linkUrl || fallback
-}
-
-function isExternal(url: string) {
-  return /^https?:\/\//i.test(url)
-}
-
-function nudgeStories(dir: number) {
-  storyRail.value?.scrollBy({ left: dir * 140, behavior: 'smooth' })
-}
-
-function heroHeading(slide: Slide | null | undefined) {
-  const title = slide?.title?.trim()
-  if (!title || /живой сезон/i.test(title)) return SITE_NAME
-  return title
-}
-
-const bannerTitle = computed(() => openTournament.value ? heroHeading(current.value) : SITE_NAME)
 </script>
 
 <template>
-  <section class="home">
-    <div class="stage">
+  <section class="home-v2">
+    <div class="band">
       <div class="container">
-        <div v-if="stories.length" class="stories-wrap">
-          <button class="nudge" type="button" aria-label="Сюжеты назад" @click="nudgeStories(-1)">‹</button>
-          <div ref="storyRail" class="stories">
-            <button
-              v-for="(item, index) in stories"
-              :key="item.id"
-              type="button"
-              class="story"
-              @click="openStory(Number(index))"
-            >
-              <img :src="item.url" width="72" height="72" :alt="item.title || item.caption || 'Сюжет'" />
-              <span>{{ item.title || item.caption || 'Сюжет' }}</span>
-            </button>
-          </div>
-          <button class="nudge" type="button" aria-label="Сюжеты вперёд" @click="nudgeStories(1)">›</button>
+        <div v-if="!loaded" class="skeleton sk-hero" aria-hidden="true" />
+        <div v-else-if="failed" class="hero-card hero-state" role="alert">
+          <p>Не удалось загрузить матчи</p>
+          <button class="hv-btn" type="button" @click="load()">Повторить</button>
         </div>
-
-        <div v-if="!loaded" class="hero hero-pending" />
-        <div v-else class="hero">
-          <div class="hero-copy">
-            <p v-if="openTournament" class="eyebrow">
-              <RouterLink :to="`/tournaments/${openTournament.id}`">{{ openTournament.name || SITE_NAME }}</RouterLink>
-            </p>
-            <h1>{{ bannerTitle }}</h1>
-            <p v-if="tournamentDates">{{ tournamentDates }}</p>
-            <p v-if="openTournament && current?.caption">{{ current.caption }}</p>
-            <p v-if="openTournament && nextMatch?.id">
-              Ближайший матч: {{ teams.fullName(nextMatch.homeTeamId) }} — {{ teams.fullName(nextMatch.awayTeamId) }}
-              · {{ longKickoff(matchInstant(nextMatch)) }}
-            </p>
-            <div class="hero-actions">
-              <template v-if="openTournament">
-                <a
-                  v-if="isExternal(hrefOf(current, '/calendar'))"
-                  class="btn hero-cta"
-                  :href="hrefOf(current, '/calendar')"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {{ current?.linkLabel || 'Смотреть календарь' }}
-                </a>
-                <RouterLink v-else class="btn hero-cta" :to="hrefOf(current, '/calendar')">
-                  {{ current?.linkLabel || 'Смотреть календарь' }}
-                </RouterLink>
-              </template>
-              <template v-else>
-                <RouterLink class="btn hero-cta" to="/calendar">Игры</RouterLink>
-                <RouterLink class="btn hero-cta secondary" to="/tournaments">Турниры</RouterLink>
-              </template>
-            </div>
-            <a
-              v-if="feed?.vkAlbumUrl && !feed?.photos?.length"
-              class="album"
-              :href="feed.vkAlbumUrl"
-              target="_blank"
-              rel="noreferrer"
-            >Кадры во ВКонтакте</a>
-          </div>
-          <div class="league-badge">
-            <img class="league-photo" :src="BRAND_MARK_SRC" width="512" height="512" alt="" />
-          </div>
-          <div v-if="heroes.length > 1" class="dots">
-            <button
-              v-for="(item, index) in heroes"
-              :key="item.id"
-              type="button"
-              :class="{ on: Number(index) === slide }"
-              :aria-label="item.title || `Слайд ${Number(index) + 1}`"
-              @click="go(index)"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="container blocks">
-      <p v-if="loadError" class="form-error">{{ loadError }}</p>
-      <div v-if="!loaded" class="sheet skeleton home-skel" />
-      <div v-else-if="tape.length" class="sheet">
-        <div class="league-head">
+        <div v-else-if="offseason || plainHero" class="hero-card hero-state">
+          <img class="wm" :src="BRAND_MARK_SRC" alt="" />
           <div>
-            <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name || 'Матчи' }}</RouterLink>
-            <template v-else>{{ feed?.tournament?.name || 'Матчи' }}</template>
-            <small>Последние и ближайшие</small>
+            <h1>{{ SITE_NAME }}</h1>
+            <div class="acts">
+              <RouterLink class="hv-btn" to="/calendar">Игры</RouterLink>
+              <RouterLink class="hv-btn ghost" to="/tournaments">Турниры</RouterLink>
+            </div>
           </div>
-          <RouterLink class="more" to="/calendar">Все игры</RouterLink>
-        </div>
-        <MatchRow
-          v-for="m in tape"
-          :key="m.id"
-          :match="m"
-          :home-name="teams.fullName(m.homeTeamId)"
-          :away-name="teams.fullName(m.awayTeamId)"
-        />
-      </div>
-
-      <div class="hero-grid">
-        <div class="panel table-block">
-          <div class="page-title">
-            <p class="eyebrow">Таблица</p>
-            <h2>
-              <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name }}</RouterLink>
-              <template v-else>Турнир ещё не открыт</template>
-            </h2>
+          <div v-if="plainHero && livePreview.length" class="livebar">
+            <span class="st live on-dark">Live сейчас</span>
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+              <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+            </RouterLink>
+            <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
-          <div v-if="!loaded" class="skeleton home-skel" />
-          <EmptyState v-else-if="!standingGroupsHaveRows(homeTables)" title="Таблицы пока нет" />
-          <StandingGroups v-else :tables="homeTables" compact />
         </div>
-
-        <aside class="panel leaders" aria-label="Бомбардиры и ассистенты">
-          <section class="leaders-section">
-            <h2>Бомбардиры</h2>
-            <div v-if="!loaded" class="skeleton home-skel" />
-            <EmptyState v-else-if="!feed?.scorers?.length" title="Голов пока нет" />
-            <ol v-else class="leaders-list">
-              <li v-for="(p, index) in feed?.scorers" :key="p.playerId">
-                <RouterLink class="leader" :to="`/players/${p.playerId}`">
-                  <span class="place">{{ Number(index) + 1 }}</span>
-                  <span class="who">{{ registeredName(p) || 'Игрок' }}</span>
-                  <span class="tally">{{ p.goals }}</span>
-                </RouterLink>
-              </li>
-            </ol>
-          </section>
-          <section class="leaders-section">
-            <h2>Ассистенты</h2>
-            <div v-if="!loaded" class="skeleton" />
-            <ol v-else-if="feed?.assists?.length" class="leaders-list">
-              <li v-for="(p, index) in feed.assists" :key="'a-' + p.playerId">
-                <RouterLink class="leader" :to="`/players/${p.playerId}`">
-                  <span class="place">{{ Number(index) + 1 }}</span>
-                  <span class="who">{{ registeredName(p) || 'Игрок' }}</span>
-                  <span class="tally">{{ p.assists }}</span>
-                </RouterLink>
-              </li>
-            </ol>
-          </section>
-        </aside>
-      </div>
-
-      <div v-if="feed?.photos?.length" class="panel stack moments">
-        <div class="moments-head">
-          <h2>Моменты</h2>
-          <a v-if="feed?.vkAlbumUrl" :href="feed.vkAlbumUrl" target="_blank" rel="noreferrer">Все кадры →</a>
-        </div>
-        <EmptyState v-if="loaded && !moments.length" title="Фото пока нет" />
-        <div v-else class="photos">
-          <figure v-for="photo in moments" :key="photo.id">
-            <img :src="photo.url" :alt="photo.caption || photo.title || 'Момент'" />
-            <figcaption v-if="photo.title || photo.caption">{{ photo.title || photo.caption }}</figcaption>
-          </figure>
+        <div v-else class="hero-card hero-match" :class="{ 'has-live': livePreview.length }">
+          <img class="wm" :src="BRAND_MARK_SRC" alt="" />
+          <div>
+            <p class="eyebrow">Ближайший матч · {{ heroWhen(nextMatch?.scheduledAt, now) }}</p>
+            <div class="vs">
+              <div class="side">
+                <HomeCrest large :id="nextMatch?.homeTeamId" :name="nextMatch?.homeTeamName" :src="nextMatch?.homeLogoUrl" />
+                <span>{{ nextMatch?.homeTeamName }}</span>
+              </div>
+              <div class="x">VS</div>
+              <div class="side">
+                <HomeCrest large :id="nextMatch?.awayTeamId" :name="nextMatch?.awayTeamName" :src="nextMatch?.awayLogoUrl" />
+                <span>{{ nextMatch?.awayTeamName }}</span>
+              </div>
+            </div>
+            <div class="meta">
+              <span class="tb" :class="badgeOf(nextMatch?.tournamentId)">{{ nextMatch?.tournamentShortName || nextMatch?.tournamentName }}</span>
+              <span v-if="heroStage" class="stage">{{ heroStage }}</span>
+            </div>
+            <div class="acts">
+              <RouterLink class="hv-btn" :to="`/matches/${nextMatch?.id}`">К матчу</RouterLink>
+              <RouterLink class="hv-btn ghost" to="/calendar">Календарь игр</RouterLink>
+            </div>
+          </div>
+          <div v-if="livePreview.length" class="livebar">
+            <span class="st live on-dark">Live сейчас</span>
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+              <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+            </RouterLink>
+            <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
+          </div>
         </div>
       </div>
     </div>
 
-    <Teleport to="body">
-      <div
-        v-if="openedStory"
-        class="story-overlay"
-        role="dialog"
-        aria-modal="true"
-        :aria-label="openedStory.title || openedStory.caption || 'Сюжет'"
-        @click.self="closeStory"
-      >
-        <button class="story-close" type="button" aria-label="Закрыть" @click="closeStory">×</button>
-        <button
-          v-if="stories.length > 1 && storyIndex"
-          class="story-step"
-          type="button"
-          aria-label="Предыдущий сюжет"
-          @click="stepStory(-1)"
-        >‹</button>
-        <figure class="story-card">
-          <img :src="openedStory.url" :alt="openedStory.title || openedStory.caption || 'Сюжет'" />
-          <figcaption v-if="openedStory.title || openedStory.caption">
-            <strong v-if="openedStory.title">{{ openedStory.title }}</strong>
-            <span v-if="openedStory.caption">{{ openedStory.caption }}</span>
-          </figcaption>
-          <a
-            v-if="openedStory.linkUrl && isExternal(openedStory.linkUrl)"
-            class="btn story-link"
-            :href="openedStory.linkUrl"
-            target="_blank"
-            rel="noreferrer"
-          >{{ openedStory.linkLabel || 'Открыть' }}</a>
-          <RouterLink
-            v-else-if="openedStory.linkUrl"
-            class="btn story-link"
-            :to="openedStory.linkUrl"
-            @click="closeStory"
-          >{{ openedStory.linkLabel || 'Открыть' }}</RouterLink>
-        </figure>
-        <button
-          v-if="stories.length > 1 && storyIndex != null && storyIndex < stories.length - 1"
-          class="story-step next"
-          type="button"
-          aria-label="Следующий сюжет"
-          @click="stepStory(1)"
-        >›</button>
+    <div v-if="showStats" class="container block">
+      <div v-if="!loaded" class="skeleton sk-stats" aria-hidden="true" />
+      <div v-else-if="overview.summary" class="stats">
+        <p class="eyebrow muted">Лига в цифрах</p>
+        <div class="sgrid">
+          <div class="stat"><b>{{ overview.summary.matchesPlayed }}</b><span><span class="lf">матчей сыграно</span><span class="ls">матчей</span></span></div>
+          <div class="stat"><b>{{ overview.summary.goals }}</b><span><span class="lf">голов забито</span><span class="ls">голов</span></span></div>
+          <div class="stat"><b>{{ goalsPerMatchLabel(overview.summary.goalsPerMatch) }}</b><span><span class="lf">голов за матч</span><span class="ls">г/матч</span></span></div>
+          <div class="stat"><b>{{ overview.summary.teams }}</b><span><span class="lf">команды</span><span class="ls">команд</span></span></div>
+          <div class="stat"><b>{{ overview.summary.players }}</b><span><span class="lf">игроков</span><span class="ls">игроков</span></span></div>
+        </div>
       </div>
-    </Teleport>
+    </div>
+
+    <div class="container block">
+      <div v-if="!loaded" class="skeleton sk-matches" aria-hidden="true" />
+      <div v-else class="card">
+        <div class="card-head">
+          <div>
+            <h2>Матчи</h2>
+            <small>Все турниры · ближайшие и последние</small>
+          </div>
+          <RouterLink class="more-link" to="/calendar">Все игры</RouterLink>
+        </div>
+        <div v-if="failed" class="block-error" role="alert">
+          <p>Матчи не загрузились</p>
+          <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
+        </div>
+        <template v-else>
+          <div class="filters">
+            <div class="chips">
+              <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">Все турниры</button>
+              <button
+                v-for="tournament in tournaments"
+                :key="tournament.id"
+                class="chip"
+                :class="{ on: chip === tournament.id }"
+                type="button"
+                @click="chip = tournament.id"
+              >{{ tournament.shortName || tournament.name }}</button>
+            </div>
+          </div>
+          <p v-if="!upcoming.length && !recent.length" class="block-empty">Матчей пока нет</p>
+          <div v-else class="feed-list">
+            <div class="feed-col">
+              <p v-if="!upcoming.length" class="block-empty">Нет ближайших игр</p>
+              <RouterLink v-for="match in upcoming" :key="match.id" class="mrow" :to="`/matches/${match.id}`">
+                <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
+                <div class="mmain">
+                  <div class="mmeta">
+                    <div class="l">
+                      <span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span>
+                      <span v-if="stageText(match)" class="stage">{{ stageText(match) }}</span>
+                    </div>
+                    <span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span>
+                  </div>
+                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span></div>
+                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+                </div>
+                <div class="mscore"><b class="dim">{{ scoreText(match, 'home') }}</b><b class="dim">{{ scoreText(match, 'away') }}</b></div>
+              </RouterLink>
+            </div>
+            <div class="feed-col">
+              <p v-if="!recent.length" class="block-empty">Результатов пока нет</p>
+              <RouterLink v-for="match in recent" :key="match.id" class="mrow" :to="`/matches/${match.id}`">
+                <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
+                <div class="mmain">
+                  <div class="mmeta">
+                    <div class="l">
+                      <span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span>
+                      <span v-if="stageText(match)" class="stage">{{ stageText(match) }}</span>
+                    </div>
+                    <span class="st done">Завершён</span>
+                  </div>
+                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span></div>
+                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+                </div>
+                <div class="mscore"><b>{{ scoreText(match, 'home') }}</b><b>{{ scoreText(match, 'away') }}</b></div>
+              </RouterLink>
+            </div>
+          </div>
+          <div v-if="upcoming.length || recent.length" class="feed-cards">
+            <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
+              <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
+              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b class="dim">{{ scoreText(match, 'home') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span><b class="dim">{{ scoreText(match, 'away') }}</b></div>
+              <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
+            </RouterLink>
+            <RouterLink v-for="match in recent" :key="`r-${match.id}`" class="mc" :to="`/matches/${match.id}`">
+              <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st done">Завершён</span></div>
+              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b>{{ scoreText(match, 'home') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span><b>{{ scoreText(match, 'away') }}</b></div>
+              <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
+            </RouterLink>
+          </div>
+          <RouterLink class="more" to="/calendar">Все игры →</RouterLink>
+        </template>
+      </div>
+    </div>
+
+    <div v-if="showTournaments" class="container block">
+      <div class="section-title">
+        <h2>Идут сейчас</h2>
+        <RouterLink class="more-link" to="/tournaments">Все турниры</RouterLink>
+      </div>
+      <div v-if="!loaded" class="tgrid">
+        <div class="skeleton sk-tcard" aria-hidden="true" />
+        <div class="skeleton sk-tcard" aria-hidden="true" />
+      </div>
+      <div v-else-if="failed" class="card block-error" role="alert">
+        <p>Турниры не загрузились</p>
+        <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
+      </div>
+      <div v-else class="tgrid">
+        <article v-for="(tournament, index) in tournaments" :key="tournament.id" class="card tcard">
+          <div class="tc-head">
+            <div class="tc-top">
+              <div>
+                <span class="tb" :class="badgeClass(index)">{{ tournament.shortName || tournament.name }}</span>
+                <h3>{{ tournament.name }}</h3>
+              </div>
+              <span class="st" :class="tournament.status === 'REGISTRATION' ? 'warn' : 'ok'">{{ tournament.status === 'REGISTRATION' ? 'Регистрация' : 'Идёт' }}</span>
+            </div>
+            <div class="tc-meta">
+              <span>{{ tournament.seasonLabel || 'Сезон' }}</span>
+              <span>{{ tournament.formatTitle }}</span>
+              <span>{{ teamCount(tournament) }}</span>
+            </div>
+            <div class="prog"><i v-if="tournament.progress != null" :style="{ width: `${progressWidth(tournament.progress)}%` }" /></div>
+            <div class="tc-prog">
+              <span>{{ tournament.status === 'REGISTRATION' ? registrationHeadline(tournament) : tournament.stageLabel }}</span>
+              <RouterLink class="hv-btn dark sm" :to="`/tournaments/${tournament.id}`">К турниру</RouterLink>
+            </div>
+            <div v-if="tournament.status === 'REGISTRATION'" class="lead">
+              <span class="crest plus">+</span>
+              <div><b>Набор открыт</b><span>{{ leaderLine(tournament) }}</span></div>
+            </div>
+            <div v-else-if="tournament.leader" class="lead">
+              <HomeCrest :id="tournament.leader.teamId" :name="tournament.leader.teamName" :src="tournament.leader.logoUrl" />
+              <div><b>{{ tournament.leader.teamName }}</b><span>{{ leaderLine(tournament) }}</span></div>
+            </div>
+            <div v-else-if="leaderLine(tournament)" class="lead">
+              <div><b>{{ tournament.playoffRoundTitle || tournament.stageLabel }}</b><span>{{ leaderLine(tournament) }}</span></div>
+            </div>
+          </div>
+          <div class="tc-label">{{ tournament.status === 'REGISTRATION' ? 'Матчи' : 'Последний и ближайший матчи' }}</div>
+          <div v-if="!cardMatches(tournament).length" class="empty-note">
+            <template v-if="tournament.status === 'REGISTRATION'">
+              Матчи появятся после старта турнира.<br />
+              <span>{{ registrationEmpty(tournament) }}</span>
+            </template>
+            <template v-else>Матчей пока нет</template>
+          </div>
+          <RouterLink
+            v-for="match in cardMatches(tournament)"
+            :key="match.id"
+            class="irow"
+            :to="`/matches/${match.id}`"
+          >
+            <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
+            <div class="h"><span class="n">{{ match.homeTeamName }}</span><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
+            <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
+              <span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span>
+              <small v-if="match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
+            </div>
+            <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+            <div class="stc"><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
+          </RouterLink>
+        </article>
+      </div>
+    </div>
+
+    <div v-if="showScorers" class="container block">
+      <div class="section-title">
+        <h2>Бомбардиры по турнирам</h2>
+        <RouterLink class="more-link" :to="statsLink(activeScorers?.tournamentId)">Вся статистика</RouterLink>
+      </div>
+      <div v-if="!loaded" class="skeleton sk-scorers" aria-hidden="true" />
+      <div v-else-if="failed" class="card block-error" role="alert">
+        <p>Статистика не загрузилась</p>
+        <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
+      </div>
+      <div v-else class="card">
+        <div class="tabs">
+          <button
+            v-for="group in scorerGroups"
+            :key="group.tournamentId"
+            type="button"
+            :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
+            @click="scorerTab = group.tournamentId"
+          >{{ group.shortName || group.tournamentName }}</button>
+        </div>
+        <p v-if="!activeScorers?.scorers.length" class="block-empty">Голов пока нет</p>
+        <template v-else>
+          <table class="stbl">
+            <thead>
+              <tr><th></th><th>Игрок</th><th>Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(player, index) in activeScorers.scorers" :key="player.playerId">
+                <td class="rk">{{ index + 1 }}</td>
+                <td>
+                  <RouterLink class="pl" :to="`/players/${player.playerId}`">
+                    <HomeAvatar :src="player.avatarUrl" :name="player.displayName" />
+                    <b>{{ player.displayName }}</b>
+                  </RouterLink>
+                </td>
+                <td class="tm">{{ player.teamName }}</td>
+                <td class="num">{{ player.appearances }}</td>
+                <td class="num">{{ player.assists }}</td>
+                <td class="num g">{{ player.goals }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="sl-mob">
+            <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
+              <span class="rk">{{ index + 1 }}</span>
+              <HomeAvatar :src="player.avatarUrl" :name="player.displayName" />
+              <div><div class="nm">{{ player.displayName }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
+            </RouterLink>
+          </div>
+        </template>
+        <RouterLink v-if="activeScorers" class="more" :to="statsLink(activeScorers.tournamentId, true)">Полный список · {{ activeScorers.shortName || activeScorers.tournamentName }} →</RouterLink>
+      </div>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.stage {
+.home-v2 { color: var(--text); min-width: 0; }
+.container { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; min-width: 0; }
+.band {
   background:
-    radial-gradient(720px 280px at 80% 0%, rgba(76, 180, 229, 0.22), transparent 60%),
+    radial-gradient(900px 260px at 92% 0%, rgba(76, 180, 229, 0.22), transparent 70%),
     var(--navy);
-  padding: 0.85rem 0 1.15rem;
+  padding-bottom: 1.5rem;
 }
-.stories-wrap {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 0.4rem;
-}
-.nudge {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
+.block { padding-top: 1.5rem; }
+.block:last-child { padding-bottom: 0.5rem; }
+.hero-card {
+  background: var(--ink);
   color: #fff;
-  cursor: pointer;
-  font-size: 1.4rem;
-  line-height: 1;
-}
-.nudge:hover { background: rgba(255, 255, 255, 0.24); }
-.stories {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  padding: 0.4rem 0 1.1rem;
-  scrollbar-width: none;
-}
-.stories::-webkit-scrollbar { display: none; }
-.story {
-  width: 86px;
-  flex: 0 0 auto;
-  display: grid;
-  justify-items: center;
-  gap: 0.4rem;
-  color: #fff;
-  text-decoration: none;
-  font: inherit;
-  font-size: 0.72rem;
-  text-align: center;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-.story:hover { color: #fff; text-decoration: none; }
-.story img {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--ice);
-  box-shadow: 0 0 0 3px rgba(76, 180, 229, 0.22);
-}
-.story span {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: 2.1em;
-}
-.hero {
+  border-radius: 22px;
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
+  overflow: hidden;
+  min-height: 253px;
+}
+.hero-state, .hero-match { display: grid; gap: 1.1rem; padding: 2rem 2.2rem; align-items: center; }
+.hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1.25fr 1fr; }
+.wm { position: absolute; right: -30px; top: -40px; width: 340px; opacity: 0.08; pointer-events: none; }
+.eyebrow { margin: 0; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ice); }
+.eyebrow.muted { color: var(--muted); margin-bottom: 0.6rem; }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink); margin: 0; }
+.hero-card h1 { color: #fff; font-size: 2rem; }
+.vs { display: flex; align-items: center; gap: 1.5rem; margin: 0.9rem 0 0.8rem; flex-wrap: wrap; }
+.side { display: flex; align-items: center; gap: 0.8rem; font-size: 1.6rem; font-weight: 800; text-transform: uppercase; color: #fff; }
+.x { color: var(--ice); font-weight: 800; font-size: 1rem; letter-spacing: 0.1em; }
+.meta, .acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
+.meta { margin-bottom: 1.2rem; }
+.stage { font-size: 0.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.03em; }
+.hv-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 13px; padding: 0.7rem 1.15rem;
+  background: var(--ice); color: var(--navy); font-family: var(--font-display);
+  font-weight: 700; font-size: 0.9375rem; text-decoration: none; cursor: pointer;
+}
+.hv-btn.ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.35); }
+.hv-btn.dark { background: #fff; color: var(--navy); border-color: var(--line-strong); }
+.hv-btn.sm { padding: 0.45rem 0.85rem; font-size: 0.8125rem; border-radius: 11px; }
+.livebar {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
-  overflow: hidden;
-  min-height: 280px;
-  padding: 1.25rem 1.35rem 1.35rem 1.5rem;
-  background:
-    radial-gradient(280px 280px at 100% 50%, rgba(255, 255, 255, 0.14), transparent 68%),
-    #001433;
-}
-.hero-pending { min-height: 280px; display: block; }
-.album { color: #fff; font-weight: 700; width: fit-content; }
-.album:hover { color: #fff; }
-.home-skel { min-height: 220px; }
-.league-badge {
-  width: min(220px, 34vw);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #fff;
+  padding: 1rem;
   display: grid;
-  place-items: center;
-  padding: 0.4rem;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-}
-.league-badge img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-.hero-copy {
+  gap: 0.6rem;
   position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 0.55rem;
-  align-content: center;
-  min-width: 0;
-  color: #fff;
 }
-.hero-copy h1,
-.hero-copy .eyebrow,
-.hero-copy p { color: #fff; }
-.hero-copy h1 { font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
-.hero-copy p { color: rgba(255,255,255,0.86); }
-.hero-copy a,
-.hero-copy a:hover { color: #fff; text-decoration: none; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.table-block h2 a,
-.league-head a { color: inherit; text-decoration: none; }
-.hero-cta,
-.hero-cta:hover {
-  width: fit-content;
-  border-radius: 999px;
-  padding: 0.58rem 1.15rem;
-  color: #fff;
+.lv {
+  display: flex; justify-content: space-between; gap: 0.5rem; color: #fff;
+  padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.06); border-radius: 14px;
+  font-size: 0.9375rem; align-items: center; flex-wrap: wrap; text-decoration: none;
+  border-left: 3px solid var(--status-live);
+  background-image: linear-gradient(90deg, rgba(227, 107, 91, 0.07), transparent 60%);
 }
-a.hero-cta.secondary,
-a.hero-cta.secondary:hover {
-  background: #fff;
-  color: var(--navy);
+.lv span, .all-live { font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); font-weight: 600; }
+.all-live { justify-self: end; text-decoration: none; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.stats { padding: 0.9rem 1.4rem 1.2rem; }
+.sgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
+.stat { border-left: 3px solid var(--ice); padding-left: 0.8rem; min-width: 0; }
+.stat b { display: block; font-size: 2rem; line-height: 1.1; color: var(--ink); font-weight: 800; }
+.stat span { font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.ls { display: none; }
+.card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.card-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.7rem 1rem; background: #eef4f9; border-bottom: 1px solid var(--line);
 }
-.dots {
-  position: absolute;
-  left: 50%;
-  bottom: 1rem;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 0.4rem;
+.card-head h2, .section-title h2 { font-size: 0.9375rem; color: var(--navy); }
+.section-title h2 { font-size: 1.25rem; }
+.card-head small { display: block; margin-top: 1px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); text-transform: none; }
+.section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin: 0 0 0.8rem; }
+.more-link, .more {
+  font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--navy); white-space: nowrap; text-decoration: none;
 }
-.dots button {
-  width: 28px;
-  height: 4px;
-  border: 0;
-  border-radius: 99px;
-  background: rgba(255,255,255,0.35);
-  cursor: pointer;
-  padding: 0;
+.more-link::after { content: " →"; }
+.more { display: block; text-align: center; padding: 0.9rem; border-top: 1px solid var(--line); }
+.filters { padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); }
+.chips, .tabs { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.chips::-webkit-scrollbar, .tabs::-webkit-scrollbar { display: none; }
+.chip, .tabs button {
+  flex: 0 0 auto; border: 1px solid var(--line); background: #fff; color: var(--navy);
+  border-radius: 999px; padding: 0.45rem 0.85rem; font-family: var(--font-display);
+  font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; cursor: pointer;
 }
-.dots button.on { width: 46px; background: #fff; }
-.blocks { display: grid; gap: 1.2rem; padding-top: 1.4rem; }
-.sheet {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
+.chip.on { background: var(--ice); border-color: var(--ice); }
+.tabs { border-bottom: 1px solid var(--line); gap: 0; }
+.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 0.75rem 1rem; background: transparent; }
+.tabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
+.feed-list { display: grid; grid-template-columns: 1fr 1fr; }
+.feed-col + .feed-col { border-left: 1px solid var(--line); }
+.feed-cards { display: none; }
+.mrow, .irow, .mc, .srow, .pl { color: inherit; text-decoration: none; }
+.mrow {
+  display: grid; grid-template-columns: 56px 1fr 40px; gap: 0.75rem; align-items: center;
+  padding: 0.75rem 1rem; border-top: 1px solid var(--line);
 }
-.league-head { justify-content: space-between; }
-.more { color: var(--navy); font-size: 0.75rem; font-weight: 800; }
-.hero-grid { display: grid; grid-template-columns: 1.5fr 0.8fr; gap: 1rem; align-items: start; }
-.hero-grid > * { min-width: 0; }
-.table-block { padding: 1.4rem 1.5rem; }
-.leaders {
-  display: grid;
-  gap: 1.25rem;
-  align-content: start;
-  background: #fff;
-  color: var(--text);
-  padding: 1.15rem 1.05rem 0.8rem;
+.feed-col .mrow:first-child { border-top: 0; }
+.mtime { display: flex; flex-direction: column; align-items: flex-start; font-size: 0.8125rem; line-height: 1.25; color: var(--muted); font-weight: 600; }
+.mtime b { color: var(--navy); font-weight: 800; }
+.mmain { display: grid; gap: 0.35rem; min-width: 0; }
+.mmeta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
+.mmeta .l, .mteam, .mc-t { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.mteam, .mc-t { gap: 0.6rem; font-weight: 700; color: var(--ink); }
+.n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mscore { display: grid; gap: 0.35rem; text-align: right; font-weight: 800; color: var(--ink); font-size: 1.125rem; }
+.mscore b { height: 28px; line-height: 28px; }
+.mscore b.dim, .mc-t b.dim, .sc.dim { color: var(--muted); font-weight: 600; }
+.tb {
+  display: inline-flex; align-items: center; border-radius: 7px; padding: 0.12rem 0.5rem;
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.03em; white-space: nowrap; line-height: 1.5;
 }
-.leaders-section { display: grid; min-width: 0; }
-.leaders h2 {
-  position: relative;
-  width: fit-content;
-  margin: 0 0 0.55rem;
-  padding: 0 0 0.42rem;
-  font-size: 0.92rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  color: var(--navy);
+.tb-0 { background: var(--navy); color: #fff; }
+.tb-1 { background: var(--ice); color: var(--navy); }
+.tb-2 { background: #dbeaf6; color: #1b4f7a; box-shadow: inset 0 0 0 1px rgba(47, 124, 177, 0.35); }
+.tb-3 { background: #fff; color: var(--navy); box-shadow: inset 0 0 0 1.5px var(--navy); }
+.card .stage, .mc-foot, .tc-meta, .lead span { color: var(--muted); }
+.st {
+  display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px;
+  padding: 0.15rem 0.6rem; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em;
+  text-transform: uppercase; white-space: nowrap; line-height: 1.5;
 }
-.leaders h2::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 1.65rem;
-  height: 2px;
-  border-radius: 99px;
-  background: var(--ice);
+.st.today, .st.soon { background: var(--status-soon-soft); color: var(--status-soon-ink); }
+.st.done { background: var(--status-done-soft); color: var(--status-done-ink); }
+.st.ok { background: var(--status-ok-soft); color: var(--status-ok); }
+.st.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.st.live { background: var(--status-live-soft); color: var(--status-live-ink); }
+.st.live::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--status-live);
+  box-shadow: 0 0 0 0 rgba(227, 107, 91, 0.6); animation: hv-pulse 1.6s infinite;
 }
-.leaders-list {
-  list-style: none;
-  margin: 0.1rem -0.45rem 0;
-  padding: 0;
-  min-width: 0;
+.st.on-dark { background: rgba(227, 107, 91, 0.2); color: #ffd2cb; }
+@keyframes hv-pulse { 70% { box-shadow: 0 0 0 7px rgba(227, 107, 91, 0); } 100% { box-shadow: 0 0 0 0 rgba(227, 107, 91, 0); } }
+.tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: stretch; }
+.tcard { display: flex; flex-direction: column; }
+.tc-head { padding: 1.1rem 1.2rem 1rem; display: grid; gap: 0.7rem; }
+.tc-top { display: flex; justify-content: space-between; gap: 0.6rem; align-items: flex-start; }
+.tc-top h3 { font-size: 1.0625rem; margin-top: 0.45rem; line-height: 1.25; }
+.tc-meta { display: flex; gap: 0.4rem 1rem; flex-wrap: wrap; font-size: 0.8125rem; font-weight: 600; }
+.tc-meta span + span::before { content: "·"; margin-right: 1rem; color: var(--line-strong); }
+.tc-prog { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--muted); font-weight: 600; flex-wrap: wrap; }
+.prog { height: 6px; border-radius: 99px; background: var(--bg-wash); overflow: hidden; }
+.prog i { display: block; height: 100%; border-radius: 99px; background: var(--ice); }
+.lead { display: flex; align-items: center; gap: 0.7rem; background: #f4f8fb; border: 1px solid var(--line); border-radius: 14px; padding: 0.55rem 0.8rem; }
+.lead div { display: flex; flex-direction: column; line-height: 1.3; }
+.lead b { color: var(--ink); font-size: 0.9375rem; }
+.lead div span { font-size: 0.8125rem; font-weight: 600; }
+.crest.plus, .plus {
+  width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-wash); color: var(--navy); font-weight: 800; box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.leader {
-  display: grid;
-  grid-template-columns: 1.35rem minmax(0, 1fr) auto;
-  column-gap: 0.55rem;
-  align-items: center;
-  min-height: 2.85rem;
-  padding: 0.48rem 0.45rem;
-  border-bottom: 1px solid var(--line);
-  color: var(--navy);
-  text-decoration: none;
+.tc-label { padding: 0.5rem 1.2rem; background: #f6f9fc; border-top: 1px solid var(--line); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.empty-note, .block-empty, .block-error {
+  padding: 1.6rem 1.2rem; text-align: center; color: var(--muted); font-size: 0.9375rem;
 }
-.leaders-list li:last-child .leader { border-bottom: 0; }
-.leader:hover {
-  background: rgba(76, 180, 229, 0.08);
-  text-decoration: none;
+.block-error { display: grid; gap: 0.7rem; justify-items: center; }
+.hero-state p { color: rgba(255, 255, 255, 0.86); margin: 0 0 0.8rem; }
+.irow {
+  display: grid; grid-template-columns: 56px 1fr 64px 1fr; grid-template-areas: "time h sc a" ". stc stc stc";
+  gap: 0.3rem 0.6rem; align-items: center; padding: 0.6rem 1.2rem; border-top: 1px solid var(--line);
 }
-.leader:focus-visible {
-  outline: 2px solid var(--ice);
-  outline-offset: -2px;
-}
-.place {
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.who {
-  min-width: 0;
-  font-size: 0.98rem;
-  font-weight: 700;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  overflow-wrap: break-word;
-}
-.tally {
-  font-size: 0.98rem;
-  font-weight: 800;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  padding-left: 0.35rem;
-}
-.moments-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-}
-.moments-head a { font-weight: 700; }
-.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 0.8rem; }
-.photos figure { position: relative; margin: 0; }
-.photos img { width: 100%; height: 240px; object-fit: cover; border-radius: 16px; display: block; }
-.photos figcaption {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 1.4rem 0.75rem 0.7rem;
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  background: linear-gradient(transparent, rgba(0, 20, 51, 0.86));
-  border-radius: 0 0 16px 16px;
-}
-.story-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 20, 51, 0.88);
-  padding: 1.2rem;
-}
-.story-card {
-  margin: 0;
-  width: min(520px, 100%);
-  display: grid;
-  gap: 0.75rem;
-  justify-items: center;
-}
-.story-card img {
-  width: 100%;
-  max-height: 72vh;
-  object-fit: contain;
-  border-radius: 16px;
-  background: #001433;
-}
-.story-card figcaption {
-  display: grid;
-  gap: 0.25rem;
-  color: #fff;
-  text-align: center;
-}
-.story-card strong { font-size: 1.05rem; }
-.story-card span { color: rgba(255, 255, 255, 0.82); font-size: 0.9rem; }
-.story-link { width: fit-content; }
-.story-close,
-.story-step {
-  position: absolute;
-  border: 0;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  cursor: pointer;
-  line-height: 1;
-}
-.story-close {
-  top: 1rem;
-  right: 1rem;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 1.6rem;
-}
-.story-step {
-  left: 0.8rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  font-size: 1.6rem;
-}
-.story-step.next { left: auto; right: 0.8rem; }
-.story-close:hover,
-.story-step:hover { background: rgba(255, 255, 255, 0.28); }
-@media (max-width: 1099px) and (min-width: 720px) {
-  .blocks {
-    grid-template-columns: 1.15fr 0.85fr;
-    align-items: start;
+.irow .mtime { grid-area: time; }
+.irow .h, .irow .a { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--ink); min-width: 0; }
+.irow .h { grid-area: h; justify-content: flex-end; text-align: right; }
+.irow .a { grid-area: a; }
+.irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; }
+.irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.irow .stc { grid-area: stc; display: flex; justify-content: center; }
+.stbl { width: 100%; border-collapse: collapse; }
+.stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
+.stbl td { padding: 0.6rem 0.8rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
+.stbl .num { text-align: right; }
+.stbl .rk, .srow .rk { width: 40px; text-align: center; font-weight: 800; color: var(--muted); }
+.stbl .tm { color: var(--muted); font-weight: 600; }
+.stbl .g { font-weight: 800; font-size: 1.125rem; color: var(--navy); }
+.pl { display: flex; align-items: center; gap: 0.7rem; }
+.pl b, .srow .nm { color: var(--ink); font-weight: 700; }
+.sl-mob { display: none; }
+.srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 1rem; border-top: 1px solid var(--line); }
+.srow .tm { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.srow .g { font-weight: 800; font-size: 1.25rem; color: var(--navy); text-align: right; line-height: 1; }
+.srow .g small { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-top: 3px; }
+.sk-hero { height: 253px; min-height: 253px; border-radius: 22px; }
+.sk-stats { height: 127px; min-height: 127px; }
+.sk-matches { height: 521px; min-height: 521px; }
+.sk-tcard { height: 455px; min-height: 455px; }
+.sk-scorers { height: 321px; min-height: 321px; }
+@media (max-width: 720px) {
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; padding: 1.25rem; }
+  .hero-card { min-height: 446px; }
+  .side { font-size: 1.1rem; }
+  .vs { gap: 0.8rem; }
+  .wm { width: 220px; right: -50px; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 44px; height: 44px; }
+  .feed-list { display: none; }
+  .feed-cards { display: flex; gap: 0.75rem; overflow-x: auto; padding: 1rem; scroll-snap-type: x mandatory; scrollbar-width: none; min-width: 0; width: 100%; }
+  .feed-cards::-webkit-scrollbar { display: none; }
+  .mc {
+    flex: 0 0 244px; scroll-snap-align: start; border: 1px solid var(--line); border-radius: 14px;
+    padding: 0.8rem; display: grid; gap: 0.5rem; background: #fff;
   }
-  .sheet { grid-column: 1; grid-row: 1 / span 2; }
-  .hero-grid { grid-column: 2; grid-template-columns: 1fr; }
-  .moments { grid-column: 1 / -1; }
+  .mc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
+  .mc-t b { font-size: 1.125rem; margin-left: auto; }
+  .mc-foot { font-size: 0.75rem; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+  .tgrid { grid-template-columns: 1fr; }
+  .irow { grid-template-columns: 48px 1fr 36px; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
+  .irow .h { flex-direction: row-reverse; justify-content: flex-end; text-align: left; }
+  .irow .sc { align-items: flex-end; }
+  .irow .sc .sep { display: none; }
+  .irow .stc { justify-content: flex-start; }
+  .tc-meta span + span::before { display: none; }
+  .stats { padding: 0.8rem 0.6rem 1rem; }
+  .sgrid { gap: 0.35rem; }
+  .stat { border-left-width: 2px; padding-left: 0.35rem; }
+  .stat b { font-size: 1.25rem; line-height: 1.15; }
+  .stat span { font-size: 0.6875rem; line-height: 1.2; }
+  .lf { display: none; }
+  .ls { display: inline; }
+  .stbl { display: none; }
+  .sl-mob { display: block; }
+  .sk-hero { height: 446px; min-height: 446px; }
+  .sk-stats { height: 136px; min-height: 136px; }
+  .sk-matches { height: 381px; min-height: 381px; }
+  .sk-tcard { height: 554px; min-height: 554px; }
+  .sk-scorers { height: 291px; min-height: 291px; }
 }
-@media (max-width: 719px) {
-  .hero-grid { grid-template-columns: 1fr; }
-  .hero { grid-template-columns: minmax(0, 1fr) 96px; min-height: 220px; padding: 1rem; }
-  .hero-copy a,
-  .hero-copy a:hover { color: #fff; }
-  a.hero-cta.secondary,
-  a.hero-cta.secondary:hover { color: var(--navy); }
-  .stories-wrap { gap: 0.2rem; }
-  .nudge { width: 28px; height: 28px; }
-  .story { width: 72px; }
-  .story img { width: 60px; height: 60px; }
-  .hero-pending { min-height: 220px; }
-  .league-badge { width: 96px; }
-  .hero-copy h1 { font-size: 1.25rem; }
-  .blocks { padding-top: 0.75rem; gap: 0.7rem; }
-  .table-block { padding: 0.85rem; }
-  .leaders { padding: 0.95rem 0.8rem 0.7rem; gap: 1.05rem; }
-  .who, .tally { font-size: 1rem; }
-  .leader { min-height: 2.95rem; }
+@media (prefers-reduced-motion: reduce) {
+  .st.live::before { animation: none; }
 }
 </style>

@@ -36,12 +36,15 @@ import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -181,18 +184,46 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public Page<MatchResponse> list(UUID tournamentId, MatchStatus status, Pageable pageable) {
+        return list(tournamentId, status, null, null, pageable);
+    }
+
+    /**
+     * Same list as before. {@code from} and {@code to} additionally bound {@code scheduledAt}
+     * (inclusive). Sort is unchanged: an unknown sort property still fails the same way.
+     */
+    @Transactional(readOnly = true)
+    public Page<MatchResponse> list(UUID tournamentId, MatchStatus status, Instant from, Instant to, Pageable pageable) {
         abandonedLiveMatchService.closeIdle(Instant.now());
-        Page<Match> page;
-        if (tournamentId != null && status != null) {
-            page = matchRepository.findByTournamentIdAndStatus(tournamentId, status, pageable);
-        } else if (tournamentId != null) {
-            page = matchRepository.findByTournamentId(tournamentId, pageable);
-        } else if (status != null) {
-            page = matchRepository.findByStatus(status, pageable);
-        } else {
-            page = matchRepository.findAll(pageable);
+        if (from == null && to == null) {
+            Page<Match> page;
+            if (tournamentId != null && status != null) {
+                page = matchRepository.findByTournamentIdAndStatus(tournamentId, status, pageable);
+            } else if (tournamentId != null) {
+                page = matchRepository.findByTournamentId(tournamentId, pageable);
+            } else if (status != null) {
+                page = matchRepository.findByStatus(status, pageable);
+            } else {
+                page = matchRepository.findAll(pageable);
+            }
+            return matchMapper.toPage(page);
         }
-        return matchMapper.toPage(page);
+        Specification<Match> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (tournamentId != null) {
+                predicates.add(cb.equal(root.get("tournamentId"), tournamentId));
+            }
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("scheduledAt"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("scheduledAt"), to));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+        return matchMapper.toPage(matchRepository.findAll(spec, pageable));
     }
 
     /**

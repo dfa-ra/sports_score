@@ -74,7 +74,8 @@ public class StandingsBoardCache {
         entries.keySet().removeIf(key ->
                 key.equals(standingsKey(tournamentId))
                         || key.startsWith("board:" + id + ":")
-                        || key.startsWith("board:all:"));
+                        || key.startsWith("board:all:")
+                        || key.startsWith("summary:"));
     }
 
     static String boardKey(UUID tournamentId, int limit) {

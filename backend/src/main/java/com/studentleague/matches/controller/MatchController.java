@@ -17,6 +17,7 @@ import com.studentleague.matches.dto.UpdateMatchRequest;
 import com.studentleague.matches.futsal.FutsalBoardService;
 import com.studentleague.matches.service.AnalystAssignmentService;
 import com.studentleague.matches.service.AnalystStatsService;
+import com.studentleague.matches.service.KickoffRange;
 import com.studentleague.matches.service.MatchLineupService;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.matches.service.PenaltyShootoutService;
@@ -82,13 +83,21 @@ public class MatchController {
     }
 
     @GetMapping
-    @Operation(summary = "List matches with optional filters")
+    @Operation(summary = "List matches. from and to bound scheduledAt, inclusive. A YYYY-MM-DD is a Europe/Moscow civil day.")
     public PageResponse<MatchResponse> list(
             @RequestParam(required = false) UUID tournamentId,
             @RequestParam(required = false) MatchStatus status,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
             @PageableDefault(size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return PageResponse.from(matchService.list(tournamentId, status, pageable));
+        return PageResponse.from(matchService.list(
+                tournamentId,
+                status,
+                KickoffRange.start(from),
+                KickoffRange.end(to),
+                pageable
+        ));
     }
 
     @GetMapping("/next")
