@@ -1,13 +1,16 @@
 package com.studentleague.home;
 
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
@@ -22,6 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     @Test
     void overviewCarriesRunningTournamentsMatchesAndScorers() throws Exception {
@@ -166,7 +172,7 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void liveMatchBeatsEarlierKickoffAcrossActiveTournaments() throws Exception {
+    void nextIsTheEarliestFutureScheduledMatchAcrossActiveTournaments() throws Exception {
         String stamp = String.valueOf(System.nanoTime());
         String adminToken = createAdminAndLogin("near-admin-" + stamp + "@example.com", "Str0ngPass!");
         String captainEmail = "near-cap-" + stamp + "@example.com";
@@ -194,46 +200,55 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
         String teamB = createTeam(adminToken, "Юг " + stamp, playerId(otherToken));
 
         String sport = sportId(adminToken);
-        String earlyCup = createTournament(adminToken, sport, "Ранний кубок " + stamp, "REGISTRATION", "2026-09-01");
+        String futureCup = createTournament(adminToken, sport, "Будущий кубок " + stamp, "REGISTRATION", "2026-09-01");
         String liveCup = createTournament(adminToken, sport, "Живой кубок " + stamp, "REGISTRATION", "2026-09-02");
+        String pastCup = createTournament(adminToken, sport, "Прошлый кубок " + stamp, "REGISTRATION", "2026-09-03");
         String signup = createTournament(adminToken, sport, "Набор кубка " + stamp, "REGISTRATION", "2099-01-01");
-        registerAndApprove(adminToken, captainToken, earlyCup, teamA);
-        registerAndApprove(adminToken, otherToken, earlyCup, teamB);
+        registerAndApprove(adminToken, captainToken, futureCup, teamA);
+        registerAndApprove(adminToken, otherToken, futureCup, teamB);
         registerAndApprove(adminToken, captainToken, liveCup, teamA);
         registerAndApprove(adminToken, otherToken, liveCup, teamB);
+        registerAndApprove(adminToken, captainToken, pastCup, teamA);
+        registerAndApprove(adminToken, otherToken, pastCup, teamB);
         registerAndApprove(adminToken, captainToken, signup, teamA);
         registerAndApprove(adminToken, otherToken, signup, teamB);
-        activate(adminToken, earlyCup);
+        activate(adminToken, futureCup);
         activate(adminToken, liveCup);
+        activate(adminToken, pastCup);
 
-        Instant sooner = Instant.now().plus(20, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.SECONDS);
-        Instant earlierKick = sooner.plus(30, ChronoUnit.MINUTES);
-        Instant laterKick = sooner.plus(3, ChronoUnit.HOURS);
-        String signupSooner = createMatch(adminToken, signup, teamA, teamB, sooner);
-        String earlyMatch = createMatch(adminToken, earlyCup, teamA, teamB, earlierKick);
-        String liveMatch = createMatch(adminToken, liveCup, teamB, teamA, laterKick);
+        Instant kickoff = Instant.now().plus(2, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.SECONDS);
+        Instant pastKick = Instant.now().minus(3, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
+        Instant signupSooner = kickoff.minus(1, ChronoUnit.HOURS);
+        String futureMatch = createMatch(adminToken, futureCup, teamA, teamB, kickoff);
+        String liveMatch = createMatch(adminToken, liveCup, teamB, teamA, kickoff);
+        String pastMatch = createMatch(adminToken, pastCup, teamA, teamB, pastKick);
+        String undatedMatch = createMatch(adminToken, pastCup, teamB, teamA, kickoff.plus(1, ChronoUnit.DAYS));
+        String signupMatch = createMatch(adminToken, signup, teamA, teamB, signupSooner);
+        var undated = matchRepository.findById(UUID.fromString(undatedMatch)).orElseThrow();
+        undated.setScheduledAt(null);
+        matchRepository.saveAndFlush(undated);
         boolean started = false;
         try {
             start(adminToken, liveMatch);
             started = true;
-            MvcResult overview = mockMvc.perform(get("/api/v1/home/overview"))
+            mockMvc.perform(get("/api/v1/home/overview"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.next.id").value(liveMatch))
-                    .andExpect(jsonPath("$.next.status").value("LIVE"))
-                    .andExpect(jsonPath("$.next.tournamentId").value(liveCup))
-                    .andReturn();
-            String nextId = objectMapper.readTree(overview.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                    .get("next").get("id").asText();
-            org.junit.jupiter.api.Assertions.assertNotEquals(earlyMatch, nextId);
-            org.junit.jupiter.api.Assertions.assertNotEquals(signupSooner, nextId);
+                    .andExpect(jsonPath("$.live[?(@.id == '%s')]".formatted(liveMatch)).isNotEmpty())
+                    .andExpect(jsonPath("$.live[?(@.id == '%s')].status".formatted(liveMatch), hasItem("LIVE")))
+                    .andExpect(jsonPath("$.next.id").value(futureMatch))
+                    .andExpect(jsonPath("$.next.status").value("SCHEDULED"))
+                    .andExpect(jsonPath("$.next.tournamentId").value(futureCup))
+                    .andExpect(jsonPath("$.next.id").value(org.hamcrest.Matchers.not(liveMatch)))
+                    .andExpect(jsonPath("$.live[?(@.id == '%s')]".formatted(futureMatch)).isEmpty());
         } finally {
             if (started) {
                 finishLive(adminToken, liveMatch);
             }
-            finish(adminToken, earlyMatch);
-            mockMvc.perform(delete("/api/v1/matches/" + signupSooner)
-                            .header("Authorization", auth(adminToken)))
-                    .andExpect(status().isNoContent());
+            for (String matchId : new String[] {futureMatch, pastMatch, undatedMatch, signupMatch}) {
+                mockMvc.perform(delete("/api/v1/matches/" + matchId)
+                                .header("Authorization", auth(adminToken)))
+                        .andExpect(status().isNoContent());
+            }
         }
     }
 

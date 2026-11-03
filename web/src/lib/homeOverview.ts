@@ -139,6 +139,15 @@ export function badgeIndex(tournaments: { id: string }[], tournamentId?: string 
   return index < 0 ? 0 : index
 }
 
+export function isFutureScheduled(
+  match: { id?: string; status?: string; scheduledAt?: string | null } | null | undefined,
+  nowMs: number = Date.now(),
+) {
+  if (!match?.id || match.status !== 'SCHEDULED' || !match.scheduledAt) return false
+  const instant = parseInstant(match.scheduledAt)
+  return !!instant && instant.getTime() >= nowMs
+}
+
 export function heroWhen(value?: string | null, now: Date = new Date()) {
   const day = moscowYmd(value)
   const clock = moscowClock(value)

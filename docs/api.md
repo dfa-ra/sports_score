@@ -304,7 +304,7 @@ Backend проверяет подпись токена, срок, issuer Google 
 
 ## WebSocket
 
-- Connect: `ws://host/ws` (STOMP).
+- Connect: `ws://host/websocket` (native STOMP; the home page uses this). `ws://host/ws` stays SockJS for the match page and the referee and analyst pads.
 - Subscribe: `/topic/matches/{matchId}`.
 - Auth: JWT на CONNECT.
 

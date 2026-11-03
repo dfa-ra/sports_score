@@ -24,8 +24,10 @@ import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.StandingRow;
 import com.studentleague.tournaments.dto.StandingTableResponse;
+import com.studentleague.tournaments.entity.PlayoffSlot;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.entity.TournamentTeam;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.tournaments.service.TournamentService;
@@ -58,6 +60,7 @@ public class HomeOverviewService {
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
     private final MatchRepository matchRepository;
+    private final PlayoffSlotRepository playoffSlotRepository;
     private final TeamRepository teamRepository;
     private final TournamentService tournamentService;
     private final StatisticsService statisticsService;
@@ -68,6 +71,7 @@ public class HomeOverviewService {
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             MatchRepository matchRepository,
+            PlayoffSlotRepository playoffSlotRepository,
             TeamRepository teamRepository,
             TournamentService tournamentService,
             StatisticsService statisticsService,
@@ -77,6 +81,7 @@ public class HomeOverviewService {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.matchRepository = matchRepository;
+        this.playoffSlotRepository = playoffSlotRepository;
         this.teamRepository = teamRepository;
         this.tournamentService = tournamentService;
         this.statisticsService = statisticsService;
@@ -119,15 +124,16 @@ public class HomeOverviewService {
         }
 
         Map<UUID, Team> teams = loadTeams(corpus, running);
+        Map<UUID, Integer> bracketRounds = bracketRounds(tournamentIds);
         Map<UUID, MatchResponse> mapped = mapMatches(displayMatches(liveEntities, upcomingEntities, recentEntities, running, byTournament));
 
-        HomeMatchResponse next = nearest(now, corpus, tournamentsById, teams, byTournament, mapped);
+        HomeMatchResponse next = nearest(now, corpus, tournamentsById, teams, byTournament, mapped, bracketRounds);
 
         List<HomeTournamentResponse> cards = new ArrayList<>();
         List<HomeScorersResponse> scorers = new ArrayList<>();
         for (Tournament tournament : running) {
             List<Match> matches = byTournament.getOrDefault(tournament.getId(), List.of());
-            cards.add(card(tournament, matches, now, tournamentsById, teams, mapped));
+            cards.add(card(tournament, matches, now, tournamentsById, teams, mapped, bracketRounds));
             if (tournament.getStatus() == TournamentStatus.ACTIVE) {
                 scorers.add(scorersOf(tournament, teams));
             }
@@ -137,9 +143,9 @@ public class HomeOverviewService {
         return new HomeOverviewResponse(
                 now,
                 next,
-                toHomeList(liveEntities, tournamentsById, teams, byTournament, mapped),
-                toHomeList(upcomingEntities, tournamentsById, teams, byTournament, mapped),
-                toHomeList(recentEntities, tournamentsById, teams, byTournament, mapped),
+                toHomeList(liveEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
+                toHomeList(upcomingEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
+                toHomeList(recentEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
                 cards,
                 scorers,
                 summary
@@ -147,9 +153,9 @@ public class HomeOverviewService {
     }
 
     /**
-     * «Ближайший матч» looks at every active tournament. A live or paused match
-     * wins over a scheduled kickoff, even when that kickoff is sooner and belongs
-     * to another tournament. A match with no date is skipped.
+     * «Ближайший матч» is the earliest SCHEDULED kickoff that is not in the past,
+     * across every ACTIVE tournament. Live and paused matches stay in {@code live}.
+     * A match with no date is skipped.
      */
     private HomeMatchResponse nearest(
             Instant now,
@@ -157,44 +163,33 @@ public class HomeOverviewService {
             Map<UUID, Tournament> tournaments,
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
-            Map<UUID, MatchResponse> mapped
+            Map<UUID, MatchResponse> mapped,
+            Map<UUID, Integer> bracketRounds
     ) {
         Match chosen = matches.stream()
-                .filter(match -> match.getScheduledAt() != null)
+                .filter(match -> match.getStatus() == MatchStatus.SCHEDULED)
+                .filter(match -> match.getScheduledAt() != null && !match.getScheduledAt().isBefore(now))
                 .filter(match -> {
                     Tournament tournament = tournaments.get(match.getTournamentId());
                     return tournament != null && tournament.getStatus() == TournamentStatus.ACTIVE;
                 })
-                .filter(match -> isInPlay(match) || isUnplayed(match, now))
-                .min(Comparator
-                        .comparingInt((Match match) -> kickoffRank(match.getStatus()))
-                        .thenComparing(Match::getScheduledAt)
-                        .thenComparing(Match::getId))
+                .min(Comparator.comparing(Match::getScheduledAt).thenComparing(Match::getId))
                 .orElse(null);
         if (chosen == null) {
             return null;
         }
-        return toHome(chosen, tournaments, teams, byTournament, mapped);
+        return toHome(chosen, tournaments, teams, byTournament, mapped, bracketRounds);
     }
 
-    private static boolean isInPlay(Match match) {
-        return match.getStatus() == MatchStatus.LIVE || match.getStatus() == MatchStatus.PAUSED;
-    }
-
-    private static boolean isUnplayed(Match match, Instant now) {
-        return match.getStatus() == MatchStatus.SCHEDULED
-                && match.getScheduledAt() != null
-                && !match.getScheduledAt().isBefore(now);
-    }
-
-    private static int kickoffRank(MatchStatus status) {
-        if (status == MatchStatus.LIVE) {
-            return 0;
+    private Map<UUID, Integer> bracketRounds(Set<UUID> tournamentIds) {
+        Map<UUID, Integer> rounds = new HashMap<>();
+        if (tournamentIds.isEmpty()) {
+            return rounds;
         }
-        if (status == MatchStatus.PAUSED) {
-            return 1;
+        for (PlayoffSlot slot : playoffSlotRepository.findByTournamentIdIn(tournamentIds)) {
+            rounds.merge(slot.getTournamentId(), slot.getRoundNumber(), Math::max);
         }
-        return 2;
+        return rounds;
     }
 
     private List<Tournament> runningTournaments() {
@@ -234,9 +229,11 @@ public class HomeOverviewService {
             Instant now,
             Map<UUID, Tournament> tournamentsById,
             Map<UUID, Team> teams,
-            Map<UUID, MatchResponse> mapped
+            Map<UUID, MatchResponse> mapped,
+            Map<UUID, Integer> bracketRounds
     ) {
-        RoundPlan plan = HomeLabels.plan(matches, tournament.getCompetitionStage());
+        int rounds = bracketRounds.getOrDefault(tournament.getId(), 0);
+        RoundPlan plan = HomeLabels.plan(matches, tournament.getCompetitionStage(), rounds);
         int teamsCount = (int) tournamentTeamRepository.findByTournamentId(tournament.getId()).stream()
                 .filter(entry -> entry.getStatus() == TournamentTeamStatus.APPROVED)
                 .count();
@@ -275,8 +272,8 @@ public class HomeOverviewService {
                 playoff ? plan.playedPairs() : null,
                 playoff ? plan.totalPairs() : null,
                 tournament.getStatus() == TournamentStatus.REGISTRATION ? tournament.getStartDate() : null,
-                last == null ? null : toHome(last, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped),
-                next == null ? null : toHome(next, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped)
+                last == null ? null : toHome(last, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracketRounds),
+                next == null ? null : toHome(next, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracketRounds)
         );
     }
 
@@ -433,11 +430,12 @@ public class HomeOverviewService {
             Map<UUID, Tournament> tournaments,
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
-            Map<UUID, MatchResponse> mapped
+            Map<UUID, MatchResponse> mapped,
+            Map<UUID, Integer> bracketRounds
     ) {
         List<HomeMatchResponse> rows = new ArrayList<>();
         for (Match match : matches) {
-            rows.add(toHome(match, tournaments, teams, byTournament, mapped));
+            rows.add(toHome(match, tournaments, teams, byTournament, mapped, bracketRounds));
         }
         return rows;
     }
@@ -447,7 +445,8 @@ public class HomeOverviewService {
             Map<UUID, Tournament> tournaments,
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
-            Map<UUID, MatchResponse> mapped
+            Map<UUID, MatchResponse> mapped,
+            Map<UUID, Integer> bracketRounds
     ) {
         MatchResponse response = mapped.get(match.getId());
         if (response == null) {
@@ -486,7 +485,7 @@ public class HomeOverviewService {
                 response.bracketRound(),
                 response.penaltyHome(),
                 response.penaltyAway(),
-                HomeLabels.matchStageLabel(match, siblings),
+                HomeLabels.matchStageLabel(match, siblings, bracketRounds.getOrDefault(match.getTournamentId(), 0)),
                 match.getBracketRound() != null ? match.getBracketRound() : HomeLabels.groupRoundOf(match, siblings)
         );
     }

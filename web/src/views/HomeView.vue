@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Client } from '@stomp/stompjs'
-import SockJS from 'sockjs-client'
 import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
@@ -16,6 +15,7 @@ import {
   feedUpcoming,
   goalsPerMatchLabel,
   heroWhen,
+  isFutureScheduled,
   leaderLine,
   matchClockLabel,
   matchDayLabel,
@@ -46,7 +46,11 @@ let client: Client | null = null
 let subscribedKey = ''
 
 const now = computed(() => new Date(nowMs.value))
-const nextMatch = computed(() => overview.value.next?.id ? withLiveMinute(overview.value.next, nowMs.value) : null)
+const nextMatch = computed(() => {
+  const match = overview.value.next
+  if (!isFutureScheduled(match, nowMs.value)) return null
+  return withLiveMinute(match as HomeMatch, nowMs.value)
+})
 const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
 const livePreview = computed(() => liveRows.value.slice(0, 3))
 const tournaments = computed(() => overview.value.tournaments)
@@ -119,6 +123,11 @@ function statsLink(tournamentId?: string, full = false) {
   return { path: '/table', query: tableRouteQuery({ tournamentId, tab: 'scorers', listAll: full }) }
 }
 
+function liveSocketUrl() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${protocol}//${window.location.host}/websocket`
+}
+
 function connectLive() {
   const ids = liveKey.value ? liveKey.value.split(',') : []
   const key = liveKey.value
@@ -128,7 +137,7 @@ function connectLive() {
   client = null
   if (!ids.length) return
   const next = new Client({
-    webSocketFactory: () => new SockJS('/ws') as WebSocket,
+    brokerURL: liveSocketUrl(),
     reconnectDelay: 5000,
     onConnect: () => {
       ids.forEach((id) => {
@@ -424,7 +433,7 @@ onUnmounted(() => {
             <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
             <div class="h"><span class="n">{{ match.homeTeamName }}</span><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
             <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
-              <span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span>
+              <span class="line"><span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span></span>
               <small v-if="match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
             </div>
             <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
@@ -492,7 +501,14 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.home-v2 { color: var(--text); min-width: 0; }
+.home-v2 {
+  color: var(--text);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  container-type: inline-size;
+  container-name: home;
+}
 .container { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; min-width: 0; }
 .band {
   background:
@@ -518,7 +534,8 @@ onUnmounted(() => {
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .hero-card h1 { color: #fff; font-size: 2rem; }
 .vs { display: flex; align-items: center; gap: 1.5rem; margin: 0.9rem 0 0.8rem; flex-wrap: wrap; }
-.side { display: flex; align-items: center; gap: 0.8rem; font-size: 1.6rem; font-weight: 800; text-transform: uppercase; color: #fff; }
+.side { display: flex; align-items: center; gap: 0.8rem; font-size: 1.6rem; font-weight: 800; text-transform: uppercase; color: #fff; min-width: 0; }
+.side span { min-width: 0; overflow-wrap: anywhere; }
 .x { color: var(--ice); font-weight: 800; font-size: 1rem; letter-spacing: 0.1em; }
 .meta, .acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
 .meta { margin-bottom: 1.2rem; }
@@ -659,8 +676,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .h, .irow .a { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--ink); min-width: 0; }
 .irow .h { grid-area: h; justify-content: flex-end; text-align: right; }
 .irow .a { grid-area: a; }
-.irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; }
-.irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
+.irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
+.irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
 .stbl { width: 100%; border-collapse: collapse; }
 .stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
@@ -681,7 +699,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .sk-matches { height: 521px; min-height: 521px; }
 .sk-tcard { height: 455px; min-height: 455px; }
 .sk-scorers { height: 321px; min-height: 321px; }
-@media (max-width: 720px) {
+@media (max-width: 719px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; padding: 1.25rem; }
   .hero-card { min-height: 446px; }
   .side { font-size: 1.1rem; }
@@ -699,11 +717,13 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .mc-t b { font-size: 1.125rem; margin-left: auto; }
   .mc-foot { font-size: 0.75rem; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.5rem; }
   .tgrid { grid-template-columns: 1fr; }
-  .irow { grid-template-columns: 48px 1fr 36px; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
+  .irow { grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
   .irow .h { flex-direction: row-reverse; justify-content: flex-end; text-align: left; }
+  .irow .n { white-space: normal; overflow: visible; text-overflow: unset; }
   .irow .sc { align-items: flex-end; }
-  .irow .sc .sep { display: none; }
+  .irow .sc .line { white-space: nowrap; }
   .irow .stc { justify-content: flex-start; }
+  .tb { white-space: normal; }
   .tc-meta span + span::before { display: none; }
   .stats { padding: 0.8rem 0.6rem 1rem; }
   .sgrid { gap: 0.35rem; }
@@ -719,6 +739,13 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .sk-matches { height: 381px; min-height: 381px; }
   .sk-tcard { height: 554px; min-height: 554px; }
   .sk-scorers { height: 291px; min-height: 291px; }
+}
+@container home (max-width: 719px) {
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
+  .tgrid { grid-template-columns: 1fr; }
+  .irow { grid-template-columns: 48px minmax(0, 1fr) auto; }
+  .irow .sc .line { white-space: nowrap; }
+  .irow .n { white-space: normal; overflow: visible; text-overflow: unset; }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }
