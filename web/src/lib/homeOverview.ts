@@ -249,6 +249,8 @@ export function withLiveMinute(match: HomeMatch, nowMs: number): HomeMatch {
   return minute == null ? match : { ...match, minute }
 }
 
+export { isInPlayStatus, runningCardMatches } from './runningCard'
+
 export function feedUpcoming(overview: HomeOverview, tournamentId: string | null, nextId?: string | null) {
   return overview.upcoming
     .filter((match) => match.status === 'SCHEDULED')

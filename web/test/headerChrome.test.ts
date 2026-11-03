@@ -19,24 +19,27 @@ function mediaBlock(query: string) {
   throw new Error(`unclosed ${marker}`)
 }
 
-test('guest and logged-in headers share one compact cutoff', () => {
+test('wide screens have a profile menu and no burger; narrow screens have only the burger', () => {
   assert.match(src, /const compactQuery = '\(max-width: 1023px\)'/)
   assert.doesNotMatch(src, /device-width/)
-  assert.match(src, /<div ref="menuRoot" class="menu" :class="\{ 'has-extra': extraLinks.length \}">/)
-  assert.doesNotMatch(src, /v-if="[^"]*(?:isAuthenticated|extraLinks)/)
+  assert.match(src, /<div ref="menuRoot" class="menu">/)
+  assert.doesNotMatch(src, /has-extra/)
+  assert.doesNotMatch(src, /only-compact/)
   assert.equal(src.match(/Войти/g)?.length, 1)
   assert.match(src, /class="login-pill" to="\/login">Войти<\/RouterLink>/)
-  assert.match(src, /class="menu-logout only-compact"/)
-  assert.match(src, /class="only-compact"/)
+  assert.match(src, /class="profile-button"/)
+  assert.match(src, /aria-label="Профиль"/)
+  assert.match(src, /class="menu-sep" role="separator"/)
+  assert.match(src, /headerAccountLinks/)
 
   const compact = mediaBlock('(max-width: 1023px)')
   assert.match(compact, /\.primary \{ display: none; \}/)
   assert.match(compact, /\.menu \{ display: block; \}/)
-  assert.match(compact, /\.menu-logout \{ display: flex; \}/)
-  assert.doesNotMatch(compact, /\.auth/)
+  assert.match(compact, /\.account \{ display: none; \}/)
+  assert.doesNotMatch(compact, /\.auth \{/)
 
   const wide = mediaBlock('(min-width: 1024px)')
-  assert.match(wide, /\.only-compact \{ display: none; \}/)
-  assert.match(wide, /\.menu\.has-extra \{ display: block; \}/)
-  assert.equal([...src.matchAll(/\.menu\.has-extra/g)].length, 1)
+  assert.match(wide, /\.menu \{ display: none; \}/)
+  assert.match(wide, /\.account \{ display: block; \}/)
+  assert.doesNotMatch(wide, /has-extra/)
 })

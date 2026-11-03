@@ -719,7 +719,12 @@ const finalLinkStyle = computed(() => ({
   background: #fff;
   color: var(--ink);
 }
-.po-board.compact :deep(.pr) { height: 34px; }
+.po-board.compact :deep(.pr) {
+  height: auto;
+  min-height: 34px;
+  max-height: 36px;
+  overflow: hidden;
+}
 .po-board.compact :deep(.pf) { min-height: 26px; padding: 0.2rem 0.6rem; }
 .po-board.compact :deep(.seed) { display: none; }
 .seg {
