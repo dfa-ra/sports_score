@@ -329,10 +329,29 @@ async function loadPlayoff(id: string, quiet = false) {
   }
 }
 
-function refreshPlayoff() {
-  const id = tournament.value?.id
+let publishedRequest = 0
+
+/** Slot save already updated the bracket card. Refresh every other tournament tab from the server. */
+async function refreshAfterScheduleSave() {
+  const id = String(tournament.value?.id || '')
   if (!id) return
-  void loadPlayoff(String(id), true)
+  const request = ++publishedRequest
+  void loadPlayoff(id, true)
+  try {
+    const [teamRes, standingRes, matchRes, overviewRes] = await Promise.all([
+      api.get(`/tournaments/${id}/teams`),
+      api.get(`/tournaments/${id}/standings`),
+      api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
+      api.get(`/tournaments/${id}/overview`).catch(() => ({ data: null })),
+    ])
+    if (request !== publishedRequest || String(route.params.id) !== id) return
+    teams.value = teamRes.data ?? []
+    standings.value = parseStandings(standingRes.data)
+    matches.value = matchRes.data.content ?? []
+    if (overviewRes.data) overview.value = overviewRes.data
+  } catch {
+    // The bracket card already shows the saved kickoff. Leave the other tabs as they were.
+  }
 }
 
 async function exclude(team: { teamId: string; teamName?: string }) {
@@ -462,7 +481,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       :loading="playoffLoading"
       :error="playoffError"
       :editable="auth.canManageLeague && playoff?.competitionStage === 'PLAYOFF'"
-      @saved="refreshPlayoff"
+      @saved="refreshAfterScheduleSave"
       @retry="loadPlayoff(String(tournament.id))"
       @show-table="setTab('table')"
     />

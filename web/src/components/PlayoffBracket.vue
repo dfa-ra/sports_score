@@ -5,6 +5,7 @@ import PlayoffPairCard from './PlayoffPairCard.vue'
 import TeamCrest from './TeamCrest.vue'
 import { fromLocalInput, toLocalInput } from '../lib/datetime'
 import { apiError } from '../lib/errors'
+import { noteScheduleChange } from '../lib/scheduleRefresh'
 import {
   advancedTeamId,
   arrivalLine,
@@ -22,6 +23,7 @@ import {
   roundNote,
   segmentLabel,
   slotsOf,
+  cssViewportWidth,
   stackChampion,
   teamCountOf,
   useRoundTabs,
@@ -49,7 +51,12 @@ const pending = reactive<Record<string, boolean>>({})
 const root = ref<HTMLElement | null>(null)
 const scroller = ref<HTMLElement | null>(null)
 const tablist = ref<HTMLElement | null>(null)
-const viewport = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+function readViewport() {
+  if (typeof window === 'undefined') return 1280
+  return cssViewportWidth(window.innerWidth, window.visualViewport?.width, window.visualViewport?.scale)
+}
+
+const viewport = ref(readViewport())
 const containerWidth = ref(0)
 const active = ref(0)
 let pan: { x: number; y: number; index: number; id: number } | null = null
@@ -122,14 +129,15 @@ function measureContainer() {
 }
 
 function onViewport() {
-  viewport.value = window.innerWidth
+  viewport.value = readViewport()
   measureContainer()
 }
 
 onMounted(() => {
   canHover.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches
   window.addEventListener('resize', onViewport)
-  measureContainer()
+  window.visualViewport?.addEventListener('resize', onViewport)
+  onViewport()
   if (root.value && typeof ResizeObserver !== 'undefined') {
     boardObserver = new ResizeObserver(() => {
       measureContainer()
@@ -142,6 +150,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onViewport)
+  window.visualViewport?.removeEventListener('resize', onViewport)
   boardObserver?.disconnect()
   panelObserver?.disconnect()
 })
@@ -326,6 +335,7 @@ async function save(slot: PlayoffSlot) {
       venue: fresh[slot.id].venue || '',
     }
     emit('saved')
+    noteScheduleChange()
   } catch (e: unknown) {
     saveError.value = apiError(e)
   } finally {
