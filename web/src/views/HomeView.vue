@@ -23,6 +23,7 @@ import {
   progressWidth,
   registrationEmpty,
   registrationHeadline,
+  runningCardMatches,
   stageText,
   statusChip,
   statusText,
@@ -132,7 +133,7 @@ function teamCount(tournament: HomeTournament) {
 }
 
 function cardMatches(tournament: HomeTournament) {
-  return [tournament.lastMatch, tournament.nextMatch].filter((match): match is HomeMatch => !!match?.id)
+  return runningCardMatches(tournament, liveRows.value)
 }
 
 function statsLink(tournamentId?: string, full = false) {

@@ -64,7 +64,7 @@ function rowLit(home: boolean) {
   <component
     :is="slot.matchId ? RouterLink : 'div'"
     class="pc"
-    :class="{ live, final, static: !slot.matchId }"
+    :class="{ live, final, compact, static: !slot.matchId }"
     :to="slot.matchId ? `/matches/${slot.matchId}` : undefined"
     :role="slot.matchId ? undefined : 'group'"
     :aria-label="aria"
@@ -86,8 +86,8 @@ function rowLit(home: boolean) {
       @mouseleave="canHover && emit('hover', null)"
     >
       <template v-if="kind(home) === 'empty'">
-        <span class="crest empty" aria-hidden="true"></span>
-        <span class="pn">{{ name(home) }}</span>
+        <span class="ph" aria-hidden="true"></span>
+        <span class="pn" :title="name(home)">{{ name(home) }}</span>
       </template>
       <template v-else>
         <TeamCrest :src="logo?.(teamId(home))" :name="name(home)" :size="24" />
@@ -209,14 +209,46 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   color: var(--muted);
   font-weight: 600;
 }
-.crest.empty {
+.ph {
+  box-sizing: border-box;
   width: 24px;
   height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  max-width: 24px;
+  max-height: 24px;
+  padding: 0;
+  margin: 0;
   border-radius: 50%;
   border: 1.5px dashed var(--line-strong);
   background: transparent;
+  display: block;
+  justify-self: center;
+  align-self: center;
 }
 .pr.empty .pn { font-size: 0.875rem; }
+.pc.compact .pr {
+  height: auto;
+  min-height: 34px;
+  max-height: 36px;
+  overflow: hidden;
+}
+.pc.compact .pn,
+.pc.compact .pr.empty .pn {
+  font-size: 13px;
+  line-height: 16px;
+  max-height: 32px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: manual;
+}
 .pr.hl {
   background: rgba(0, 32, 91, 0.07) !important;
   box-shadow: inset 3px 0 0 var(--navy) !important;

@@ -5,7 +5,7 @@ import { useAuthStore } from './stores/auth'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
 import { SITE_NAME } from './lib/brand'
-import { headerAuthSlot, headerExtraLinks } from './lib/headerAuth'
+import { headerAccountLinks, headerAuthSlot } from './lib/headerAuth'
 import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
@@ -21,7 +21,9 @@ const mood = computed(() => {
 })
 
 const menuOpen = ref(false)
+const accountOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
+const accountRoot = ref<HTMLElement | null>(null)
 const compactQuery = '(max-width: 1023px)'
 const compact = ref(typeof window !== 'undefined' && window.matchMedia(compactQuery).matches)
 let compactMedia: MediaQueryList | null = null
@@ -35,7 +37,7 @@ const commonLinks = [
   { to: '/players', label: 'Игроки' },
 ]
 
-const extraLinks = computed(() => headerExtraLinks((role) => auth.hasRole(role)))
+const accountLinks = computed(() => headerAccountLinks((role) => auth.hasRole(role)))
 const authSlot = computed(() => headerAuthSlot(auth.sessionReady, auth.isAuthenticated))
 
 function syncCompact() {
@@ -49,14 +51,21 @@ function navActive(to: string) {
 }
 
 function onPointerDown(event: PointerEvent) {
-  if (!menuOpen.value || !menuRoot.value) return
   const target = event.target
-  if (target instanceof Node && menuRoot.value.contains(target)) return
-  menuOpen.value = false
+  if (!(target instanceof Node)) return
+  if (menuOpen.value && menuRoot.value && !menuRoot.value.contains(target)) menuOpen.value = false
+  if (accountOpen.value && accountRoot.value && !accountRoot.value.contains(target)) accountOpen.value = false
 }
 
 function onKey(event: KeyboardEvent) {
-  if (event.key === 'Escape') menuOpen.value = false
+  if (event.key !== 'Escape') return
+  menuOpen.value = false
+  accountOpen.value = false
+}
+
+function closeMenus() {
+  menuOpen.value = false
+  accountOpen.value = false
 }
 
 onMounted(() => {
@@ -79,17 +88,17 @@ watch(mood, (value) => {
 }, { immediate: true })
 
 async function logout() {
-  menuOpen.value = false
+  closeMenus()
   await auth.logout()
   router.push('/')
 }
 
 watch(() => route.fullPath, () => {
-  menuOpen.value = false
+  closeMenus()
 })
 
 watch(compact, () => {
-  menuOpen.value = false
+  closeMenus()
 })
 
 </script>
@@ -114,17 +123,32 @@ watch(compact, () => {
           </nav>
 
           <div class="auth" :aria-busy="authSlot === 'pending'">
-            <template v-if="authSlot === 'account'">
-              <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
+            <div v-if="authSlot === 'account'" ref="accountRoot" class="account">
+              <button
+                class="profile-button"
+                type="button"
+                aria-label="Профиль"
+                aria-haspopup="true"
+                :aria-expanded="accountOpen"
+                @click="accountOpen = !accountOpen"
+              >
                 <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="32" />
-              </RouterLink>
-              <button class="login-pill ghost" type="button" @click="logout">Выйти</button>
-            </template>
+              </button>
+              <div v-if="accountOpen" class="menu-panel">
+                <RouterLink
+                  v-for="item in accountLinks"
+                  :key="`account-${item.to}`"
+                  :to="item.to"
+                  :class="{ on: navActive(item.to) }"
+                >{{ item.label }}</RouterLink>
+                <button class="menu-logout" type="button" @click="logout">Выйти</button>
+              </div>
+            </div>
             <RouterLink v-else-if="authSlot === 'login'" class="login-pill" to="/login">Войти</RouterLink>
             <span v-else class="auth-pending" aria-hidden="true"></span>
           </div>
 
-          <div ref="menuRoot" class="menu" :class="{ 'has-extra': extraLinks.length }">
+          <div ref="menuRoot" class="menu">
             <button
               class="menu-button"
               type="button"
@@ -136,25 +160,22 @@ watch(compact, () => {
               <span class="menu-glyph" aria-hidden="true">{{ menuOpen ? '✕' : '☰' }}</span>
             </button>
             <div v-if="menuOpen" class="menu-panel">
-              <div class="only-compact">
-                <RouterLink
-                  v-for="item in commonLinks"
-                  :key="`menu-${item.to}`"
-                  :to="item.to"
-                  :class="{ on: navActive(item.to) }"
-                >{{ item.label }}</RouterLink>
-                <RouterLink v-if="authSlot === 'account'" class="menu-user" to="/profile">
-                  <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="28" />
-                  <span>Профиль</span>
-                </RouterLink>
-              </div>
               <RouterLink
-                v-for="item in extraLinks"
-                :key="item.to"
+                v-for="item in commonLinks"
+                :key="`menu-${item.to}`"
                 :to="item.to"
                 :class="{ on: navActive(item.to) }"
               >{{ item.label }}</RouterLink>
-              <button v-if="authSlot === 'account'" class="menu-logout only-compact" type="button" @click="logout">Выйти</button>
+              <template v-if="authSlot === 'account'">
+                <div class="menu-sep" role="separator"></div>
+                <RouterLink
+                  v-for="item in accountLinks"
+                  :key="`burger-${item.to}`"
+                  :to="item.to"
+                  :class="{ on: navActive(item.to) }"
+                >{{ item.label }}</RouterLink>
+                <button class="menu-logout" type="button" @click="logout">Выйти</button>
+              </template>
             </div>
           </div>
         </div>
@@ -245,9 +266,26 @@ watch(compact, () => {
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
 .auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; margin-left: auto; }
 .auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
-.avatar-link { display: grid; place-items: center; }
+.account { position: relative; display: none; }
+.profile-button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.profile-button:hover { background: rgba(255,255,255,0.08); }
 .menu { position: relative; flex: 0 0 auto; display: none; }
-.only-compact { display: contents; }
+.menu-sep {
+  height: 1px;
+  margin: 0.3rem 0.45rem;
+  background: rgba(255, 255, 255, 0.22);
+}
 .menu-button {
   width: 42px;
   height: 42px;
@@ -319,8 +357,8 @@ watch(compact, () => {
   white-space: nowrap;
 }
 @media (min-width: 1024px) {
-  .only-compact { display: none; }
-  .menu.has-extra { display: block; }
+  .menu { display: none; }
+  .account { display: block; }
 }
 
 @media (max-width: 1099px) {
@@ -331,7 +369,7 @@ watch(compact, () => {
 @media (max-width: 1023px) {
   .primary { display: none; }
   .menu { display: block; }
-  .menu-logout { display: flex; }
+  .account { display: none; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.82rem; }
 }

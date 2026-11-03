@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { headerAuthSlot, headerExtraLinks, type HeaderNavRole } from './headerAuth.ts'
+import { headerAccountLinks, headerAuthSlot, headerExtraLinks, type HeaderNavRole } from './headerAuth.ts'
 
 function roles(...list: HeaderNavRole[]) {
   return (role: HeaderNavRole) => list.includes(role)
@@ -14,30 +14,38 @@ test('guest burger has no role items', () => {
   assert.deepEqual(headerExtraLinks(roles()), [])
 })
 
-test('admin sees Админ only, not Судья, Аналитик, or Моя команда', () => {
-  assert.deepEqual(labels(['ADMIN']), ['Админ'])
+test('admin sees Админка only, not Пульт судьи, Аналитик, or Моя команда', () => {
+  assert.deepEqual(labels(['ADMIN']), ['Админка'])
 })
 
-test('referee sees Судья only', () => {
-  assert.deepEqual(labels(['REFEREE']), ['Судья'])
+test('referee sees Пульт судьи only', () => {
+  assert.deepEqual(labels(['REFEREE']), ['Пульт судьи'])
 })
 
 test('analyst is a separate role and is not granted by admin', () => {
   assert.deepEqual(labels(['ANALYST']), ['Аналитик'])
-  assert.deepEqual(labels(['ADMIN', 'ANALYST']), ['Админ', 'Аналитик'])
+  assert.deepEqual(labels(['ADMIN', 'ANALYST']), ['Админка', 'Аналитик'])
 })
 
 test('my team is player or captain, including when they also have a staff role', () => {
   assert.deepEqual(labels(['PLAYER']), ['Моя команда'])
   assert.deepEqual(labels(['CAPTAIN']), ['Моя команда'])
-  assert.deepEqual(labels(['PLAYER', 'REFEREE']), ['Моя команда', 'Судья'])
-  assert.deepEqual(labels(['CAPTAIN', 'ADMIN']), ['Моя команда', 'Админ'])
+  assert.deepEqual(labels(['PLAYER', 'REFEREE']), ['Моя команда', 'Пульт судьи'])
+  assert.deepEqual(labels(['CAPTAIN', 'ADMIN']), ['Моя команда', 'Админка'])
   assert.deepEqual(labels(['PLAYER', 'ADMIN', 'REFEREE', 'ANALYST']), [
     'Моя команда',
-    'Админ',
-    'Судья',
+    'Админка',
+    'Пульт судьи',
     'Аналитик',
   ])
+})
+
+test('the account menu starts with Профиль and then the same role rows', () => {
+  assert.deepEqual(headerAccountLinks(roles()).map((item) => item.label), ['Профиль'])
+  assert.deepEqual(headerAccountLinks(roles('REFEREE')).map((item) => item.label), ['Профиль', 'Пульт судьи'])
+  assert.deepEqual(headerAccountLinks(roles('ADMIN')).map((item) => item.label), ['Профиль', 'Админка'])
+  assert.deepEqual(headerAccountLinks(roles('ANALYST')).map((item) => item.label), ['Профиль', 'Аналитик'])
+  assert.deepEqual(headerAccountLinks(roles('PLAYER')).map((item) => item.label), ['Профиль', 'Моя команда'])
 })
 
 test('header shows neither login nor avatar until the session check finishes', () => {
