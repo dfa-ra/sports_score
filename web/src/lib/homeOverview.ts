@@ -124,6 +124,56 @@ export function emptyOverview(): HomeOverview {
   return { live: [], upcoming: [], recent: [], tournaments: [], scorersByTournament: [], summary: null, next: null }
 }
 
+const LIVE_MATCH_STATUS = new Set(['LIVE', 'PAUSED'])
+
+function tournamentHasLiveMatch(tournament: HomeTournament, live: HomeMatch[]) {
+  if (live.some((match) => match.tournamentId === tournament.id && LIVE_MATCH_STATUS.has(match.status))) return true
+  return [tournament.lastMatch, tournament.nextMatch].some((match) => !!match && LIVE_MATCH_STATUS.has(match.status))
+}
+
+/** Earliest upcoming kickoff already chosen for the card. Missing when the tournament has no future match. */
+function nearestKickoff(tournament: HomeTournament) {
+  const match = tournament.nextMatch
+  if (!match?.scheduledAt || match.status !== 'SCHEDULED') return null
+  const instant = parseInstant(match.scheduledAt)
+  return instant ? instant.getTime() : null
+}
+
+/**
+ * «Идут сейчас»: live matches, then other ACTIVE tournaments by nearest kickoff,
+ * then REGISTRATION. Input order is the API start-date order and stays in place
+ * when kickoff times are equal or missing. A live tournament is not repeated.
+ */
+export function orderRunningTournaments(tournaments: HomeTournament[], live: HomeMatch[] = []) {
+  const liveGroup: HomeTournament[] = []
+  const activeGroup: HomeTournament[] = []
+  const registrationGroup: HomeTournament[] = []
+  const otherGroup: HomeTournament[] = []
+  for (const tournament of tournaments) {
+    if (tournamentHasLiveMatch(tournament, live)) liveGroup.push(tournament)
+    else if (tournament.status === 'ACTIVE') activeGroup.push(tournament)
+    else if (tournament.status === 'REGISTRATION') registrationGroup.push(tournament)
+    else otherGroup.push(tournament)
+  }
+  activeGroup.sort((left, right) => {
+    const a = nearestKickoff(left)
+    const b = nearestKickoff(right)
+    if (a == null && b == null) return 0
+    if (a == null) return 1
+    if (b == null) return -1
+    return a - b
+  })
+  return [...liveGroup, ...activeGroup, ...registrationGroup, ...otherGroup]
+}
+
+/** Same unfiltered list as /tournaments: totalElements, or the rendered page when the total is absent. */
+export function tournamentDirectoryCount(payload: { content?: unknown; totalElements?: unknown } | null | undefined) {
+  if (!payload || typeof payload !== 'object') return null
+  const total = payload.totalElements
+  if (typeof total === 'number' && Number.isFinite(total)) return total
+  return Array.isArray(payload.content) ? payload.content.length : null
+}
+
 export function crestClass(id?: string | null) {
   if (!id) return 'c0'
   let hash = 0
