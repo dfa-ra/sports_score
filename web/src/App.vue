@@ -145,7 +145,6 @@ watch(compact, () => {
                   <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="28" />
                   <span>Профиль</span>
                 </RouterLink>
-                <RouterLink v-else-if="authSlot === 'login'" to="/login">Войти</RouterLink>
               </div>
               <RouterLink
                 v-for="item in extraLinks"
@@ -241,11 +240,10 @@ watch(compact, () => {
 }
 .login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
-.auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; }
+.auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; margin-left: auto; }
 .auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
 .avatar-link { display: grid; place-items: center; }
 .menu { position: relative; flex: 0 0 auto; display: none; }
-.menu.has-extra { display: block; }
 .only-compact { display: contents; }
 .menu-button {
   width: 42px;
@@ -314,6 +312,7 @@ watch(compact, () => {
 }
 @media (min-width: 960px) {
   .only-compact { display: none; }
+  .menu.has-extra { display: block; }
 }
 
 @media (max-width: 1099px) {
@@ -322,8 +321,9 @@ watch(compact, () => {
 }
 
 @media (max-width: 959px) {
-  .primary, .auth { display: none; }
+  .primary { display: none; }
   .menu { display: block; }
+  .menu-logout { display: flex; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.82rem; }
 }
