@@ -543,10 +543,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .side {
   display: flex; align-items: center; gap: 0.8rem; flex: 1 1 0; min-width: 0;
   font-size: 1em; font-weight: 800; text-transform: uppercase; color: #fff;
+  container-type: inline-size;
 }
 .team-name {
   min-width: 0; overflow: visible; text-overflow: unset; white-space: normal;
-  overflow-wrap: break-word; word-break: normal; line-height: 1.15;
+  word-break: normal; overflow-wrap: normal; hyphens: manual; line-height: 1.15;
+  font-size: clamp(0.95rem, 12cqi, 1em);
 }
 .x { flex: 0 0 auto; color: var(--ice); font-weight: 800; font-size: 1em; letter-spacing: 0.1em; line-height: 1; }
 .meta, .acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
@@ -640,7 +642,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   overflow: hidden;
   white-space: normal;
   text-overflow: ellipsis;
-  overflow-wrap: break-word;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: manual;
+  font-size: clamp(0.95rem, 28cqi, 1em);
   line-height: 1.25;
 }
 .mscore { display: grid; gap: 0.35rem; text-align: right; font-weight: 800; color: var(--ink); font-size: 1.125rem; }
@@ -700,7 +705,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   gap: 0.3rem 0.6rem; align-items: center; padding: 0.6rem 1.2rem; border-top: 1px solid var(--line);
 }
 .irow .mtime { grid-area: time; }
-.irow .h, .irow .a { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--ink); min-width: 0; }
+.irow .h, .irow .a { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--ink); min-width: 0; container-type: inline-size; }
 .irow .h { grid-area: h; justify-content: flex-end; text-align: right; }
 .irow .a { grid-area: a; }
 .irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; min-width: 0; }

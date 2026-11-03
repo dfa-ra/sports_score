@@ -22,7 +22,7 @@ const mood = computed(() => {
 
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
-const compactQuery = '(max-width: 959px)'
+const compactQuery = '(max-width: 1023px)'
 const compact = ref(typeof window !== 'undefined' && window.matchMedia(compactQuery).matches)
 let compactMedia: MediaQueryList | null = null
 
@@ -40,6 +40,12 @@ const authSlot = computed(() => headerAuthSlot(auth.sessionReady, auth.isAuthent
 
 function syncCompact() {
   compact.value = !!compactMedia?.matches
+}
+
+function navActive(to: string) {
+  const path = route.path
+  if (to === '/') return path === '/'
+  return path === to || path.startsWith(`${to}/`)
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -103,8 +109,7 @@ watch(compact, () => {
               v-for="item in commonLinks"
               :key="item.to"
               :to="item.to"
-              :exact-active-class="item.to === '/' ? 'on' : undefined"
-              :active-class="item.to === '/' ? undefined : 'on'"
+              :class="{ on: navActive(item.to) }"
             >{{ item.label }}</RouterLink>
           </nav>
 
@@ -123,14 +128,12 @@ watch(compact, () => {
             <button
               class="menu-button"
               type="button"
-              aria-label="Меню"
+              :aria-label="menuOpen ? 'Закрыть меню' : 'Открыть меню'"
               aria-haspopup="true"
               :aria-expanded="menuOpen"
               @click="menuOpen = !menuOpen"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-              </svg>
+              <span class="menu-glyph" aria-hidden="true">{{ menuOpen ? '✕' : '☰' }}</span>
             </button>
             <div v-if="menuOpen" class="menu-panel">
               <div class="only-compact">
@@ -138,8 +141,7 @@ watch(compact, () => {
                   v-for="item in commonLinks"
                   :key="`menu-${item.to}`"
                   :to="item.to"
-                  :exact-active-class="item.to === '/' ? 'on' : undefined"
-                  :active-class="item.to === '/' ? undefined : 'on'"
+                  :class="{ on: navActive(item.to) }"
                 >{{ item.label }}</RouterLink>
                 <RouterLink v-if="authSlot === 'account'" class="menu-user" to="/profile">
                   <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="28" />
@@ -150,7 +152,7 @@ watch(compact, () => {
                 v-for="item in extraLinks"
                 :key="item.to"
                 :to="item.to"
-                active-class="on"
+                :class="{ on: navActive(item.to) }"
               >{{ item.label }}</RouterLink>
               <button v-if="authSlot === 'account'" class="menu-logout only-compact" type="button" @click="logout">Выйти</button>
             </div>
@@ -259,7 +261,7 @@ watch(compact, () => {
   padding: 0;
 }
 .menu-button:hover { background: rgba(255,255,255,0.08); }
-.menu-button svg { width: 22px; height: 22px; }
+.menu-glyph { font-size: 1.25rem; line-height: 1; }
 .menu-panel {
   position: absolute;
   top: calc(100% + 0.45rem);
@@ -269,10 +271,10 @@ watch(compact, () => {
   min-width: 220px;
   max-width: min(280px, calc(100vw - 1.2rem));
   padding: 0.35rem;
-  background: #fff;
-  color: var(--navy);
+  background: #00205b;
+  color: #fff;
   border-radius: 14px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 16px 28px rgba(0, 16, 46, 0.35);
 }
 .menu-panel a,
 .menu-logout {
@@ -282,10 +284,10 @@ watch(compact, () => {
   width: 100%;
   border: 0;
   background: transparent;
-  color: var(--navy);
+  color: #fff;
   text-align: left;
   text-decoration: none;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.92rem;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
@@ -293,8 +295,13 @@ watch(compact, () => {
   white-space: nowrap;
 }
 .menu-panel a:hover,
-.menu-logout:hover { background: rgba(76, 180, 229, 0.12); color: var(--navy); }
-.menu-panel a.on { background: var(--ice); }
+.menu-logout:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.menu-panel a.on {
+  background: transparent;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 4px 0 0 #4cb4e5;
+}
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
@@ -311,7 +318,7 @@ watch(compact, () => {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-@media (min-width: 960px) {
+@media (min-width: 1024px) {
   .only-compact { display: none; }
   .menu.has-extra { display: block; }
 }
@@ -321,7 +328,7 @@ watch(compact, () => {
   .primary a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
 }
 
-@media (max-width: 959px) {
+@media (max-width: 1023px) {
   .primary { display: none; }
   .menu { display: block; }
   .menu-logout { display: flex; }

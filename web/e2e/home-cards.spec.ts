@@ -100,6 +100,49 @@ function exactName(page: Page, name: string) {
   return page.locator('.tcard .irow .n').filter({ hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) })
 }
 
+async function assertWholeWords(locator: Locator) {
+  const info = await locator.evaluate((el) => {
+    const style = getComputedStyle(el)
+    const node = [...el.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && (child.textContent || '').trim())
+    const text = ((node?.textContent || el.textContent) || '').replace(/\s+/g, ' ').trim()
+    const lines: string[] = []
+    if (node && node.nodeType === Node.TEXT_NODE && node.textContent) {
+      const raw = node.textContent
+      const range = document.createRange()
+      let start = 0
+      for (let i = 1; i <= raw.length; i += 1) {
+        range.setStart(node, start)
+        range.setEnd(node, i)
+        if (range.getClientRects().length > 1) {
+          lines.push(raw.slice(start, i - 1))
+          start = i - 1
+        }
+      }
+      lines.push(raw.slice(start))
+    } else {
+      lines.push(text)
+    }
+    const rendered = lines.map((line) => line.trim()).filter(Boolean)
+    const words = text.split(' ').filter(Boolean)
+    const flat = rendered.flatMap((line) => line.split(/\s+/).filter(Boolean))
+    const min = 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    return {
+      wordBreak: style.wordBreak,
+      overflowWrap: style.overflowWrap,
+      fontSize: Number.parseFloat(style.fontSize),
+      min,
+      rendered,
+      words,
+      flat,
+    }
+  })
+  expect(info.wordBreak).toBe('normal')
+  expect(info.overflowWrap).toBe('normal')
+  expect(info.fontSize).toBeGreaterThanOrEqual(info.min - 0.2)
+  expect(info.flat).toEqual(info.words)
+  for (const line of info.rendered) expect(line).not.toMatch(/^\p{L}$/u)
+}
+
 async function columns(locator: Locator) {
   return locator.evaluate((el) => getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length)
 }
@@ -238,6 +281,14 @@ test('live cards are one column through 960px and clamp team names at two lines'
       expect(overflowTops[1]).toBeGreaterThan(overflowTops[0] + 2)
     }
 
+    if (width === 768) {
+      for (const name of await page.locator('.hero-match .team-name').all()) await assertWholeWords(name)
+      for (const name of [exactName(page, fitName).first(), exactName(page, twoLineName).first()]) {
+        await assertWholeWords(name)
+      }
+      await page.locator('.hero-match').screenshot({ path: '/opt/cursor/artifacts/home-hero-768.png' })
+    }
+
     if (width === 768 || width === 1100) {
       const section = page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Идут сейчас' }) })
       await section.screenshot({ path: `/opt/cursor/artifacts/home-cards-${width}.png` })
@@ -290,4 +341,100 @@ test('nearest match fills the hero when nothing is live', async ({ page }) => {
       await page.locator('.band').screenshot({ path: '/opt/cursor/artifacts/home-no-live-640.png' })
     }
   }
+})
+
+test('guest burger switches at 1024 and the menu matches on home and a tournament', async ({ page }) => {
+  await page.route('**/api/v1/**', async (route: Route) => {
+    const path = new URL(route.request().url()).pathname
+    let payload: unknown = {}
+    if (path.endsWith('/home/overview')) payload = overview(true)
+    else if (/\/tournaments\/[^/]+$/.test(path)) {
+      payload = {
+        id: 'cup-a',
+        name: 'Осенний кубок',
+        status: 'ACTIVE',
+        format: 'CUP',
+        seasonYear: 2026,
+        description: '',
+        regulations: '',
+        startDate: '2026-09-01',
+        endDate: '2026-12-20',
+      }
+    } else if (path.includes('/matches')) payload = { content: [] }
+    else if (path.includes('/tables') || path.includes('/standings')) payload = []
+    else if (path.includes('/tournaments/') && path.endsWith('/teams')) payload = []
+    else if (path.endsWith('/teams')) payload = { content: [] }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
+  })
+  mkdirSync('/opt/cursor/artifacts', { recursive: true })
+
+  async function expectMenu(open: boolean, active: string) {
+    const button = page.locator('.menu-button')
+    await expect(button).toBeVisible()
+    await expect(button).toHaveAttribute('aria-expanded', open ? 'true' : 'false')
+    await expect(button).toHaveAccessibleName(open ? 'Закрыть меню' : 'Открыть меню')
+    await expect(button.locator('.menu-glyph')).toHaveText(open ? '✕' : '☰')
+    const panel = page.locator('.menu-panel')
+    if (!open) {
+      await expect(panel).toHaveCount(0)
+      return
+    }
+    await expect(panel).toBeVisible()
+    const panelStyle = await panel.evaluate((el) => {
+      const style = getComputedStyle(el)
+      const link = el.querySelector('a')
+      return {
+        background: style.backgroundColor,
+        color: link ? getComputedStyle(link).color : '',
+        shadow: style.boxShadow,
+      }
+    })
+    expect(panelStyle.background).toBe('rgb(0, 32, 91)')
+    expect(panelStyle.color).toBe('rgb(255, 255, 255)')
+    expect(panelStyle.shadow).not.toBe('none')
+    const current = panel.locator('a.on', { hasText: new RegExp(`^${active}$`) })
+    await expect(current).toBeVisible()
+    const activeStyle = await current.evaluate((el) => {
+      const style = getComputedStyle(el)
+      const idle = el.parentElement?.querySelector('a:not(.on)')
+      return {
+        weight: Number(style.fontWeight),
+        shadow: style.boxShadow,
+        idleWeight: idle ? Number(getComputedStyle(idle).fontWeight) : 400,
+      }
+    })
+    expect(activeStyle.weight).toBeGreaterThan(activeStyle.idleWeight)
+    expect(activeStyle.shadow).toContain('rgb(76, 180, 229)')
+    await expect(panel.locator('a.on')).toHaveCount(1)
+  }
+
+  await page.setViewportSize({ width: 1023, height: 900 })
+  await page.goto('/')
+  await expect(page.locator('.eyebrow', { hasText: 'Ближайший матч' })).toBeVisible()
+  await expect(page.locator('nav.primary')).toBeHidden()
+  await expect(page.locator('.login-pill', { hasText: 'Войти' })).toBeVisible()
+  await expectMenu(false, 'Главная')
+  await page.locator('.menu-button').click()
+  await expectMenu(true, 'Главная')
+  await page.locator('.menu-button').click()
+  await expectMenu(false, 'Главная')
+
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await expect(page.locator('.menu-button')).toBeHidden()
+  await expect(page.locator('nav.primary')).toBeVisible()
+  await expect(page.locator('nav.primary a')).toHaveCount(6)
+  await expect(page.locator('nav.primary a.on')).toHaveText('Главная')
+  await expect(page.locator('.login-pill', { hasText: 'Войти' })).toBeVisible()
+
+  await page.setViewportSize({ width: 768, height: 900 })
+  await page.goto('/tournaments/cup-a')
+  await expect(page.getByRole('heading', { name: 'Осенний кубок' })).toBeVisible()
+  await expect(page.locator('nav.primary')).toBeHidden()
+  await expectMenu(false, 'Турниры')
+  await page.locator('.menu-button').click()
+  await expectMenu(true, 'Турниры')
+  await page.screenshot({
+    path: '/opt/cursor/artifacts/menu-open-tournament.png',
+    clip: { x: 0, y: 0, width: 768, height: 520 },
+  })
 })

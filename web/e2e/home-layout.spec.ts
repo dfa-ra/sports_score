@@ -159,8 +159,9 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
       const style = getComputedStyle(el)
       return { fontSize: style.fontSize, color: style.color }
     })
-    expect(nameStyle.fontSize).toBe('17.6px')
-    expect(vsStyle.fontSize).toBe(nameStyle.fontSize)
+    expect(vsStyle.fontSize).toBe('17.6px')
+    expect(parseFloat(nameStyle.fontSize)).toBeGreaterThanOrEqual(15.2)
+    expect(parseFloat(nameStyle.fontSize)).toBeLessThanOrEqual(parseFloat(vsStyle.fontSize) + 0.05)
     expect(vsStyle.color).toBe('rgb(76, 180, 229)')
     expect(nameStyle.whiteSpace).not.toBe('nowrap')
     expect(nameStyle.textOverflow).not.toBe('ellipsis')
@@ -188,8 +189,9 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
   const desktopName = await page.locator('.hero-match .vs .team-name').first().evaluate((el) => getComputedStyle(el).fontSize)
   const desktopVs = await page.locator('.hero-match .vs .x').evaluate((el) => getComputedStyle(el).fontSize)
   expect(Math.round(desktopCrest!.width)).toBe(56)
-  expect(desktopName).toBe('25.6px')
-  expect(desktopVs).toBe(desktopName)
+  expect(desktopVs).toBe('25.6px')
+  expect(parseFloat(desktopName)).toBeGreaterThanOrEqual(15.2)
+  expect(parseFloat(desktopName)).toBeLessThanOrEqual(parseFloat(desktopVs) + 0.05)
   const desktopHome = await page.locator('.hero-match .vs .side').nth(0).boundingBox()
   const desktopAway = await page.locator('.hero-match .vs .side').nth(1).boundingBox()
   const desktopHomeMid = desktopHome!.y + desktopHome!.height / 2

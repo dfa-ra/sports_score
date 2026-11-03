@@ -20,7 +20,7 @@ function mediaBlock(query: string) {
 }
 
 test('guest and logged-in headers share one compact cutoff', () => {
-  assert.match(src, /const compactQuery = '\(max-width: 959px\)'/)
+  assert.match(src, /const compactQuery = '\(max-width: 1023px\)'/)
   assert.doesNotMatch(src, /device-width/)
   assert.match(src, /<div ref="menuRoot" class="menu" :class="\{ 'has-extra': extraLinks.length \}">/)
   assert.doesNotMatch(src, /v-if="[^"]*(?:isAuthenticated|extraLinks)/)
@@ -29,13 +29,13 @@ test('guest and logged-in headers share one compact cutoff', () => {
   assert.match(src, /class="menu-logout only-compact"/)
   assert.match(src, /class="only-compact"/)
 
-  const compact = mediaBlock('(max-width: 959px)')
+  const compact = mediaBlock('(max-width: 1023px)')
   assert.match(compact, /\.primary \{ display: none; \}/)
   assert.match(compact, /\.menu \{ display: block; \}/)
   assert.match(compact, /\.menu-logout \{ display: flex; \}/)
   assert.doesNotMatch(compact, /\.auth/)
 
-  const wide = mediaBlock('(min-width: 960px)')
+  const wide = mediaBlock('(min-width: 1024px)')
   assert.match(wide, /\.only-compact \{ display: none; \}/)
   assert.match(wide, /\.menu\.has-extra \{ display: block; \}/)
   assert.equal([...src.matchAll(/\.menu\.has-extra/g)].length, 1)
