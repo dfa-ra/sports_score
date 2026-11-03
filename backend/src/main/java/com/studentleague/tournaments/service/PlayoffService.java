@@ -905,7 +905,7 @@ public class PlayoffService {
         return team == null ? "Команда" : team.getName();
     }
 
-    private static String roundTitle(int round, int rounds) {
+    public static String roundTitle(int round, int rounds) {
         int fromFinal = rounds - round;
         return switch (fromFinal) {
             case 0 -> "Финал";
@@ -917,7 +917,7 @@ public class PlayoffService {
         };
     }
 
-    private static int roundCount(int teamCount) {
+    public static int roundCount(int teamCount) {
         int rounds = 0;
         int remaining = teamCount;
         while (remaining > 1) {

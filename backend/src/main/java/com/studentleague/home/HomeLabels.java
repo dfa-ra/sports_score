@@ -5,6 +5,7 @@ import com.studentleague.matches.entity.Match;
 import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentFormat;
 import com.studentleague.tournaments.domain.TournamentStatus;
+import com.studentleague.tournaments.service.PlayoffService;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,7 +18,8 @@ import java.util.TreeMap;
 /**
  * Short labels and round numbers for the home overview.
  * A round is one Europe/Moscow calendar day of non-playoff matches.
- * Playoff rounds follow the bracket number already stored on the match.
+ * Playoff titles are {@link PlayoffService#roundTitle}: the round number counted back
+ * from the size of the bracket, the same titles the playoff grid shows.
  */
 public final class HomeLabels {
 
@@ -65,20 +67,16 @@ public final class HomeLabels {
     }
 
     public static String roundTitle(int round, int rounds) {
-        int fromFinal = Math.max(0, rounds) - round;
-        return switch (fromFinal) {
-            case 0 -> "Финал";
-            case 1 -> "1/2 финала";
-            case 2 -> "1/4 финала";
-            case 3 -> "1/8 финала";
-            case 4 -> "1/16 финала";
-            default -> "Раунд " + round;
-        };
+        return PlayoffService.roundTitle(round, rounds);
     }
 
     public static RoundPlan plan(List<Match> matches, CompetitionStage stage) {
+        return plan(matches, stage, 0);
+    }
+
+    public static RoundPlan plan(List<Match> matches, CompetitionStage stage, int bracketRounds) {
         if (stage == CompetitionStage.PLAYOFF) {
-            return playoffPlan(matches);
+            return playoffPlan(matches, bracketRounds);
         }
         return groupPlan(matches);
     }
@@ -105,11 +103,20 @@ public final class HomeLabels {
     }
 
     public static String matchStageLabel(Match match, List<Match> tournamentMatches) {
+        return matchStageLabel(match, tournamentMatches, 0);
+    }
+
+    /**
+     * @param bracketRounds highest playoff slot round in the tournament, or 0 when the
+     *                      bracket has not been built and the label falls back to the
+     *                      highest round that already has a match
+     */
+    public static String matchStageLabel(Match match, List<Match> tournamentMatches, int bracketRounds) {
         if (match == null) {
             return null;
         }
         if (match.getBracketRound() != null) {
-            int total = tournamentMatches.stream()
+            int total = bracketRounds > 0 ? bracketRounds : tournamentMatches.stream()
                     .filter(row -> row.getBracketRound() != null)
                     .mapToInt(Match::getBracketRound)
                     .max()
@@ -169,14 +176,15 @@ public final class HomeLabels {
         return RoundPlan.group(current, days.size());
     }
 
-    private static RoundPlan playoffPlan(List<Match> matches) {
+    private static RoundPlan playoffPlan(List<Match> matches, int bracketRounds) {
         List<Match> bracket = matches.stream()
                 .filter(match -> match.getBracketRound() != null && match.getStatus() != MatchStatus.CANCELLED)
                 .toList();
         if (bracket.isEmpty()) {
             return RoundPlan.playoff(null, null, null, null, null);
         }
-        int total = bracket.stream().mapToInt(Match::getBracketRound).max().orElse(1);
+        int fromMatches = bracket.stream().mapToInt(Match::getBracketRound).max().orElse(1);
+        int total = bracketRounds > 0 ? bracketRounds : fromMatches;
         int current = bracket.stream()
                 .filter(match -> match.getStatus() != MatchStatus.FINISHED)
                 .mapToInt(Match::getBracketRound)

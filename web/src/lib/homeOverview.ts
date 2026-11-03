@@ -116,6 +116,10 @@ export type HomeOverview = {
   summary?: LeagueSummary | null
 }
 
+export function matchTournamentChips<T extends { status?: string }>(tournaments: T[]) {
+  return tournaments.filter((tournament) => tournament.status === 'ACTIVE')
+}
+
 export function emptyOverview(): HomeOverview {
   return { live: [], upcoming: [], recent: [], tournaments: [], scorersByTournament: [], summary: null, next: null }
 }
@@ -137,6 +141,15 @@ export function badgeClass(index: number) {
 export function badgeIndex(tournaments: { id: string }[], tournamentId?: string | null) {
   const index = tournaments.findIndex((item) => item.id === tournamentId)
   return index < 0 ? 0 : index
+}
+
+export function isFutureScheduled(
+  match: { id?: string; status?: string; scheduledAt?: string | null } | null | undefined,
+  nowMs: number = Date.now(),
+) {
+  if (!match?.id || match.status !== 'SCHEDULED' || !match.scheduledAt) return false
+  const instant = parseInstant(match.scheduledAt)
+  return !!instant && instant.getTime() >= nowMs
 }
 
 export function heroWhen(value?: string | null, now: Date = new Date()) {

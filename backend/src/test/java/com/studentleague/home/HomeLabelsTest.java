@@ -4,6 +4,7 @@ import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentStatus;
+import com.studentleague.tournaments.service.PlayoffService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -53,6 +54,29 @@ class HomeLabelsTest {
         assertEquals(2, plan.totalPairs());
         assertEquals("1/2 финала", HomeLabels.matchStageLabel(open, List.of(done, open, semi)));
         assertEquals("Финал", HomeLabels.matchStageLabel(semi, List.of(done, open, semi)));
+    }
+
+    @Test
+    void stageLabelsFollowTheBracketSize() {
+        assertBracket(2, "Финал");
+        assertBracket(4, "1/2 финала", "Финал");
+        assertBracket(8, "1/4 финала", "1/2 финала", "Финал");
+        assertBracket(16, "1/8 финала", "1/4 финала", "1/2 финала", "Финал");
+    }
+
+    private static void assertBracket(int teams, String... titles) {
+        int rounds = PlayoffService.roundCount(teams);
+        assertEquals(titles.length, rounds);
+        for (int round = 1; round <= rounds; round++) {
+            assertEquals(titles[round - 1], PlayoffService.roundTitle(round, rounds));
+            Match row = match(Instant.parse("2026-11-05T12:00:00Z"), MatchStatus.SCHEDULED, round);
+            assertEquals(titles[round - 1], HomeLabels.matchStageLabel(row, List.of(row), rounds));
+            assertEquals(titles[round - 1], HomeLabels.roundTitle(round, rounds));
+        }
+        Match first = match(Instant.parse("2026-11-05T12:00:00Z"), MatchStatus.SCHEDULED, 1);
+        HomeLabels.RoundPlan plan = HomeLabels.plan(List.of(first), CompetitionStage.PLAYOFF, rounds);
+        assertEquals(titles[0], plan.roundTitle());
+        assertEquals(rounds, plan.roundsTotal());
     }
 
     @Test
