@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -158,8 +159,8 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/teams"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.teamId=='" + teamB + "')]").isEmpty())
-                .andExpect(jsonPath("$[?(@.teamId=='" + teamA + "')]").isNotEmpty());
+                .andExpect(jsonPath("$[?(@.teamId=='" + teamB + "')].status", contains("WITHDRAWN")))
+                .andExpect(jsonPath("$[?(@.teamId=='" + teamA + "')].status", contains("APPROVED")));
         mockMvc.perform(get("/api/v1/matches/" + matchId))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/standings"))
