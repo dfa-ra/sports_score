@@ -2,6 +2,7 @@ import type { APIRequestContext } from '@playwright/test'
 import { apiGet, apiSend, asList, asRecord } from './api'
 import type { Session } from './accounts'
 import { uniqueEntityName } from './env'
+import { Tracker } from './tracker'
 
 const FOOTBALL_ID = '11111111-1111-1111-1111-111111111101'
 
@@ -10,8 +11,6 @@ export type CreatedIds = {
   teamIds: string[]
   matchIds: string[]
   galleryIds: string[]
-  /** true только для одноразовых сущностей. Пул E2E не удаляем: DELETE /tournaments даёт 500. */
-  disposable?: boolean
 }
 
 export function emptyIds(): CreatedIds {
@@ -21,10 +20,10 @@ export function emptyIds(): CreatedIds {
 export async function createTournament(
   request: APIRequestContext,
   admin: Session,
-  options: { name?: string; startDate?: string; endDate?: string; status?: string; format?: string } = {},
+  options: { name?: string; startDate?: string; endDate?: string; status?: string; format?: string; track?: Tracker } = {},
 ) {
   const name = options.name || uniqueEntityName('турнир')
-  return apiSend(request, 'POST', '/tournaments', {
+  const created = await apiSend(request, 'POST', '/tournaments', {
     token: admin.accessToken,
     data: {
       name,
@@ -37,6 +36,8 @@ export async function createTournament(
       format: options.format ?? 'ROUND_ROBIN',
     },
   })
+  if (created.status === 201) options.track?.tournament(idOf(created.body))
+  return created
 }
 
 export async function createTeam(
@@ -44,14 +45,17 @@ export async function createTeam(
   admin: Session,
   name?: string,
   shortName?: string,
+  track?: Tracker,
 ) {
-  return apiSend(request, 'POST', '/teams', {
+  const created = await apiSend(request, 'POST', '/teams', {
     token: admin.accessToken,
     data: {
       name: name || uniqueEntityName('команда'),
       shortName: (shortName || `E2${Math.random().toString(36).slice(2, 5)}`).slice(0, 8),
     },
   })
+  if (created.status === 201) track?.team(idOf(created.body))
+  return created
 }
 
 export async function updateTournament(
@@ -92,9 +96,9 @@ export async function approveTeam(
 export async function createMatch(
   request: APIRequestContext,
   admin: Session,
-  data: { tournamentId: string; homeTeamId: string; awayTeamId: string; scheduledAt?: string },
+  data: { tournamentId: string; homeTeamId: string; awayTeamId: string; scheduledAt?: string; track?: Tracker },
 ) {
-  return apiSend(request, 'POST', '/matches', {
+  const created = await apiSend(request, 'POST', '/matches', {
     token: admin.accessToken,
     data: {
       tournamentId: data.tournamentId,
@@ -105,6 +109,8 @@ export async function createMatch(
       periodLengthMinutes: 15,
     },
   })
+  if (created.status === 201) data.track?.match(idOf(created.body))
+  return created
 }
 
 export async function assignReferee(
@@ -142,20 +148,13 @@ export async function firstPublicTeam(request: APIRequestContext, excludeIds: st
 }
 
 export async function cleanupCreated(request: APIRequestContext, admin: Session, ids: CreatedIds) {
-  for (const matchId of ids.matchIds) {
-    await apiSend(request, 'DELETE', `/matches/${matchId}`, { token: admin.accessToken })
-  }
-  for (const galleryId of ids.galleryIds) {
-    await apiSend(request, 'DELETE', `/admin/gallery/${galleryId}`, { token: admin.accessToken })
-  }
-  if (!ids.disposable) return
-  for (const teamId of ids.teamIds) {
-    await apiSend(request, 'DELETE', `/teams/${teamId}`, { token: admin.accessToken })
-    await apiSend(request, 'DELETE', `/teams/${teamId}?purge=true`, { token: admin.accessToken })
-  }
-  if (ids.tournamentId) {
-    await updateTournament(request, admin, ids.tournamentId, { status: 'CANCELLED' })
-  }
+  const { disposeBag } = await import('./cleanup')
+  const bag = new Tracker()
+  if (ids.tournamentId) bag.tournament(ids.tournamentId)
+  for (const id of ids.teamIds) bag.team(id)
+  for (const id of ids.matchIds) bag.match(id)
+  for (const id of ids.galleryIds) bag.gallery(id)
+  await disposeBag(request, bag)
 }
 
 export function idOf(body: unknown): string {

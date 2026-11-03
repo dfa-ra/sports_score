@@ -3,6 +3,8 @@ import { apiGet, apiSend, asList, asRecord, errorMessage } from './api'
 import type { Session } from './accounts'
 import { applyTeam, approveTeam, createTeam, createTournament, idOf } from './entities'
 import { findNamed, listPages } from './pool'
+import { entityName, entityShort } from './run'
+import { Tracker } from './tracker'
 
 export const PLAYOFF_SKIP = 'плей-офф не задеплоен на dev (PR #56)'
 export const PENALTIES_SKIP = 'серия пенальти не задеплоена на dev'
@@ -110,14 +112,21 @@ export async function ensurePoTeam(
   request: APIRequestContext,
   admin: Session,
   index: number,
+  bag: Tracker,
 ): Promise<string> {
-  const name = `E2E PO ${String(index).padStart(2, '0')}`
+  const name = entityName(`PO ${String(index).padStart(2, '0')}`)
   const existing = await findNamed(await listPages(request, '/teams'), name)
-  if (existing?.id) return String(existing.id)
-  const created = await createTeam(request, admin, name, `P${String(index).padStart(2, '0')}`)
+  if (existing?.id) {
+    bag.team(String(existing.id))
+    return String(existing.id)
+  }
+  const created = await createTeam(request, admin, name, entityShort(`P${index}`), bag)
   if (created.status === 201) return idOf(created.body)
   const again = await findNamed(await listPages(request, '/teams'), name)
-  if (again?.id) return String(again.id)
+  if (again?.id) {
+    bag.team(String(again.id))
+    return String(again.id)
+  }
   throw new Error(`команда «${name}»: ${created.status} ${JSON.stringify(created.body)}`)
 }
 
@@ -125,9 +134,10 @@ export async function ensurePoTeams(
   request: APIRequestContext,
   admin: Session,
   count: number,
+  bag: Tracker,
 ): Promise<string[]> {
   const ids: string[] = []
-  for (let i = 1; i <= count; i++) ids.push(await ensurePoTeam(request, admin, i))
+  for (let i = 1; i <= count; i++) ids.push(await ensurePoTeam(request, admin, i, bag))
   return ids
 }
 
@@ -137,12 +147,15 @@ export async function ensurePoTournament(
   name: string,
   teamIds: string[],
   groups: string[][],
+  bag: Tracker,
 ): Promise<{ id: string; stage: string }> {
   const existing = await findNamed(await listPages(request, '/tournaments'), name)
   const id = existing?.id
     ? String(existing.id)
-    : await createPoTournament(request, admin, name)
+    : await createPoTournament(request, admin, name, bag)
+  bag.tournament(id)
   const view = await viewPlayoff(request, id)
+  trackPlayoffMatches(view.body, bag)
   const stage = String(asRecord(view.body).competitionStage || existing?.status || '')
   if (stage === 'PLAYOFF') return { id, stage }
   for (const teamId of teamIds) {
@@ -164,16 +177,29 @@ async function createPoTournament(
   request: APIRequestContext,
   admin: Session,
   name: string,
+  bag: Tracker,
 ): Promise<string> {
   const created = await createTournament(request, admin, {
     name,
     status: 'REGISTRATION',
     format: 'GROUPS_PLAYOFF',
+    track: bag,
   })
   if (created.status === 201) return idOf(created.body)
   const again = await findNamed(await listPages(request, '/tournaments'), name)
-  if (again?.id) return String(again.id)
+  if (again?.id) {
+    bag.tournament(String(again.id))
+    return String(again.id)
+  }
   throw new Error(`турнир «${name}»: ${created.status} ${JSON.stringify(created.body)}`)
+}
+
+export function trackPlayoffMatches(body: unknown, bag: Tracker) {
+  for (const round of playoffRounds(body)) {
+    for (const slot of round.slots) {
+      if (slot.matchId) bag.match(String(slot.matchId))
+    }
+  }
 }
 
 export function pairList(teamIds: string[]): { homeTeamId: string; awayTeamId: string; venue: string }[] {
@@ -256,11 +282,13 @@ export async function openNamedPlayoff(
   teamIds: string[],
   groups: string[][],
   places: number[],
+  bag: Tracker,
 ): Promise<{ id: string; body: Record<string, unknown>; openedNow: boolean }> {
-  const tournament = await ensurePoTournament(request, admin, name, teamIds, groups)
+  const tournament = await ensurePoTournament(request, admin, name, teamIds, groups, bag)
   const current = await viewPlayoff(request, tournament.id)
   if (String(asRecord(current.body).competitionStage || '') === 'PLAYOFF'
     && playoffRounds(current.body).length > 0) {
+    trackPlayoffMatches(current.body, bag)
     return { id: tournament.id, body: asRecord(current.body), openedNow: false }
   }
   const saved = await setPlaces(request, admin, tournament.id, places)
@@ -273,6 +301,7 @@ export async function openNamedPlayoff(
   if (opened.status >= 400) {
     throw new Error(`открытие «${name}»: ${opened.status} ${JSON.stringify(opened.body)}`)
   }
+  trackPlayoffMatches(opened.body, bag)
   return { id: tournament.id, body: asRecord(opened.body), openedNow: true }
 }
 

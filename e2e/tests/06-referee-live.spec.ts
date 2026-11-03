@@ -2,8 +2,22 @@ import { expect, test } from '@playwright/test'
 import { apiGet, apiSend, asList, asRecord } from '../src/api'
 import { injectSession, requireRole, skipWithout } from '../src/accounts'
 import { check, title } from '../src/check'
-import { deleteMatch, prepareAssignedMatch, standingRows } from '../src/pool'
+import { createLivePool, deleteMatch, disposeSpec, prepareAssignedMatch, standingRows, type LivePool } from '../src/pool'
+import { Tracker } from '../src/tracker'
 import { waitForApp } from '../src/ui'
+
+const bag = new Tracker()
+let pool: LivePool | undefined
+
+test.beforeAll(async ({ request }) => {
+  if (skipWithout('ADMIN') || skipWithout('REFEREE')) return
+  const admin = await requireRole(request, 'ADMIN')
+  pool = await createLivePool(request, admin, bag, 'live')
+})
+
+test.afterAll(async ({ request }) => {
+  await disposeSpec(request, bag, '06-referee')
+})
 
 function needLiveRoles() {
   return skipWithout('ADMIN') || skipWithout('REFEREE')
@@ -28,7 +42,7 @@ async function addPlayerToHome(
 test(title({ id: 'M1' }, 'назначенный матч виден в /referee'), check({ id: 'M1' }), async ({ page, request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await injectSession(page, ctx.referee)
     await page.goto('/referee')
@@ -42,7 +56,7 @@ test(title({ id: 'M1' }, 'назначенный матч виден в /referee
 test(title({ id: 'M2' }, 'старт → LIVE, часы идут; пауза / продолжить / тайм / финиш'), check({ id: 'M2' }), async ({ request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   const token = ctx.referee.accessToken
   try {
     const started = await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token })
@@ -69,7 +83,7 @@ test(title({ id: 'M2' }, 'старт → LIVE, часы идут; пауза / �
 test(title({ id: 'M3', bugs: [5] }, 'гол с автором: минута = минута часов, счёт +1'), check({ id: 'M3', bugs: [5] }), async ({ request }) => {
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
@@ -94,7 +108,7 @@ test(title({ id: 'M3', bugs: [5] }, 'гол с автором: минута = м
 test(title({ id: 'M4', bugs: [20, 21, 22, 23, 24, 25] }, 'гол без игроков в заявке или понятное сообщение; автогол не зацикливается'), check({ id: 'M4', bugs: [20, 21, 22, 23, 24, 25] }), async ({ request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     const teamGoal = await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/events`, {
@@ -118,7 +132,7 @@ test(title({ id: 'M4', bugs: [20, 21, 22, 23, 24, 25] }, 'гол без игро
 test(title({ id: 'M5', bugs: [20, 21, 22, 23, 24, 25] }, 'гол не ставит матч на паузу незаметно'), check({ id: 'M5', bugs: [20, 21, 22, 23, 24, 25] }), async ({ request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/events`, {
@@ -135,7 +149,7 @@ test(title({ id: 'M5', bugs: [20, 21, 22, 23, 24, 25] }, 'гол не стави
 test(title({ id: 'M6' }, 'жёлтая и красная карточка пишутся с минутой'), check({ id: 'M6' }), async ({ request }) => {
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
@@ -156,7 +170,7 @@ test(title({ id: 'M6' }, 'жёлтая и красная карточка пиш
 test(title({ id: 'M7' }, 'отмена события пересчитывает счёт везде'), check({ id: 'M7' }), async ({ request }) => {
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
@@ -180,7 +194,7 @@ test(title({ id: 'M7' }, 'отмена события пересчитывает
 test(title({ id: 'M8', bugs: [20, 21, 22, 23, 24, 25, 4] }, 'публичная страница, /live и главная обновляются ≤5 с; минута на /live реальная'), check({ id: 'M8', bugs: [20, 21, 22, 23, 24, 25, 4] }), async ({ page, request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await page.goto(`/matches/${ctx.matchId}`)
@@ -208,7 +222,7 @@ test(title({ id: 'M8', bugs: [20, 21, 22, 23, 24, 25, 4] }, 'публичная 
 test(title({ id: 'M9', bugs: [20, 21, 22, 23, 24, 25] }, 'протокол на публичной странице с минутами начала/конца тайма'), check({ id: 'M9', bugs: [20, 21, 22, 23, 24, 25] }), async ({ page, request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/next-period`, { token: ctx.referee.accessToken })
@@ -231,7 +245,7 @@ test(title({ id: 'M9', bugs: [20, 21, 22, 23, 24, 25] }, 'протокол на 
 test(title({ id: 'M10', bugs: [20, 21, 22, 23, 24, 25] }, 'после финиша события нельзя добавить; статус ЗАВЕРШЕН; дата не будущая'), check({ id: 'M10', bugs: [20, 21, 22, 23, 24, 25] }), async ({ page, request }) => {
   const reason = needLiveRoles()
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/finish`, { token: ctx.referee.accessToken })
@@ -256,7 +270,7 @@ test(title({ id: 'M11', bugs: [6] }, 'результат попадает в т�
   test.setTimeout(90_000)
   const reason = needLiveRoles() || skipWithout('PLAYER')
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag, { pool })
   const playerId = await addPlayerToHome(request, ctx.admin.accessToken, ctx.homeId)
   try {
     await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token: ctx.referee.accessToken })

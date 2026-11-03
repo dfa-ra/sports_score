@@ -4,6 +4,7 @@ import { fanSession, injectSession, registerFan, requireRole, skipWithout } from
 import { hasRole } from '../src/env'
 import { check, title } from '../src/check'
 import { firstPublicMatch, firstPublicTeam } from '../src/entities'
+import { chromeLink, openChromeMenu } from '../src/ui'
 
 test(title({ id: 'P1' }, 'болельщик не ходит в /admin и /referee; admin API → 403'), check({ id: 'P1' }), async ({ page, request }) => {
   const fan = await fanSession(request)
@@ -78,7 +79,8 @@ test(title({ id: 'P4' }, 'судья не видит админку'), check({ i
   const referee = await requireRole(request, 'REFEREE')
   await injectSession(page, referee)
   await page.goto('/')
-  await expect(page.getByRole('link', { name: 'Админ' })).toHaveCount(0)
+  await openChromeMenu(page)
+  await expect(await chromeLink(page, 'Админ')).toHaveCount(0)
   await page.goto('/admin')
   await expect(page).not.toHaveURL(/\/admin/)
 })
@@ -87,7 +89,8 @@ test(title({ id: 'P5', bugs: [15, 16, 17, 18, 19] }, 'роль в UI совпа�
   const fan = await fanSession(request)
   await injectSession(page, fan)
   await page.goto('/')
-  await expect(page.getByRole('link', { name: 'Аналитик' })).toHaveCount(0)
+  await openChromeMenu(page)
+  await expect(await chromeLink(page, 'Аналитик')).toHaveCount(0)
   await page.goto('/profile')
   const chips = (await page.locator('.badge').allInnerTexts()).join(' ')
   expect(chips, chips).not.toMatch(/аналитик/i)

@@ -4,6 +4,9 @@ import { fanSession, injectSession, requireRole, skipWithout } from '../src/acco
 import { check, title } from '../src/check'
 import { assignReferee, createMatch, idOf } from '../src/entities'
 import { hasRole } from '../src/env'
+import { disposeSpec } from '../src/pool'
+import { entityName } from '../src/run'
+import { Tracker } from '../src/tracker'
 import {
   PENALTIES_SKIP,
   addPenaltyKick,
@@ -34,17 +37,22 @@ import {
 } from '../src/playoff'
 import { hasHorizontalOverflow, waitForApp } from '../src/ui'
 
+const bag = new Tracker()
 const NAMES = {
-  po12: 'E2E PO-pen-12',
-  po13a: 'E2E PO-pen-13a',
-  po13b: 'E2E PO-pen-13b',
-  po14: 'E2E PO-pen-14',
-  po15: 'E2E PO-pen-15',
-  po16: 'E2E PO-pen-16',
-  po17: 'E2E PO-pen-17',
-  sizes: 'E2E PO-sizes',
-  po19: 'E2E PO-pen-19',
+  po12: entityName('PO-pen-12'),
+  po13a: entityName('PO-pen-13a'),
+  po13b: entityName('PO-pen-13b'),
+  po14: entityName('PO-pen-14'),
+  po15: entityName('PO-pen-15'),
+  po16: entityName('PO-pen-16'),
+  po17: entityName('PO-pen-17'),
+  sizes: entityName('PO-sizes'),
+  po19: entityName('PO-pen-19'),
 }
+
+test.afterAll(async ({ request }) => {
+  await disposeSpec(request, bag, '11-penalties')
+})
 
 async function needPenalties(request: import('@playwright/test').APIRequestContext, needAdmin = true) {
   test.skip(!(await playoffDeployed(request)), PLAYOFF_SKIP)
@@ -67,8 +75,8 @@ async function liveDrawPlayoff(
   admin: Awaited<ReturnType<typeof requireRole>>,
   name: string,
 ) {
-  const teams = await ensurePoTeams(request, admin, 4)
-  const opened = await openNamedPlayoff(request, admin, name, teams, [teams], placesForSize(4))
+  const teams = await ensurePoTeams(request, admin, 4, bag)
+  const opened = await openNamedPlayoff(request, admin, name, teams, [teams], placesForSize(4), bag)
   const slot = firstRoundSlots(opened.body).find((row) => {
     const status = String(row.matchStatus || '')
     return status === 'SCHEDULED' || status === 'LIVE' || status === 'PAUSED'
@@ -321,13 +329,14 @@ test(title({ id: 'PO18' }, 'в групповом матче ничья обыч
   const reason = skipWithout('ADMIN')
   test.skip(!!reason, reason || '')
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 12)
-  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams])
+  const teams = await ensurePoTeams(request, admin, 12, bag)
+  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams], bag)
   expect(sizes.stage, 'E2E PO-sizes остаётся в группах').not.toBe('PLAYOFF')
   const created = await createMatch(request, admin, {
     tournamentId: sizes.id,
     homeTeamId: teams[0],
     awayTeamId: teams[1],
+    track: bag,
   })
   expect(created.status, JSON.stringify(created.body)).toBe(201)
   const matchId = idOf(created.body)

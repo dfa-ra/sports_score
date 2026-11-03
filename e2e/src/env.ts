@@ -1,5 +1,8 @@
+import { RUN_PREFIX, entityName } from './run'
+
 export const DEFAULT_DEV_URL = 'http://144.31.153.52:3000'
-export const ENTITY_PREFIX = 'E2E '
+export const ENTITY_PREFIX = RUN_PREFIX
+export { RUN_ID, RUN_PREFIX, entityName, isE2EName } from './run'
 
 export type RoleName = 'FAN' | 'PLAYER' | 'CAPTAIN' | 'REFEREE' | 'ADMIN'
 
@@ -54,7 +57,7 @@ export function uniqueEmail(label: string): string {
 }
 
 export function uniqueEntityName(label: string): string {
-  return `${ENTITY_PREFIX}${label} ${uniqueStamp()}`
+  return entityName(`${label} ${uniqueStamp()}`)
 }
 
 export function generatedPassword(): string {

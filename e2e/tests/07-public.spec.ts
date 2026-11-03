@@ -3,7 +3,8 @@ import { apiGet, apiSend, asList, asRecord } from '../src/api'
 import { requireRole } from '../src/accounts'
 import { check, title } from '../src/check'
 import { hasRole } from '../src/env'
-import { waitForApp } from '../src/ui'
+import { entityName } from '../src/run'
+import { calendarDayButtons, datePicker, pickCalendarDay, waitForApp } from '../src/ui'
 
 test(title({ id: 'T1', bugs: [3] }, 'список матчей турнира: команды и даты есть, ФИНАЛ только у финала'), check({ id: 'T1', bugs: [3] }), async ({ page, request }) => {
   const list = asList((await apiGet(request, '/tournaments?size=20')).body)
@@ -43,9 +44,13 @@ test(title({ id: 'T2', bugs: [7] }, 'календарь: фильтр по да�
   if (!match) throw new Error('нет матча для фильтра календаря')
   const day = String(match.scheduledAt).slice(0, 10)
   await page.goto('/calendar')
-  await page.getByLabel('Дата').fill(day)
-  await page.getByLabel('Дата').dispatchEvent('change')
-  await expect(page.locator('.sheet, .empty').first()).toBeVisible()
+  await pickCalendarDay(page, day)
+  await expect(page.locator('.sheet, .empty, main').first()).toBeVisible()
+  if (await datePicker(page).count()) {
+    // старая шапка ещё с дейтпикером — T4 проверяет уже новый календарь
+  } else {
+    expect(await calendarDayButtons(page).count(), 'лента дат без дейтпикера').toBeGreaterThan(0)
+  }
   const sports = await apiGet(request, '/sports')
   const football = asList(sports.body).find((row) => row.code === 'FOOTBALL') || asList(sports.body)[0]
   if (football?.id) {
@@ -67,7 +72,7 @@ test(title({ id: 'T3', bugs: [2] }, 'одно отключённое фото н
     token: admin.accessToken,
     data: {
       url: '/media/e2e-disabled-should-not-leak.png',
-      title: 'E2E фото',
+      title: entityName('фото'),
       slot: 'GALLERY',
       enabled: false,
     },

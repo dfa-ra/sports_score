@@ -4,7 +4,14 @@ import { PIXEL_PNG, registerFan, requireRole, skipWithout } from '../src/account
 import { check, title } from '../src/check'
 import { uniqueStamp } from '../src/env'
 import { createMatch } from '../src/entities'
-import { deleteMatch, ensureLivePool, prepareAssignedMatch } from '../src/pool'
+import { createLivePool, deleteMatch, disposeSpec, prepareAssignedMatch } from '../src/pool'
+import { Tracker } from '../src/tracker'
+
+const bag = new Tracker()
+
+test.afterAll(async ({ request }) => {
+  await disposeSpec(request, bag, '10-api')
+})
 
 const TEXT_JPG = Buffer.from('this is not a jpeg, just plain text for e2e avatar check\n')
 
@@ -49,7 +56,7 @@ test(title({ id: 'E6' }, 'GET /matches/{id}/referees анониму не отд�
   if (matchId) return
   const reason = skipWithout('ADMIN') || skipWithout('REFEREE')
   test.skip(!!reason, reason || 'на стенде нет матча с судьёй')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag)
   try {
     const referees = await apiGet(request, `/matches/${ctx.matchId}/referees`)
     expect(referees.status, `GET referees → ${referees.status}`).toBe(200)
@@ -65,7 +72,7 @@ test(title({ id: 'E7' }, 'второй PUT /matches/{id}/lineups не 500'), che
   const reason = skipWithout('ADMIN')
   test.skip(!!reason, reason || '')
   const admin = await requireRole(request, 'ADMIN')
-  const pool = await ensureLivePool(request, admin)
+  const pool = await createLivePool(request, admin, bag, 'E7')
   const members = asList((await apiGet(request, `/teams/${pool.homeId}/members`, admin.accessToken)).body)
   let playerId = String(members[0]?.playerId || members[0]?.id || '')
   if (!playerId && !skipWithout('PLAYER')) {
@@ -79,11 +86,12 @@ test(title({ id: 'E7' }, 'второй PUT /matches/{id}/lineups не 500'), che
       })
     }
   }
-  test.skip(!playerId, 'в E2E Хозяева нет игрока для состава')
+  test.skip(!playerId, 'в хозяевах нет игрока для состава')
   const match = await createMatch(request, admin, {
     tournamentId: pool.tournamentId,
     homeTeamId: pool.homeId,
     awayTeamId: pool.awayId,
+    track: bag,
   })
   expect(match.status, JSON.stringify(match.body)).toBe(201)
   const matchId = String(asRecord(match.body).id || '')
@@ -182,7 +190,7 @@ test(title({ id: 'E10' }, '/auth/me у админа и судьи отдаёт �
 test(title({ id: 'E11' }, 'минута события -5 и сильно больше длительности → 400'), check({ id: 'E11' }), async ({ request }) => {
   const reason = skipWithout('ADMIN') || skipWithout('REFEREE')
   test.skip(!!reason, reason || '')
-  const ctx = await prepareAssignedMatch(request)
+  const ctx = await prepareAssignedMatch(request, bag)
   const token = ctx.admin.accessToken
   try {
     const started = await apiSend(request, 'POST', `/referee/matches/${ctx.matchId}/start`, { token })

@@ -8,6 +8,7 @@ export default defineConfig({
   testDir: './tests',
   timeout: 60_000,
   globalTimeout: 60 * 60 * 1000,
+  globalTeardown: './global-teardown.ts',
   expect: { timeout: 12_000 },
   fullyParallel: false,
   forbidOnly: !!process.env.CI,

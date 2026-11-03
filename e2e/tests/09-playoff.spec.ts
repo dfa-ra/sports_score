@@ -30,18 +30,26 @@ import {
   viewPlayoff,
   voidEvent,
 } from '../src/playoff'
+import { disposeSpec } from '../src/pool'
+import { entityName } from '../src/run'
+import { Tracker } from '../src/tracker'
 import { hasHorizontalOverflow, waitForApp } from '../src/ui'
 
+const bag = new Tracker()
 const NAMES = {
-  two: 'E2E PO-2',
-  four: 'E2E PO-4',
-  eight: 'E2E PO-8',
-  sixteen: 'E2E PO-16',
-  snap: 'E2E PO-snap',
-  sizes: 'E2E PO-sizes',
-  recalc: 'E2E PO-6b-reset',
-  locked: 'E2E PO-6b-lock',
+  two: entityName('PO-2'),
+  four: entityName('PO-4'),
+  eight: entityName('PO-8'),
+  sixteen: entityName('PO-16'),
+  snap: entityName('PO-snap'),
+  sizes: entityName('PO-sizes'),
+  recalc: entityName('PO-6b-reset'),
+  locked: entityName('PO-6b-lock'),
 }
+
+test.afterAll(async ({ request }) => {
+  await disposeSpec(request, bag, '09-playoff')
+})
 
 async function needPlayoff(request: import('@playwright/test').APIRequestContext, needAdmin = true) {
   test.skip(!(await playoffDeployed(request)), PLAYOFF_SKIP)
@@ -66,7 +74,7 @@ test(title({ id: 'PO1' }, 'перевод в плей-офф: 2/4/8/16 соби�
   test.setTimeout(180_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 16)
+  const teams = await ensurePoTeams(request, admin, 16, bag)
 
   const valid: { name: string; count: number; groupSize: number; rounds: number }[] = [
     { name: NAMES.two, count: 2, groupSize: 2, rounds: 1 },
@@ -83,6 +91,7 @@ test(title({ id: 'PO1' }, 'перевод в плей-офф: 2/4/8/16 соби�
       ids,
       groupsOf(ids, item.groupSize),
       placesForSize(item.groupSize),
+      bag,
     )
     const rounds = playoffRounds(opened.body)
     expect(asRecord(opened.body).competitionStage, `${item.name}: стадия`).toBe('PLAYOFF')
@@ -91,7 +100,7 @@ test(title({ id: 'PO1' }, 'перевод в плей-офф: 2/4/8/16 соби�
     expect(rounds.at(-1)?.title, `${item.name}: финал`).toMatch(/финал/i)
   }
 
-  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams.slice(0, 12), [teams.slice(0, 12)])
+  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams.slice(0, 12), [teams.slice(0, 12)], bag)
   expect(sizes.stage, 'E2E PO-sizes не открываем — только негативные размеры').not.toBe('PLAYOFF')
   const dummy = pairList(teams.slice(0, 2))
   for (const count of [3, 5, 6, 12]) {
@@ -110,9 +119,9 @@ test(title({ id: 'PO2' }, 'места 1–2 из каждой группы; вы
   test.setTimeout(120_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 8)
+  const teams = await ensurePoTeams(request, admin, 8, bag)
   const groups = groupsOf(teams, 4)
-  const opened = await openNamedPlayoff(request, admin, NAMES.snap, teams, groups, [1, 2])
+  const opened = await openNamedPlayoff(request, admin, NAMES.snap, teams, groups, [1, 2], bag)
   const qualified = qualifiedTeams(opened.body)
   expect(qualified.length, 'из двух групп по 1–2 месту → 4 вышедших').toBe(4)
   const byGroup = new Map<string, number[]>()
@@ -145,8 +154,8 @@ test(title({ id: 'PO3' }, 'ручные пары: нельзя дубль, чу�
   test.setTimeout(120_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 12)
-  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams])
+  const teams = await ensurePoTeams(request, admin, 12, bag)
+  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams], bag)
   expect(sizes.stage).not.toBe('PLAYOFF')
   const places = await setPlaces(request, admin, sizes.id, [1, 2, 3, 4])
   expect(places.status).toBe(200)
@@ -198,8 +207,8 @@ test(title({ id: 'PO4' }, 'на 8 командах победитель пары
   test.setTimeout(180_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 8)
-  const opened = await openNamedPlayoff(request, admin, NAMES.eight, teams, [teams], placesForSize(8))
+  const teams = await ensurePoTeams(request, admin, 8, bag)
+  const opened = await openNamedPlayoff(request, admin, NAMES.eight, teams, [teams], placesForSize(8), bag)
   const first = firstRoundSlots(opened.body)
   expect(first.length).toBe(4)
   const winners: string[] = []
@@ -233,8 +242,8 @@ test(title({ id: 'PO5' }, 'после перевода пары нельзя м�
   test.setTimeout(120_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 2)
-  const opened = await openNamedPlayoff(request, admin, NAMES.two, teams, [teams], [1, 2])
+  const teams = await ensurePoTeams(request, admin, 2, bag)
+  const opened = await openNamedPlayoff(request, admin, NAMES.two, teams, [teams], [1, 2], bag)
   const slot = firstRoundSlots(opened.body)[0]
   expect(slot?.id).toBeTruthy()
   const home = String(slot.homeTeamId || '')
@@ -259,8 +268,8 @@ test(title({ id: 'PO6' }, 'победитель выходит дальше; о�
   test.setTimeout(180_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 4)
-  const opened = await openNamedPlayoff(request, admin, NAMES.four, teams, [teams], placesForSize(4))
+  const teams = await ensurePoTeams(request, admin, 4, bag)
+  const opened = await openNamedPlayoff(request, admin, NAMES.four, teams, [teams], placesForSize(4), bag)
   const first = firstRoundSlots(opened.body)
   expect(first.length).toBe(2)
   const slot = first[0]
@@ -295,9 +304,9 @@ test(title({ id: 'PO6b' }, 'отмена гола: слот сбрасывает
   test.setTimeout(180_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 4)
+  const teams = await ensurePoTeams(request, admin, 4, bag)
 
-  const reset = await openNamedPlayoff(request, admin, NAMES.recalc, teams, [teams], placesForSize(4))
+  const reset = await openNamedPlayoff(request, admin, NAMES.recalc, teams, [teams], placesForSize(4), bag)
   const resetSlot = firstRoundSlots(reset.body)[0]
   const resetMatchId = String(resetSlot.matchId || '')
   const resetHome = String(resetSlot.homeTeamId || '')
@@ -321,7 +330,7 @@ test(title({ id: 'PO6b' }, 'отмена гола: слот сбрасывает
     'слот следующего раунда должен сброситься и пересчитаться, пока следующий матч не начат',
   ).not.toBe(resetHome)
 
-  const locked = await openNamedPlayoff(request, admin, NAMES.locked, teams, [teams], placesForSize(4))
+  const locked = await openNamedPlayoff(request, admin, NAMES.locked, teams, [teams], placesForSize(4), bag)
   const first = firstRoundSlots(locked.body)
   expect(first.length).toBe(2)
   for (const slot of first) {
@@ -350,8 +359,8 @@ test(title({ id: 'PO7' }, 'ничья: если следующая пара со
   test.setTimeout(180_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const fourTeams = await ensurePoTeams(request, admin, 4)
-  const four = await openNamedPlayoff(request, admin, NAMES.four, fourTeams, [fourTeams], placesForSize(4))
+  const fourTeams = await ensurePoTeams(request, admin, 4, bag)
+  const four = await openNamedPlayoff(request, admin, NAMES.four, fourTeams, [fourTeams], placesForSize(4), bag)
   const fourSlots = firstRoundSlots((await viewPlayoff(request, four.id)).body)
   const pending = fourSlots.find((slot) => String(slot.matchStatus || '') === 'SCHEDULED')
   if (pending?.matchId) {
@@ -369,8 +378,8 @@ test(title({ id: 'PO7' }, 'ничья: если следующая пара со
     }
   }
 
-  const eightTeams = await ensurePoTeams(request, admin, 8)
-  const eight = await openNamedPlayoff(request, admin, NAMES.eight, eightTeams, [eightTeams], placesForSize(8))
+  const eightTeams = await ensurePoTeams(request, admin, 8, bag)
+  const eight = await openNamedPlayoff(request, admin, NAMES.eight, eightTeams, [eightTeams], placesForSize(8), bag)
   const qf = firstRoundSlots((await viewPlayoff(request, eight.id)).body)
   for (const slot of qf.slice(0, 2)) {
     await ensureWin(request, admin, String(slot.matchId || ''), String(slot.homeTeamId || ''))
@@ -389,8 +398,8 @@ test(title({ id: 'PO8' }, 'прикрепление сыгранного мат�
   test.setTimeout(120_000)
   await needPlayoff(request)
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 12)
-  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams])
+  const teams = await ensurePoTeams(request, admin, 12, bag)
+  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams], bag)
   expect(sizes.stage).not.toBe('PLAYOFF')
   const tables = asList((await listTables(request, sizes.id)).body)
   const tableId = String(tables[0]?.id || '')
@@ -400,6 +409,7 @@ test(title({ id: 'PO8' }, 'прикрепление сыгранного мат�
     tournamentId: sizes.id,
     homeTeamId: teams[0],
     awayTeamId: teams[1],
+    track: bag,
   })
   expect(created.status, `матч группы: ${created.status} ${JSON.stringify(created.body)}`).toBe(201)
   const matchId = idOf(created.body)
@@ -459,15 +469,16 @@ test(title({ id: 'PO9' }, 'управление сеткой: 401 аноним, 
   const adminReason = skipWithout('ADMIN')
   test.skip(!!adminReason, adminReason || '')
   const admin = await requireRole(request, 'ADMIN')
-  const teams = await ensurePoTeams(request, admin, 12)
-  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams])
-  const two = await openNamedPlayoff(request, admin, NAMES.two, teams.slice(0, 2), [teams.slice(0, 2)], [1, 2])
+  const teams = await ensurePoTeams(request, admin, 12, bag)
+  const sizes = await ensurePoTournament(request, admin, NAMES.sizes, teams, [teams], bag)
+  const two = await openNamedPlayoff(request, admin, NAMES.two, teams.slice(0, 2), [teams.slice(0, 2)], [1, 2], bag)
   const slot = firstRoundSlots(two.body)[0]
   const tables = asList((await listTables(request, sizes.id)).body)
   const created = await createMatch(request, admin, {
     tournamentId: sizes.id,
     homeTeamId: teams[2],
     awayTeamId: teams[3],
+    track: bag,
   })
 
   const places = await setPlaces(request, admin, sizes.id, [1, 2])
@@ -500,8 +511,8 @@ test(title({ id: 'PO10' }, 'публичная сетка: десктоп и 375
   }
   if (!tournamentId && hasRole('ADMIN')) {
     const admin = await requireRole(request, 'ADMIN')
-    const teams = await ensurePoTeams(request, admin, 4)
-    const opened = await openNamedPlayoff(request, admin, NAMES.four, teams, [teams], placesForSize(4))
+    const teams = await ensurePoTeams(request, admin, 4, bag)
+    const opened = await openNamedPlayoff(request, admin, NAMES.four, teams, [teams], placesForSize(4), bag)
     tournamentId = opened.id
   }
   test.skip(!tournamentId, 'на стенде нет открытой сетки плей-офф')
@@ -529,7 +540,12 @@ test(title({ id: 'PO10' }, 'публичная сетка: десктоп и 375
     if (waiting) {
       expect(body, `${viewport.label}: TBD-слот должен быть понятен`).toMatch(/ожидает/i)
     }
-    const names = page.locator('.slot b')
+    const unknown = playoffRounds(view.body).flatMap((round) => round.slots).filter((slot) => !slot.matchId)
+    if (unknown.length) {
+      const cards = page.locator('article.slot, .slot, [class*="slot"]')
+      expect(await cards.count(), `${viewport.label}: пустые карточки для неизвестных матчей`).toBeGreaterThan(0)
+    }
+    const names = page.locator('.slot b, article.slot b, [class*="slot"] b')
     const count = await names.count()
     for (let i = 0; i < count; i++) {
       const clipped = await names.nth(i).evaluate((el) => (el as HTMLElement).scrollWidth > (el as HTMLElement).clientWidth + 1)

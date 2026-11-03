@@ -1,6 +1,7 @@
 import type { APIRequestContext } from '@playwright/test'
 import { apiGet, apiSend, asList, asRecord } from './api'
 import { requireRole, type Session } from './accounts'
+import { disposeBag, printReport } from './cleanup'
 import {
   applyTeam,
   approveTeam,
@@ -11,24 +12,18 @@ import {
   idOf,
   updateTournament,
 } from './entities'
-
-/** Постоянные сущности на dev. Капитанская «E2E Команда» — чужая, её не трогаем. */
-export const POOL = {
-  tournament: 'E2E Пул',
-  home: 'E2E Хозяева',
-  away: 'E2E Гости',
-  apply: 'E2E Заявка',
-  captain: 'E2E Команда',
-} as const
+import { entityName, entityShort } from './run'
+import { Tracker } from './tracker'
 
 export type LivePool = {
   tournamentId: string
   homeId: string
   awayId: string
   applyTeamId: string
+  homeName: string
+  applyName: string
+  bag: Tracker
 }
-
-let cached: LivePool | undefined
 
 export async function listPages(
   request: APIRequestContext,
@@ -36,7 +31,7 @@ export async function listPages(
   token?: string,
 ): Promise<Record<string, unknown>[]> {
   const rows: Record<string, unknown>[] = []
-  for (let page = 0; page < 6; page++) {
+  for (let page = 0; page < 40; page++) {
     const sep = path.includes('?') ? '&' : '?'
     const call = await apiGet(request, `${path}${sep}size=50&page=${page}`, token)
     const batch = asList(call.body)
@@ -51,44 +46,6 @@ export async function findNamed(
   name: string,
 ): Promise<Record<string, unknown> | undefined> {
   return rows.find((row) => String(row.name || '') === name)
-}
-
-export async function ensureTeam(
-  request: APIRequestContext,
-  admin: Session,
-  name: string,
-  shortName: string,
-): Promise<string> {
-  const existing = await findNamed(await listPages(request, '/teams'), name)
-  if (existing?.id) return String(existing.id)
-  const created = await createTeam(request, admin, name, shortName)
-  if (created.status === 201) return idOf(created.body)
-  const again = await findNamed(await listPages(request, '/teams'), name)
-  if (again?.id) return String(again.id)
-  throw new Error(`не удалось получить команду «${name}»: ${created.status} ${JSON.stringify(created.body)}`)
-}
-
-export async function ensureTournament(
-  request: APIRequestContext,
-  admin: Session,
-  name: string,
-): Promise<string> {
-  const existing = await findNamed(await listPages(request, '/tournaments'), name)
-  if (existing?.id) {
-    const status = String(existing.status || '')
-    if (status !== 'REGISTRATION' && status !== 'DRAFT') {
-      const updated = await updateTournament(request, admin, String(existing.id), { status: 'REGISTRATION' })
-      if (updated.status >= 400) {
-        throw new Error(`не перевести «${name}» в REGISTRATION: ${updated.status} ${JSON.stringify(updated.body)}`)
-      }
-    }
-    return String(existing.id)
-  }
-  const created = await createTournament(request, admin, { name, status: 'REGISTRATION' })
-  if (created.status === 201) return idOf(created.body)
-  const again = await findNamed(await listPages(request, '/tournaments'), name)
-  if (again?.id) return String(again.id)
-  throw new Error(`не удалось получить турнир «${name}»: ${created.status} ${JSON.stringify(created.body)}`)
 }
 
 export async function ensureApproved(
@@ -115,16 +72,36 @@ export async function ensureApproved(
   }
 }
 
-export async function ensureLivePool(request: APIRequestContext, admin: Session): Promise<LivePool> {
-  if (cached) return cached
-  const tournamentId = await ensureTournament(request, admin, POOL.tournament)
-  const homeId = await ensureTeam(request, admin, POOL.home, 'E2H')
-  const awayId = await ensureTeam(request, admin, POOL.away, 'E2A')
-  const applyTeamId = await ensureTeam(request, admin, POOL.apply, 'E2Z')
+export async function createLivePool(
+  request: APIRequestContext,
+  admin: Session,
+  bag = new Tracker(),
+  label = 'Пул',
+): Promise<LivePool> {
+  const homeName = entityName(`${label} хозяева`)
+  const awayName = entityName(`${label} гости`)
+  const applyName = entityName(`${label} заявка`)
+  const tournament = await createTournament(request, admin, {
+    name: entityName(label),
+    status: 'REGISTRATION',
+    track: bag,
+  })
+  if (tournament.status !== 201) {
+    throw new Error(`турнир «${label}»: ${tournament.status} ${JSON.stringify(tournament.body)}`)
+  }
+  const tournamentId = idOf(tournament.body)
+  const home = await createTeam(request, admin, homeName, entityShort('H'), bag)
+  const away = await createTeam(request, admin, awayName, entityShort('A'), bag)
+  const apply = await createTeam(request, admin, applyName, entityShort('Z'), bag)
+  if (home.status !== 201 || away.status !== 201 || apply.status !== 201) {
+    throw new Error(`команды пула: ${home.status}/${away.status}/${apply.status}`)
+  }
+  const homeId = idOf(home.body)
+  const awayId = idOf(away.body)
+  const applyTeamId = idOf(apply.body)
   await ensureApproved(request, admin, tournamentId, homeId)
   await ensureApproved(request, admin, tournamentId, awayId)
-  cached = { tournamentId, homeId, awayId, applyTeamId }
-  return cached
+  return { tournamentId, homeId, awayId, applyTeamId, homeName, applyName, bag }
 }
 
 export async function activateIfNeeded(
@@ -140,11 +117,12 @@ export async function activateIfNeeded(
 
 export async function prepareAssignedMatch(
   request: APIRequestContext,
-  options: { activate?: boolean } = {},
+  bag: Tracker,
+  options: { activate?: boolean; pool?: LivePool } = {},
 ) {
   const admin = await requireRole(request, 'ADMIN')
   const referee = await requireRole(request, 'REFEREE')
-  const pool = await ensureLivePool(request, admin)
+  const pool = options.pool || await createLivePool(request, admin, bag, 'live')
   if (options.activate) {
     await activateIfNeeded(request, admin, pool.tournamentId)
   }
@@ -152,6 +130,7 @@ export async function prepareAssignedMatch(
     tournamentId: pool.tournamentId,
     homeTeamId: pool.homeId,
     awayTeamId: pool.awayId,
+    track: bag,
   })
   if (match.status !== 201) {
     throw new Error(`матч пула: ${match.status} ${JSON.stringify(match.body)}`)
@@ -169,6 +148,9 @@ export async function prepareAssignedMatch(
     awayId: pool.awayId,
     tournamentId: pool.tournamentId,
     applyTeamId: pool.applyTeamId,
+    homeName: pool.homeName,
+    applyName: pool.applyName,
+    bag,
   }
 }
 
@@ -185,6 +167,11 @@ export async function excludeTeamFromTournament(
   return apiSend(request, 'DELETE', `/tournaments/${tournamentId}/teams/${teamId}`, {
     token: admin.accessToken,
   })
+}
+
+export async function disposeSpec(request: APIRequestContext, bag: Tracker, label = 'afterAll') {
+  const report = await disposeBag(request, bag)
+  printReport(report, label)
 }
 
 export function standingRows(body: unknown): Record<string, unknown>[] {
