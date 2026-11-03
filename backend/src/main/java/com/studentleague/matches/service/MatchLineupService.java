@@ -18,6 +18,7 @@ import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.entity.TeamMember;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import com.studentleague.users.domain.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class MatchLineupService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final PlayerProfileRepository playerProfileRepository;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public MatchLineupService(
             MatchRepository matchRepository,
@@ -44,7 +46,8 @@ public class MatchLineupService {
             MatchRefereeRepository matchRefereeRepository,
             TeamRepository teamRepository,
             TeamMemberRepository teamMemberRepository,
-            PlayerProfileRepository playerProfileRepository
+            PlayerProfileRepository playerProfileRepository,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.matchRepository = matchRepository;
         this.lineupRepository = lineupRepository;
@@ -52,6 +55,7 @@ public class MatchLineupService {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.playerProfileRepository = playerProfileRepository;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional(readOnly = true)
@@ -101,6 +105,7 @@ public class MatchLineupService {
                     request.teamId(), playerId, TeamMemberStatus.ACTIVE)) {
                 throw ApiException.badRequest("В старте или на скамейке только игроки из заявки команды");
             }
+            tournamentRosterGuard.rejectAppearanceForSecondClub(match.getTournamentId(), request.teamId(), playerId);
         }
 
         List<MatchLineupPlayer> previous = lineupRepository.findByMatchIdAndTeamId(matchId, request.teamId());

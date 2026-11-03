@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatClock } from '../lib/format'
-import { eventMinute, kickoffClock, kickoffDayMonth } from '../lib/match'
+import { eventMinute, kickoffClock, kickoffDayMonth, matchInstant } from '../lib/match'
 import { useMatchClock } from '../lib/useMatchClock'
 
 const props = withDefaults(defineProps<{
   at?: string | number | Date | null
-  playedAt?: string | number | Date | null
+  startedAt?: string | number | Date | null
   status?: string
   minute?: number | null
   align?: 'center' | 'start'
@@ -31,10 +31,19 @@ const isLive = computed(() => props.status === 'LIVE' || props.status === 'PAUSE
 const hasClock = computed(() =>
   props.gameTimeSeconds != null || !!props.clockRunningSince || props.period != null,
 )
-const dateLabel = computed(() => kickoffDayMonth(props.status === 'FINISHED' ? (props.playedAt || props.at) : props.at))
+const dateLabel = computed(() => kickoffDayMonth(matchInstant({
+  status: props.status,
+  scheduledAt: props.at,
+  startedAt: props.startedAt,
+})))
 const timeLabel = computed(() => {
   if (props.status === 'FINISHED') return 'Завершён'
-  if (!isLive.value) return kickoffClock(props.at) || '—'
+  if (!isLive.value) {
+    const clock = kickoffClock(props.at)
+    if (clock) return clock
+    if (props.status === 'SCHEDULED' || !props.status) return 'Дата уточняется'
+    return '—'
+  }
   const fromClock = eventMinute(kickoff.value, props.period, props.periodLengthSeconds)
   const minute = hasClock.value ? fromClock : props.minute
   if (minute != null && minute > 0) return `${minute}'`

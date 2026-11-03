@@ -96,6 +96,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/photo-ticket",
                                 "/ws",
                                 "/ws/**",
+                                "/websocket",
+                                "/websocket/**",
                                 "/media/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
@@ -113,6 +115,7 @@ public class SecurityConfig {
                                 "/api/v1/sports",
                                 "/api/v1/sports/**",
                                 "/api/v1/home",
+                                "/api/v1/home/**",
                                 "/api/v1/gallery",
                                 "/api/v1/gallery/**"
                         ).permitAll()

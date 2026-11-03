@@ -10,6 +10,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import { myTeamStub, showsMyTeamRoster } from '../lib/myTeamAccess'
 import { registeredName } from '../lib/playerTitle'
 
 const auth = useAuthStore()
@@ -32,11 +33,12 @@ const pending = ref(false)
 const rsvpPending = ref(false)
 
 const canEditRoster = computed(() => auth.hasRole('CAPTAIN') || auth.hasRole('ADMIN'))
+const rosterPage = computed(() => showsMyTeamRoster((role) => auth.hasRole(role)))
 
 const nextMatch = computed(() => {
   const now = Date.now()
   return schedule.value
-    .filter((match) => match.status === 'SCHEDULED' && new Date(match.scheduledAt).getTime() >= now)
+    .filter((match) => match.status === 'SCHEDULED' && match.scheduledAt && new Date(match.scheduledAt).getTime() >= now)
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0] || null
 })
 
@@ -49,7 +51,9 @@ const myStatus = computed(() => {
 })
 const canRsvp = computed(() => !!nextMatch.value && !!myPlayerId.value && rosterIds.value.has(myPlayerId.value))
 
-onMounted(load)
+onMounted(() => {
+  if (rosterPage.value) load()
+})
 
 async function load() {
   unassigned.value = false
@@ -149,7 +153,13 @@ async function removeMember(id: string) {
 </script>
 
 <template>
-  <section class="stack">
+  <section v-if="!rosterPage" class="stack">
+    <div class="page-title">
+      <h1>{{ myTeamStub.title }}</h1>
+    </div>
+    <RouterLink :to="myTeamStub.homeTo">{{ myTeamStub.homeLabel }}</RouterLink>
+  </section>
+  <section v-else class="stack">
     <div class="page-title team-head">
       <TeamCrest v-if="team" :src="team.logoUrl" :name="team.name" :size="42" />
       <div>
@@ -197,7 +207,7 @@ async function removeMember(id: string) {
         <h2>Ближайший матч</h2>
         <p>
           <RouterLink :to="`/matches/${nextMatch.id}`">
-            <KickoffWhen :at="nextMatch.scheduledAt" :status="nextMatch.status" align="start" />
+            <KickoffWhen :at="nextMatch.scheduledAt" :started-at="nextMatch.startedAt" :status="nextMatch.status" align="start" />
           </RouterLink>
           <span v-if="opponentName"> · против {{ opponentName }}</span>
         </p>
@@ -243,8 +253,8 @@ async function removeMember(id: string) {
         <h2>Календарь команды</h2>
         <EmptyState v-if="!matches.length" title="Матчей нет" />
         <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-          <StatusBadge :status="m.status" />
-          <KickoffWhen :at="m.scheduledAt" :status="m.status" align="start" />
+          <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
+          <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" align="start" />
           <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         </RouterLink>
       </div>

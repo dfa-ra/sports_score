@@ -10,6 +10,10 @@ import com.studentleague.matches.repository.PenaltyKickRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.sports.repository.SportRepository;
+import com.studentleague.teams.entity.Team;
+import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.TournamentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -40,6 +44,12 @@ class MatchMapperListFieldsTest {
     @Mock
     PenaltyKickRepository penaltyKickRepository;
 
+    @Mock
+    TeamRepository teamRepository;
+
+    @Mock
+    TournamentRepository tournamentRepository;
+
     @Test
     void responseCarriesLastGoalScorerAndMinute() {
         UUID matchId = UUID.randomUUID();
@@ -63,12 +73,27 @@ class MatchMapperListFieldsTest {
                 .thenReturn(List.of(goal));
         when(playerProfileRepository.findAllById(any())).thenReturn(List.of(player));
 
+        UUID homeId = UUID.randomUUID();
+        UUID awayId = UUID.randomUUID();
+        UUID tournamentId = UUID.randomUUID();
+        Team home = new Team();
+        home.setId(homeId);
+        home.setName("Физтех");
+        Team away = new Team();
+        away.setId(awayId);
+        away.setName("Юристы");
+        Tournament tournament = new Tournament();
+        tournament.setId(tournamentId);
+        tournament.setName("Студенческий кубок");
+        when(teamRepository.findAllById(any())).thenReturn(List.of(home, away));
+        when(tournamentRepository.findAllById(any())).thenReturn(List.of(tournament));
+
         Match match = new Match();
         match.setId(matchId);
-        match.setTournamentId(UUID.randomUUID());
+        match.setTournamentId(tournamentId);
         match.setSportId(UUID.randomUUID());
-        match.setHomeTeamId(UUID.randomUUID());
-        match.setAwayTeamId(UUID.randomUUID());
+        match.setHomeTeamId(homeId);
+        match.setAwayTeamId(awayId);
         match.setScheduledAt(Instant.parse("2026-09-30T12:00:00Z"));
         match.setStatus(MatchStatus.LIVE);
         match.setHomeScore(1);
@@ -82,7 +107,9 @@ class MatchMapperListFieldsTest {
                 sportRepository,
                 playerProfileRepository,
                 matchEventRepository,
-                penaltyKickRepository
+                penaltyKickRepository,
+                teamRepository,
+                tournamentRepository
         );
         MatchResponse response = mapper.toResponse(match);
 
@@ -90,5 +117,8 @@ class MatchMapperListFieldsTest {
         assertThat(response.minute()).isEqualTo(3);
         assertThat(response.homeScore()).isEqualTo(1);
         assertThat(response.playerOfTheMatch()).isNull();
+        assertThat(response.homeTeamName()).isEqualTo("Физтех");
+        assertThat(response.awayTeamName()).isEqualTo("Юристы");
+        assertThat(response.tournamentName()).isEqualTo("Студенческий кубок");
     }
 }

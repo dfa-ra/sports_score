@@ -25,6 +25,7 @@ import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.StandingRow;
 import com.studentleague.tournaments.dto.StandingTableResponse;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
+import com.studentleague.tournaments.dto.TournamentOverviewResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentStandingsResponse;
 import com.studentleague.tournaments.dto.TournamentTableResponse;
@@ -36,6 +37,7 @@ import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.format.StandingsContext;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
@@ -52,6 +54,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -63,6 +66,7 @@ public class TournamentService {
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
     private final TournamentTableRepository tournamentTableRepository;
+    private final PlayoffSlotRepository playoffSlotRepository;
     private final SportRepository sportRepository;
     private final TeamRepository teamRepository;
     private final PlayerProfileRepository playerProfileRepository;
@@ -73,11 +77,13 @@ public class TournamentService {
     private final NotificationService notificationService;
     private final TournamentFormatRegistry formatRegistry;
     private final StandingsBoardCache standingsBoardCache;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public TournamentService(
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             TournamentTableRepository tournamentTableRepository,
+            PlayoffSlotRepository playoffSlotRepository,
             SportRepository sportRepository,
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
@@ -87,11 +93,13 @@ public class TournamentService {
             MatchRefereeRepository matchRefereeRepository,
             NotificationService notificationService,
             TournamentFormatRegistry formatRegistry,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.tournamentTableRepository = tournamentTableRepository;
+        this.playoffSlotRepository = playoffSlotRepository;
         this.sportRepository = sportRepository;
         this.teamRepository = teamRepository;
         this.playerProfileRepository = playerProfileRepository;
@@ -102,6 +110,7 @@ public class TournamentService {
         this.notificationService = notificationService;
         this.formatRegistry = formatRegistry;
         this.standingsBoardCache = standingsBoardCache;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -165,6 +174,51 @@ public class TournamentService {
     }
 
     @Transactional(readOnly = true)
+    public TournamentOverviewResponse overview(UUID id) {
+        Tournament tournament = requireTournament(id);
+        int teamsCount = (int) tournamentTeamRepository.countByTournamentIdAndStatusNot(id, TournamentTeamStatus.WITHDRAWN);
+        int matchesCount = (int) matchRepository.countByTournamentId(id);
+        boolean hasSlots = playoffSlotRepository.countByTournamentId(id) > 0;
+        List<UUID> matchIds = playoffSlotRepository.findMatchIdsByTournamentId(id);
+        boolean playoffLive = false;
+        if (!matchIds.isEmpty()) {
+            for (Match match : matchRepository.findAllById(matchIds)) {
+                if (match.getStatus() == MatchStatus.LIVE || match.getStatus() == MatchStatus.PAUSED) {
+                    playoffLive = true;
+                    break;
+                }
+            }
+        }
+        boolean hasPlayoff = hasSlots
+                || tournament.getCompetitionStage() == CompetitionStage.PLAYOFF
+                || formatIncludesPlayoff(tournament.getFormat());
+        return new TournamentOverviewResponse(
+                tournament.getId(),
+                tournament.getName(),
+                tournament.getStatus().name(),
+                tournament.getFormat(),
+                tournament.getSeasonYear(),
+                tournament.getStartDate(),
+                tournament.getEndDate(),
+                teamsCount,
+                matchesCount,
+                tournament.getCompetitionStage().name(),
+                hasPlayoff,
+                playoffLive
+        );
+    }
+
+    private static boolean formatIncludesPlayoff(String format) {
+        if (format == null) {
+            return false;
+        }
+        return switch (format) {
+            case "CUP", "GROUPS_PLAYOFF", "DOUBLE_ELIMINATION", "KNOCKOUT" -> true;
+            default -> false;
+        };
+    }
+
+    @Transactional(readOnly = true)
     public Page<TournamentResponse> list(TournamentStatus status, UUID sportId, Pageable pageable) {
         Page<Tournament> page;
         if (status != null && sportId != null) {
@@ -199,14 +253,19 @@ public class TournamentService {
             }
         }
 
-        if (tournamentTeamRepository.existsByTournamentIdAndTeamId(tournamentId, team.getId())) {
+        Optional<TournamentTeam> existing = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, team.getId());
+        if (existing.isPresent() && TournamentRosterGuard.isEntered(existing.get().getStatus())) {
             throw ApiException.conflict("Команда уже заявлена на этот турнир");
         }
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, team.getId());
 
-        TournamentTeam entry = new TournamentTeam();
-        entry.setTournamentId(tournamentId);
-        entry.setTeamId(team.getId());
+        TournamentTeam entry = existing.orElseGet(TournamentTeam::new);
+        if (entry.getId() == null) {
+            entry.setTournamentId(tournamentId);
+            entry.setTeamId(team.getId());
+        }
         entry.setStatus(TournamentTeamStatus.PENDING);
+        entry.setApprovedAt(null);
         tournamentTeamRepository.save(entry);
         notificationService.publishToUser(
                 principal.getId(),
@@ -225,6 +284,7 @@ public class TournamentService {
     public TournamentTeamResponse approveTeam(UUID tournamentId, UUID teamId) {
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
                 .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, teamId);
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
@@ -251,7 +311,10 @@ public class TournamentService {
             matchRefereeRepository.deleteByMatchId(match.getId());
             matchRepository.delete(match);
         }
-        tournamentTeamRepository.delete(entry);
+        entry.setStatus(TournamentTeamStatus.WITHDRAWN);
+        entry.setApprovedAt(null);
+        entry.setTableId(null);
+        tournamentTeamRepository.save(entry);
         standingsBoardCache.invalidateTournament(tournamentId);
     }
 

@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { labelOfSport } from '../lib/format'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateTournamentForm from '../components/CreateTournamentForm.vue'
@@ -11,7 +10,6 @@ import TournamentCard from '../components/TournamentCard.vue'
 
 const auth = useAuthStore()
 const items = ref<any[]>([])
-const sports = ref<Record<string, { name?: string, code?: string }>>({})
 const error = ref('')
 const loading = ref(true)
 const showForm = ref(false)
@@ -27,23 +25,10 @@ const sorted = computed(() => {
   })
 })
 
-function sportName(tournament: any) {
-  const sport = sports.value[tournament.sportId]
-  return sport ? labelOfSport(sport.code, sport.name) : ''
-}
-
 async function load() {
   try {
-    const [tournaments, sportRes] = await Promise.all([
-      api.get('/tournaments', { params: { size: 50 } }),
-      api.get('/sports'),
-    ])
+    const tournaments = await api.get('/tournaments', { params: { size: 50 } })
     items.value = tournaments.data.content ?? []
-    const map: Record<string, { name?: string, code?: string }> = {}
-    for (const sport of sportRes.data ?? []) {
-      map[sport.id] = sport
-    }
-    sports.value = map
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Турниры не загрузились.'
   } finally {
@@ -76,7 +61,6 @@ onMounted(load)
         v-for="t in sorted"
         :key="t.id"
         :tournament="t"
-        :sport-name="sportName(t)"
         @apply="applying = t"
       />
     </div>

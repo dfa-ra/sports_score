@@ -10,6 +10,7 @@ import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
 import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
+import com.studentleague.tournaments.dto.TournamentOverviewResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentStandingsResponse;
 import com.studentleague.tournaments.dto.TournamentTableResponse;
@@ -102,6 +103,12 @@ public class TournamentController {
         return tournamentService.get(id);
     }
 
+    @GetMapping("/{id}/overview")
+    @Operation(summary = "Tournament header: format, team count, stage, and tab counts")
+    public TournamentOverviewResponse overview(@PathVariable UUID id) {
+        return tournamentService.overview(id);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Update tournament (ADMIN)")
@@ -130,7 +137,7 @@ public class TournamentController {
     @DeleteMapping("/{id}/teams/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Remove team from tournament (ADMIN). Deletes the entry and unplayed fixtures.")
+    @Operation(summary = "Withdraw a team from the tournament (ADMIN). Keeps the entry as WITHDRAWN and deletes unplayed fixtures.")
     public void exclude(@PathVariable UUID id, @PathVariable UUID teamId) {
         tournamentService.excludeTeam(id, teamId);
     }

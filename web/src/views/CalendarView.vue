@@ -2,10 +2,10 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../api/client'
-import { labelOfSport } from '../lib/format'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
-import { ymd } from '../lib/match'
+import { moscowWeekdayShort, shiftYmd } from '../lib/moscowTime'
+import { matchInstant, ymd } from '../lib/match'
 import EmptyState from '../components/EmptyState.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchRow from '../components/MatchRow.vue'
@@ -19,9 +19,6 @@ const tournaments = ref<Record<string, string>>({})
 const error = ref('')
 const loading = ref(true)
 const mineOnly = ref(false)
-const sports = ref<any[]>([])
-const sportId = ref('')
-const historyFloor = ref('')
 const teams = useTeamDirectory()
 const fav = useFavorites()
 const stripEl = ref<HTMLElement | null>(null)
@@ -30,19 +27,7 @@ let alignedStrip = false
 
 const liveOnly = computed(() => route.name === 'live')
 
-function atNoon(date = new Date()) {
-  const next = new Date(date)
-  next.setHours(12, 0, 0, 0)
-  return next
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-const todayKey = computed(() => ymd(atNoon()))
+const todayKey = computed(() => ymd(new Date()))
 const day = ref(todayKey.value)
 
 function oldestKey(batch: any[]) {
@@ -55,13 +40,8 @@ function oldestKey(batch: any[]) {
   return oldest
 }
 
-function monthStart(key: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return ''
-  return `${key.slice(0, 8)}01`
-}
-
 async function loadMatches() {
-  const fromKey = historyFloor.value || ymd(addDays(atNoon(), -PAST_DAYS))
+  const fromKey = shiftYmd(ymd(new Date()), -PAST_DAYS)
   const collected: any[] = []
   for (let page = 0; page < 30; page += 1) {
     const { data } = await api.get('/matches', {
@@ -79,15 +59,13 @@ async function loadMatches() {
 onMounted(async () => {
   try {
     await teams.load()
-    const [, t, s] = await Promise.all([
+    const [, t] = await Promise.all([
       loadMatches(),
       api.get('/tournaments', { params: { size: 50 } }),
-      api.get('/sports'),
     ])
     const names: Record<string, string> = {}
     for (const item of t.data.content ?? []) names[item.id] = item.name
     tournaments.value = names
-    sports.value = s.data ?? []
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Календарь не загрузился.'
   } finally {
@@ -134,43 +112,67 @@ function pad(n: number) {
   return String(n).padStart(2, '0')
 }
 
-function weekday(date: Date) {
-  return date.toLocaleDateString('ru-RU', { weekday: 'short' }).replace('.', '').toUpperCase()
+function weekday(key: string) {
+  return moscowWeekdayShort(key)
+}
+
+function windowStartKey() {
+  return shiftYmd(ymd(new Date()), -PAST_DAYS)
+}
+
+function inWindow(match: any) {
+  const key = ymd(matchInstant(match))
+  const floor = windowStartKey()
+  return !!key && !!floor && key >= floor
+}
+
+function preferredDay(keys: string[], today: string, current: string) {
+  if (keys.includes(current)) return current
+  if (keys.includes(today)) return today
+  const upcoming = keys.find((key) => key >= today)
+  if (upcoming) return upcoming
+  return keys[keys.length - 1] || today
 }
 
 function selectDay(key: string) {
-  if (!key) return
+  if (!matchDates.value.includes(key)) return
   day.value = key
-  const floor = monthStart(key)
-  const loadedFrom = historyFloor.value || ymd(addDays(atNoon(), -PAST_DAYS))
   nextTick(alignStrip)
-  if (!floor || (floor >= loadedFrom && key >= loadedFrom)) return
-  historyFloor.value = floor < loadedFrom ? floor : loadedFrom
-  loadMatches().catch((e: any) => {
-    error.value = e.response?.data?.message || 'Календарь не загрузился.'
-  })
 }
+
+const calendarMatches = computed(() => {
+  const rows = items.value.filter(inWindow)
+  return mineOnly.value ? rows.filter(isMine) : rows
+})
+
+const matchDates = computed(() => {
+  const keys = new Set<string>()
+  for (const match of calendarMatches.value) {
+    const key = ymd(matchInstant(match))
+    if (key) keys.add(key)
+  }
+  return [...keys].sort()
+})
+
+watch(matchDates, (keys) => {
+  const next = preferredDay(keys, todayKey.value, day.value)
+  if (next !== day.value) day.value = next
+  if (!liveOnly.value) nextTick(alignStrip)
+})
 
 const strip = computed(() => {
   const current = todayKey.value
-  const selected = day.value || current
-  const [yearText, monthText] = selected.split('-')
-  const year = Number(yearText)
-  const month = Number(monthText)
-  if (!year || !month) return []
-  const last = new Date(year, month, 0).getDate()
-  const days: { key: string; label: string }[] = []
-  for (let date = 1; date <= last; date += 1) {
-    const key = `${yearText}-${pad(month)}-${pad(date)}`
-    const parsed = new Date(year, month - 1, date, 12)
-    days.push({
+  return matchDates.value.map((key) => {
+    const [, monthText, dateText] = key.split('-')
+    const month = Number(monthText)
+    const date = Number(dateText)
+    return {
       key,
       label: key === current
         ? `Сегодня ${pad(date)}.${pad(month)}.`
-        : `${weekday(parsed)} ${pad(date)}.${pad(month)}.`,
-    })
-  }
-  return days
+        : `${weekday(key)} ${pad(date)}.${pad(month)}.`,
+    }
+  })
 })
 
 function isMine(match: any) {
@@ -178,17 +180,14 @@ function isMine(match: any) {
 }
 
 const visible = computed(() => {
-  let rows: any[]
   if (liveOnly.value) {
-    rows = items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
-  } else {
-    rows = items.value
-      .filter((m) => ymd(m.scheduledAt) === day.value)
-      .slice()
-      .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
+    const rows = items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
+    return mineOnly.value ? rows.filter(isMine) : rows
   }
-  if (sportId.value) rows = rows.filter((m) => m.sportId === sportId.value)
-  return mineOnly.value ? rows.filter(isMine) : rows
+  return calendarMatches.value
+    .filter((m) => ymd(matchInstant(m)) === day.value)
+    .slice()
+    .sort((a, b) => String(matchInstant(a) || '').localeCompare(String(matchInstant(b) || '')))
 })
 
 const grouped = computed(() => {
@@ -213,19 +212,6 @@ const grouped = computed(() => {
       <h1>Live</h1>
       <MatchGoalAlerts />
     </div>
-    <div class="calendar-tools">
-      <label v-if="!liveOnly" class="tool">Дата
-        <input type="date" :value="day" @change="selectDay(($event.target as HTMLInputElement).value)" />
-      </label>
-      <label class="tool">Вид спорта
-        <select v-model="sportId">
-          <option value="">Все виды</option>
-          <option v-for="sport in sports" :key="sport.id" :value="sport.id">
-            {{ sport.name || labelOfSport(sport.code) }}
-          </option>
-        </select>
-      </label>
-    </div>
     <div class="calendar-bar">
       <button
         type="button"
@@ -248,13 +234,14 @@ const grouped = computed(() => {
     <div v-if="loading" class="skeleton" />
     <EmptyState
       v-else-if="!visible.length"
-      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : 'В этот день матчей нет'"
+      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : matchDates.length ? 'В этот день матчей нет' : 'Матчей нет'"
     />
     <div v-else class="sheet">
       <section v-for="group in grouped" :key="group.id">
         <div class="league-head">
           <div>
-            {{ group.name }}
+            <RouterLink v-if="group.id !== 'none'" :to="`/tournaments/${group.id}`">{{ group.name }}</RouterLink>
+            <template v-else>{{ group.name }}</template>
           </div>
         </div>
         <MatchRow
@@ -264,7 +251,11 @@ const grouped = computed(() => {
           :home-name="teams.fullName(m.homeTeamId)"
           :away-name="teams.fullName(m.awayTeamId)"
         />
-        <RouterLink v-if="!liveOnly" class="sheet-link" :to="`/table`">К таблице ›</RouterLink>
+        <RouterLink
+          v-if="!liveOnly"
+          class="sheet-link"
+          :to="group.id !== 'none' ? { path: '/table', query: { tournament: group.id } } : '/table'"
+        >К таблице ›</RouterLink>
       </section>
     </div>
   </section>
@@ -276,39 +267,12 @@ const grouped = computed(() => {
   min-width: 0;
   max-width: 100%;
 }
-.calendar-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0.35rem 0 0.45rem;
-}
-.tool {
-  display: grid;
-  gap: 0.2rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.tool input,
-.tool select {
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 650;
-  font-size: 0.9rem;
-  color: var(--navy);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 0.35rem 0.5rem;
-  background: #fff;
-}
 .calendar-bar {
   display: flex;
   align-items: stretch;
   flex-wrap: nowrap;
   gap: 0.35rem;
-  margin: 0 -0.2rem 0.15rem;
+  margin: 0.35rem -0.2rem 0.15rem;
   min-width: 0;
   max-width: 100%;
 }

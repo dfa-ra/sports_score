@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
+import PlayoffBracket from '../components/PlayoffBracket.vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { setPageMeta } from '../lib/pageMeta'
+import { civilYear } from '../lib/moscowTime'
+import { matchInstant } from '../lib/match'
+import { tableRouteQuery } from '../lib/tableQuery'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
+type Tab = 'table' | 'playoff' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
 const TOP = 10
 
 const route = useRoute()
@@ -26,15 +30,31 @@ const scorers = ref<any[]>([])
 const assists = ref<any[]>([])
 const keepers = ref<any[]>([])
 const tournament = ref<any>(null)
+const playoff = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
 const loadError = ref('')
+const playoffError = ref(false)
 const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
+const hasPlayoff = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (picked?.competitionStage === 'PLAYOFF') return true
+  return (playoff.value?.rounds?.length ?? 0) > 0
+})
+
+const headingName = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (picked?.name) return picked.name
+  if (!loading.value && tournament.value?.name) return tournament.value.name
+  return ''
+})
+
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
+  if (value === 'playoff' && hasPlayoff.value) return 'playoff'
   if (value === 'results' || value === 'scorers' || value === 'assists' || value === 'keepers' || value === 'players') return value
   return 'table'
 })
@@ -69,8 +89,8 @@ function topNote(rows: any[], key: keyof typeof expanded.value) {
 
 const season = computed(() => {
   const start = tournament.value?.startsOn || tournament.value?.startDate
-  if (!start) return ''
-  const year = new Date(start).getFullYear()
+  const year = civilYear(start)
+  if (year == null) return ''
   return `${year}/${year + 1}`
 })
 
@@ -78,7 +98,7 @@ const results = computed(() =>
   matches.value
     .filter((m) => m.tournamentId === tournamentId.value && (m.status === 'FINISHED' || m.status === 'CANCELLED'))
     .slice()
-    .sort((a, b) => String(b.scheduledAt).localeCompare(String(a.scheduledAt)))
+    .sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
 )
 
 onMounted(async () => {
@@ -98,17 +118,46 @@ onMounted(async () => {
   ])
   tournaments.value = data.content ?? []
   matches.value = games.data.content ?? []
-  try {
-    const current = await api.get('/tournaments/current')
-    if (current.data?.id) tournamentId.value = current.data.id
-  } catch {
-    if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+  const requested = String(route.query.tournament || '')
+  if (requested && tournaments.value.some((item) => item.id === requested)) {
+    tournamentId.value = requested
+  } else {
+    try {
+      const current = await api.get('/tournaments/current')
+      if (current.data?.id) tournamentId.value = current.data.id
+    } catch {
+      if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+    }
+    if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
   }
-  if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  await load()
+  if (!tournamentId.value) await load()
 })
 
-watch(tournamentId, load)
+watch(tournamentId, (id) => {
+  const requested = String(route.query.tab || '')
+  const stagePlayoff = tournaments.value.find((item) => item.id === id)?.competitionStage === 'PLAYOFF'
+  const rememberPlayoff = requested === 'playoff' && !stagePlayoff
+  const listAll = fullList.value
+  void (async () => {
+    if (id && String(route.query.tournament || '') !== id) {
+      await router.replace({
+        query: tableRouteQuery({
+          tournamentId: id,
+          tab: rememberPlayoff ? 'table' : requested,
+          keepPlayoff: stagePlayoff,
+          listAll,
+        }),
+      })
+    }
+    await load({ rememberPlayoff, listAll })
+  })()
+})
+
+watch(() => String(route.query.tournament || ''), (id) => {
+  if (!id || id === tournamentId.value) return
+  if (!tournaments.value.some((item) => item.id === id)) return
+  tournamentId.value = id
+})
 
 watch(tab, async () => {
   await nextTick()
@@ -119,10 +168,14 @@ onUnmounted(() => inkObserver?.disconnect())
 
 function setTab(next: Tab, list?: 'all') {
   expanded.value = { scorers: false, assists: false, keepers: false }
-  const query: Record<string, string> = {}
-  if (next !== 'table') query.tab = next
-  if (list === 'all') query.list = 'all'
-  router.replace({ query })
+  router.replace({
+    query: tableRouteQuery({
+      tournamentId: tournamentId.value,
+      tab: next,
+      keepPlayoff: next === 'playoff',
+      listAll: list === 'all',
+    }),
+  })
   if (next === 'scorers' || next === 'assists' || next === 'keepers') {
     if (statsLoadedFor.value !== tournamentId.value) {
       statsLoading.value = true
@@ -158,25 +211,50 @@ async function loadStats() {
   }
 }
 
-async function load() {
+function syncPlayoffTab(id: string, rememberPlayoff: boolean, listAll: boolean) {
+  if (tournamentId.value !== id) return
+  const queryTab = String(route.query.tab || '')
+  if (queryTab === 'playoff' && !hasPlayoff.value) {
+    void router.replace({
+      query: tableRouteQuery({ tournamentId: id, tab: 'table', listAll }),
+    })
+    return
+  }
+  if (rememberPlayoff && hasPlayoff.value && queryTab !== 'playoff') {
+    void router.replace({
+      query: tableRouteQuery({ tournamentId: id, tab: 'playoff', keepPlayoff: true, listAll }),
+    })
+  }
+}
+
+async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) {
+  const rememberPlayoff = options?.rememberPlayoff ?? false
+  const listAll = options?.listAll ?? fullList.value
   if (!tournamentId.value) {
+    playoff.value = null
     loading.value = false
     return
   }
   loading.value = true
   loadError.value = ''
+  tournament.value = null
   statsLoadedFor.value = ''
+  playoff.value = null
+  playoffError.value = false
   scorers.value = []
   assists.value = []
   keepers.value = []
   const id = tournamentId.value
   try {
-    const [t, s] = await Promise.all([
+    const [t, s, p] = await Promise.all([
       api.get(`/tournaments/${id}`),
       api.get(`/tournaments/${id}/standings`),
+      api.get(`/tournaments/${id}/playoff`).then((res) => ({ data: res.data, failed: false })).catch(() => ({ data: null, failed: true })),
     ])
     if (tournamentId.value !== id) return
     tournament.value = t.data
+    playoff.value = p.data
+    playoffError.value = p.failed
     standings.value = parseStandings(s.data)
     const name = t.data?.name || 'Таблица'
     setPageMeta({
@@ -188,10 +266,14 @@ async function load() {
   } catch {
     if (tournamentId.value !== id) return
     tournament.value = null
+    playoff.value = null
     standings.value = []
     loadError.value = 'Таблица не загрузилась.'
   } finally {
-    if (tournamentId.value === id) loading.value = false
+    if (tournamentId.value === id) {
+      loading.value = false
+      syncPlayoffTab(id, rememberPlayoff, listAll)
+    }
   }
 }
 </script>
@@ -201,7 +283,10 @@ async function load() {
     <div class="league">
       <BrandMark :size="56" rounded="tile" />
       <div>
-        <h1>{{ tournament?.name || 'Таблица' }}</h1>
+        <h1>
+          <RouterLink v-if="tournamentId && headingName" class="league-title" :to="`/tournaments/${tournamentId}`">{{ headingName }}</RouterLink>
+          <template v-else>{{ loading ? 'Загрузка…' : 'Таблица' }}</template>
+        </h1>
         <label class="field season">
           <select v-model="tournamentId">
             <option v-for="t in tournaments" :key="t.id" :value="t.id">
@@ -214,6 +299,7 @@ async function load() {
 
     <div ref="tabBar" class="fs-tabs league-tabs">
       <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
+      <button v-if="hasPlayoff" type="button" :class="{ on: tab === 'playoff' }" @click="setTab('playoff')">Плей-офф</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
       <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
@@ -241,6 +327,17 @@ async function load() {
       </div>
     </template>
 
+    <template v-else-if="tab === 'playoff'">
+      <PlayoffBracket
+        :tournament-id="tournamentId"
+        :rounds="playoff?.rounds ?? []"
+        :loading="false"
+        :error="playoffError"
+        @retry="load()"
+        @show-table="setTab('table')"
+      />
+    </template>
+
     <template v-else-if="tab === 'results'">
       <EmptyState v-if="!results.length" title="Сыгранных матчей ещё нет" />
       <div v-else class="sheet">
@@ -248,8 +345,8 @@ async function load() {
           v-for="m in results"
           :key="m.id"
           :match="m"
-          :home-name="teams.fullName(m.homeTeamId)"
-          :away-name="teams.fullName(m.awayTeamId)"
+          :home-name="m.homeTeamName || teams.fullName(m.homeTeamId)"
+          :away-name="m.awayTeamName || teams.fullName(m.awayTeamId)"
         />
       </div>
     </template>
@@ -357,7 +454,8 @@ async function load() {
 </template>
 
 <style scoped>
-.page { gap: 0.45rem; }
+.page { gap: 0.45rem; min-width: 0; max-width: 100%; }
+.page > * { min-width: 0; }
 .league-tabs { position: relative; }
 .league-tabs button,
 .league-tabs button.on { border-bottom-color: transparent; }
@@ -379,6 +477,9 @@ async function load() {
   padding: 0.35rem 0 0.2rem;
 }
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
+.league-title,
+.league-title:hover { color: inherit; text-decoration: none; }
+.sheet { min-width: 0; max-width: 100%; }
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
 .tie-note {

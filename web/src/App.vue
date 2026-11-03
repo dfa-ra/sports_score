@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
-import { useFavorites } from './stores/favorites'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
 import { SITE_NAME } from './lib/brand'
+import { headerAuthSlot, headerExtraLinks } from './lib/headerAuth'
 import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
-const fav = useFavorites()
 const route = useRoute()
 const router = useRouter()
 
@@ -21,13 +20,58 @@ const mood = computed(() => {
   return 'mood-home'
 })
 
-const hideDock = computed(() =>
-  route.path.startsWith('/login')
-  || route.path.startsWith('/register')
-  || route.path.startsWith('/admin')
-  || route.path.startsWith('/referee')
-  || route.path.startsWith('/analyst')
-)
+const menuOpen = ref(false)
+const menuRoot = ref<HTMLElement | null>(null)
+const compactQuery = '(max-width: 1023px)'
+const compact = ref(typeof window !== 'undefined' && window.matchMedia(compactQuery).matches)
+let compactMedia: MediaQueryList | null = null
+
+const commonLinks = [
+  { to: '/', label: 'Главная' },
+  { to: '/table', label: 'Таблица' },
+  { to: '/calendar', label: 'Игры' },
+  { to: '/live', label: 'Live' },
+  { to: '/tournaments', label: 'Турниры' },
+  { to: '/players', label: 'Игроки' },
+]
+
+const extraLinks = computed(() => headerExtraLinks((role) => auth.hasRole(role)))
+const authSlot = computed(() => headerAuthSlot(auth.sessionReady, auth.isAuthenticated))
+
+function syncCompact() {
+  compact.value = !!compactMedia?.matches
+}
+
+function navActive(to: string) {
+  const path = route.path
+  if (to === '/') return path === '/'
+  return path === to || path.startsWith(`${to}/`)
+}
+
+function onPointerDown(event: PointerEvent) {
+  if (!menuOpen.value || !menuRoot.value) return
+  const target = event.target
+  if (target instanceof Node && menuRoot.value.contains(target)) return
+  menuOpen.value = false
+}
+
+function onKey(event: KeyboardEvent) {
+  if (event.key === 'Escape') menuOpen.value = false
+}
+
+onMounted(() => {
+  compactMedia = window.matchMedia(compactQuery)
+  syncCompact()
+  compactMedia.addEventListener('change', syncCompact)
+  document.addEventListener('pointerdown', onPointerDown)
+  document.addEventListener('keydown', onKey)
+})
+
+onUnmounted(() => {
+  compactMedia?.removeEventListener('change', syncCompact)
+  document.removeEventListener('pointerdown', onPointerDown)
+  document.removeEventListener('keydown', onKey)
+})
 
 watch(mood, (value) => {
   document.body.classList.remove('mood-auth', 'mood-pitch', 'mood-ref', 'mood-admin', 'mood-home')
@@ -35,47 +79,23 @@ watch(mood, (value) => {
 }, { immediate: true })
 
 async function logout() {
+  menuOpen.value = false
   await auth.logout()
   router.push('/')
 }
-
-const profileTo = computed(() => auth.isAuthenticated ? '/profile' : '/login')
-const menuOpen = ref(false)
-const moreRoot = ref<HTMLElement | null>(null)
-const showAnalystLink = computed(() => auth.hasRole('ANALYST'))
 
 watch(() => route.fullPath, () => {
   menuOpen.value = false
 })
 
-watch(showAnalystLink, (visible) => {
-  if (!visible) menuOpen.value = false
-})
-
-function onDocumentPointer(event: Event) {
-  const root = moreRoot.value
-  if (!root || !menuOpen.value) return
-  if (event.target instanceof Node && root.contains(event.target)) return
+watch(compact, () => {
   menuOpen.value = false
-}
-
-function onDocumentKey(event: KeyboardEvent) {
-  if (event.key === 'Escape') menuOpen.value = false
-}
-
-onMounted(() => {
-  document.addEventListener('pointerdown', onDocumentPointer)
-  document.addEventListener('keydown', onDocumentKey)
 })
 
-onBeforeUnmount(() => {
-  document.removeEventListener('pointerdown', onDocumentPointer)
-  document.removeEventListener('keydown', onDocumentKey)
-})
 </script>
 
 <template>
-  <div class="shell" :data-mood="mood" :class="{ docked: !hideDock }">
+  <div class="shell" :data-mood="mood">
     <header class="chrome">
       <div class="nav-bar">
         <div class="container nav-inner">
@@ -84,51 +104,58 @@ onBeforeUnmount(() => {
             <span class="brand-name">{{ SITE_NAME }}</span>
           </RouterLink>
 
-          <nav>
-            <RouterLink to="/" exact-active-class="on">Главная</RouterLink>
-            <RouterLink to="/table" active-class="on">Таблица</RouterLink>
-            <RouterLink to="/calendar" active-class="on">Игры</RouterLink>
-            <RouterLink to="/live" active-class="on">Live</RouterLink>
-            <RouterLink to="/tournaments" active-class="on">Турниры</RouterLink>
-            <RouterLink to="/players" active-class="on">Игроки</RouterLink>
-            <RouterLink v-if="auth.canAccessMyTeam" to="/my-team" active-class="on">Моя команда</RouterLink>
-            <RouterLink v-if="auth.canManageLeague" to="/admin" active-class="on">Админ</RouterLink>
-            <RouterLink v-if="auth.canOfficiate" to="/referee" active-class="on">Судья</RouterLink>
+          <nav class="primary" aria-label="Разделы">
+            <RouterLink
+              v-for="item in commonLinks"
+              :key="item.to"
+              :to="item.to"
+              :class="{ on: navActive(item.to) }"
+            >{{ item.label }}</RouterLink>
           </nav>
 
-          <div v-if="showAnalystLink" ref="moreRoot" class="nav-more">
-            <button
-              class="burger"
-              type="button"
-              :aria-expanded="menuOpen"
-              aria-controls="nav-more-panel"
-              aria-label="Меню"
-              @click="menuOpen = !menuOpen"
-            >
-              <span></span>
-              <span></span>
-              <span></span>
-            </button>
-            <div v-if="menuOpen" id="nav-more-panel" class="nav-more-panel" role="menu">
-              <RouterLink role="menuitem" to="/analyst" active-class="on" @click="menuOpen = false">Аналитик</RouterLink>
-            </div>
-          </div>
-
-          <div class="auth">
-            <template v-if="auth.isAuthenticated">
+          <div class="auth" :aria-busy="authSlot === 'pending'">
+            <template v-if="authSlot === 'account'">
               <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
                 <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="32" />
               </RouterLink>
-              <button class="login-pill ghost wide-only" type="button" @click="logout">Выйти</button>
+              <button class="login-pill ghost" type="button" @click="logout">Выйти</button>
             </template>
-            <template v-else>
-              <RouterLink class="login-pill wide-only" to="/login">Войти</RouterLink>
-              <RouterLink class="avatar-link phone-only" to="/login" aria-label="Войти">
-                <span class="user-ico" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3.2 3.8-4.6 7-4.6S17.6 15.8 19 19"/></svg>
-                </span>
-              </RouterLink>
-            </template>
+            <RouterLink v-else-if="authSlot === 'login'" class="login-pill" to="/login">Войти</RouterLink>
+            <span v-else class="auth-pending" aria-hidden="true"></span>
+          </div>
+
+          <div ref="menuRoot" class="menu" :class="{ 'has-extra': extraLinks.length }">
+            <button
+              class="menu-button"
+              type="button"
+              :aria-label="menuOpen ? 'Закрыть меню' : 'Открыть меню'"
+              aria-haspopup="true"
+              :aria-expanded="menuOpen"
+              @click="menuOpen = !menuOpen"
+            >
+              <span class="menu-glyph" aria-hidden="true">{{ menuOpen ? '✕' : '☰' }}</span>
+            </button>
+            <div v-if="menuOpen" class="menu-panel">
+              <div class="only-compact">
+                <RouterLink
+                  v-for="item in commonLinks"
+                  :key="`menu-${item.to}`"
+                  :to="item.to"
+                  :class="{ on: navActive(item.to) }"
+                >{{ item.label }}</RouterLink>
+                <RouterLink v-if="authSlot === 'account'" class="menu-user" to="/profile">
+                  <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="28" />
+                  <span>Профиль</span>
+                </RouterLink>
+              </div>
+              <RouterLink
+                v-for="item in extraLinks"
+                :key="item.to"
+                :to="item.to"
+                :class="{ on: navActive(item.to) }"
+              >{{ item.label }}</RouterLink>
+              <button v-if="authSlot === 'account'" class="menu-logout only-compact" type="button" @click="logout">Выйти</button>
+            </div>
           </div>
         </div>
       </div>
@@ -144,58 +171,25 @@ onBeforeUnmount(() => {
       </div>
     </footer>
 
-    <nav v-if="!hideDock" class="dock" aria-label="Основное меню">
-      <RouterLink
-        to="/calendar"
-        :class="{ on: route.path.startsWith('/calendar') || route.path.startsWith('/matches') }"
-      >
-        <span class="ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 12h18M8 6v12"/></svg>
-        </span>
-        <span>Игры</span>
-      </RouterLink>
-      <RouterLink to="/table" :class="{ on: route.path.startsWith('/table') || route.path.startsWith('/players') }">
-        <span class="ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
-        </span>
-        <span>Таблица</span>
-      </RouterLink>
-      <RouterLink to="/live" :class="{ on: route.path.startsWith('/live') }">
-        <span class="ico live" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="9.2"/></svg>
-        </span>
-        <span>Live</span>
-      </RouterLink>
-      <RouterLink to="/tournaments" :class="{ on: route.path.startsWith('/tournaments') }">
-        <span class="ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 5h8v3.2a4 4 0 0 1-8 0V5z"/><path d="M8 6.8H5.4A2.6 2.6 0 0 0 8 9.6"/><path d="M16 6.8h2.6A2.6 2.6 0 0 1 16 9.6"/><path d="M12 12.4V16"/><path d="M9 20h6"/><path d="M10.2 16h3.6v2.4h-3.6z"/></svg>
-        </span>
-        <span>Турниры</span>
-      </RouterLink>
-      <RouterLink :to="profileTo" :class="{ on: route.path.startsWith('/profile') }">
-        <span class="ico" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5 19c1.4-3.2 3.8-4.6 7-4.6S17.6 15.8 19 19"/></svg>
-          <i v-if="fav.count" class="badge">{{ fav.count }}</i>
-        </span>
-        <span>Профиль</span>
-      </RouterLink>
-    </nav>
   </div>
 </template>
 
 <style scoped>
-.shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+.shell { min-height: 100vh; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; }
+.shell > * { min-width: 0; }
 .chrome { background: var(--navy); color: #fff; }
 .nav-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   min-height: 68px;
+  flex-wrap: nowrap;
 }
 .brand {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 0.65rem;
   color: #fff;
   text-decoration: none;
@@ -216,17 +210,25 @@ onBeforeUnmount(() => {
   width: 36px;
   height: 36px;
 }
-nav { display: flex; gap: 0.15rem; flex-wrap: wrap; }
-nav a {
+.primary {
+  display: flex;
+  gap: 0.15rem;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.primary a {
   color: rgba(255,255,255,0.82);
   font-weight: 700;
   font-size: 0.88rem;
   padding: 0.4rem 0.85rem;
   border-radius: 999px;
   text-decoration: none;
+  white-space: nowrap;
 }
-nav a:hover { color: #fff; background: rgba(255,255,255,0.08); }
-nav a.on { color: var(--navy); background: var(--ice); }
+.primary a:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.primary a.on { color: var(--navy); background: var(--ice); }
 .login-pill {
   display: inline-flex;
   align-items: center;
@@ -241,64 +243,65 @@ nav a.on { color: var(--navy); background: var(--ice); }
 }
 .login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
-.nav-more { position: relative; flex: none; }
-.burger {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(255,255,255,0.45);
-  border-radius: 999px;
+.auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; margin-left: auto; }
+.auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
+.avatar-link { display: grid; place-items: center; }
+.menu { position: relative; flex: 0 0 auto; display: none; }
+.only-compact { display: contents; }
+.menu-button {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 12px;
   background: transparent;
-  display: inline-flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-  padding: 0;
+  color: #fff;
   cursor: pointer;
+  padding: 0;
 }
-.burger span {
-  display: block;
-  width: 16px;
-  height: 2px;
-  border-radius: 1px;
-  background: #fff;
-}
-.burger[aria-expanded="true"] { background: rgba(255,255,255,0.12); }
-.nav-more-panel {
+.menu-button:hover { background: rgba(255,255,255,0.08); }
+.menu-glyph { font-size: 1.25rem; line-height: 1; }
+.menu-panel {
   position: absolute;
   top: calc(100% + 0.45rem);
   right: 0;
-  min-width: 11rem;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(8, 20, 40, 0.18);
-  padding: 0.35rem;
   z-index: 50;
-}
-.nav-more-panel a {
-  display: block;
-  color: var(--navy);
-  font-weight: 700;
-  font-size: 0.9rem;
-  text-decoration: none;
-  padding: 0.55rem 0.75rem;
-  border-radius: 8px;
-}
-.nav-more-panel a:hover,
-.nav-more-panel a.on { background: var(--ice); color: var(--navy); }
-.auth { display: flex; gap: 0.4rem; align-items: center; }
-.avatar-link { display: grid; place-items: center; }
-.phone-only { display: none; }
-.user-ico {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
   display: grid;
-  place-items: center;
-  border: 1.5px solid rgba(255,255,255,0.55);
+  min-width: 220px;
+  max-width: min(280px, calc(100vw - 1.2rem));
+  padding: 0.35rem;
+  background: #00205b;
   color: #fff;
+  border-radius: 14px;
+  box-shadow: 0 16px 28px rgba(0, 16, 46, 0.35);
 }
-.user-ico svg { width: 22px; height: 22px; }
+.menu-panel a,
+.menu-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.menu-panel a:hover,
+.menu-logout:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.menu-panel a.on {
+  background: transparent;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: inset 4px 0 0 #4cb4e5;
+}
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
@@ -315,72 +318,21 @@ nav a.on { color: var(--navy); background: var(--ice); }
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.dock { display: none; }
+@media (min-width: 1024px) {
+  .only-compact { display: none; }
+  .menu.has-extra { display: block; }
+}
 
 @media (max-width: 1099px) {
   .nav-inner { min-height: 56px; }
-  nav a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
+  .primary a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
 }
 
-@media (max-width: 719px) {
-  header nav { display: none; }
+@media (max-width: 1023px) {
+  .primary { display: none; }
+  .menu { display: block; }
+  .menu-logout { display: flex; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.82rem; }
-  .wide-only { display: none; }
-  .phone-only { display: grid; }
-  .shell.docked .main { padding-bottom: 1.2rem; }
-  .shell.docked .foot {
-    display: block;
-    padding: 0 0 calc(0.85rem + 4.8rem + env(safe-area-inset-bottom));
-  }
-  .dock {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 40;
-    background: #fff;
-    border-top: 1px solid var(--line);
-    padding: 0.28rem 0.2rem calc(0.28rem + env(safe-area-inset-bottom));
-  }
-  .dock a {
-    display: grid;
-    justify-items: center;
-    gap: 0.12rem;
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 0.62rem;
-    font-weight: 700;
-    letter-spacing: 0.02em;
-    text-transform: uppercase;
-    padding: 0.25rem 0;
-  }
-  .dock a.on { color: var(--navy); }
-  .dock .ico {
-    position: relative;
-    width: 22px;
-    height: 22px;
-    display: grid;
-    place-items: center;
-  }
-  .dock .ico svg { width: 20px; height: 20px; }
-  .dock .ico.live { color: var(--ice); }
-  .dock .badge {
-    position: absolute;
-    top: -0.35rem;
-    right: -0.55rem;
-    min-width: 1rem;
-    height: 1rem;
-    border-radius: 999px;
-    background: var(--navy);
-    color: #fff;
-    font-size: 0.58rem;
-    display: grid;
-    place-items: center;
-    padding: 0 0.2rem;
-    font-style: normal;
-  }
 }
 </style>

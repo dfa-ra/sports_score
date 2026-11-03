@@ -85,6 +85,9 @@ export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(null)
   const refreshToken = ref<string | null>(null)
   const user = ref<User | null>(null)
+  // Stays false while a stored token still has to be checked or refreshed.
+  // A visitor with nothing stored is ready immediately, so «Войти» is not delayed.
+  const sessionReady = ref(false)
   let refreshInFlight: Promise<void> | null = null
   let restoreInFlight: Promise<void> | null = null
 
@@ -226,27 +229,34 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function restoreSessionOnce() {
-    hydrate()
-    if (accessToken.value) {
-      try {
-        await refreshMe()
-        return
-      } catch (error) {
-        if (!isUnauthorized(error)) return
-        accessToken.value = null
-      }
-    }
-    if (!refreshToken.value) {
-      user.value = null
-      persist()
-      return
-    }
     try {
-      await refresh()
-    } catch (error) {
-      if (isUnauthorized(error)) logoutLocal()
+      hydrate()
+      if (accessToken.value) {
+        try {
+          await refreshMe()
+          return
+        } catch (error) {
+          if (!isUnauthorized(error)) return
+          accessToken.value = null
+        }
+      }
+      if (!refreshToken.value) {
+        user.value = null
+        persist()
+        return
+      }
+      try {
+        await refresh()
+      } catch (error) {
+        if (isUnauthorized(error)) logoutLocal()
+      }
+    } finally {
+      sessionReady.value = true
     }
   }
+
+  hydrate()
+  if (!accessToken.value && !refreshToken.value) sessionReady.value = true
 
   if (typeof window !== 'undefined') {
     window.addEventListener('storage', (event) => {
@@ -286,6 +296,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     user,
     isAuthenticated,
+    sessionReady,
     role,
     approvedRoles,
     hasRole,

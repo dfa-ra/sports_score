@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { Client, type IMessage, type StompSubscription } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
 import { registeredName } from '../../lib/playerTitle'
-import { protocolMinute, publicScore } from '../../lib/match'
+import { finishConfirmQuestion, protocolMinute, protocolScore, publicScore, refereeBoardScore } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
@@ -37,10 +39,14 @@ const awayRoster = ref<any[]>([])
 const message = ref('')
 const error = ref('')
 const pending = ref(false)
+const voidingId = ref('')
+const protocolDirty = ref(false)
 const sheet = ref<Sheet | null>(null)
 const heldClock = ref(false)
 const teams = useTeamDirectory()
 const { elapsed, remaining, expired, cap } = useMatchClock(match)
+let liveClient: Client | null = null
+let liveSub: StompSubscription | null = null
 
 const homeLabel = computed(() => teams.fullName(match.value?.homeTeamId, 'Хозяева'))
 const awayLabel = computed(() => teams.fullName(match.value?.awayTeamId, 'Гости'))
@@ -143,6 +149,112 @@ const sheetHint = computed(() => {
   return heldClock.value ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.'
 })
 
+function eventKey(event: { id?: string | number | null }) {
+  return event?.id == null ? '' : String(event.id)
+}
+
+function serverCaughtUp(server: any[], local: any[]) {
+  return local.every((event) => {
+    const id = eventKey(event)
+    if (!id) return true
+    const row = server.find((item) => eventKey(item) === id)
+    if (!row) return false
+    return !event.voided || !!row.voided
+  })
+}
+
+function mergeServerEvents(server: any[], local: any[]) {
+  const voidedLocal = new Map(
+    local.filter((event) => eventKey(event) && event.voided).map((event) => [eventKey(event), event]),
+  )
+  const merged = server.map((event) => {
+    const localVoid = voidedLocal.get(eventKey(event))
+    if (localVoid && !event.voided) {
+      return { ...event, voided: true, voidedAt: localVoid.voidedAt ?? event.voidedAt }
+    }
+    return event
+  })
+  const known = new Set(merged.map((event) => eventKey(event)))
+  for (const event of local) {
+    const id = eventKey(event)
+    if (id && !known.has(id)) merged.push(event)
+  }
+  return merged
+}
+
+function paintScore(current = match.value, rows = events.value) {
+  if (!current) return
+  const counted = protocolScore(current, rows)
+  match.value = { ...current, homeScore: counted.home, awayScore: counted.away }
+}
+
+function upsertProtocolEvent(event: any) {
+  if (!event || !match.value) return
+  const id = eventKey(event)
+  if (!id) {
+    events.value = [...events.value, event]
+  } else {
+    const index = events.value.findIndex((row) => eventKey(row) === id)
+    if (index === -1) {
+      events.value = [...events.value, event]
+    } else {
+      const next = events.value.slice()
+      next[index] = { ...next[index], ...event }
+      events.value = next
+    }
+  }
+  protocolDirty.value = true
+  paintScore()
+}
+
+function applyLive(live: any) {
+  if (!match.value || !live) return
+  if (live.matchId && String(live.matchId) !== String(match.value.id)) return
+  if (live.lastEvent?.id) upsertProtocolEvent(live.lastEvent)
+  const counted = protocolScore(match.value, events.value)
+  const frameScore = typeof live.homeScore === 'number' && typeof live.awayScore === 'number'
+  match.value = {
+    ...match.value,
+    status: live.status ?? match.value.status,
+    homeScore: protocolDirty.value || live.lastEvent ? counted.home : (frameScore ? live.homeScore : counted.home),
+    awayScore: protocolDirty.value || live.lastEvent ? counted.away : (frameScore ? live.awayScore : counted.away),
+    gameTimeSeconds: live.gameTimeSeconds ?? match.value.gameTimeSeconds,
+    period: live.period ?? match.value.period,
+    periodCount: live.periodCount ?? match.value.periodCount,
+    periodLengthSeconds: live.periodLengthSeconds ?? match.value.periodLengthSeconds,
+    clockRunningSince: 'clockRunningSince' in live ? live.clockRunningSince : match.value.clockRunningSince,
+    sportCode: live.sportCode ?? match.value.sportCode,
+  }
+}
+
+function connectLive() {
+  if (liveClient) return
+  liveClient = new Client({
+    webSocketFactory: () => new SockJS('/ws') as WebSocket,
+    connectHeaders: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {},
+    reconnectDelay: 4000,
+    onConnect: () => {
+      liveSub?.unsubscribe()
+      liveSub = liveClient?.subscribe(`/topic/matches/${route.params.id}`, (message: IMessage) => {
+        try {
+          applyLive(JSON.parse(message.body))
+        } catch {
+          /* ignore a bad frame */
+        }
+      }) ?? null
+    },
+  })
+  liveClient.activate()
+}
+
+function disconnectLive() {
+  liveSub?.unsubscribe()
+  liveSub = null
+  const current = liveClient
+  liveClient = null
+  void current?.deactivate()
+}
+
 async function reload() {
   await teams.load()
   const id = route.params.id
@@ -153,17 +265,25 @@ async function reload() {
     api.get(`/matches/${id}/referees`),
     api.get(`/matches/${id}/shootout`),
   ])
+  const serverEvents = Array.isArray(e.data) ? e.data : []
+  const merged = mergeServerEvents(serverEvents, events.value)
+  const caughtUp = serverCaughtUp(serverEvents, events.value)
   shootout.value = s.data
   referees.value = r.data
-  match.value = m.data
+  // The protocol is the score. A match GET can come back from before the save
+  // and would otherwise put the header back to 0:0 while the goal stays listed.
+  match.value = { ...m.data, ...protocolScorePatch(m.data, merged) }
+  if (caughtUp) protocolDirty.value = false
   if (!canControl.value) {
     events.value = []
     lineups.value = null
     homeRoster.value = []
     awayRoster.value = []
+    protocolDirty.value = false
     return
   }
-  events.value = e.data
+  events.value = merged
+  if (!caughtUp) paintScore()
   lineups.value = l.data
   const [home, away] = await Promise.all([
     api.get(`/teams/${m.data.homeTeamId}/members`),
@@ -173,9 +293,14 @@ async function reload() {
   awayRoster.value = away.data
 }
 
+function protocolScorePatch(current: any, rows: any[]) {
+  const counted = protocolScore(current, rows)
+  return { homeScore: counted.home, awayScore: counted.away }
+}
+
 async function refreshMatch() {
   const { data } = await api.get(`/matches/${route.params.id}`)
-  match.value = data
+  match.value = { ...data, ...protocolScorePatch(data, events.value) }
 }
 
 async function holdClock() {
@@ -245,10 +370,16 @@ async function undoKick() {
 async function action(path: string) {
   if (path === 'finish') {
     const current = match.value
+    const series = shootout.value
     const halfStillOpen = remaining.value > 0 || (current?.period ?? 1) < (current?.periodCount ?? 1)
-    const question = halfStillOpen
-      ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
-      : 'Завершить матч?'
+    const question = finishConfirmQuestion({
+      halfStillOpen,
+      homeScore: current?.homeScore,
+      awayScore: current?.awayScore,
+      penaltyHome: series?.penaltyHome ?? current?.penaltyHome,
+      penaltyAway: series?.penaltyAway ?? current?.penaltyAway,
+      decisive: !!series?.decisive,
+    })
     if (!confirm(question)) return
   }
   message.value = ''
@@ -271,36 +402,51 @@ function canUndo(ev: { voided?: boolean; eventType?: string }) {
 }
 
 async function undoEvent(ev: { id: string; eventType?: string }) {
+  if (pending.value || voidingId.value === ev.id) return
   const label = labelOf(eventLabel, ev.eventType)
   if (!confirm(`Убрать «${label}» из протокола? Счёт пересчитается по оставшимся голам.`)) return
+  if (pending.value || voidingId.value === ev.id) return
   message.value = ''
   error.value = ''
   pending.value = true
+  voidingId.value = ev.id
   try {
-    await api.post(`/referee/matches/${route.params.id}/events/${ev.id}/void`)
+    const { data } = await api.post(`/referee/matches/${route.params.id}/events/${ev.id}/void`)
+    upsertProtocolEvent(data)
     message.value = 'Событие убрано из протокола.'
-    await reload()
+    try {
+      await reload()
+    } catch {
+      /* the voided row is already on the board */
+    }
   } catch (e: any) {
     error.value = apiError(e, 'Событие не убралось.')
   } finally {
     pending.value = false
+    voidingId.value = ''
   }
 }
 
 async function addEvent(payload: Record<string, unknown>) {
+  if (pending.value) return
   message.value = ''
   error.value = ''
   pending.value = true
   try {
     const played = elapsed.value
-    await api.post(`/referee/matches/${route.params.id}/events`, {
+    const { data } = await api.post(`/referee/matches/${route.params.id}/events`, {
       ...payload,
       ...(played > 0 ? { gameTime: played } : {}),
     })
+    upsertProtocolEvent(data)
     sheet.value = null
     message.value = 'В протоколе.'
     await releaseClock()
-    await reload()
+    try {
+      await reload()
+    } catch {
+      /* the saved event is already on the board */
+    }
   } catch (e: any) {
     error.value = apiError(e, 'Не удалось записать событие')
   } finally {
@@ -309,6 +455,7 @@ async function addEvent(payload: Record<string, unknown>) {
 }
 
 async function openSheet(kind: EventKind) {
+  if (pending.value) return
   error.value = ''
   if (!live.value) {
     error.value = 'Сначала стартуйте матч.'
@@ -400,6 +547,7 @@ function confirmSubstitution(incomingId: string) {
 }
 
 function confirmGoal(assistPlayerId?: string | null, ownGoal = false) {
+  if (pending.value) return
   const current = sheet.value
   if (!current?.teamId || !current.player) return
   const flagged = ownGoal || !!current.ownGoal
@@ -442,8 +590,11 @@ function backSheet() {
   void closeSheet()
 }
 
-onMounted(reload)
+onMounted(() => {
+  reload().finally(connectLive)
+})
 onUnmounted(() => {
+  disconnectLive()
   if (!heldClock.value) return
   heldClock.value = false
   api.post(`/referee/matches/${route.params.id}/resume`).catch((reason) => {
@@ -467,7 +618,7 @@ onUnmounted(() => {
     </div>
 
     <div class="panel scoreboard" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <StatusBadge :status="match.status" />
+      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" />
       <p class="period">{{ periodLabel(match.period, match.sportCode, match.periodCount) }}</p>
       <div class="clock" :class="{ expired }">{{ formatClock(remaining) }}</div>
       <p class="muted">осталось из {{ formatClock(cap) }} · прошло {{ formatClock(elapsed) }}</p>
@@ -478,7 +629,7 @@ onUnmounted(() => {
           {{ homeLabel }}
         </strong>
         <div class="score">
-          {{ shootoutOpen && shootout?.kicks?.length ? shootoutLine : `${match.homeScore} : ${match.awayScore}` }}
+          {{ refereeBoardScore(match, shootout, shootoutOpen) }}
         </div>
         <strong class="club">
           <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="28" />
@@ -513,7 +664,7 @@ onUnmounted(() => {
         class="btn large"
         :disabled="pending || !live || (match.period ?? 1) >= match.periodCount"
         @click="action('next-period')"
-      >Следующий {{ match.sportCode === 'BASKETBALL' ? 'четверть' : 'тайм' }}</button>
+      >Следующий тайм</button>
       <button
         class="btn large danger"
         :disabled="pending || !live || (shootoutOpen && !shootout?.decisive)"
@@ -589,7 +740,7 @@ onUnmounted(() => {
         <span v-if="protocolMinute(ev, match.periodLengthSeconds) != null" class="t">{{ protocolMinute(ev, match.periodLengthSeconds) }}'</span>
         <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
         <span>{{ eventDetail(ev) || '—' }}</span>
-        <button v-if="canUndo(ev)" class="btn ghost" type="button" :disabled="pending" @click="undoEvent(ev)">Убрать</button>
+        <button v-if="canUndo(ev)" class="btn ghost" type="button" :disabled="pending || voidingId === ev.id" @click="undoEvent(ev)">Убрать</button>
       </div>
     </div>
     <p v-if="message" class="form-ok">{{ message }}</p>

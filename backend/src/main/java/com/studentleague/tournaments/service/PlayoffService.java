@@ -4,6 +4,7 @@ import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.service.MatchListFields;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.PenaltyKick;
 import com.studentleague.matches.repository.MatchAnalystAssignmentRepository;
@@ -396,20 +397,16 @@ public class PlayoffService {
             return;
         }
         Tournament tournament = requireTournament(slot.getTournamentId());
-        Instant kickoff = slot.getScheduledAt() != null ? slot.getScheduledAt() : Instant.now();
         Match match = newPlayoffMatch(
                 tournament,
                 slot.getHomeTeamId(),
                 slot.getAwayTeamId(),
-                kickoff,
+                slot.getScheduledAt(),
                 slot.getVenue(),
                 slot.getRoundNumber()
         );
         Match saved = matchRepository.save(match);
         slot.setMatchId(saved.getId());
-        if (slot.getScheduledAt() == null) {
-            slot.setScheduledAt(kickoff);
-        }
         playoffSlotRepository.save(slot);
         notifyScheduled(saved);
     }
@@ -576,7 +573,13 @@ public class PlayoffService {
         return named;
     }
 
+    /**
+     * First-round slots keep the group name and place, not the table id.
+     * The group row is still {@code tournament_teams.table_id}; opening the
+     * playoff does not clear it, and groups stay locked afterwards.
+     */
     private List<QualifiedTeamResponse> qualifiedFromBracket(List<PlayoffSlot> slots) {
+        Map<UUID, UUID> tableByTeam = groupTableByTeam(slots);
         List<QualifiedTeamResponse> qualified = new ArrayList<>();
         for (PlayoffSlot slot : slots) {
             if (slot.getRoundNumber() != 1) {
@@ -586,7 +589,7 @@ public class PlayoffService {
                 qualified.add(new QualifiedTeamResponse(
                         slot.getHomeTeamId(),
                         null,
-                        null,
+                        tableByTeam.get(slot.getHomeTeamId()),
                         slot.getHomeGroupName(),
                         slot.getHomePlace() == null ? 0 : slot.getHomePlace()
                 ));
@@ -595,13 +598,26 @@ public class PlayoffService {
                 qualified.add(new QualifiedTeamResponse(
                         slot.getAwayTeamId(),
                         null,
-                        null,
+                        tableByTeam.get(slot.getAwayTeamId()),
                         slot.getAwayGroupName(),
                         slot.getAwayPlace() == null ? 0 : slot.getAwayPlace()
                 ));
             }
         }
         return qualified;
+    }
+
+    private Map<UUID, UUID> groupTableByTeam(List<PlayoffSlot> slots) {
+        if (slots.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, UUID> tableByTeam = new HashMap<>();
+        for (TournamentTeam entry : tournamentTeamRepository.findByTournamentId(slots.getFirst().getTournamentId())) {
+            if (entry.getTableId() != null) {
+                tableByTeam.put(entry.getTeamId(), entry.getTableId());
+            }
+        }
+        return tableByTeam;
     }
 
     private PlayoffSlotResponse toSlotResponse(
@@ -635,15 +651,16 @@ public class PlayoffService {
                 teamName(teams, slot.getAwayTeamId()),
                 slot.getAwayGroupName(),
                 slot.getAwayPlace(),
-                waitingLabel(slot, true),
-                waitingLabel(slot, false),
+                waitingLabel(slot, true, rounds),
+                waitingLabel(slot, false, rounds),
                 slot.getScheduledAt(),
                 slot.getVenue(),
                 match == null ? null : match.getStatus().name(),
                 match == null ? null : match.getHomeScore(),
                 match == null ? null : match.getAwayScore(),
                 penaltyHome,
-                penaltyAway
+                penaltyAway,
+                match == null ? null : MatchListFields.minute(match, Instant.now())
         );
     }
 
@@ -848,13 +865,36 @@ public class PlayoffService {
         return ShootoutRules.winner(match.getHomeTeamId(), match.getAwayTeamId(), kicks);
     }
 
-    private static String waitingLabel(PlayoffSlot slot, boolean home) {
+    /**
+     * Empty feeder side: «Победитель 1/2 №1». The round token is the source round
+     * (1/2, 1/4, 1/8, финала, …) and the index is that pair, starting at 1.
+     */
+    static String waitingLabel(PlayoffSlot slot, boolean home, int rounds) {
         UUID teamId = home ? slot.getHomeTeamId() : slot.getAwayTeamId();
         if (teamId != null || slot.getRoundNumber() <= 1) {
             return null;
         }
-        int feeder = slot.getSlotIndex() * 2 + (home ? 0 : 1);
-        return "Ожидает победителя пары " + (feeder + 1);
+        int feeder = slot.getSlotIndex() * 2 + (home ? 1 : 2);
+        return winnerSlotLabel(roundTitle(slot.getRoundNumber() - 1, rounds), feeder);
+    }
+
+    static String winnerSlotLabel(String sourceRoundTitle, int feeder) {
+        String title = shortSourceRound(sourceRoundTitle);
+        if (title.isEmpty()) {
+            title = "пары";
+        }
+        return "Победитель " + title + " №" + feeder;
+    }
+
+    static String shortSourceRound(String title) {
+        if (title == null) {
+            return "";
+        }
+        String text = title.trim();
+        if (text.equalsIgnoreCase("Финал")) {
+            return "финала";
+        }
+        return text.replaceFirst("(?i)\\s*финала\\s*$", "").trim();
     }
 
     private static String teamName(Map<UUID, Team> teams, UUID teamId) {
@@ -865,7 +905,7 @@ public class PlayoffService {
         return team == null ? "Команда" : team.getName();
     }
 
-    private static String roundTitle(int round, int rounds) {
+    public static String roundTitle(int round, int rounds) {
         int fromFinal = rounds - round;
         return switch (fromFinal) {
             case 0 -> "Финал";
@@ -877,7 +917,7 @@ public class PlayoffService {
         };
     }
 
-    private static int roundCount(int teamCount) {
+    public static int roundCount(int teamCount) {
         int rounds = 0;
         int remaining = teamCount;
         while (remaining > 1) {

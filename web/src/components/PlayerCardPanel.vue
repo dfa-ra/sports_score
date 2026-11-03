@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ageLine, formatMatchDay, outcomeMark } from '../lib/format'
+import { matchInstant } from '../lib/match'
 import { playerHeader } from '../lib/playerTitle'
 import { useAuthStore } from '../stores/auth'
 import PlayerAvatar from './PlayerAvatar.vue'
@@ -10,6 +11,8 @@ import TeamCrest from './TeamCrest.vue'
 type MatchRow = {
   matchId: string
   scheduledAt?: string
+  startedAt?: string | null
+  status?: string
   tournamentName?: string | null
   homeTeamName?: string
   awayTeamName?: string
@@ -18,7 +21,6 @@ type MatchRow = {
   home?: boolean
   homeScore?: number
   awayScore?: number
-  status?: string
   outcome?: string | null
   goals?: number
   assists?: number
@@ -62,7 +64,11 @@ const subtitle = computed(() => {
     || (props.editable && auth.hasRole('CAPTAIN'))
   return captain ? 'Капитан' : (props.card?.position || 'Игрок')
 })
-const history = computed<MatchRow[]>(() => props.card.matchHistory ?? [])
+const history = computed<MatchRow[]>(() =>
+  [...(props.card.matchHistory ?? [])].sort((a, b) =>
+    String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')),
+  ),
+)
 const stats = computed(() => {
   const raw = props.card.statistics
   if (!raw || typeof raw !== 'object') return []
@@ -127,7 +133,7 @@ function marks(row: MatchRow) {
     <div v-else class="games">
       <p v-if="!history.length" class="muted empty">Матчей пока нет.</p>
       <RouterLink v-for="m in history" :key="m.matchId" class="game" :to="`/matches/${m.matchId}`">
-        <span class="when">{{ formatMatchDay(m.scheduledAt).slice(0, 5) }}</span>
+        <span class="when">{{ formatMatchDay(matchInstant(m)).slice(0, 5) }}</span>
         <span class="sides">
           <span :class="{ own: m.home }">
             <TeamCrest :src="m.homeTeamLogoUrl" :name="m.homeTeamName" :size="16" />

@@ -227,7 +227,7 @@ onUnmounted(() => {
     <div class="panel scoreboard">
       <div class="clock">{{ clockText }}</div>
       <p v-if="clockCaption" class="clock-caption">{{ clockCaption }}</p>
-      <StatusBadge :status="match.status" />
+      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" />
       <p v-if="!closed && !coverage" class="closed">Вы не назначены на этот матч</p>
       <div class="sides">
         <strong class="club">

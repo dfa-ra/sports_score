@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -93,7 +93,7 @@ const headToHead = computed(() => {
       && ((row.homeTeamId === a && row.awayTeamId === b) || (row.homeTeamId === b && row.awayTeamId === a))
     )
     .slice()
-    .sort((x, y) => String(y.scheduledAt || '').localeCompare(String(x.scheduledAt || '')))
+    .sort((x, y) => String(matchInstant(y) || '').localeCompare(String(matchInstant(x) || '')))
     .slice(0, 5)
 })
 
@@ -339,8 +339,8 @@ async function load() {
       api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
       api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
     ])
-    homeForm.value = hf.data
-    awayForm.value = af.data
+    homeForm.value = [...(hf.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
+    awayForm.value = [...(af.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
     allMatches.value = games.data.content ?? []
   } catch {
     homeForm.value = []
@@ -656,15 +656,16 @@ onUnmounted(() => {
 <template>
   <MatchGoalAlerts headless />
   <section v-if="match" class="stack">
-    <RouterLink class="league-bar" to="/table">
-      {{ tournament?.name || 'Матч' }}
+    <RouterLink v-if="match.tournamentId" class="league-bar" :to="`/tournaments/${match.tournamentId}`">
+      {{ tournament?.name || 'Турнир' }}
       <span>›</span>
     </RouterLink>
+    <p v-else class="league-bar">{{ tournament?.name || 'Матч' }}</p>
 
     <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <p class="when">{{ longKickoff(match.scheduledAt) }}</p>
+      <p class="when">{{ longKickoff(matchInstant(match)) }}</p>
       <div class="club">
         <button
           class="star"
@@ -920,7 +921,9 @@ onUnmounted(() => {
                 </b>
                 <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
                 <span v-if="ev.eventType === 'GOAL' && !isOwnGoal(ev) && registeredName(ev, 'secondary')" class="line">
-                  пас {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}
+                  пас
+                  <RouterLink v-if="ev.secondaryPlayerId" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
+                  <template v-else>{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template>
                 </span>
                 <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
               </span>
@@ -933,7 +936,7 @@ onUnmounted(() => {
       </div>
       <div class="stack recent">
         <div class="panel">
-          <h2>Последние игры {{ teams.fullName(match.homeTeamId) }}</h2>
+          <h2>Последние игры <RouterLink :to="`/teams/${match.homeTeamId}`">{{ teams.fullName(match.homeTeamId) }}</RouterLink></h2>
           <RouterLink
             v-for="f in homeForm"
             :key="f.id"
@@ -949,12 +952,12 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
           </RouterLink>
           <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
-          <h2>Последние игры {{ teams.fullName(match.awayTeamId) }}</h2>
+          <h2>Последние игры <RouterLink :to="`/teams/${match.awayTeamId}`">{{ teams.fullName(match.awayTeamId) }}</RouterLink></h2>
           <RouterLink
             v-for="f in awayForm"
             :key="f.id"
@@ -970,18 +973,18 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(f.scheduledAt) }}</span>
+            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
           </RouterLink>
           <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
         <div class="panel">
           <h2>Очные встречи</h2>
-          <p v-for="f in headToHead" :key="f.id" class="muted recent-line">
+          <RouterLink v-for="f in headToHead" :key="f.id" class="muted recent-line" :to="`/matches/${f.id}`">
             <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
             {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
             <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
-            · {{ formatWhen(f.scheduledAt) }}
-          </p>
+            · {{ formatWhen(matchInstant(f)) }}
+          </RouterLink>
           <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
         </div>
       </div>
@@ -1030,7 +1033,13 @@ onUnmounted(() => {
               <template v-if="ev.playerId || playerTag(registeredName(ev), ev.playerJersey)">
                 <RouterLink v-if="ev.playerId" class="player-link" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || 'Игрок' }}</RouterLink>
                 <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) }}</template>
-                <template v-if="protocolExtra(ev)"> {{ protocolExtra(ev) }}</template>
+                <template v-if="ev.secondaryPlayerId && ev.eventType === 'GOAL' && !isOwnGoal(ev)">
+                  · пас <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
+                </template>
+                <template v-else-if="ev.secondaryPlayerId && ev.eventType === 'SUBSTITUTION'">
+                  → <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
+                </template>
+                <template v-else-if="protocolExtra(ev)"> {{ protocolExtra(ev) }}</template>
                 ·
               </template>
               <template v-else-if="isOwnGoal(ev)">Автогол · </template>
@@ -1335,7 +1344,10 @@ h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
   flex-wrap: wrap;
   gap: 0.35rem;
   margin: 0.25rem 0;
+  color: inherit;
+  text-decoration: none;
 }
+h2 a { color: inherit; }
 .protocol-form { margin: 0.4rem 0 0.8rem; }
 .shootout-line {
   margin: 0 0 0.8rem;

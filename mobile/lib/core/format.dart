@@ -62,6 +62,77 @@ String formatWhen(DateTime? at) {
   return '${d.day} ${monthShort[d.month - 1]}, $h:$min';
 }
 
+/// Same numbers as the public page: level score plus both penalty totals.
+({int home, int away})? penaltyPair({
+  required int homeScore,
+  required int awayScore,
+  int? penaltyHome,
+  int? penaltyAway,
+}) {
+  if (homeScore != awayScore || penaltyHome == null || penaltyAway == null) return null;
+  return (home: penaltyHome, away: penaltyAway);
+}
+
+String publicScore({
+  required int homeScore,
+  required int awayScore,
+  int? penaltyHome,
+  int? penaltyAway,
+}) {
+  final pens = penaltyPair(
+    homeScore: homeScore,
+    awayScore: awayScore,
+    penaltyHome: penaltyHome,
+    penaltyAway: penaltyAway,
+  );
+  if (pens == null) return '$homeScore:$awayScore';
+  return '$homeScore:$awayScore (пен. ${pens.home}:${pens.away})';
+}
+
+/// Finished shootout uses the public line. A match without one keeps the spaced score.
+String refereeBoardScore({
+  required String status,
+  required int homeScore,
+  required int awayScore,
+  int? penaltyHome,
+  int? penaltyAway,
+}) {
+  if (status == 'FINISHED') {
+    final line = publicScore(
+      homeScore: homeScore,
+      awayScore: awayScore,
+      penaltyHome: penaltyHome,
+      penaltyAway: penaltyAway,
+    );
+    if (penaltyPair(homeScore: homeScore, awayScore: awayScore, penaltyHome: penaltyHome, penaltyAway: penaltyAway) != null) {
+      return line;
+    }
+  }
+  return '$homeScore : $awayScore';
+}
+
+/// A decided shootout names the score. Otherwise the early-finish question stays.
+String finishConfirmQuestion({
+  required bool halfStillOpen,
+  required int homeScore,
+  required int awayScore,
+  int? penaltyHome,
+  int? penaltyAway,
+  bool decisive = false,
+}) {
+  if (decisive) {
+    final pens = penaltyPair(
+      homeScore: homeScore,
+      awayScore: awayScore,
+      penaltyHome: penaltyHome,
+      penaltyAway: penaltyAway,
+    );
+    if (pens != null) return 'Завершить матч? $homeScore:$awayScore, пен. ${pens.home}:${pens.away}';
+  }
+  if (halfStillOpen) return 'Завершить матч до конца тайма? Счёт зафиксируется как есть.';
+  return 'Завершить матч?';
+}
+
 String matchStateLabel(String status) {
   return switch (status) {
     'FINISHED' => 'Завершен',

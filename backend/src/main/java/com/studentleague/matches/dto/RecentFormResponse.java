@@ -19,6 +19,7 @@ public record RecentFormResponse(
         int homeScore,
         int awayScore,
         Instant scheduledAt,
-        MatchStatus status
+        MatchStatus status,
+        Instant startedAt
 ) {
 }

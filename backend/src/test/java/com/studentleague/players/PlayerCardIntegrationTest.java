@@ -82,7 +82,16 @@ class PlayerCardIntegrationTest extends AbstractIntegrationTest {
         String captainId = upsertPlayer(captainToken, "Cap", "Tain", 7, "FW");
         String memberId = upsertPlayer(memberToken, "Reg", "Ular", 11, "MF");
         String alphaId = createTeam(adminToken, "Alpha FC", captainId);
-        String betaId = createTeam(adminToken, "Beta FC", captainId);
+        MvcResult beta = mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Beta FC","shortName":"BE","captainPlayerId":"%s"}
+                                """.formatted(captainId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.captainId").value(captainId))
+                .andReturn();
+        String betaId = objectMapper.readTree(beta.getResponse().getContentAsString()).get("id").asText();
         addMember(adminToken, alphaId, memberId);
 
         mockMvc.perform(get("/api/v1/players/" + captainId + "/card"))

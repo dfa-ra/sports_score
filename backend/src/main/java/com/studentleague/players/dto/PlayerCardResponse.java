@@ -26,6 +26,7 @@ public record PlayerCardResponse(
     public record MatchHistoryItem(
             UUID matchId,
             Instant scheduledAt,
+            Instant startedAt,
             String tournamentName,
             String homeTeamName,
             String awayTeamName,

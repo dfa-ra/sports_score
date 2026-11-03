@@ -48,7 +48,7 @@ function tapStar() {
       <span class="kick-slot">
         <KickoffWhen
           :at="match.scheduledAt"
-          :played-at="match.finishedAt"
+          :started-at="match.startedAt"
           :status="match.status"
           :minute="match.minute"
           :game-time-seconds="match.gameTimeSeconds"

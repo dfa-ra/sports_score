@@ -123,7 +123,7 @@ class LeagueStore extends ChangeNotifier {
   List<LeagueMatch> liveMatches() => matches.where((m) => m.isLive).toList();
 
   List<LeagueMatch> upcomingMatches() {
-    final list = matches.where((m) => m.status == 'SCHEDULED' || m.isLive).toList();
+    final list = matches.where((m) => m.isLive || (m.status == 'SCHEDULED' && m.scheduledAt != null)).toList();
     list.sort((a, b) => (a.scheduledAt ?? DateTime(2100)).compareTo(b.scheduledAt ?? DateTime(2100)));
     return list;
   }

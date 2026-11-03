@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
-import { labelOf, labelOfSport, roleLabel } from '../../lib/format'
+import { labelOf, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { loadAllReferees, refereeTitle } from '../../lib/referees'
 import { registeredName } from '../../lib/playerTitle'
@@ -30,7 +30,6 @@ let refereeSearchTimer = 0
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
 const teams = ref<any[]>([])
-const sports = ref<any[]>([])
 const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics' | 'gallery'>('users')
 const roleRequests = ref<any[]>([])
 const gallery = ref<any>({ photos: [], vkAlbumUrl: '' })
@@ -104,12 +103,11 @@ function onUserQueryInput() {
 }
 
 async function load() {
-  const [u, t, m, tm, s, rr, g, refs] = await Promise.all([
+  const [u, t, m, tm, rr, g, refs] = await Promise.all([
     api.get('/admin/users', { params: userListParams() }),
     api.get('/tournaments', { params: { size: 50 } }),
     api.get('/matches', { params: { size: 50 } }),
     api.get('/teams', { params: { size: 50, includeDisbanded: true } }),
-    api.get('/sports'),
     api.get('/admin/role-requests'),
     api.get('/admin/gallery'),
     loadAllReferees(refereeQuery.value),
@@ -119,7 +117,6 @@ async function load() {
   tournaments.value = t.data.content
   matches.value = m.data.content
   teams.value = tm.data.content
-  sports.value = s.data
   roleRequests.value = rr.data
   gallery.value = g.data
   vkAlbumUrl.value = g.data.vkAlbumUrl || ''
@@ -479,7 +476,7 @@ async function deleteTeam(team: any) {
             {{ names.name(m.homeTeamId) }} {{ m.homeScore }}:{{ m.awayScore }} {{ names.name(m.awayTeamId) }}
           </RouterLink>
           <span class="match-actions">
-            <StatusBadge :status="m.status" />
+            <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
             <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch(m)">Удалить</button>
           </span>
         </div>
@@ -525,7 +522,6 @@ async function deleteTeam(team: any) {
           {{ refereeTitle(u) }}
         </span>
       </div>
-      <p class="muted">Виды спорта: {{ sports.map(s => labelOfSport(s.code, s.name)).join(', ') || 'пока не заданы' }}</p>
     </div>
 
     <div v-else-if="tab === 'gallery'" class="panel stack">

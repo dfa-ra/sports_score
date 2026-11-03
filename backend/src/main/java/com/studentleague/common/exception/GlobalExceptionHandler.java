@@ -27,17 +27,21 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
+import java.util.regex.Pattern;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Pattern MATCH_BY_ID = Pattern.compile("^/api/v1/matches/[^/]+/?$");
 
     private final ObjectMapper objectMapper;
 
@@ -163,12 +167,22 @@ public class GlobalExceptionHandler {
                     request
             ));
         }
+        // QA looks up /api/v1/matches/999999. A bad token on that exact match URL is a missing match.
+        // Other routes keep the shared «Некорректный идентификатор» response.
+        if (UUID.class.equals(ex.getRequiredType()) && isMatchById(request)) {
+            return matchNotFound(request);
+        }
         return ResponseEntity.badRequest().body(error(
                 "BAD_REQUEST",
                 "Некорректный идентификатор",
                 List.of(new ApiError.FieldErrorDetail(name, "Ожидается корректный идентификатор")),
                 request
         ));
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiError> handleUnknownProperty(PropertyReferenceException ex, HttpServletRequest request) {
+        return unknownValue(request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -212,9 +226,48 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
+        if (causedByUnknownProperty(ex)) {
+            return unknownValue(request);
+        }
         log.error("Unhandled {} {}", request.getMethod(), request.getRequestURI(), ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(error("INTERNAL_ERROR", "Внутренняя ошибка сервера", List.of(), request));
+    }
+
+    private ResponseEntity<ApiError> unknownValue(HttpServletRequest request) {
+        List<ApiError.FieldErrorDetail> details = request.getParameter("sort") == null
+                ? List.of()
+                : List.of(new ApiError.FieldErrorDetail("sort", "Некорректное значение"));
+        return ResponseEntity.badRequest().body(error("BAD_REQUEST", "Некорректное значение", details, request));
+    }
+
+    private static ResponseEntity<ApiError> matchNotFound(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("NOT_FOUND", "Матч не найден", List.of(), request));
+    }
+
+    private static boolean isMatchById(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        if (uri == null) {
+            return false;
+        }
+        String context = request.getContextPath();
+        String path = context != null && !context.isEmpty() && uri.startsWith(context)
+                ? uri.substring(context.length())
+                : uri;
+        return MATCH_BY_ID.matcher(path).matches();
+    }
+
+    private static boolean causedByUnknownProperty(Throwable ex) {
+        Throwable current = ex;
+        int guard = 0;
+        while (current != null && guard++ < 8) {
+            if (current instanceof PropertyReferenceException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static ApiError error(String code, String message, List<ApiError.FieldErrorDetail> details, HttpServletRequest request) {

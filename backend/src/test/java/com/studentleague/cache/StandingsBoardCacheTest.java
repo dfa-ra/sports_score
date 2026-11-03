@@ -12,9 +12,11 @@ import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.format.TournamentFormatHandler;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import com.studentleague.tournaments.service.TournamentService;
 import org.junit.jupiter.api.Test;
 
@@ -60,6 +62,7 @@ class StandingsBoardCacheTest {
                 tournamentRepository,
                 tournamentTeamRepository,
                 tournamentTableRepository,
+                mock(PlayoffSlotRepository.class),
                 mock(SportRepository.class),
                 teamRepository,
                 mock(PlayerProfileRepository.class),
@@ -69,7 +72,8 @@ class StandingsBoardCacheTest {
                 mock(MatchRefereeRepository.class),
                 mock(NotificationService.class),
                 formatRegistry,
-                cache
+                cache,
+                mock(TournamentRosterGuard.class)
         );
 
         service.standings(tournamentId);
