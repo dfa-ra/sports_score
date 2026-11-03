@@ -38,7 +38,12 @@ const dateLabel = computed(() => kickoffDayMonth(matchInstant({
 })))
 const timeLabel = computed(() => {
   if (props.status === 'FINISHED') return 'Завершён'
-  if (!isLive.value) return kickoffClock(props.at) || '—'
+  if (!isLive.value) {
+    const clock = kickoffClock(props.at)
+    if (clock) return clock
+    if (props.status === 'SCHEDULED' || !props.status) return 'Дата уточняется'
+    return '—'
+  }
   const fromClock = eventMinute(kickoff.value, props.period, props.periodLengthSeconds)
   const minute = hasClock.value ? fromClock : props.minute
   if (minute != null && minute > 0) return `${minute}'`

@@ -6,6 +6,7 @@ import KickoffWhen from '../../components/KickoffWhen.vue'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import EmptyState from '../../components/EmptyState.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
+import { refereeBoardScore } from '../../lib/match'
 
 const matches = ref<any[]>([])
 const teams = useTeamDirectory()
@@ -35,9 +36,9 @@ onMounted(async () => {
     <EmptyState v-if="!ordered.length" title="Нет назначений" />
     <div v-else class="grid cards">
       <RouterLink v-for="m in ordered" :key="m.id" class="panel card-link" :to="`/referee/matches/${m.id}`">
-        <StatusBadge :status="m.status" />
+        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
         <div class="versus">{{ teams.fullName(m.homeTeamId) }} — {{ teams.fullName(m.awayTeamId) }}</div>
-        <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
+        <div class="score">{{ refereeBoardScore(m) }}</div>
         <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" :minute="m.minute" align="start" />
       </RouterLink>
     </div>

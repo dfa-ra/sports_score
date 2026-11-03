@@ -171,12 +171,30 @@ class _RefereePadPageState extends State<RefereePadPage> {
       now: now,
     );
     final halfStillOpen = cap - elapsed > 0 || (current.period ?? 1) < current.periodCount;
+    var penaltyHome = current.penaltyHome;
+    var penaltyAway = current.penaltyAway;
+    var decisive = false;
+    try {
+      final raw = await context.read<AuthController>().api.get('/matches/${widget.matchId}/shootout');
+      if (raw is Map) {
+        decisive = raw['decisive'] == true;
+        penaltyHome = (raw['penaltyHome'] as num?)?.toInt() ?? penaltyHome;
+        penaltyAway = (raw['penaltyAway'] as num?)?.toInt() ?? penaltyAway;
+      }
+    } catch (_) {}
+    if (!mounted) return false;
+    final question = finishConfirmQuestion(
+      halfStillOpen: halfStillOpen,
+      homeScore: current.homeScore,
+      awayScore: current.awayScore,
+      penaltyHome: penaltyHome,
+      penaltyAway: penaltyAway,
+      decisive: decisive,
+    );
     final answer = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        content: Text(halfStillOpen
-            ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
-            : 'Завершить матч?'),
+        content: Text(question),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Финиш')),
@@ -417,7 +435,16 @@ class _RefereePadPageState extends State<RefereePadPage> {
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('${current.homeScore} : ${current.awayScore}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.navy)),
+                          child: Text(
+                            refereeBoardScore(
+                              status: current.status,
+                              homeScore: current.homeScore,
+                              awayScore: current.awayScore,
+                              penaltyHome: current.penaltyHome,
+                              penaltyAway: current.penaltyAway,
+                            ),
+                            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.navy),
+                          ),
                         ),
                         Expanded(
                           child: Row(

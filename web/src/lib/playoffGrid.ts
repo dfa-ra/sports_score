@@ -151,7 +151,7 @@ export function pairWhen(value?: InstantInput): string {
   return `${day} · ${clock}`
 }
 
-export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done'; label: string; right: string } {
+export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done' | 'open'; label: string; right: string } {
   const when = pairWhen(slot.scheduledAt)
   const rightTime = when || 'Дата уточняется'
   if (slot.matchStatus === 'LIVE') {
@@ -171,7 +171,8 @@ export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done';
   }
   if (slot.matchStatus === 'FINISHED') return { kind: 'done', label: 'Завершён', right: rightTime }
   if (slot.matchStatus === 'CANCELLED') return { kind: 'done', label: 'Отменён', right: rightTime }
-  return { kind: 'soon', label: 'Скоро', right: rightTime }
+  if (!when) return { kind: 'open', label: '', right: 'Дата уточняется' }
+  return { kind: 'soon', label: 'Скоро', right: when }
 }
 
 export function emptySideLabel(slot: PlayoffSlot, home: boolean, previousTitle?: string | null) {
@@ -202,7 +203,8 @@ export function pairAria(slot: PlayoffSlot, previousTitle?: string | null) {
   const homeScore = scoreView(slot, true)
   const awayScore = scoreView(slot, false)
   const score = homeScore.dash ? 'счёт не начат' : `${homeScore.text}:${awayScore.text}`
-  return `${home} — ${away}, ${score}, ${footer.label}`
+  const note = [footer.label, footer.right].filter(Boolean).join(', ')
+  return `${home} — ${away}, ${score}, ${note}`
 }
 
 export function advancedTeamId(slot?: PlayoffSlot | null): string | null {

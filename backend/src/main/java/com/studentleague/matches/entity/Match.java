@@ -31,7 +31,7 @@ public class Match {
     @Column(name = "away_team_id", nullable = false)
     private UUID awayTeamId;
 
-    @Column(name = "scheduled_at", nullable = false)
+    @Column(name = "scheduled_at")
     private Instant scheduledAt;
 
     @Column(name = "started_at")

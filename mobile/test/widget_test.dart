@@ -181,6 +181,29 @@ void main() {
     );
   });
 
+  test('referee score keeps a shootout and the finish question names it only when decided', () {
+    expect(
+      refereeBoardScore(status: 'FINISHED', homeScore: 1, awayScore: 1, penaltyHome: 5, penaltyAway: 3),
+      '1:1 (пен. 5:3)',
+    );
+    expect(refereeBoardScore(status: 'FINISHED', homeScore: 2, awayScore: 1), '2 : 1');
+    expect(
+      finishConfirmQuestion(
+        halfStillOpen: true,
+        homeScore: 1,
+        awayScore: 1,
+        penaltyHome: 5,
+        penaltyAway: 3,
+        decisive: true,
+      ),
+      'Завершить матч? Счёт 1:1, пен. 5:3',
+    );
+    expect(
+      finishConfirmQuestion(halfStillOpen: true, homeScore: 1, awayScore: 0),
+      'Завершить матч до конца тайма? Счёт зафиксируется как есть.',
+    );
+  });
+
   test('favorites toggle teams and matches in memory', () {
     final fav = FavoritesStore(persist: false);
     fav.toggleMatch('m1');

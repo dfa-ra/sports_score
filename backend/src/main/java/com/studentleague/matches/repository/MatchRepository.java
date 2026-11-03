@@ -26,6 +26,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     /**
      * Next kickoff: a live or paused match first, otherwise a scheduled match that has not started.
      * Equal kickoffs stay stable by id. A scheduled row in the past is not chosen.
+     * {@code scheduledAt >= :from} is unknown for a null kickoff, so a dateless scheduled match
+     * stays out. A live or paused match is still chosen when its kickoff is empty.
      */
     @Query("""
             select m from Match m

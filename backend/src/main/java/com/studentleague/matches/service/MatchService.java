@@ -206,8 +206,10 @@ public class MatchService {
 
     /**
      * Nearest match for the home banner. With a tournament id, only that tournament counts.
-     * Live or paused wins. Otherwise the soonest scheduled kickoff that is not before {@code now}.
-     * A finished match is not nearest, even when its planned kickoff is still ahead.
+     * Live or paused wins, including a match whose kickoff was never set.
+     * Otherwise the soonest scheduled kickoff that is not before {@code now}.
+     * A scheduled match with no kickoff is not nearest. A finished match is not nearest,
+     * even when its planned kickoff is still ahead.
      */
     @Transactional(readOnly = true)
     public MatchResponse nextUpcoming(Instant now, UUID tournamentId) {

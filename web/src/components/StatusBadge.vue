@@ -2,9 +2,10 @@
 import { computed } from 'vue'
 import { labelOf, statusLabel } from '../lib/format'
 
-const props = defineProps<{ status?: string | null; scope?: 'tournament' | 'match' }>()
+const props = defineProps<{ status?: string | null; scope?: 'tournament' | 'match'; at?: string | null }>()
 const text = computed(() => {
   if (props.scope === 'tournament' && props.status === 'FINISHED') return 'Завершён'
+  if (props.status === 'SCHEDULED' && props.at === null) return 'Дата уточняется'
   return labelOf(statusLabel, props.status)
 })
 const klass = computed(() => {

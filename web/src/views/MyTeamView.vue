@@ -38,7 +38,7 @@ const rosterPage = computed(() => showsMyTeamRoster((role) => auth.hasRole(role)
 const nextMatch = computed(() => {
   const now = Date.now()
   return schedule.value
-    .filter((match) => match.status === 'SCHEDULED' && new Date(match.scheduledAt).getTime() >= now)
+    .filter((match) => match.status === 'SCHEDULED' && match.scheduledAt && new Date(match.scheduledAt).getTime() >= now)
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0] || null
 })
 
@@ -253,7 +253,7 @@ async function removeMember(id: string) {
         <h2>Календарь команды</h2>
         <EmptyState v-if="!matches.length" title="Матчей нет" />
         <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-          <StatusBadge :status="m.status" />
+          <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
           <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" align="start" />
           <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         </RouterLink>

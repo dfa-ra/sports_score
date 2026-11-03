@@ -47,7 +47,7 @@ onMounted(async () => {
     />
     <div v-else class="grid cards">
       <RouterLink v-for="m in ordered" :key="m.id" class="panel card-link" :to="`/analyst/matches/${m.id}`">
-        <StatusBadge :status="m.status" />
+        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
         <p v-if="m.status === 'FINISHED'" class="note">Завершён</p>
         <p v-else-if="m.status === 'CANCELLED'" class="note">Отменён</p>
         <p v-if="sideLabel(m.coverage)" class="note">{{ sideLabel(m.coverage) }}</p>

@@ -397,20 +397,16 @@ public class PlayoffService {
             return;
         }
         Tournament tournament = requireTournament(slot.getTournamentId());
-        Instant kickoff = slot.getScheduledAt() != null ? slot.getScheduledAt() : Instant.now();
         Match match = newPlayoffMatch(
                 tournament,
                 slot.getHomeTeamId(),
                 slot.getAwayTeamId(),
-                kickoff,
+                slot.getScheduledAt(),
                 slot.getVenue(),
                 slot.getRoundNumber()
         );
         Match saved = matchRepository.save(match);
         slot.setMatchId(saved.getId());
-        if (slot.getScheduledAt() == null) {
-            slot.setScheduledAt(kickoff);
-        }
         playoffSlotRepository.save(slot);
         notifyScheduled(saved);
     }
