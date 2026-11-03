@@ -11,6 +11,7 @@ import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.notifications.NotificationEventType;
 import com.studentleague.notifications.NotificationService;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.security.CurrentUser;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
@@ -284,11 +285,31 @@ public class TournamentService {
     public TournamentTeamResponse approveTeam(UUID tournamentId, UUID teamId) {
         TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
                 .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
+        if (entry.getStatus() != TournamentTeamStatus.PENDING) {
+            throw ApiException.conflict("Заявку можно одобрить только в статусе «На рассмотрении»");
+        }
         tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, teamId);
+        assignSoleTable(tournamentId, entry);
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.save(entry);
         standingsBoardCache.invalidateTournament(tournamentId);
+        String name = teamRepository.findById(teamId).map(Team::getName).orElse(null);
+        return toTeamResponse(entry, name);
+    }
+
+    @Transactional
+    public TournamentTeamResponse restoreTeam(UUID tournamentId, UUID teamId) {
+        requireTournament(tournamentId);
+        TournamentTeam entry = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
+                .orElseThrow(() -> ApiException.notFound("Заявка команды на турнир не найдена"));
+        if (entry.getStatus() != TournamentTeamStatus.WITHDRAWN) {
+            throw ApiException.conflict("Вернуть можно только снятую заявку");
+        }
+        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournamentId, teamId);
+        entry.setStatus(TournamentTeamStatus.PENDING);
+        entry.setApprovedAt(null);
+        tournamentTeamRepository.save(entry);
         String name = teamRepository.findById(teamId).map(Team::getName).orElse(null);
         return toTeamResponse(entry, name);
     }
@@ -321,12 +342,28 @@ public class TournamentService {
     @Transactional(readOnly = true)
     public List<TournamentTeamResponse> listTeams(UUID tournamentId) {
         requireTournament(tournamentId);
+        boolean includeWithdrawn = CurrentUser.isAdmin();
         return tournamentTeamRepository.findByTournamentId(tournamentId).stream()
+                .filter(entry -> includeWithdrawn || entry.getStatus() != TournamentTeamStatus.WITHDRAWN)
                 .map(entry -> {
                     String name = teamRepository.findById(entry.getTeamId()).map(Team::getName).orElse(null);
                     return toTeamResponse(entry, name);
                 })
                 .toList();
+    }
+
+    /**
+     * A tournament with a single group puts every newly approved club into it.
+     * Several groups stay a manual assignment, same as a club approved for the first time.
+     */
+    private void assignSoleTable(UUID tournamentId, TournamentTeam entry) {
+        if (entry.getTableId() != null) {
+            return;
+        }
+        List<TournamentTable> tables = tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId);
+        if (tables.size() == 1) {
+            entry.setTableId(tables.getFirst().getId());
+        }
     }
 
     @Transactional(readOnly = true)

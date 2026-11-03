@@ -83,11 +83,11 @@ public class CalendarImportService {
         if (file == null || file.isEmpty()) {
             throw ApiException.badRequest("Файл календаря пустой");
         }
-        List<String[]> rows = readRows(file);
+        List<SheetRow> rows = readRows(file);
         if (rows.isEmpty()) {
             throw ApiException.badRequest("В файле нет строк. Нужны колонки: date, time, home, away");
         }
-        Header header = Header.parse(rows.getFirst());
+        Header header = Header.parse(rows.getFirst().cells());
         if (!header.hasAny("date", "дата") || !header.hasAny("home", "хозяева", "хозяин") || !header.hasAny("away", "гости", "гость")) {
             throw ApiException.badRequest("Не удалось прочитать календарь. Нужны колонки: date, time, home, away");
         }
@@ -95,7 +95,8 @@ public class CalendarImportService {
         List<String> warnings = new ArrayList<>();
         int skipped = 0;
         for (int i = 1; i < rows.size(); i++) {
-            String[] row = rows.get(i);
+            SheetRow sheetRow = rows.get(i);
+            String[] row = sheetRow.cells();
             if (isBlank(row)) {
                 continue;
             }
@@ -115,13 +116,13 @@ public class CalendarImportService {
                 created.add(match.id());
             } catch (ApiException ex) {
                 if (rosterConflict(ex)) {
-                    throw ex;
+                    throw ApiException.conflict("Строка " + sheetRow.number() + ": " + ex.getMessage());
                 }
                 skipped++;
-                warnings.add("Строка " + (i + 1) + ": " + ex.getMessage());
+                warnings.add("Строка " + sheetRow.number() + ": " + ex.getMessage());
             } catch (RuntimeException ex) {
                 skipped++;
-                warnings.add("Строка " + (i + 1) + ": " + ex.getMessage());
+                warnings.add("Строка " + sheetRow.number() + ": " + ex.getMessage());
             }
         }
         if (created.isEmpty()) {
@@ -215,7 +216,7 @@ public class CalendarImportService {
         throw ApiException.badRequest("Непонятное время: " + raw);
     }
 
-    private static List<String[]> readRows(MultipartFile file) {
+    private static List<SheetRow> readRows(MultipartFile file) {
         String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         try {
             if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
@@ -229,22 +230,24 @@ public class CalendarImportService {
         }
     }
 
-    private static List<String[]> readCsv(MultipartFile file) throws IOException {
-        List<String[]> rows = new ArrayList<>();
+    private static List<SheetRow> readCsv(MultipartFile file) throws IOException {
+        List<SheetRow> rows = new ArrayList<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
+            int lineNumber = 0;
             while ((line = reader.readLine()) != null) {
+                lineNumber++;
                 if (line.startsWith("\uFEFF")) {
                     line = line.substring(1);
                 }
-                rows.add(splitCsv(line));
+                rows.add(new SheetRow(lineNumber, splitCsv(line)));
             }
         }
         return rows;
     }
 
-    private static List<String[]> readExcel(MultipartFile file) throws IOException {
-        List<String[]> rows = new ArrayList<>();
+    private static List<SheetRow> readExcel(MultipartFile file) throws IOException {
+        List<SheetRow> rows = new ArrayList<>();
         try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter formatter = new DataFormatter();
@@ -255,7 +258,7 @@ public class CalendarImportService {
                     Cell cell = row.getCell(i);
                     values[i] = cell == null ? "" : formatter.formatCellValue(cell).trim();
                 }
-                rows.add(values);
+                rows.add(new SheetRow(row.getRowNum() + 1, values));
             }
         }
         return rows;
@@ -276,6 +279,9 @@ public class CalendarImportService {
             }
         }
         return true;
+    }
+
+    private record SheetRow(int number, String[] cells) {
     }
 
     private record Header(Map<String, Integer> columns) {

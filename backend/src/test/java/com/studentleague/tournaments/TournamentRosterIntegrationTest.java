@@ -6,15 +6,22 @@ import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import org.junit.jupiter.api.Test;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static org.hamcrest.Matchers.contains;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -266,7 +273,7 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
                 """.formatted(southName, westName, westName, northName);
         MockMultipartFile file = new MockMultipartFile(
                 "file", "calendar.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
-        String conflict = "Орлов Илья уже играет за «" + northName + "»";
+        String conflict = "Строка 2: Орлов Илья уже играет за «" + northName + "»";
         mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
                         .file(file)
                         .header("Authorization", auth(admin)))
@@ -313,7 +320,7 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
                         .file(file)
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value("Орлов Илья уже играет за «" + northName + "»"));
+                .andExpect(jsonPath("$.message").value("Строка 2: Орлов Илья уже играет за «" + northName + "»"));
 
         mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
                 .andExpect(status().isOk())
@@ -339,7 +346,8 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("WITHDRAWN")))
                 .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].id").isNotEmpty());
@@ -354,9 +362,256 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.teamId").value(southId));
 
-        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("WITHDRAWN")));
+    }
+
+    @Test
+    void publicTeamListHidesWithdrawnEntries() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("pub-admin-" + suffix + "@example.com", "Str0ngPass!");
+        String fan = registerAndLogin("pub-fan-" + suffix + "@example.com", "Str0ngPass!");
+        String northCaptain = player("pub-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("pub-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northId = createTeam(admin, "Север " + suffix, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, northId);
+        enter(admin, springId, southId);
+        approve(admin, springId, northId);
+        approve(admin, springId, southId);
+        withdraw(admin, springId, southId);
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("APPROVED")))
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')]").isEmpty());
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(fan)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("APPROVED")));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')].status", contains("WITHDRAWN")));
+    }
+
+    @Test
+    void restoringAWithdrawnEntryConflictsAndLeavesItWithdrawn() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("rst-no-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("rst-no-a-" + suffix + "@example.com", "PLAYER", "Илья", "Орлов");
+        String sokolovId = player("rst-no-b-" + suffix + "@example.com", "PLAYER", "Мария", "Соколов");
+        String northCaptain = player("rst-no-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("rst-no-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northName = "Север " + suffix;
+        String northId = createTeam(admin, northName, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        addMember(admin, southId, orlovId);
+        addMember(admin, southId, sokolovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, southId);
+        approve(admin, springId, southId);
+        withdraw(admin, springId, southId);
+        addMember(admin, northId, orlovId);
+        addMember(admin, northId, sokolovId);
+        enter(admin, springId, northId);
+        approve(admin, springId, northId);
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/restore")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value(
+                        "Орлов Илья уже играет за «" + northName + "»; Соколов Мария уже играет за «" + northName + "»"));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')].status", contains("WITHDRAWN")));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')]").isEmpty());
+    }
+
+    @Test
+    void approvingWithdrawnOrRejectedStaysOutOfTheTable() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("appr-st-" + suffix + "@example.com", "Str0ngPass!");
+        String northCaptain = player("appr-st-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("appr-st-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northId = createTeam(admin, "Север " + suffix, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, northId);
+        enter(admin, springId, southId);
+        approve(admin, springId, northId);
+        approve(admin, springId, southId);
+        withdraw(admin, springId, northId);
+        forceStatus(springId, southId, TournamentTeamStatus.REJECTED);
+
+        String onlyPending = "Заявку можно одобрить только в статусе «На рассмотрении»";
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + northId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(onlyPending));
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(onlyPending));
+
+        MvcResult listed = mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode teams = objectMapper.readTree(listed.getResponse().getContentAsString());
+        JsonNode north = findTeam(teams, northId);
+        JsonNode south = findTeam(teams, southId);
+        assertNotNull(north);
+        assertNotNull(south);
+        assertEquals("WITHDRAWN", north.path("status").asText());
+        assertTrue(north.path("tableId").isNull());
+        assertEquals("REJECTED", south.path("status").asText());
+        assertTrue(south.path("tableId").isNull());
+    }
+
+    @Test
+    void restoredEntryApprovesIntoTheSameTableAsANormalApproval() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("rst-ok-" + suffix + "@example.com", "Str0ngPass!");
+        String northCaptain = player("rst-ok-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("rst-ok-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String northId = createTeam(admin, "Север " + suffix, northCaptain);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptain);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        String tableId = soleTable(admin, springId);
+        enter(admin, springId, northId);
+        enter(admin, springId, southId);
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + northId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.tableId").value(tableId));
+        approve(admin, springId, southId);
+        withdraw(admin, springId, southId);
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Заявку можно одобрить только в статусе «На рассмотрении»"));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].id").value(tableId))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId=='" + northId + "')]").isNotEmpty())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId=='" + southId + "')]").isEmpty());
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/restore")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.teamId").value(southId));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "')].status", contains("PENDING")));
+
+        mockMvc.perform(post("/api/v1/tournaments/" + springId + "/teams/" + southId + "/approve")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.tableId").value(tableId));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/standings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId=='" + northId + "')]").isNotEmpty())
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId=='" + southId + "')]").isNotEmpty());
+    }
+
+    @Test
+    void calendarImportXlsxNamesTheFileRowAndRollsBack() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("xlsx-no-" + suffix + "@example.com", "Str0ngPass!");
+        String orlovId = player("xlsx-no-pl-" + suffix + "@example.com", "PLAYER", "Иван", "Иванов");
+        String northCaptain = player("xlsx-no-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String southCaptain = player("xlsx-no-s-" + suffix + "@example.com", "CAPTAIN", "Юг", "Капитан");
+        String westCaptain = player("xlsx-no-w-" + suffix + "@example.com", "CAPTAIN", "Запад", "Капитан");
+        String northName = "Север " + suffix;
+        String southName = "Юг " + suffix;
+        String westName = "Запад " + suffix;
+        String northId = createTeam(admin, northName, northCaptain);
+        String southId = createTeam(admin, southName, southCaptain);
+        String westId = createTeam(admin, westName, westCaptain);
+        addMember(admin, northId, orlovId);
+        addMember(admin, southId, orlovId);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+        enter(admin, springId, northId);
+        approve(admin, springId, northId);
+
+        String[][] grid = new String[12][];
+        grid[0] = new String[] {"date", "time", "home", "away"};
+        grid[1] = new String[] {"2026-09-12", "18:00", westName, northName};
+        grid[11] = new String[] {"2026-09-20", "19:00", southName, westName};
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "calendar.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                xlsx(grid));
+        mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
+                        .file(file)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.message").value("Строка 12: Иванов Иван уже играет за «" + northName + "»"));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/teams")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.teamId=='" + southId + "' && @.status=='APPROVED')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + westId + "' && @.status=='APPROVED')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.teamId=='" + northId + "')].status", contains("APPROVED")));
+        mockMvc.perform(get("/api/v1/tournaments/" + springId + "/matches"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void cleanCalendarImportReturnsOk() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String admin = createAdminAndLogin("imp-ok-" + suffix + "@example.com", "Str0ngPass!");
+        String northCaptain = player("imp-ok-n-" + suffix + "@example.com", "CAPTAIN", "Север", "Капитан");
+        String westCaptain = player("imp-ok-w-" + suffix + "@example.com", "CAPTAIN", "Запад", "Капитан");
+        String northName = "Север " + suffix;
+        String westName = "Запад " + suffix;
+        createTeam(admin, northName, northCaptain);
+        createTeam(admin, westName, westCaptain);
+        String springId = tournament(admin, "Весна " + suffix, sportId(admin));
+
+        String csv = """
+                date,time,home,away
+                2026-09-12,18:00,%s,%s
+                """.formatted(northName, westName);
+        MockMultipartFile csvFile = new MockMultipartFile(
+                "file", "calendar.csv", "text/csv", csv.getBytes(StandardCharsets.UTF_8));
+        mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
+                        .file(csvFile)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(1));
+
+        String[][] grid = new String[][] {
+                {"date", "time", "home", "away"},
+                {"2026-09-13", "19:00", westName, northName}
+        };
+        MockMultipartFile xlsxFile = new MockMultipartFile(
+                "file", "calendar.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                xlsx(grid));
+        mockMvc.perform(multipart("/api/v1/tournaments/" + springId + "/calendar/import")
+                        .file(xlsxFile)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.created").value(1));
     }
 
     private void forceEntered(String tournamentId, String teamId) {
@@ -366,6 +621,60 @@ class TournamentRosterIntegrationTest extends AbstractIntegrationTest {
         entry.setStatus(TournamentTeamStatus.APPROVED);
         entry.setApprovedAt(Instant.now());
         tournamentTeamRepository.saveAndFlush(entry);
+    }
+
+    private void forceStatus(String tournamentId, String teamId, TournamentTeamStatus status) {
+        TournamentTeam entry = tournamentTeamRepository
+                .findByTournamentIdAndTeamId(UUID.fromString(tournamentId), UUID.fromString(teamId))
+                .orElseThrow();
+        entry.setStatus(status);
+        entry.setApprovedAt(null);
+        entry.setTableId(null);
+        tournamentTeamRepository.saveAndFlush(entry);
+    }
+
+    private void withdraw(String admin, String tournamentId, String teamId) throws Exception {
+        mockMvc.perform(delete("/api/v1/tournaments/" + tournamentId + "/teams/" + teamId)
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isNoContent());
+    }
+
+    private String soleTable(String admin, String tournamentId) throws Exception {
+        MvcResult tables = mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/tables")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tables":[{"name":"Группа A","teamIds":[]}]}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(tables.getResponse().getContentAsString()).get(0).get("id").asText();
+    }
+
+    private static JsonNode findTeam(JsonNode teams, String teamId) {
+        for (JsonNode team : teams) {
+            if (teamId.equals(team.path("teamId").asText())) {
+                return team;
+            }
+        }
+        return null;
+    }
+
+    private static byte[] xlsx(String[][] grid) throws IOException {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet();
+            for (int r = 0; r < grid.length; r++) {
+                if (grid[r] == null) {
+                    continue;
+                }
+                var row = sheet.createRow(r);
+                for (int c = 0; c < grid[r].length; c++) {
+                    row.createCell(c).setCellValue(grid[r][c]);
+                }
+            }
+            workbook.write(out);
+            return out.toByteArray();
+        }
     }
 
     private String player(String email, String role, String first, String last) throws Exception {
