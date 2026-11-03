@@ -39,7 +39,7 @@ const extraLinks = computed(() => {
   if (auth.canAccessMyTeam) links.push({ to: '/my-team', label: 'Моя команда' })
   if (auth.canManageLeague) links.push({ to: '/admin', label: 'Админ' })
   if (auth.canOfficiate) links.push({ to: '/referee', label: 'Судья' })
-  if (auth.canAnalyze) links.push({ to: '/analyst', label: 'Аналитик' })
+  if (auth.hasRole('ANALYST')) links.push({ to: '/analyst', label: 'Аналитик' })
   return links
 })
 

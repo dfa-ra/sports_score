@@ -23,14 +23,16 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     Page<Match> findByStatus(MatchStatus status, Pageable pageable);
 
     /**
-     * Next kickoff: a live or paused match, or a scheduled match that has not started yet.
-     * Ordered by kickoff, then id, so equal times are stable and a past scheduled row is not chosen.
+     * Next kickoff: a live or paused match first, otherwise a scheduled match that has not started.
+     * Equal kickoffs stay stable by id. A scheduled row in the past is not chosen.
      */
     @Query("""
             select m from Match m
             where m.status in :inPlay
                or (m.status = :scheduled and m.scheduledAt >= :from)
-            order by m.scheduledAt asc, m.id asc
+            order by case when m.status in :inPlay then 0 else 1 end,
+                     m.scheduledAt asc,
+                     m.id asc
             """)
     List<Match> findNextByKickoff(
             @Param("inPlay") Collection<MatchStatus> inPlay,

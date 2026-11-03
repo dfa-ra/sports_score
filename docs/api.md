@@ -227,6 +227,7 @@ Backend проверяет подпись токена, срок, issuer Google 
 | Метод | Путь | Auth |
 |---|---|---|
 | GET | `/matches` | Публичный — фильтры |
+| GET | `/matches/next` | Публичный. Ближайший матч: LIVE или PAUSED, иначе самый ранний SCHEDULED со стартом не раньше текущего момента. Нет такого матча — 204 |
 | GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode`, `bracketRound` (номер круга плей-офф или `null`), `penaltyHome`, `penaltyAway` |
 | POST | `/matches` | ADMIN. Опционально `periodCount` (1–8), `periodLengthMinutes` (1–90, иначе 2×20) и `venue` (зал, до 120 символов) |
 | PUT | `/matches/{id}` | ADMIN. Опционально `venue` (зал, до 120 символов); пустая строка очищает |
