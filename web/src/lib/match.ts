@@ -109,7 +109,7 @@ export function finishConfirmQuestion(input: {
       penaltyHome: input.penaltyHome,
       penaltyAway: input.penaltyAway,
     })
-    if (pens) return `Завершить матч? Счёт ${home}:${away}, пен. ${pens.home}:${pens.away}`
+    if (pens) return `Завершить матч? ${home}:${away}, пен. ${pens.home}:${pens.away}`
   }
   if (input.halfStillOpen) return 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
   return 'Завершить матч?'
