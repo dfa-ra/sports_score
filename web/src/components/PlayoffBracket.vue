@@ -5,6 +5,7 @@ import PlayoffPairCard from './PlayoffPairCard.vue'
 import TeamCrest from './TeamCrest.vue'
 import { fromLocalInput, toLocalInput } from '../lib/datetime'
 import { apiError } from '../lib/errors'
+import { noteScheduleChange } from '../lib/scheduleRefresh'
 import {
   advancedTeamId,
   arrivalLine,
@@ -334,6 +335,7 @@ async function save(slot: PlayoffSlot) {
       venue: fresh[slot.id].venue || '',
     }
     emit('saved')
+    noteScheduleChange()
   } catch (e: unknown) {
     saveError.value = apiError(e)
   } finally {

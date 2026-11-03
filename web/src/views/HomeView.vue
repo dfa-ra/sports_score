@@ -33,6 +33,7 @@ import {
   type HomeTournament,
 } from '../lib/homeOverview'
 import { setPageMeta } from '../lib/pageMeta'
+import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
 
 const loaded = ref(false)
@@ -189,6 +190,11 @@ function connectLive() {
 }
 
 watch(liveKey, () => connectLive())
+
+watch(scheduleRevision, () => {
+  if (!loaded.value) return
+  void load(true)
+})
 
 onMounted(() => {
   setPageMeta({
