@@ -60,10 +60,32 @@ export function isLiveStatus(status?: string | null) {
   return status === 'LIVE' || status === 'PAUSED'
 }
 
-/** Round tabs: 16 teams from 1180px down, 4 and 8 teams from 720px down. A final-only bracket has no switcher. */
-export function useRoundTabs(teamCount: number, viewportWidth: number) {
+/**
+ * Minimum width of the public grid. The numbers are the min tracks in `gridColumns`:
+ * a 16-team board is four 150px rounds, four 22px links and a 168px champion.
+ */
+export function gridMinWidth(roundCount: number, compact: boolean) {
+  if (roundCount <= 1) return 238 + 160
+  const col = compact ? 150 : 238
+  const link = compact ? 22 : 30
+  const champion = compact ? 168 : 160
+  return roundCount * col + roundCount * link + champion
+}
+
+/**
+ * Round tabs: 16 teams at a viewport of 1180px or less, and also when the bracket
+ * container itself is narrower than the five-column grid (a padded page must not
+ * keep those columns). 4 and 8 teams stay on the 720px viewport cutoff.
+ * A final-only bracket has no switcher.
+ */
+export function useRoundTabs(teamCount: number, viewportWidth: number, containerWidth?: number | null) {
   if (teamCount <= 2) return false
-  if (teamCount > 8) return viewportWidth <= 1180
+  if (teamCount > 8) {
+    if (viewportWidth <= 1180) return true
+    const rounds = Math.round(Math.log2(teamCount))
+    const needed = gridMinWidth(Math.max(1, rounds), true)
+    return !!containerWidth && containerWidth > 0 && containerWidth < needed
+  }
   return viewportWidth <= 720
 }
 

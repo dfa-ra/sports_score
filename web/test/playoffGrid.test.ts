@@ -10,6 +10,7 @@ import {
   footerView,
   formatRoundSpan,
   gridColumns,
+  gridMinWidth,
   overviewMeta,
   pairWhen,
   scoreView,
@@ -26,9 +27,18 @@ test('round tabs follow team count and width', () => {
   assert.equal(useRoundTabs(4, 721), false)
   assert.equal(useRoundTabs(8, 720), true)
   assert.equal(useRoundTabs(8, 900), false)
+  assert.equal(useRoundTabs(16, 1024), true)
   assert.equal(useRoundTabs(16, 1180), true)
   assert.equal(useRoundTabs(16, 1181), false)
   assert.equal(useRoundTabs(16, 1440), false)
+  const fiveColumns = gridMinWidth(4, true)
+  assert.equal(fiveColumns, 4 * 150 + 4 * 22 + 168)
+  assert.equal(useRoundTabs(16, 1440, fiveColumns - 1), true)
+  assert.equal(useRoundTabs(16, 1440, fiveColumns), false)
+  assert.equal(useRoundTabs(16, 1440, 0), false)
+  assert.equal(useRoundTabs(8, 900, 400), false)
+  assert.equal(useRoundTabs(4, 1000, 200), false)
+  assert.equal(useRoundTabs(2, 400, 100), false)
 })
 
 test('a two-team final stacks the champion under the match on a phone', () => {
