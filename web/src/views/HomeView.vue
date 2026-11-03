@@ -53,9 +53,11 @@ const nextMatch = computed(() => {
   if (!isFutureScheduled(match, nowMs.value)) return null
   return withLiveMinute(match as HomeMatch, nowMs.value)
 })
+const runningTournamentCap = 4
 const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
 const livePreview = computed(() => liveRows.value.slice(0, 3))
 const tournaments = computed(() => overview.value.tournaments)
+const visibleTournaments = computed(() => tournaments.value.slice(0, runningTournamentCap))
 const matchChips = computed(() => matchTournamentChips(tournaments.value))
 const offseason = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length === 0)
 const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length > 0)
@@ -392,8 +394,9 @@ onUnmounted(() => {
         <p>Турниры не загрузились</p>
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
       </div>
-      <div v-else class="tgrid">
-        <article v-for="(tournament, index) in tournaments" :key="tournament.id" class="card tcard">
+      <template v-else>
+      <div class="tgrid">
+        <article v-for="(tournament, index) in visibleTournaments" :key="tournament.id" class="card tcard">
           <div class="tc-head">
             <div class="tc-top">
               <div>
@@ -449,6 +452,12 @@ onUnmounted(() => {
           </RouterLink>
         </article>
       </div>
+      <RouterLink
+        v-if="tournaments.length > runningTournamentCap"
+        class="hv-btn dark running-more"
+        to="/tournaments"
+      >Все турниры ({{ tournaments.length }}) →</RouterLink>
+      </template>
     </div>
 
     <div v-if="showScorers" class="container block">
@@ -569,6 +578,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .hv-btn.ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.35); }
 .hv-btn.dark { background: #fff; color: var(--navy); border-color: var(--line-strong); }
 .hv-btn.sm { padding: 0.45rem 0.85rem; font-size: 0.8125rem; border-radius: 11px; }
+.running-more { display: flex; width: fit-content; max-width: 100%; margin: 1rem auto 0; }
+.running-more:hover { background: var(--surface-hover); border-color: var(--ice); color: var(--navy); }
 .livebar {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
