@@ -4,6 +4,7 @@ import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
 import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.service.MatchListFields;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.PenaltyKick;
 import com.studentleague.matches.repository.MatchAnalystAssignmentRepository;
@@ -643,7 +644,8 @@ public class PlayoffService {
                 match == null ? null : match.getHomeScore(),
                 match == null ? null : match.getAwayScore(),
                 penaltyHome,
-                penaltyAway
+                penaltyAway,
+                match == null ? null : MatchListFields.minute(match, Instant.now())
         );
     }
 
@@ -849,7 +851,7 @@ public class PlayoffService {
     }
 
     /**
-     * Empty feeder side: «Победитель 1/2 #1». The round token is the source round
+     * Empty feeder side: «Победитель 1/2 №1». The round token is the source round
      * (1/2, 1/4, 1/8, финала, …) and the index is that pair, starting at 1.
      */
     static String waitingLabel(PlayoffSlot slot, boolean home, int rounds) {
@@ -866,7 +868,7 @@ public class PlayoffService {
         if (title.isEmpty()) {
             title = "пары";
         }
-        return "Победитель " + title + " #" + feeder;
+        return "Победитель " + title + " №" + feeder;
     }
 
     static String shortSourceRound(String title) {

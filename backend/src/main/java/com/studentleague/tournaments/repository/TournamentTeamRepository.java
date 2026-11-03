@@ -1,5 +1,6 @@
 package com.studentleague.tournaments.repository;
 
+import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -9,6 +10,7 @@ import java.util.UUID;
 
 public interface TournamentTeamRepository extends JpaRepository<TournamentTeam, UUID> {
     List<TournamentTeam> findByTournamentId(UUID tournamentId);
+    long countByTournamentIdAndStatusNot(UUID tournamentId, TournamentTeamStatus status);
     Optional<TournamentTeam> findByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);
     boolean existsByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);
     List<TournamentTeam> findByTeamId(UUID teamId);

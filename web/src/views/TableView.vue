@@ -34,6 +34,7 @@ const playoff = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
 const loadError = ref('')
+const playoffError = ref(false)
 const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
@@ -239,6 +240,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   tournament.value = null
   statsLoadedFor.value = ''
   playoff.value = null
+  playoffError.value = false
   scorers.value = []
   assists.value = []
   keepers.value = []
@@ -247,11 +249,12 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     const [t, s, p] = await Promise.all([
       api.get(`/tournaments/${id}`),
       api.get(`/tournaments/${id}/standings`),
-      api.get(`/tournaments/${id}/playoff`).catch(() => ({ data: null })),
+      api.get(`/tournaments/${id}/playoff`).then((res) => ({ data: res.data, failed: false })).catch(() => ({ data: null, failed: true })),
     ])
     if (tournamentId.value !== id) return
     tournament.value = t.data
     playoff.value = p.data
+    playoffError.value = p.failed
     standings.value = parseStandings(s.data)
     const name = t.data?.name || 'Таблица'
     setPageMeta({
@@ -325,9 +328,14 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     </template>
 
     <template v-else-if="tab === 'playoff'">
-      <div class="sheet bracket-sheet">
-        <PlayoffBracket :tournament-id="tournamentId" :rounds="playoff?.rounds ?? []" />
-      </div>
+      <PlayoffBracket
+        :tournament-id="tournamentId"
+        :rounds="playoff?.rounds ?? []"
+        :loading="false"
+        :error="playoffError"
+        @retry="load()"
+        @show-table="setTab('table')"
+      />
     </template>
 
     <template v-else-if="tab === 'results'">
@@ -337,8 +345,8 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           v-for="m in results"
           :key="m.id"
           :match="m"
-          :home-name="teams.fullName(m.homeTeamId)"
-          :away-name="teams.fullName(m.awayTeamId)"
+          :home-name="m.homeTeamName || teams.fullName(m.homeTeamId)"
+          :away-name="m.awayTeamName || teams.fullName(m.awayTeamId)"
         />
       </div>
     </template>
@@ -446,7 +454,8 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 </template>
 
 <style scoped>
-.page { gap: 0.45rem; }
+.page { gap: 0.45rem; min-width: 0; max-width: 100%; }
+.page > * { min-width: 0; }
 .league-tabs { position: relative; }
 .league-tabs button,
 .league-tabs button.on { border-bottom-color: transparent; }
@@ -470,7 +479,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
 .league-title,
 .league-title:hover { color: inherit; text-decoration: none; }
-.bracket-sheet { padding: 0.85rem 0.75rem 1rem; overflow: auto; }
+.sheet { min-width: 0; max-width: 100%; }
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
 .tie-note {

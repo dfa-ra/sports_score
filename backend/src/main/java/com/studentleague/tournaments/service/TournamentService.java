@@ -25,6 +25,7 @@ import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
 import com.studentleague.tournaments.dto.StandingRow;
 import com.studentleague.tournaments.dto.StandingTableResponse;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
+import com.studentleague.tournaments.dto.TournamentOverviewResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.dto.TournamentStandingsResponse;
 import com.studentleague.tournaments.dto.TournamentTableResponse;
@@ -36,6 +37,7 @@ import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.format.StandingsContext;
 import com.studentleague.tournaments.format.TournamentFormatRegistry;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
@@ -63,6 +65,7 @@ public class TournamentService {
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
     private final TournamentTableRepository tournamentTableRepository;
+    private final PlayoffSlotRepository playoffSlotRepository;
     private final SportRepository sportRepository;
     private final TeamRepository teamRepository;
     private final PlayerProfileRepository playerProfileRepository;
@@ -78,6 +81,7 @@ public class TournamentService {
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             TournamentTableRepository tournamentTableRepository,
+            PlayoffSlotRepository playoffSlotRepository,
             SportRepository sportRepository,
             TeamRepository teamRepository,
             PlayerProfileRepository playerProfileRepository,
@@ -92,6 +96,7 @@ public class TournamentService {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.tournamentTableRepository = tournamentTableRepository;
+        this.playoffSlotRepository = playoffSlotRepository;
         this.sportRepository = sportRepository;
         this.teamRepository = teamRepository;
         this.playerProfileRepository = playerProfileRepository;
@@ -162,6 +167,51 @@ public class TournamentService {
     @Transactional(readOnly = true)
     public TournamentResponse get(UUID id) {
         return toResponse(requireTournament(id));
+    }
+
+    @Transactional(readOnly = true)
+    public TournamentOverviewResponse overview(UUID id) {
+        Tournament tournament = requireTournament(id);
+        int teamsCount = (int) tournamentTeamRepository.countByTournamentIdAndStatusNot(id, TournamentTeamStatus.WITHDRAWN);
+        int matchesCount = (int) matchRepository.countByTournamentId(id);
+        boolean hasSlots = playoffSlotRepository.countByTournamentId(id) > 0;
+        List<UUID> matchIds = playoffSlotRepository.findMatchIdsByTournamentId(id);
+        boolean playoffLive = false;
+        if (!matchIds.isEmpty()) {
+            for (Match match : matchRepository.findAllById(matchIds)) {
+                if (match.getStatus() == MatchStatus.LIVE || match.getStatus() == MatchStatus.PAUSED) {
+                    playoffLive = true;
+                    break;
+                }
+            }
+        }
+        boolean hasPlayoff = hasSlots
+                || tournament.getCompetitionStage() == CompetitionStage.PLAYOFF
+                || formatIncludesPlayoff(tournament.getFormat());
+        return new TournamentOverviewResponse(
+                tournament.getId(),
+                tournament.getName(),
+                tournament.getStatus().name(),
+                tournament.getFormat(),
+                tournament.getSeasonYear(),
+                tournament.getStartDate(),
+                tournament.getEndDate(),
+                teamsCount,
+                matchesCount,
+                tournament.getCompetitionStage().name(),
+                hasPlayoff,
+                playoffLive
+        );
+    }
+
+    private static boolean formatIncludesPlayoff(String format) {
+        if (format == null) {
+            return false;
+        }
+        return switch (format) {
+            case "CUP", "GROUPS_PLAYOFF", "DOUBLE_ELIMINATION", "KNOCKOUT" -> true;
+            default -> false;
+        };
     }
 
     @Transactional(readOnly = true)

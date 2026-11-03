@@ -32,6 +32,9 @@ public record MatchResponse(
         UUID tableId,
         Integer bracketRound,
         Integer penaltyHome,
-        Integer penaltyAway
+        Integer penaltyAway,
+        String homeTeamName,
+        String awayTeamName,
+        String tournamentName
 ) {
 }

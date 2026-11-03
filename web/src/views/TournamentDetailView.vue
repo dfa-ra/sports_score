@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
 import { matchInstant, matchStateLabel, publicScore } from '../lib/match'
+import {
+  overviewMeta,
+  roundsHaveLive,
+  tournamentHasPlayoff,
+  tournamentStatusChip,
+} from '../lib/playoffGrid'
 import { setPageMeta } from '../lib/pageMeta'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -20,6 +26,7 @@ import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../l
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const names = useTeamDirectory()
 const tournament = ref<any>(null)
@@ -28,6 +35,9 @@ const standings = ref<StandingGroup[]>([])
 const tableDraft = ref<{ id?: string; name: string; teamIds: string[] }[]>([])
 const matches = ref<any[]>([])
 const playoff = ref<any>(null)
+const overview = ref<any>(null)
+const playoffLoading = ref(false)
+const playoffError = ref(false)
 const name = ref('')
 const description = ref('')
 const status = ref('REGISTRATION')
@@ -36,7 +46,7 @@ const regulations = ref('')
 const seasonYear = ref(2026)
 const startDate = ref('')
 const endDate = ref('')
-const tab = ref<'table' | 'rules'>('table')
+type TourTab = 'playoff' | 'table' | 'matches' | 'teams' | 'rules'
 const calendarFile = ref<File | null>(null)
 const error = ref('')
 const ok = ref('')
@@ -65,13 +75,22 @@ async function load() {
   const id = route.params.id
   if (!tournament.value || tournament.value.id !== id) {
     tournament.value = null
+    overview.value = null
+    playoff.value = null
+    playoffLoading.value = false
+    playoffError.value = false
     missing.value = false
     error.value = ''
   }
   let detail: any
   try {
     await names.load()
-    detail = (await api.get(`/tournaments/${id}`)).data
+    const [tourRes, overviewRes] = await Promise.all([
+      api.get(`/tournaments/${id}`),
+      api.get(`/tournaments/${id}/overview`).catch(() => ({ data: null })),
+    ])
+    detail = tourRes.data
+    if (route.params.id === id) overview.value = overviewRes.data
   } catch (e: any) {
     if (route.params.id !== id) return
     const status = e?.response?.status
@@ -89,18 +108,19 @@ async function load() {
     return
   }
   if (route.params.id !== id) return
+  missing.value = false
+  tournament.value = detail
+  const playoffTask = loadPlayoff(String(id))
   try {
-    const [teamRes, standingRes, matchRes, tableRes, playoffRes] = await Promise.all([
+    const [teamRes, standingRes, matchRes, tableRes] = await Promise.all([
       api.get(`/tournaments/${id}/teams`),
       api.get(`/tournaments/${id}/standings`),
       api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
       api.get(`/tournaments/${id}/tables`),
-      api.get(`/tournaments/${id}/playoff`),
     ])
     if (route.params.id !== id) return
     teams.value = teamRes.data
     standings.value = parseStandings(standingRes.data)
-    playoff.value = playoffRes.data
     tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
       id: row.id,
       name: row.name,
@@ -112,9 +132,8 @@ async function load() {
     if (route.params.id !== id) return
     error.value = apiError(e, 'Турнир не загрузился.')
   }
+  await playoffTask
   if (route.params.id !== id) return
-  missing.value = false
-  tournament.value = detail
   setPageMeta({
     title: detail?.name || 'Турнир',
     description: `${detail?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
@@ -250,6 +269,57 @@ const savedTables = computed(() =>
 )
 const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 const listedTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
+const showGrid = computed(() => tournamentHasPlayoff({
+  format: overview.value?.format || tournament.value?.format,
+  stage: overview.value?.stage || playoff.value?.competitionStage || tournament.value?.competitionStage,
+  rounds: playoff.value?.rounds,
+  hasPlayoff: overview.value?.hasPlayoff,
+}))
+const playoffKnown = computed(() => {
+  if (overview.value != null) return true
+  if (!tournament.value) return false
+  return !playoffLoading.value
+})
+const tab = computed<TourTab | 'pending'>(() => {
+  const raw = String(route.query.tab || '')
+  if (raw === 'matches' || raw === 'teams' || raw === 'rules' || raw === 'table') return raw
+  // Until the overview (or the bracket) arrives, do not paint «Таблица» and then jump to «Сетка».
+  if (!playoffKnown.value) return 'pending'
+  if (raw === 'playoff') return showGrid.value ? 'playoff' : 'table'
+  return showGrid.value ? 'playoff' : 'table'
+})
+const statusChip = computed(() => tournamentStatusChip(tournament.value?.status))
+const teamsCount = computed(() => overview.value?.teamsCount ?? listedTeams.value.length)
+const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
+const playoffLive = computed(() => roundsHaveLive(playoff.value?.rounds) || overview.value?.playoffLive === true)
+const metaParts = computed(() => overviewMeta({
+  seasonYear: overview.value?.seasonYear ?? tournament.value?.seasonYear,
+  format: overview.value?.format ?? tournament.value?.format,
+  teamsCount: overview.value ? overview.value.teamsCount : (teams.value.length ? listedTeams.value.length : null),
+  startDate: overview.value?.startDate ?? tournament.value?.startDate,
+  endDate: overview.value?.endDate ?? tournament.value?.endDate,
+  stage: overview.value?.stage ?? playoff.value?.competitionStage ?? tournament.value?.competitionStage,
+}))
+
+function setTab(next: TourTab) {
+  router.replace({ query: { ...route.query, tab: next } })
+}
+
+async function loadPlayoff(id: string) {
+  playoffLoading.value = true
+  playoffError.value = false
+  try {
+    const { data } = await api.get(`/tournaments/${id}/playoff`)
+    if (route.params.id !== id) return
+    playoff.value = data
+  } catch {
+    if (route.params.id !== id) return
+    playoff.value = null
+    playoffError.value = true
+  } finally {
+    if (route.params.id === id) playoffLoading.value = false
+  }
+}
 
 async function exclude(team: { teamId: string; teamName?: string }) {
   const name = team.teamName || 'команду'
@@ -269,11 +339,30 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 </script>
 
 <template>
-  <section v-if="tournament" class="stack">
-    <div class="page-title">
-      <StatusBadge :status="tournament.status" scope="tournament" />
-      <h1>{{ tournament.name }}</h1>
-      <p v-if="tournament.description">{{ tournament.description }}</p>
+  <section v-if="missing" class="stack">
+    <h1>Турнир не найден</h1>
+  </section>
+  <p v-else-if="!tournament && error" class="form-error">{{ error }}</p>
+  <section v-else class="stack tour">
+    <nav class="crumbs" aria-label="Навигация">
+      <RouterLink to="/tournaments">Турниры</RouterLink>
+      <span aria-hidden="true"> › </span>
+      <span v-if="tournament">{{ tournament.name }}</span>
+      <span v-else class="crumb-skel" aria-hidden="true"></span>
+    </nav>
+    <div class="th">
+      <div v-if="tournament">
+        <span v-if="statusChip" class="tour-st" :class="statusChip.kind">{{ statusChip.text }}</span>
+        <h1>{{ tournament.name }}</h1>
+        <p v-if="metaParts.length" class="meta">
+          <span v-for="part in metaParts" :key="part">{{ part }}</span>
+        </p>
+        <p v-if="tournament.description" class="lede">{{ tournament.description }}</p>
+      </div>
+      <div v-else class="title-pending" role="status" aria-busy="true" aria-label="Заголовок загружается">
+        <span class="title-skel"></span>
+        <span class="meta-skel"></span>
+      </div>
     </div>
 
     <div v-if="showApply" class="panel stack">
@@ -286,21 +375,35 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </RouterLink>
     </div>
 
-    <div class="filters">
-      <button class="btn secondary" :class="{ on: tab === 'table' }" @click="tab = 'table'">Таблица</button>
-      <button class="btn secondary" :class="{ on: tab === 'rules' }" @click="tab = 'rules'">Регламент</button>
+    <div class="ttabs" role="tablist" aria-label="Разделы турнира">
+      <button v-if="showGrid || tab === 'pending'" type="button" role="tab" :aria-selected="tab === 'playoff'" :class="{ on: tab === 'playoff' }" @click="tab !== 'pending' && setTab('playoff')">
+        Сетка
+        <span v-if="playoffLive" class="dot" role="img" aria-label="Есть live"></span>
+      </button>
+      <button type="button" role="tab" :aria-selected="tab === 'table'" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
+      <button type="button" role="tab" :aria-selected="tab === 'matches'" :class="{ on: tab === 'matches' }" @click="setTab('matches')">
+        Матчи <i v-if="overview">{{ matchesCount }}</i>
+      </button>
+      <button type="button" role="tab" :aria-selected="tab === 'teams'" :class="{ on: tab === 'teams' }" @click="setTab('teams')">
+        Команды <i v-if="overview">{{ teamsCount }}</i>
+      </button>
+      <button type="button" role="tab" :aria-selected="tab === 'rules'" :class="{ on: tab === 'rules' }" @click="setTab('rules')">Регламент</button>
     </div>
-    <div v-if="tab === 'rules'" class="panel">
+
+    <div v-if="tab === 'pending' || !tournament" class="panel tour-skel" role="status" aria-busy="true" aria-label="Турнир загружается">
+      <span class="card-skel"></span>
+      <span class="card-skel short"></span>
+    </div>
+    <div v-else-if="tab === 'rules'" class="panel" role="tabpanel">
       <h2>Регламент</h2>
       <p style="white-space: pre-wrap">{{ tournament.regulations || 'Регламент ещё не опубликован.' }}</p>
     </div>
-    <div v-if="tab === 'table'" class="panel">
+    <div v-else-if="tab === 'table'" class="panel" role="tabpanel">
       <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
       <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Результатов пока нет" />
       <StandingGroups v-else :tables="standings" :marked-places="playoff?.advancingPlaces ?? []" />
     </div>
-
-    <div class="panel stack">
+    <div v-else-if="tab === 'teams'" class="panel stack" role="tabpanel">
       <h2>Команды</h2>
       <EmptyState v-if="!listedTeams.length" title="Заявок нет" />
       <div v-for="team in listedTeams" :key="team.id" class="row">
@@ -311,29 +414,18 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <StatusBadge :status="team.status" />
       </div>
     </div>
-
-    <div v-if="playoff?.rounds?.length" class="panel stack">
-      <h2>Сетка плей-офф</h2>
-      <PlayoffBracket
-        :tournament-id="tournament.id"
-        :rounds="playoff.rounds"
-        :editable="auth.canManageLeague && playoff.competitionStage === 'PLAYOFF'"
-        @saved="load"
-      />
-    </div>
-
-    <div class="panel stack">
+    <div v-else-if="tab === 'matches'" class="panel stack" role="tabpanel">
       <h2>Матчи</h2>
       <EmptyState v-if="!matches.length" title="Матчей нет" />
       <RouterLink v-for="m in matches" :key="m.id" class="row match-row" :to="`/matches/${m.id}`">
         <span class="match-side">
-          <TeamCrest :src="names.logo(m.homeTeamId)" :name="names.fullName(m.homeTeamId)" :size="22" />
-          <span>{{ names.fullName(m.homeTeamId) }}</span>
+          <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="22" />
+          <span>{{ m.homeTeamName || names.fullName(m.homeTeamId) }}</span>
         </span>
         <span class="match-score">{{ publicScore(m) }}</span>
         <span class="match-side away">
-          <span>{{ names.fullName(m.awayTeamId) }}</span>
-          <TeamCrest :src="names.logo(m.awayTeamId)" :name="names.fullName(m.awayTeamId)" :size="22" />
+          <span>{{ m.awayTeamName || names.fullName(m.awayTeamId) }}</span>
+          <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
         </span>
         <span class="match-meta">
           <span>{{ formatWhen(matchInstant(m)) }}</span>
@@ -341,6 +433,18 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         </span>
       </RouterLink>
     </div>
+    <PlayoffBracket
+      v-else-if="tab === 'playoff'"
+      role="tabpanel"
+      :tournament-id="tournament.id"
+      :rounds="playoff?.rounds ?? []"
+      :loading="playoffLoading"
+      :error="playoffError"
+      :editable="auth.canManageLeague && playoff?.competitionStage === 'PLAYOFF'"
+      @saved="load"
+      @retry="loadPlayoff(String(tournament.id))"
+      @show-table="setTab('table')"
+    />
     <p v-if="error && !auth.canManageLeague" class="form-error">{{ error }}</p>
     <p v-if="ok && !auth.canManageLeague" class="form-ok">{{ ok }}</p>
 
@@ -351,7 +455,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       @applied="onApplied"
     />
 
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа" open>
+    <AdminOnly v-if="tournament && auth.canManageLeague" title="Для админа" open>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
       <h2>Настройки турнира</h2>
@@ -458,13 +562,92 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
-  <section v-else-if="missing" class="stack">
-    <h1>Турнир не найден</h1>
-  </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>
+.tour { min-width: 0; max-width: 100%; }
+.tour > * { min-width: 0; }
+.crumbs { font-size: 0.8125rem; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.crumbs a { color: var(--muted); }
+.crumbs a:hover { color: var(--navy); }
+.crumb-skel { display: inline-block; width: 8rem; height: 0.8rem; border-radius: 6px; background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%); background-size: 200% 100%; animation: tour-shimmer 1.4s infinite; }
+.th h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0.45rem 0 0.35rem; }
+.title-pending { display: grid; gap: 0.55rem; padding-top: 0.2rem; }
+.title-skel, .meta-skel, .card-skel {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%);
+  background-size: 200% 100%;
+  animation: tour-shimmer 1.4s infinite;
+}
+.title-skel { height: 2.1rem; width: min(280px, 70%); }
+.meta-skel { height: 0.9rem; width: min(420px, 92%); }
+.tour-skel { display: grid; gap: 0.7rem; }
+.card-skel { height: 7.5rem; }
+.card-skel.short { width: 70%; height: 4.5rem; }
+@keyframes tour-shimmer { to { background-position: -200% 0; } }
+.tour-st {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.tour-st.ok { background: #dff3ec; color: #1f8f6b; }
+.tour-st.soon { background: rgba(76, 180, 229, 0.16); color: #1b5f8c; }
+.tour-st.done { background: #eef2f6; color: var(--muted); }
+.meta {
+  display: flex;
+  gap: 0.3rem 1rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.meta span + span::before { content: "·"; margin-right: 1rem; color: var(--line-strong); }
+.lede { margin: 0.45rem 0 0; color: var(--muted); }
+.ttabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line-strong);
+  scrollbar-width: none;
+  min-width: 0;
+  max-width: 100%;
+}
+.ttabs::-webkit-scrollbar { display: none; }
+.ttabs button {
+  flex: 0 0 auto;
+  padding: 0.8rem 1rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  cursor: pointer;
+}
+.ttabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
+.ttabs i {
+  font-style: normal;
+  background: #e3ebf3;
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.ttabs .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
 h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
 .head { display: flex; justify-content: space-between; gap: 1rem; align-items: center; flex-wrap: wrap; }
 .row {
@@ -502,7 +685,19 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   font-size: 0.82rem;
   white-space: nowrap;
 }
+@media (prefers-reduced-motion: reduce) {
+  .crumb-skel, .title-skel, .meta-skel, .card-skel { animation: none; }
+}
 @media (max-width: 720px) {
+  .th h1 { font-size: 1.5rem; }
+  .title-skel { height: 1.7rem; }
+  .ttabs button { padding: 0.75rem 0.8rem; }
+  .meta { gap: 0.15rem 1rem; }
+  .meta span + span::before { display: none; }
+  .ttabs {
+    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent);
+    mask-image: linear-gradient(90deg, #000 82%, transparent);
+  }
   .row.match-row {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }

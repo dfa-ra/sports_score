@@ -15,16 +15,24 @@ import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.sports.entity.Sport;
 import com.studentleague.sports.repository.SportRepository;
+import com.studentleague.teams.entity.Team;
+import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.TournamentRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Component
 public class MatchMapper {
@@ -33,17 +41,23 @@ public class MatchMapper {
     private final PlayerProfileRepository playerProfileRepository;
     private final MatchEventRepository matchEventRepository;
     private final PenaltyKickRepository penaltyKickRepository;
+    private final TeamRepository teamRepository;
+    private final TournamentRepository tournamentRepository;
 
     public MatchMapper(
             SportRepository sportRepository,
             PlayerProfileRepository playerProfileRepository,
             MatchEventRepository matchEventRepository,
-            PenaltyKickRepository penaltyKickRepository
+            PenaltyKickRepository penaltyKickRepository,
+            TeamRepository teamRepository,
+            TournamentRepository tournamentRepository
     ) {
         this.sportRepository = sportRepository;
         this.playerProfileRepository = playerProfileRepository;
         this.matchEventRepository = matchEventRepository;
         this.penaltyKickRepository = penaltyKickRepository;
+        this.teamRepository = teamRepository;
+        this.tournamentRepository = tournamentRepository;
     }
 
     public MatchResponse toResponse(Match match) {
@@ -52,18 +66,34 @@ public class MatchMapper {
 
     public Page<MatchResponse> toPage(Page<Match> page) {
         List<Match> matches = page.getContent();
-        Map<UUID, String> scorers = lastGoalScorers(matches.stream().map(Match::getId).toList());
-        Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
-        return page.map(match -> toResponse(match, scorers.get(match.getId()), penalties.get(match.getId())));
+        return page.map(named(matches));
     }
 
     public List<MatchResponse> toList(List<Match> matches) {
-        Map<UUID, String> scorers = lastGoalScorers(matches.stream().map(Match::getId).toList());
-        Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
-        return matches.stream().map(match -> toResponse(match, scorers.get(match.getId()), penalties.get(match.getId()))).toList();
+        var response = named(matches);
+        return matches.stream().map(response).toList();
     }
 
     public MatchResponse toResponse(Match match, String lastGoalScorer, ShootoutRules.Tally shootout) {
+        List<Match> one = List.of(match);
+        return build(match, lastGoalScorer, shootout, teamNames(one), tournamentNames(one));
+    }
+
+    private Function<Match, MatchResponse> named(List<Match> matches) {
+        Map<UUID, String> scorers = lastGoalScorers(matches.stream().map(Match::getId).toList());
+        Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
+        Map<UUID, String> teams = teamNames(matches);
+        Map<UUID, String> tournaments = tournamentNames(matches);
+        return match -> build(match, scorers.get(match.getId()), penalties.get(match.getId()), teams, tournaments);
+    }
+
+    private MatchResponse build(
+            Match match,
+            String lastGoalScorer,
+            ShootoutRules.Tally shootout,
+            Map<UUID, String> teams,
+            Map<UUID, String> tournaments
+    ) {
         String sportCode = sportRepository.findById(match.getSportId())
                 .map(Sport::getCode)
                 .orElse(null);
@@ -100,8 +130,48 @@ public class MatchMapper {
                 match.getTableId(),
                 match.getBracketRound(),
                 penaltyHome,
-                penaltyAway
+                penaltyAway,
+                match.getHomeTeamId() == null ? null : teams.get(match.getHomeTeamId()),
+                match.getAwayTeamId() == null ? null : teams.get(match.getAwayTeamId()),
+                match.getTournamentId() == null ? null : tournaments.get(match.getTournamentId())
         );
+    }
+
+    private Map<UUID, String> teamNames(Collection<Match> matches) {
+        Set<UUID> ids = new HashSet<>();
+        for (Match match : matches) {
+            if (match.getHomeTeamId() != null) {
+                ids.add(match.getHomeTeamId());
+            }
+            if (match.getAwayTeamId() != null) {
+                ids.add(match.getAwayTeamId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (Team team : teamRepository.findAllById(ids)) {
+            names.put(team.getId(), team.getName());
+        }
+        return names;
+    }
+
+    private Map<UUID, String> tournamentNames(Collection<Match> matches) {
+        Set<UUID> ids = new HashSet<>();
+        for (Match match : matches) {
+            if (match.getTournamentId() != null) {
+                ids.add(match.getTournamentId());
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, String> names = new HashMap<>();
+        for (Tournament tournament : tournamentRepository.findAllById(ids)) {
+            names.put(tournament.getId(), tournament.getName());
+        }
+        return names;
     }
 
     private ShootoutRules.Tally penaltyOf(Match match) {
