@@ -5,6 +5,7 @@ import { useAuthStore } from './stores/auth'
 import PlayerAvatar from './components/PlayerAvatar.vue'
 import { appVersionLabel, appVersionTitle } from './lib/appVersion'
 import { SITE_NAME } from './lib/brand'
+import { headerAuthSlot, headerExtraLinks } from './lib/headerAuth'
 import BrandMark from './components/BrandMark.vue'
 
 const auth = useAuthStore()
@@ -34,14 +35,8 @@ const commonLinks = [
   { to: '/players', label: 'Игроки' },
 ]
 
-const extraLinks = computed(() => {
-  const links: { to: string; label: string }[] = []
-  if (auth.canAccessMyTeam) links.push({ to: '/my-team', label: 'Моя команда' })
-  if (auth.canManageLeague) links.push({ to: '/admin', label: 'Админ' })
-  if (auth.canOfficiate) links.push({ to: '/referee', label: 'Судья' })
-  if (auth.hasRole('ANALYST')) links.push({ to: '/analyst', label: 'Аналитик' })
-  return links
-})
+const extraLinks = computed(() => headerExtraLinks((role) => auth.hasRole(role)))
+const authSlot = computed(() => headerAuthSlot(auth.sessionReady, auth.isAuthenticated))
 
 const showMenuButton = computed(() => compact.value || extraLinks.value.length > 0)
 
@@ -115,14 +110,15 @@ watch(compact, () => {
             >{{ item.label }}</RouterLink>
           </nav>
 
-          <div class="auth">
-            <template v-if="auth.isAuthenticated">
+          <div class="auth" :aria-busy="authSlot === 'pending'">
+            <template v-if="authSlot === 'account'">
               <RouterLink class="avatar-link" to="/profile" aria-label="Профиль">
                 <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="32" />
               </RouterLink>
               <button class="login-pill ghost" type="button" @click="logout">Выйти</button>
             </template>
-            <RouterLink v-else class="login-pill" to="/login">Войти</RouterLink>
+            <RouterLink v-else-if="authSlot === 'login'" class="login-pill" to="/login">Войти</RouterLink>
+            <span v-else class="auth-pending" aria-hidden="true"></span>
           </div>
 
           <div v-if="showMenuButton" ref="menuRoot" class="menu">
@@ -147,11 +143,11 @@ watch(compact, () => {
                   :exact-active-class="item.to === '/' ? 'on' : undefined"
                   :active-class="item.to === '/' ? undefined : 'on'"
                 >{{ item.label }}</RouterLink>
-                <RouterLink v-if="auth.isAuthenticated" class="menu-user" to="/profile">
+                <RouterLink v-if="authSlot === 'account'" class="menu-user" to="/profile">
                   <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="28" />
                   <span>Профиль</span>
                 </RouterLink>
-                <RouterLink v-else to="/login">Войти</RouterLink>
+                <RouterLink v-else-if="authSlot === 'login'" to="/login">Войти</RouterLink>
               </template>
               <RouterLink
                 v-for="item in extraLinks"
@@ -159,7 +155,7 @@ watch(compact, () => {
                 :to="item.to"
                 active-class="on"
               >{{ item.label }}</RouterLink>
-              <button v-if="compact && auth.isAuthenticated" class="menu-logout" type="button" @click="logout">Выйти</button>
+              <button v-if="compact && authSlot === 'account'" class="menu-logout" type="button" @click="logout">Выйти</button>
             </div>
           </div>
         </div>
@@ -248,6 +244,7 @@ watch(compact, () => {
 .login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
 .auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; }
+.auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
 .avatar-link { display: grid; place-items: center; }
 .menu { position: relative; flex: 0 0 auto; }
 .menu-button {
