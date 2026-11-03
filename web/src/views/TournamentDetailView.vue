@@ -289,6 +289,7 @@ const tab = computed<TourTab | 'pending'>(() => {
   return showGrid.value ? 'playoff' : 'table'
 })
 const statusChip = computed(() => tournamentStatusChip(tournament.value?.status))
+const hasRegulations = computed(() => !!String(tournament.value?.regulations || '').trim())
 const teamsCount = computed(() => overview.value?.teamsCount ?? listedTeams.value.length)
 const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
 const playoffLive = computed(() => roundsHaveLive(playoff.value?.rounds) || overview.value?.playoffLive === true)
@@ -305,20 +306,33 @@ function setTab(next: TourTab) {
   router.replace({ query: { ...route.query, tab: next } })
 }
 
-async function loadPlayoff(id: string) {
-  playoffLoading.value = true
-  playoffError.value = false
+let playoffRequest = 0
+async function loadPlayoff(id: string, quiet = false) {
+  const request = ++playoffRequest
+  if (!quiet) {
+    playoffLoading.value = true
+    playoffError.value = false
+  }
   try {
     const { data } = await api.get(`/tournaments/${id}/playoff`)
-    if (route.params.id !== id) return
+    if (request !== playoffRequest || route.params.id !== id) return
     playoff.value = data
+    playoffError.value = false
   } catch {
-    if (route.params.id !== id) return
-    playoff.value = null
-    playoffError.value = true
+    if (request !== playoffRequest || route.params.id !== id) return
+    if (!quiet) {
+      playoff.value = null
+      playoffError.value = true
+    }
   } finally {
-    if (route.params.id === id) playoffLoading.value = false
+    if (request === playoffRequest && route.params.id === id) playoffLoading.value = false
   }
+}
+
+function refreshPlayoff() {
+  const id = tournament.value?.id
+  if (!id) return
+  void loadPlayoff(String(id), true)
 }
 
 async function exclude(team: { teamId: string; teamName?: string }) {
@@ -360,6 +374,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <p v-if="tournament.description" class="lede">{{ tournament.description }}</p>
       </div>
       <div v-else class="title-pending" role="status" aria-busy="true" aria-label="Заголовок загружается">
+        <span class="chip-skel"></span>
         <span class="title-skel"></span>
         <span class="meta-skel"></span>
       </div>
@@ -394,9 +409,15 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <span class="card-skel"></span>
       <span class="card-skel short"></span>
     </div>
-    <div v-else-if="tab === 'rules'" class="panel" role="tabpanel">
-      <h2>Регламент</h2>
-      <p style="white-space: pre-wrap">{{ tournament.regulations || 'Регламент ещё не опубликован.' }}</p>
+    <div v-else-if="tab === 'rules'" class="panel" :class="{ 'rules-blank': !hasRegulations }" role="tabpanel">
+      <div v-if="!hasRegulations" class="rules-empty">
+        <strong>Регламент пока не опубликован</strong>
+        <p>Организаторы добавят его позже</p>
+      </div>
+      <template v-else>
+        <h2>Регламент</h2>
+        <p class="rules-body">{{ tournament.regulations }}</p>
+      </template>
     </div>
     <div v-else-if="tab === 'table'" class="panel" role="tabpanel">
       <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
@@ -441,7 +462,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       :loading="playoffLoading"
       :error="playoffError"
       :editable="auth.canManageLeague && playoff?.competitionStage === 'PLAYOFF'"
-      @saved="load"
+      @saved="refreshPlayoff"
       @retry="loadPlayoff(String(tournament.id))"
       @show-table="setTab('table')"
     />
@@ -570,18 +591,26 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 .crumbs { font-size: 0.8125rem; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .crumbs a { color: var(--muted); }
 .crumbs a:hover { color: var(--navy); }
-.crumb-skel { display: inline-block; width: 8rem; height: 0.8rem; border-radius: 6px; background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%); background-size: 200% 100%; animation: tour-shimmer 1.4s infinite; }
+.crumb-skel, .chip-skel, .title-skel, .meta-skel {
+  display: block;
+  background-color: #d3dde8;
+  background-image: linear-gradient(100deg, #d3dde8 32%, #e8eef4 50%, #d3dde8 68%);
+  background-size: 220% 100%;
+  animation: tour-shimmer 1.4s ease-in-out infinite;
+}
+.crumb-skel { display: inline-block; width: 8rem; height: 0.8rem; border-radius: 6px; }
 .th h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0.45rem 0 0.35rem; }
-.title-pending { display: grid; gap: 0.55rem; padding-top: 0.2rem; }
-.title-skel, .meta-skel, .card-skel {
+.title-pending { display: grid; gap: 0.55rem; justify-items: start; padding-top: 0.2rem; }
+.chip-skel { width: 96px; height: 24px; border-radius: 999px; }
+.title-skel { width: 320px; height: 28px; border-radius: 8px; }
+.meta-skel { width: 420px; height: 14px; border-radius: 7px; }
+.card-skel {
   display: block;
   border-radius: 10px;
   background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%);
   background-size: 200% 100%;
   animation: tour-shimmer 1.4s infinite;
 }
-.title-skel { height: 2.1rem; width: min(280px, 70%); }
-.meta-skel { height: 0.9rem; width: min(420px, 92%); }
 .tour-skel { display: grid; gap: 0.7rem; }
 .card-skel { height: 7.5rem; }
 .card-skel.short { width: 70%; height: 4.5rem; }
@@ -685,12 +714,28 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   font-size: 0.82rem;
   white-space: nowrap;
 }
+.rules-blank { padding: 1.8rem 1.4rem; }
+.rules-empty { text-align: center; color: var(--muted); }
+.rules-empty strong {
+  display: block;
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  margin-bottom: 0.35rem;
+}
+.rules-empty p { margin: 0; }
+.rules-body { white-space: pre-wrap; }
 @media (prefers-reduced-motion: reduce) {
-  .crumb-skel, .title-skel, .meta-skel, .card-skel { animation: none; }
+  .crumb-skel, .chip-skel, .title-skel, .meta-skel, .card-skel { animation: none; }
+  .crumb-skel, .chip-skel, .title-skel, .meta-skel {
+    background: #d3dde8;
+    background-image: none;
+  }
 }
 @media (max-width: 720px) {
   .th h1 { font-size: 1.5rem; }
-  .title-skel { height: 1.7rem; }
+  .title-skel { width: 70%; height: 28px; }
+  .meta-skel { width: 90%; }
   .ttabs button { padding: 0.75rem 0.8rem; }
   .meta { gap: 0.15rem 1rem; }
   .meta span + span::before { display: none; }

@@ -28,6 +28,21 @@ test('nearest scheduled kickoff ignores a past scheduled row and a finished one'
   assert.equal(picked?.id, 'soon')
 })
 
+test('a scheduled match with no kickoff is not nearest, and a live one still is', () => {
+  const picked = pickNextMatch([
+    { id: 'blank', tournamentId: 'open', status: 'SCHEDULED', scheduledAt: null },
+    { id: 'soon', tournamentId: 'open', status: 'SCHEDULED', scheduledAt: '2026-11-04T15:00:00Z' },
+  ], now, 'open')
+  assert.equal(picked?.id, 'soon')
+  assert.equal(pickNextMatch([
+    { id: 'blank', tournamentId: 'open', status: 'SCHEDULED', scheduledAt: null },
+  ], now, 'open'), null)
+  assert.equal(pickNextMatch([
+    { id: 'live-blank', tournamentId: 'open', status: 'LIVE', scheduledAt: null },
+    { id: 'soon', tournamentId: 'open', status: 'SCHEDULED', scheduledAt: '2026-11-04T15:00:00Z' },
+  ], now, 'open')?.id, 'live-blank')
+})
+
 test('no open-tournament future match means no banner row', () => {
   assert.equal(pickNextMatch([
     { id: 'done', tournamentId: 'open', status: 'FINISHED', scheduledAt: '2026-11-04T14:30:00Z' },

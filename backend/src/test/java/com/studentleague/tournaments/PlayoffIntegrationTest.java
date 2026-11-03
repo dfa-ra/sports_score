@@ -16,7 +16,10 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -78,7 +81,9 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.qualified[0].teamId").value(north.teamId))
                 .andExpect(jsonPath("$.qualified[0].teamName").value("Север"))
                 .andExpect(jsonPath("$.qualified[0].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[0].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].place").value(2))
+                .andExpect(jsonPath("$.qualified[1].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].teamId").value(east.teamId))
                 .andExpect(jsonPath("$.qualified[1].teamName").value("Восток"));
     }
@@ -175,11 +180,19 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("нельзя")));
 
+        String keptTableId = groupId(admin, tournamentId);
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rounds[0].slots[0].homeTeamId").value(north.teamId))
                 .andExpect(jsonPath("$.rounds[0].slots[0].awayTeamId").value(east.teamId))
-                .andExpect(jsonPath("$.rounds[0].slots[0].venue").value("Манеж"));
+                .andExpect(jsonPath("$.rounds[0].slots[0].venue").value("Манеж"))
+                .andExpect(jsonPath("$.qualified.length()").value(2))
+                .andExpect(jsonPath("$.qualified[0].teamId").value(north.teamId))
+                .andExpect(jsonPath("$.qualified[0].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[0].tableId").value(keptTableId))
+                .andExpect(jsonPath("$.qualified[1].teamId").value(east.teamId))
+                .andExpect(jsonPath("$.qualified[1].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[1].tableId").value(keptTableId));
 
         Instant later = Instant.now().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
         mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/slots/" + slotId)
@@ -221,7 +234,10 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[1].title").value("Финал"))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(nullValue()))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel").value("Победитель 1/2 №1"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel", containsString("№")))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel", not(containsString("#"))))
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayWaitingLabel").value("Победитель 1/2 №2"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayWaitingLabel", not(containsString("#"))))
                 .andReturn();
         JsonNode body = objectMapper.readTree(opened.getResponse().getContentAsString());
         String matchId = body.get("rounds").get(0).get("slots").get(0).get("matchId").asText();
@@ -384,6 +400,73 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void advancedMatchWithoutASlotKickoffHasNoDateAndIsNotNext() throws Exception {
+        Opened bracket = openSemifinals("po-nd-");
+        scoreAndFinish(bracket.admin, bracket.firstMatch, bracket.alpha);
+        scoreAndFinish(bracket.admin, bracket.secondMatch, bracket.gamma);
+        String finalMatch = finalMatchId(bracket.tournamentId);
+
+        mockMvc.perform(get("/api/v1/matches/" + finalMatch))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.scheduledAt").value(nullValue()));
+        mockMvc.perform(get("/api/v1/tournaments/" + bracket.tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].matchId").value(finalMatch))
+                .andExpect(jsonPath("$.rounds[1].slots[0].scheduledAt").value(nullValue()));
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", bracket.tournamentId))
+                .andExpect(status().isNoContent());
+        assertNextIsNot(finalMatch);
+
+        mockMvc.perform(post("/api/v1/referee/matches/" + finalMatch + "/start")
+                        .header("Authorization", auth(bracket.admin)))
+                .andExpect(status().isOk());
+        try {
+            mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", bracket.tournamentId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(finalMatch))
+                    .andExpect(jsonPath("$.status").value("LIVE"))
+                    .andExpect(jsonPath("$.scheduledAt").value(nullValue()));
+        } finally {
+            mockMvc.perform(post("/api/v1/referee/matches/" + finalMatch + "/events")
+                            .header("Authorization", auth(bracket.admin))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"eventType":"GOAL","teamId":"%s","playerId":"%s","gameTime":40}
+                                    """.formatted(bracket.alpha.teamId, bracket.alpha.playerId)))
+                    .andExpect(status().isCreated());
+            mockMvc.perform(post("/api/v1/referee/matches/" + finalMatch + "/finish")
+                            .header("Authorization", auth(bracket.admin)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void advancedMatchKeepsTheSlotKickoff() throws Exception {
+        Opened bracket = openSemifinals("po-kd-");
+        mockMvc.perform(put("/api/v1/tournaments/" + bracket.tournamentId + "/playoff/slots/" + bracket.finalSlotId)
+                        .header("Authorization", auth(bracket.admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"scheduledAt\":\"2026-01-15T12:00:00Z\",\"venue\":\"Финал-холл\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matchId").value(nullValue()))
+                .andExpect(jsonPath("$.scheduledAt").value("2026-01-15T12:00:00Z"));
+
+        scoreAndFinish(bracket.admin, bracket.firstMatch, bracket.alpha);
+        scoreAndFinish(bracket.admin, bracket.secondMatch, bracket.gamma);
+        String finalMatch = finalMatchId(bracket.tournamentId);
+
+        mockMvc.perform(get("/api/v1/matches/" + finalMatch))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"))
+                .andExpect(jsonPath("$.scheduledAt").value("2026-01-15T12:00:00Z"))
+                .andExpect(jsonPath("$.venue").value("Финал-холл"));
+        mockMvc.perform(get("/api/v1/tournaments/" + bracket.tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].scheduledAt").value("2026-01-15T12:00:00Z"));
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", bracket.tournamentId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void nonAdminCannotManagePlayoff() throws Exception {
         String admin = createAdminAndLogin("po-a-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String fan = registerAndLogin("po-fan-" + System.nanoTime() + "@example.com", "Str0ngPass!");
@@ -496,6 +579,59 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/tournaments/" + UUID.randomUUID() + "/overview"))
                 .andExpect(status().isNotFound());
+    }
+
+    private Opened openSemifinals(String emailPrefix) throws Exception {
+        String admin = createAdminAndLogin(emailPrefix + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        Squad alpha = register(admin, tournamentId, "Альфа");
+        Squad beta = register(admin, tournamentId, "Бета");
+        Squad gamma = register(admin, tournamentId, "Гамма");
+        Squad delta = register(admin, tournamentId, "Дельта");
+        join(admin, tournamentId, "Группа A", alpha.teamId, beta.teamId, gamma.teamId, delta.teamId);
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/places")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"places\":[1,2,3,4]}"))
+                .andExpect(status().isOk());
+        MvcResult opened = mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(pairsJson(
+                                pair(alpha.teamId, beta.teamId, "Зал 1"),
+                                pair(gamma.teamId, delta.teamId, "Зал 2"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode body = objectMapper.readTree(opened.getResponse().getContentAsString());
+        return new Opened(
+                admin,
+                tournamentId,
+                alpha,
+                gamma,
+                body.get("rounds").get(0).get("slots").get(0).get("matchId").asText(),
+                body.get("rounds").get(0).get("slots").get(1).get("matchId").asText(),
+                body.get("rounds").get(1).get("slots").get(0).get("id").asText()
+        );
+    }
+
+    private String finalMatchId(String tournamentId) throws Exception {
+        MvcResult assembled = mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(assembled.getResponse().getContentAsString())
+                .get("rounds").get(1).get("slots").get(0).get("matchId").asText();
+    }
+
+    private void assertNextIsNot(String matchId) throws Exception {
+        MvcResult global = mockMvc.perform(get("/api/v1/matches/next")).andReturn();
+        int code = global.getResponse().getStatus();
+        if (code == 200) {
+            String nextId = objectMapper.readTree(global.getResponse().getContentAsString()).path("id").asText();
+            assertNotEquals(matchId, nextId);
+            return;
+        }
+        assertEquals(204, code);
     }
 
     private String footballId(String admin) throws Exception {
@@ -640,5 +776,16 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
     }
 
     private record Squad(String teamId, String playerId) {
+    }
+
+    private record Opened(
+            String admin,
+            String tournamentId,
+            Squad alpha,
+            Squad gamma,
+            String firstMatch,
+            String secondMatch,
+            String finalSlotId
+    ) {
     }
 }

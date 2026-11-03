@@ -42,6 +42,7 @@ const emit = defineEmits<{ saved: []; retry: []; 'show-table': [] }>()
 
 const names = useTeamDirectory()
 const drafts = reactive<Record<string, { scheduledAt: string; venue: string }>>({})
+const fresh = reactive<Record<string, { scheduledAt: string | null; venue: string | null }>>({})
 const timeError = reactive<Record<string, string>>({})
 const saveError = ref('')
 const pending = reactive<Record<string, boolean>>({})
@@ -49,7 +50,9 @@ const root = ref<HTMLElement | null>(null)
 const scroller = ref<HTMLElement | null>(null)
 const tablist = ref<HTMLElement | null>(null)
 const viewport = ref(typeof window === 'undefined' ? 1280 : window.innerWidth)
+const containerWidth = ref(0)
 const active = ref(0)
+let pan: { x: number; y: number; index: number; id: number } | null = null
 const lit = ref<string[]>([])
 const canHover = ref(false)
 const panelHeight = ref(0)
@@ -59,7 +62,7 @@ let panelObserver: ResizeObserver | null = null
 const rounds = computed(() => props.rounds ?? [])
 const teamCount = computed(() => teamCountOf(rounds.value))
 const compact = computed(() => teamCount.value > 8)
-const tabMode = computed(() => !props.editable && useRoundTabs(teamCount.value, viewport.value))
+const tabMode = computed(() => !props.editable && useRoundTabs(teamCount.value, viewport.value, containerWidth.value))
 const empty = computed(() => !props.loading && !props.error && bracketIsEmpty(rounds.value))
 const squeeze = computed(() => !compact.value && !tabMode.value && viewport.value > 720 && viewport.value <= 1040)
 const stack = computed(() => stackChampion(rounds.value.length, viewport.value))
@@ -70,15 +73,36 @@ const gridStyle = computed(() => ({
 }))
 const showSwitcher = computed(() => tabMode.value && rounds.value.length > 1)
 
+function sameStamp(left?: string | null, right?: string | null) {
+  if (!left && !right) return true
+  if (!left || !right) return false
+  const a = Date.parse(left)
+  const b = Date.parse(right)
+  if (Number.isNaN(a) || Number.isNaN(b)) return left === right
+  return a === b
+}
+
+function viewSlot(slot: PlayoffSlot): PlayoffSlot {
+  if (!slot.id) return slot
+  const patch = fresh[slot.id]
+  if (!patch) return slot
+  return { ...slot, scheduledAt: patch.scheduledAt, venue: patch.venue }
+}
+
 watch(
   () => props.rounds,
   (next) => {
     for (const round of next ?? []) {
       for (const slot of round.slots ?? []) {
         if (!slot.id) continue
+        const patch = fresh[slot.id]
+        if (patch && sameStamp(slot.scheduledAt, patch.scheduledAt) && (slot.venue || '') === (patch.venue || '')) {
+          delete fresh[slot.id]
+        }
+        const shown = fresh[slot.id]
         drafts[slot.id] = {
-          scheduledAt: toLocalInput(slot.scheduledAt),
-          venue: slot.venue || '',
+          scheduledAt: toLocalInput(shown ? shown.scheduledAt : slot.scheduledAt),
+          venue: shown ? (shown.venue || '') : (slot.venue || ''),
         }
       }
     }
@@ -88,15 +112,29 @@ watch(
   { immediate: true },
 )
 
+function measureContainer() {
+  const card = root.value?.querySelector('.po-card') as HTMLElement | null
+  const box = card ?? root.value
+  if (!box) return
+  const style = getComputedStyle(box)
+  const pad = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+  containerWidth.value = Math.max(0, box.clientWidth - pad)
+}
+
 function onViewport() {
   viewport.value = window.innerWidth
+  measureContainer()
 }
 
 onMounted(() => {
   canHover.value = window.matchMedia('(hover: hover) and (pointer: fine)').matches
   window.addEventListener('resize', onViewport)
+  measureContainer()
   if (root.value && typeof ResizeObserver !== 'undefined') {
-    boardObserver = new ResizeObserver(() => measurePanel())
+    boardObserver = new ResizeObserver(() => {
+      measureContainer()
+      measurePanel()
+    })
     boardObserver.observe(root.value)
   }
   void nextTick(() => scrollTo(active.value, false))
@@ -232,6 +270,25 @@ function onSwipe() {
   }
 }
 
+function onTouchStart(event: TouchEvent) {
+  const touch = event.changedTouches[0]
+  if (!touch) return
+  pan = { x: touch.clientX, y: touch.clientY, index: active.value, id: touch.identifier }
+}
+
+function onTouchEnd(event: TouchEvent) {
+  const touch = event.changedTouches[0]
+  if (!pan || !touch || touch.identifier !== pan.id) return
+  const start = pan
+  pan = null
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return
+  const toward = dx < 0 ? start.index + 1 : start.index - 1
+  const next = Math.max(0, Math.min(rounds.value.length - 1, toward))
+  if (next !== active.value) go(next)
+}
+
 function onTabKey(event: KeyboardEvent) {
   if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
   event.preventDefault()
@@ -256,10 +313,18 @@ async function save(slot: PlayoffSlot) {
   timeError[slot.id] = ''
   pending[slot.id] = true
   try {
-    await api.put(`/tournaments/${props.tournamentId}/playoff/slots/${slot.id}`, {
+    const { data } = await api.put<PlayoffSlot>(`/tournaments/${props.tournamentId}/playoff/slots/${slot.id}`, {
       scheduledAt: draft.scheduledAt ? fromLocalInput(draft.scheduledAt) : undefined,
       venue: draft.venue,
     })
+    fresh[slot.id] = {
+      scheduledAt: data?.scheduledAt || fromLocalInput(draft.scheduledAt),
+      venue: data?.venue ?? draft.venue,
+    }
+    drafts[slot.id] = {
+      scheduledAt: toLocalInput(fresh[slot.id].scheduledAt),
+      venue: fresh[slot.id].venue || '',
+    }
     emit('saved')
   } catch (e: unknown) {
     saveError.value = apiError(e)
@@ -319,7 +384,7 @@ const finalLinkStyle = computed(() => ({
           <h3>{{ round.title }}</h3>
           <article v-for="slot in slotsOf(round)" :key="slot.id" class="admin-slot">
             <PlayoffPairCard
-              :slot="slot"
+              :slot="viewSlot(slot)"
               :previous-title="previousTitle(roundIndex)"
               :first-round="roundIndex === 0"
               :compact="compact"
@@ -380,6 +445,9 @@ const finalLinkStyle = computed(() => ({
           class="po-swipe"
           :style="panelHeight ? { height: `${panelHeight}px` } : undefined"
           @scroll.passive="onSwipe"
+          @touchstart.passive="onTouchStart"
+          @touchend.passive="onTouchEnd"
+          @touchcancel.passive="onTouchEnd"
         >
           <section
             v-for="(round, roundIndex) in rounds"
@@ -398,7 +466,7 @@ const finalLinkStyle = computed(() => ({
             <div class="pair-stack">
               <div v-for="slot in slotsOf(round)" :key="slot.id" class="pair-block">
                 <PlayoffPairCard
-                  :slot="slot"
+                  :slot="viewSlot(slot)"
                   :previous-title="previousTitle(roundIndex)"
                   :first-round="roundIndex === 0"
                   :final="roundIndex === rounds.length - 1 && Number(slot.slotIndex ?? 0) === 0"
@@ -453,7 +521,7 @@ const finalLinkStyle = computed(() => ({
               :style="matchCell(roundIndex, Number(slot.slotIndex ?? 0), rounds.length)"
             >
               <PlayoffPairCard
-                :slot="slot"
+                :slot="viewSlot(slot)"
                 :previous-title="previousTitle(roundIndex)"
                 :first-round="roundIndex === 0"
                 :compact="compact"
@@ -516,7 +584,7 @@ const finalLinkStyle = computed(() => ({
             <PlayoffPairCard
               v-for="slot in extraFinalSlots"
               :key="slot.id"
-              :slot="slot"
+              :slot="viewSlot(slot)"
               :previous-title="previousTitle(rounds.length - 1)"
               :lit="lit"
               :can-hover="canHover"
@@ -688,6 +756,7 @@ const finalLinkStyle = computed(() => ({
   scrollbar-width: none;
   max-width: 100%;
   min-width: 0;
+  touch-action: manipulation;
 }
 .po-swipe::-webkit-scrollbar { display: none; }
 .po-panel {

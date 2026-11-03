@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
 import { registeredName } from '../../lib/playerTitle'
-import { protocolMinute, publicScore } from '../../lib/match'
+import { finishConfirmQuestion, protocolMinute, publicScore, refereeBoardScore } from '../../lib/match'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
@@ -245,10 +245,16 @@ async function undoKick() {
 async function action(path: string) {
   if (path === 'finish') {
     const current = match.value
+    const series = shootout.value
     const halfStillOpen = remaining.value > 0 || (current?.period ?? 1) < (current?.periodCount ?? 1)
-    const question = halfStillOpen
-      ? 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
-      : 'Завершить матч?'
+    const question = finishConfirmQuestion({
+      halfStillOpen,
+      homeScore: current?.homeScore,
+      awayScore: current?.awayScore,
+      penaltyHome: series?.penaltyHome ?? current?.penaltyHome,
+      penaltyAway: series?.penaltyAway ?? current?.penaltyAway,
+      decisive: !!series?.decisive,
+    })
     if (!confirm(question)) return
   }
   message.value = ''
@@ -467,7 +473,7 @@ onUnmounted(() => {
     </div>
 
     <div class="panel scoreboard" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <StatusBadge :status="match.status" />
+      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" />
       <p class="period">{{ periodLabel(match.period, match.sportCode, match.periodCount) }}</p>
       <div class="clock" :class="{ expired }">{{ formatClock(remaining) }}</div>
       <p class="muted">осталось из {{ formatClock(cap) }} · прошло {{ formatClock(elapsed) }}</p>
@@ -478,7 +484,7 @@ onUnmounted(() => {
           {{ homeLabel }}
         </strong>
         <div class="score">
-          {{ shootoutOpen && shootout?.kicks?.length ? shootoutLine : `${match.homeScore} : ${match.awayScore}` }}
+          {{ refereeBoardScore(match, shootout, shootoutOpen) }}
         </div>
         <strong class="club">
           <TeamCrest :src="teams.logo(match.awayTeamId)" :name="awayLabel" :size="28" />

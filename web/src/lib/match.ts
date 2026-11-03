@@ -50,6 +50,71 @@ export function publicScore(match: {
   return `${home}:${away} (пен. ${pens.home}:${pens.away})`
 }
 
+/** Referee board. A finished shootout uses the public line. Anything else keeps the spaced score. */
+export function refereeBoardScore(
+  match: {
+    status?: string | null
+    homeScore?: number | null
+    awayScore?: number | null
+    penaltyHome?: number | null
+    penaltyAway?: number | null
+  },
+  series?: {
+    kicks?: readonly unknown[] | null
+    penaltyHome?: number | null
+    penaltyAway?: number | null
+  } | null,
+  shootoutOpen = false,
+) {
+  const home = Number(match.homeScore ?? 0)
+  const away = Number(match.awayScore ?? 0)
+  if (shootoutOpen && (series?.kicks?.length ?? 0) > 0) {
+    return publicScore({
+      homeScore: home,
+      awayScore: away,
+      penaltyHome: series?.penaltyHome,
+      penaltyAway: series?.penaltyAway,
+    })
+  }
+  if (match.status === 'FINISHED') {
+    const pens = penaltyPair({
+      homeScore: home,
+      awayScore: away,
+      penaltyHome: match.penaltyHome ?? series?.penaltyHome,
+      penaltyAway: match.penaltyAway ?? series?.penaltyAway,
+    })
+    if (pens) return publicScore({ homeScore: home, awayScore: away, penaltyHome: pens.home, penaltyAway: pens.away })
+  }
+  return `${home} : ${away}`
+}
+
+/**
+ * Finish confirmation. A decided shootout names the score. Otherwise the early-finish
+ * question stays when the half is still open.
+ */
+export function finishConfirmQuestion(input: {
+  halfStillOpen: boolean
+  homeScore?: number | null
+  awayScore?: number | null
+  penaltyHome?: number | null
+  penaltyAway?: number | null
+  decisive?: boolean | null
+}) {
+  const home = Number(input.homeScore ?? 0)
+  const away = Number(input.awayScore ?? 0)
+  if (input.decisive) {
+    const pens = penaltyPair({
+      homeScore: home,
+      awayScore: away,
+      penaltyHome: input.penaltyHome,
+      penaltyAway: input.penaltyAway,
+    })
+    if (pens) return `Завершить матч? Счёт ${home}:${away}, пен. ${pens.home}:${pens.away}`
+  }
+  if (input.halfStillOpen) return 'Завершить матч до конца тайма? Счёт зафиксируется как есть.'
+  return 'Завершить матч?'
+}
+
 export function kickoffDayMonth(value?: string | number | Date | null) {
   return moscowDayMonth(value)
 }

@@ -100,7 +100,7 @@ function rowLit(home: boolean) {
       </template>
     </div>
     <div class="pf">
-      <span class="st" :class="footer.kind">{{ footer.label }}</span>
+      <span v-if="footer.label" class="st" :class="footer.kind">{{ footer.label }}</span>
       <span>{{ footer.right }}</span>
     </div>
   </component>

@@ -476,7 +476,7 @@ async function deleteTeam(team: any) {
             {{ names.name(m.homeTeamId) }} {{ m.homeScore }}:{{ m.awayScore }} {{ names.name(m.awayTeamId) }}
           </RouterLink>
           <span class="match-actions">
-            <StatusBadge :status="m.status" />
+            <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
             <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch(m)">Удалить</button>
           </span>
         </div>
