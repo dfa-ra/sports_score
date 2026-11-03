@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -88,6 +89,16 @@ public class MatchController {
             @PageableDefault(size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         return PageResponse.from(matchService.list(tournamentId, status, pageable));
+    }
+
+    @GetMapping("/next")
+    @Operation(summary = "Next upcoming match by kickoff: live or paused, otherwise the soonest scheduled match from now")
+    public ResponseEntity<MatchResponse> next() {
+        MatchResponse match = matchService.nextUpcoming(Instant.now());
+        if (match == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(match);
     }
 
     @PostMapping

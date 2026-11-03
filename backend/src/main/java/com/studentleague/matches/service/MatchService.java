@@ -36,6 +36,7 @@ import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import com.studentleague.users.service.RoleService;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -192,6 +193,25 @@ public class MatchService {
             page = matchRepository.findAll(pageable);
         }
         return matchMapper.toPage(page);
+    }
+
+    /**
+     * The match a home banner should call nearest: in progress, otherwise the soonest kickoff from {@code now}.
+     * A scheduled match whose kickoff is already past is not upcoming.
+     */
+    @Transactional(readOnly = true)
+    public MatchResponse nextUpcoming(Instant now) {
+        abandonedLiveMatchService.closeIdle(now);
+        List<Match> found = matchRepository.findNextByKickoff(
+                List.of(MatchStatus.LIVE, MatchStatus.PAUSED),
+                MatchStatus.SCHEDULED,
+                now,
+                PageRequest.of(0, 1)
+        );
+        if (found.isEmpty()) {
+            return null;
+        }
+        return toResponse(found.getFirst());
     }
 
     @Transactional
