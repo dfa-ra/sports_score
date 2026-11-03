@@ -17,7 +17,7 @@ const router = createRouter({
     { path: '/table', name: 'table', component: () => import('../views/TableView.vue'), meta: { title: 'Таблица', description: 'Турнирная таблица, результаты, бомбардиры и ассистенты.' } },
     { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Игры', description: 'Календарь матчей Лиги ИТМО.' } },
     { path: '/live', name: 'live', component: () => import('../views/CalendarView.vue'), meta: { title: 'Live', description: 'Матчи, которые идут сейчас.' } },
-    { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue'), meta: { title: 'Турниры', description: 'Турниры Лиги ИТМО: вид спорта, сезон и формат.' } },
+    { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue'), meta: { title: 'Турниры', description: 'Турниры Лиги ИТМО: сезон и формат.' } },
     { path: '/tournaments/:id', name: 'tournament', component: () => import('../views/TournamentDetailView.vue'), meta: { title: 'Турнир', description: 'Турнир Лиги ИТМО.' } },
     { path: '/matches', redirect: '/calendar' },
     { path: '/matches/:id', name: 'match', component: () => import('../views/MatchDetailView.vue'), meta: { title: 'Матч', description: 'Протокол матча Лиги ИТМО.' } },

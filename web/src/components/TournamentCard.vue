@@ -16,7 +16,6 @@ const props = defineProps<{
     endDate?: string | null
     competitionStage?: string | null
   }
-  sportName?: string
 }>()
 const emit = defineEmits<{ apply: [] }>()
 
@@ -34,7 +33,6 @@ const meta = computed(() => {
     ? 'Плей-офф'
     : labelOf(formatLabel, props.tournament.format, '')
   const parts = [
-    props.sportName,
     props.tournament.seasonYear ? `сезон ${props.tournament.seasonYear}` : '',
     stage,
   ].filter(Boolean)

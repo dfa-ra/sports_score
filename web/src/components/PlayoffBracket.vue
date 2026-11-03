@@ -41,6 +41,21 @@ function placeLabel(group?: string | null, place?: number | null) {
   return `${group}, ${place}-е место`
 }
 
+function shortRound(title?: string | null) {
+  return String(title || '').replace(/\s*финала\s*$/i, '').trim()
+}
+
+function placeholder(slot: any, home: boolean) {
+  const roundNumber = Number(slot?.round || 0)
+  const prev = props.rounds.find((round) => Number(round?.round) === roundNumber - 1)
+  if (prev) {
+    const feeder = Number(slot?.slotIndex ?? 0) * 2 + (home ? 1 : 2)
+    const title = shortRound(prev.title) || 'пары'
+    return `Победитель ${title} #${feeder}`
+  }
+  return '—'
+}
+
 function showScore(slot: any) {
   return slot.matchStatus === 'LIVE' || slot.matchStatus === 'PAUSED' || slot.matchStatus === 'FINISHED'
 }
@@ -98,7 +113,7 @@ async function save(slot: any) {
                   </small>
                 </span>
               </template>
-              <span v-else class="wait">{{ slot.homeWaitingLabel || 'Ожидает соперника' }}</span>
+              <span v-else class="wait">{{ placeholder(slot, true) }}</span>
             </div>
             <div class="side">
               <template v-if="slot.awayTeamId">
@@ -110,7 +125,7 @@ async function save(slot: any) {
                   </small>
                 </span>
               </template>
-              <span v-else class="wait">{{ slot.awayWaitingLabel || 'Ожидает соперника' }}</span>
+              <span v-else class="wait">{{ placeholder(slot, false) }}</span>
             </div>
           </component>
           <p v-if="showScore(slot)" class="score">{{ slotScore(slot) }}</p>
@@ -165,6 +180,7 @@ async function save(slot: any) {
   border-radius: var(--radius);
   background: #fff;
   padding: 0.55rem 0.65rem 0.7rem;
+  min-height: 5.4rem;
 }
 .sides {
   display: grid;
@@ -180,17 +196,24 @@ async function save(slot: any) {
   min-height: 2rem;
 }
 .side span { min-width: 0; }
-.side b, .wait {
+.side b {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.side small, .wait, .meta {
+.side small, .meta {
   color: var(--muted);
   font-size: 0.75rem;
 }
-.wait { grid-column: 1 / -1; }
+.wait {
+  grid-column: 1 / -1;
+  color: var(--navy);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: normal;
+}
 .score {
   margin: 0.35rem 0 0;
   font-weight: 800;

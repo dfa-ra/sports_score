@@ -3,11 +3,10 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
-import { labelOfSport, tournamentDatesError } from '../lib/format'
+import { tournamentDatesError } from '../lib/format'
 
 const emit = defineEmits<{ created: [tournament: any] }>()
 const router = useRouter()
-const sports = ref<any[]>([])
 const name = ref('')
 const description = ref('')
 const sportId = ref('')
@@ -22,11 +21,15 @@ const formats = ref<any[]>([])
 const pending = ref(false)
 const error = ref('')
 
+function footballId(list: { id?: string; code?: string }[]) {
+  const football = list.find((sport) => sport.code === 'FOOTBALL')
+  return football?.id || list[0]?.id || ''
+}
+
 onMounted(async () => {
   const [{ data }, formatsRes] = await Promise.all([api.get('/sports'), api.get('/tournaments/formats')])
-  sports.value = data
   formats.value = formatsRes.data
-  if (!sportId.value && data[0]) sportId.value = data[0].id
+  sportId.value = footballId(data ?? [])
 })
 
 async function submit(event: Event) {
@@ -40,6 +43,10 @@ async function submit(event: Event) {
   const dateError = tournamentDatesError(start, end)
   if (dateError) {
     error.value = dateError
+    return
+  }
+  if (!sportId.value) {
+    error.value = 'Форма не готова, обновите страницу.'
     return
   }
   pending.value = true
@@ -73,11 +80,6 @@ async function submit(event: Event) {
     </label>
     <label class="field">Описание
       <textarea v-model="description" rows="3" placeholder="Коротко, без пафоса" />
-    </label>
-    <label class="field">Вид спорта
-      <select v-model="sportId">
-        <option v-for="s in sports" :key="s.id" :value="s.id">{{ labelOfSport(s.code, s.name) }}</option>
-      </select>
     </label>
     <label class="field">Сезон
       <input v-model.number="seasonYear" type="number" min="2000" max="2100" />

@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
+import PlayoffBracket from '../components/PlayoffBracket.vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { setPageMeta } from '../lib/pageMeta'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-type Tab = 'table' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
+type Tab = 'table' | 'playoff' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
 const TOP = 10
 
 const route = useRoute()
@@ -26,6 +27,7 @@ const scorers = ref<any[]>([])
 const assists = ref<any[]>([])
 const keepers = ref<any[]>([])
 const tournament = ref<any>(null)
+const playoff = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
 const loadError = ref('')
@@ -33,8 +35,11 @@ const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
+const hasPlayoff = computed(() => (playoff.value?.rounds?.length ?? 0) > 0)
+
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
+  if (value === 'playoff' && hasPlayoff.value) return 'playoff'
   if (value === 'results' || value === 'scorers' || value === 'assists' || value === 'keepers' || value === 'players') return value
   return 'table'
 })
@@ -160,23 +165,27 @@ async function loadStats() {
 
 async function load() {
   if (!tournamentId.value) {
+    playoff.value = null
     loading.value = false
     return
   }
   loading.value = true
   loadError.value = ''
   statsLoadedFor.value = ''
+  playoff.value = null
   scorers.value = []
   assists.value = []
   keepers.value = []
   const id = tournamentId.value
   try {
-    const [t, s] = await Promise.all([
+    const [t, s, p] = await Promise.all([
       api.get(`/tournaments/${id}`),
       api.get(`/tournaments/${id}/standings`),
+      api.get(`/tournaments/${id}/playoff`).catch(() => ({ data: null })),
     ])
     if (tournamentId.value !== id) return
     tournament.value = t.data
+    playoff.value = p.data
     standings.value = parseStandings(s.data)
     const name = t.data?.name || 'Таблица'
     setPageMeta({
@@ -188,6 +197,7 @@ async function load() {
   } catch {
     if (tournamentId.value !== id) return
     tournament.value = null
+    playoff.value = null
     standings.value = []
     loadError.value = 'Таблица не загрузилась.'
   } finally {
@@ -201,7 +211,10 @@ async function load() {
     <div class="league">
       <BrandMark :size="56" rounded="tile" />
       <div>
-        <h1>{{ tournament?.name || 'Таблица' }}</h1>
+        <h1>
+          <RouterLink v-if="tournamentId && tournament?.name" class="league-title" :to="`/tournaments/${tournamentId}`">{{ tournament.name }}</RouterLink>
+          <template v-else>{{ tournament?.name || 'Таблица' }}</template>
+        </h1>
         <label class="field season">
           <select v-model="tournamentId">
             <option v-for="t in tournaments" :key="t.id" :value="t.id">
@@ -214,6 +227,7 @@ async function load() {
 
     <div ref="tabBar" class="fs-tabs league-tabs">
       <button type="button" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
+      <button v-if="hasPlayoff" type="button" :class="{ on: tab === 'playoff' }" @click="setTab('playoff')">Плей-офф</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
       <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
@@ -238,6 +252,12 @@ async function load() {
           <StandingTable :rows="table.rows" />
         </div>
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
+      </div>
+    </template>
+
+    <template v-else-if="tab === 'playoff'">
+      <div class="sheet bracket-sheet">
+        <PlayoffBracket :tournament-id="tournamentId" :rounds="playoff?.rounds ?? []" />
       </div>
     </template>
 
@@ -379,6 +399,9 @@ async function load() {
   padding: 0.35rem 0 0.2rem;
 }
 .league h1 { font-size: clamp(1.2rem, 3vw, 1.7rem); }
+.league-title,
+.league-title:hover { color: inherit; text-decoration: none; }
+.bracket-sheet { padding: 0.85rem 0.75rem 1rem; overflow: auto; }
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
 .tie-note {

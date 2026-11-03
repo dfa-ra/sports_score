@@ -139,18 +139,14 @@ export function formatClock(totalSeconds?: number | null) {
 }
 
 export function periodNoun(sportCode?: string | null) {
-  if (sportCode === 'BASKETBALL') return 'четверть'
-  if (sportCode === 'VOLLEYBALL') return 'партия'
+  void sportCode
   return 'тайм'
 }
 
 export function periodLabel(period?: number | null, sportCode?: string | null, periodCount?: number | null) {
   if (!period) return 'Матч не начат'
   if (periodCount && period > periodCount) return 'Доп. время'
-  const noun = periodNoun(sportCode)
-  if (noun === 'четверть') return `${period}-я четверть`
-  if (noun === 'партия') return `${period}-я партия`
-  return `${period}-й тайм`
+  return `${period}-й ${periodNoun(sportCode)}`
 }
 
 export function playerTag(name?: string | null, jersey?: number | null) {

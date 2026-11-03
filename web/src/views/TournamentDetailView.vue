@@ -431,10 +431,10 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 
       <h2>Заявки</h2>
       <div v-for="team in teams" :key="`admin-${team.id}`" class="row">
-        <span class="club">
+        <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
           {{ team.teamName }}
-        </span>
+        </RouterLink>
         <StatusBadge :status="team.status" />
         <div class="actions">
           <button v-if="team.status !== 'APPROVED'" class="btn" :disabled="pending" @click="approve(team.teamId)">Допустить</button>

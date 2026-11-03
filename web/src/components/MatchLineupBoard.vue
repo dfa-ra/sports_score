@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { registeredName } from '../lib/playerTitle'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -62,8 +63,10 @@ function rowNote(player: any, onBench: boolean) {
   <div v-if="side" class="lineup">
     <header>
       <h3>
-        <TeamCrest :src="teams.logo(side.teamId)" :name="side.teamName" :size="22" />
-        {{ side.teamName }}
+        <RouterLink class="team" :to="`/teams/${side.teamId}`">
+          <TeamCrest :src="teams.logo(side.teamId)" :name="side.teamName" :size="22" />
+          {{ side.teamName }}
+        </RouterLink>
       </h3>
       <p class="muted">
         {{ side.confirmed ? 'Стартовый состав записан' : 'Состав не подан' }}
@@ -82,7 +85,8 @@ function rowNote(player: any, onBench: boolean) {
       >
         <input v-if="editable" type="checkbox" :checked="selected.includes(p.playerId)" @change="toggle(p.playerId)" />
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
+        <RouterLink v-if="!editable && p.playerId" class="name" :to="`/players/${p.playerId}`" :title="registeredName(p)">{{ registeredName(p) }}</RouterLink>
+        <span v-else class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
         <span class="meta" :title="rowNote(p, editable && !selected.includes(p.playerId))">
           {{ rowNote(p, editable && !selected.includes(p.playerId)) }}
         </span>
@@ -94,7 +98,8 @@ function rowNote(player: any, onBench: boolean) {
       <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
-        <span class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
+        <RouterLink v-if="p.playerId" class="name" :to="`/players/${p.playerId}`" :title="registeredName(p)">{{ registeredName(p) }}</RouterLink>
+        <span v-else class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
         <span class="meta" :title="rowNote(p, true)">{{ rowNote(p, true) }}</span>
       </div>
     </section>
@@ -114,6 +119,15 @@ h3 {
   font-size: 1.15rem;
   margin: 0;
 }
+.team {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.name { color: inherit; text-decoration: none; }
 h4 {
   margin: 0 0 0.4rem;
   font-size: 0.72rem;

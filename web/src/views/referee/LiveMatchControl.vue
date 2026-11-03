@@ -513,7 +513,7 @@ onUnmounted(() => {
         class="btn large"
         :disabled="pending || !live || (match.period ?? 1) >= match.periodCount"
         @click="action('next-period')"
-      >Следующий {{ match.sportCode === 'BASKETBALL' ? 'четверть' : 'тайм' }}</button>
+      >Следующий тайм</button>
       <button
         class="btn large danger"
         :disabled="pending || !live || (shootoutOpen && !shootout?.decisive)"

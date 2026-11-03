@@ -2,7 +2,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
-import BrandMark from '../components/BrandMark.vue'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import StandingGroups from '../components/StandingGroups.vue'
@@ -177,8 +176,10 @@ function heroHeading(slide: Slide | null | undefined) {
           <img v-if="current?.url" :src="current.url" width="1200" height="280" :alt="current.title || 'Главный кадр'" />
           <div v-if="current?.url" class="hero-shade" />
           <div class="hero-copy">
-            <BrandMark :size="64" />
-            <p class="eyebrow">{{ feed?.tournament?.name || SITE_NAME }}</p>
+            <p class="eyebrow">
+              <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name || SITE_NAME }}</RouterLink>
+              <template v-else>{{ SITE_NAME }}</template>
+            </p>
             <h1>{{ heroHeading(current) }}</h1>
             <p v-if="tournamentDates">{{ tournamentDates }}</p>
             <p v-if="current?.caption">{{ current.caption }}</p>
@@ -226,7 +227,8 @@ function heroHeading(slide: Slide | null | undefined) {
       <div v-else-if="tape.length" class="sheet">
         <div class="league-head">
           <div>
-            {{ feed?.tournament?.name || 'Матчи' }}
+            <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name || 'Матчи' }}</RouterLink>
+            <template v-else>{{ feed?.tournament?.name || 'Матчи' }}</template>
             <small>Последние и ближайшие</small>
           </div>
           <RouterLink class="more" to="/calendar">Все игры</RouterLink>
@@ -244,7 +246,10 @@ function heroHeading(slide: Slide | null | undefined) {
         <div class="panel table-block">
           <div class="page-title">
             <p class="eyebrow">Таблица</p>
-            <h2>{{ feed?.tournament?.name || 'Турнир ещё не открыт' }}</h2>
+            <h2>
+              <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name }}</RouterLink>
+              <template v-else>Турнир ещё не открыт</template>
+            </h2>
           </div>
           <div v-if="!loaded" class="skeleton home-skel" />
           <EmptyState v-else-if="!standingGroupsHaveRows(homeTables)" title="Таблицы пока нет" />
@@ -444,6 +449,10 @@ function heroHeading(slide: Slide | null | undefined) {
 }
 .hero-copy h1 { color: #fff; font-size: clamp(1.45rem, 3.2vw, 2.1rem); }
 .hero-copy p { color: rgba(255,255,255,0.86); }
+.hero-copy a,
+.hero-copy a:hover { color: #fff; text-decoration: none; }
+.table-block h2 a,
+.league-head a { color: inherit; text-decoration: none; }
 .hero-cta,
 .hero-cta:hover {
   width: fit-content;
@@ -658,6 +667,8 @@ function heroHeading(slide: Slide | null | undefined) {
 @media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
   .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
+  .hero-copy a,
+  .hero-copy a:hover { color: #fff; }
   .stories-wrap { gap: 0.2rem; }
   .nudge { width: 28px; height: 28px; }
   .story { width: 72px; }

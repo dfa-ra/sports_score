@@ -38,7 +38,7 @@ const scopeLine = computed(() =>
 
 <template>
   <section v-if="match?.sportCode === 'FUTSAL'" class="futsal panel">
-    <h2>Футзал</h2>
+    <h2>Фолы и тайм-аут</h2>
     <p class="scope">{{ scopeLine }}</p>
     <div class="cols">
       <article v-for="side in sides" :key="side.teamId" class="side" :class="{ away: side.away }">
