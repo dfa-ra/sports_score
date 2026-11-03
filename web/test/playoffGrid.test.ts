@@ -9,6 +9,7 @@ import {
   emptySideLabel,
   footerView,
   formatRoundSpan,
+  cssViewportWidth,
   gridColumns,
   gridMinWidth,
   overviewMeta,
@@ -39,6 +40,24 @@ test('round tabs follow team count and width', () => {
   assert.equal(useRoundTabs(8, 900, 400), false)
   assert.equal(useRoundTabs(4, 1000, 200), false)
   assert.equal(useRoundTabs(2, 400, 100), false)
+})
+
+test('zoom uses the visual CSS width and leaves 4 and 8 teams on 720', () => {
+  assert.equal(cssViewportWidth(1280, 1024, 1.25), 1024)
+  assert.equal(cssViewportWidth(1280, 853, 1.5), 853)
+  assert.equal(cssViewportWidth(1280, 731, 1.75), 731)
+  assert.equal(cssViewportWidth(1280, 1280, 1), 1280)
+  assert.equal(cssViewportWidth(1181, 1166, 1), 1181)
+  assert.equal(cssViewportWidth(1180, 1180, 1), 1180)
+  assert.equal(useRoundTabs(16, cssViewportWidth(1280, 1024, 1.25)), true)
+  assert.equal(useRoundTabs(16, cssViewportWidth(1280, 853, 1.5)), true)
+  assert.equal(useRoundTabs(16, cssViewportWidth(1280, 731, 1.75)), true)
+  assert.equal(useRoundTabs(16, cssViewportWidth(1280, 1180, 1280 / 1180)), true)
+  assert.equal(useRoundTabs(16, cssViewportWidth(1280, 1181, 1280 / 1181)), false)
+  assert.equal(useRoundTabs(8, cssViewportWidth(1280, 731, 1.75)), false)
+  assert.equal(useRoundTabs(4, cssViewportWidth(1280, 1024, 1.25)), false)
+  assert.equal(useRoundTabs(8, cssViewportWidth(720, 720, 1)), true)
+  assert.equal(useRoundTabs(2, cssViewportWidth(400, 200, 2)), false)
 })
 
 test('a two-team final stacks the champion under the match on a phone', () => {

@@ -73,6 +73,19 @@ export function gridMinWidth(roundCount: number, compact: boolean) {
 }
 
 /**
+ * CSS-pixel width of the page. Browser zoom and pinch zoom shrink
+ * `visualViewport` (a 1280px window at 125% is about 1024) and can leave
+ * `innerWidth` at the unscaled window. A scale of 1 keeps the layout width,
+ * so a scrollbar does not pretend to be zoom.
+ */
+export function cssViewportWidth(layoutWidth: number, visualWidth?: number | null, scale?: number | null) {
+  if (scale != null && scale > 1 && visualWidth != null && Number.isFinite(visualWidth) && visualWidth > 0) {
+    return visualWidth
+  }
+  return layoutWidth
+}
+
+/**
  * Round tabs: 16 teams at a viewport of 1180px or less, and also when the bracket
  * container itself is narrower than the five-column grid (a padded page must not
  * keep those columns). 4 and 8 teams stay on the 720px viewport cutoff.
