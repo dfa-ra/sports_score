@@ -121,9 +121,7 @@ public class HomeOverviewService {
         Map<UUID, Team> teams = loadTeams(corpus, running);
         Map<UUID, MatchResponse> mapped = mapMatches(displayMatches(liveEntities, upcomingEntities, recentEntities, running, byTournament));
 
-        HomeMatchResponse next = upcomingEntities.isEmpty()
-                ? null
-                : toHome(upcomingEntities.getFirst(), tournamentsById, teams, byTournament, mapped);
+        HomeMatchResponse next = nearest(now, corpus, tournamentsById, teams, byTournament, mapped);
 
         List<HomeTournamentResponse> cards = new ArrayList<>();
         List<HomeScorersResponse> scorers = new ArrayList<>();
@@ -146,6 +144,57 @@ public class HomeOverviewService {
                 scorers,
                 summary
         );
+    }
+
+    /**
+     * «Ближайший матч» looks at every active tournament. A live or paused match
+     * wins over a scheduled kickoff, even when that kickoff is sooner and belongs
+     * to another tournament. A match with no date is skipped.
+     */
+    private HomeMatchResponse nearest(
+            Instant now,
+            List<Match> matches,
+            Map<UUID, Tournament> tournaments,
+            Map<UUID, Team> teams,
+            Map<UUID, List<Match>> byTournament,
+            Map<UUID, MatchResponse> mapped
+    ) {
+        Match chosen = matches.stream()
+                .filter(match -> match.getScheduledAt() != null)
+                .filter(match -> {
+                    Tournament tournament = tournaments.get(match.getTournamentId());
+                    return tournament != null && tournament.getStatus() == TournamentStatus.ACTIVE;
+                })
+                .filter(match -> isInPlay(match) || isUnplayed(match, now))
+                .min(Comparator
+                        .comparingInt((Match match) -> kickoffRank(match.getStatus()))
+                        .thenComparing(Match::getScheduledAt)
+                        .thenComparing(Match::getId))
+                .orElse(null);
+        if (chosen == null) {
+            return null;
+        }
+        return toHome(chosen, tournaments, teams, byTournament, mapped);
+    }
+
+    private static boolean isInPlay(Match match) {
+        return match.getStatus() == MatchStatus.LIVE || match.getStatus() == MatchStatus.PAUSED;
+    }
+
+    private static boolean isUnplayed(Match match, Instant now) {
+        return match.getStatus() == MatchStatus.SCHEDULED
+                && match.getScheduledAt() != null
+                && !match.getScheduledAt().isBefore(now);
+    }
+
+    private static int kickoffRank(MatchStatus status) {
+        if (status == MatchStatus.LIVE) {
+            return 0;
+        }
+        if (status == MatchStatus.PAUSED) {
+            return 1;
+        }
+        return 2;
     }
 
     private List<Tournament> runningTournaments() {

@@ -14,6 +14,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -162,6 +163,90 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.upcoming[?(@.id == '%s')]".formatted(betaNext)).isNotEmpty())
                 .andExpect(jsonPath("$.recent[?(@.id == '%s')].tournamentName".formatted(betaDone), hasItem("Осенняя лига факультетов")))
                 .andExpect(jsonPath("$.recent[?(@.id == '%s')].homeTeamName".formatted(betaDone), hasItem("Физтех " + stamp)));
+    }
+
+    @Test
+    void liveMatchBeatsEarlierKickoffAcrossActiveTournaments() throws Exception {
+        String stamp = String.valueOf(System.nanoTime());
+        String adminToken = createAdminAndLogin("near-admin-" + stamp + "@example.com", "Str0ngPass!");
+        String captainEmail = "near-cap-" + stamp + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Илья","lastName":"Орлов"}
+                                """))
+                .andExpect(status().isOk());
+        String homePlayer = playerId(captainToken);
+        String teamA = createTeam(adminToken, "Север " + stamp, homePlayer);
+        captainToken = reLogin(captainEmail, "Str0ngPass!");
+
+        String otherEmail = "near-other-" + stamp + "@example.com";
+        String otherToken = registerAndLogin(otherEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Петр","lastName":"Волков"}
+                                """))
+                .andExpect(status().isOk());
+        String teamB = createTeam(adminToken, "Юг " + stamp, playerId(otherToken));
+
+        String sport = sportId(adminToken);
+        String earlyCup = createTournament(adminToken, sport, "Ранний кубок " + stamp, "REGISTRATION", "2026-09-01");
+        String liveCup = createTournament(adminToken, sport, "Живой кубок " + stamp, "REGISTRATION", "2026-09-02");
+        String signup = createTournament(adminToken, sport, "Набор кубка " + stamp, "REGISTRATION", "2099-01-01");
+        registerAndApprove(adminToken, captainToken, earlyCup, teamA);
+        registerAndApprove(adminToken, otherToken, earlyCup, teamB);
+        registerAndApprove(adminToken, captainToken, liveCup, teamA);
+        registerAndApprove(adminToken, otherToken, liveCup, teamB);
+        registerAndApprove(adminToken, captainToken, signup, teamA);
+        registerAndApprove(adminToken, otherToken, signup, teamB);
+        activate(adminToken, earlyCup);
+        activate(adminToken, liveCup);
+
+        Instant sooner = Instant.now().plus(20, ChronoUnit.MINUTES).truncatedTo(ChronoUnit.SECONDS);
+        Instant earlierKick = sooner.plus(30, ChronoUnit.MINUTES);
+        Instant laterKick = sooner.plus(3, ChronoUnit.HOURS);
+        String signupSooner = createMatch(adminToken, signup, teamA, teamB, sooner);
+        String earlyMatch = createMatch(adminToken, earlyCup, teamA, teamB, earlierKick);
+        String liveMatch = createMatch(adminToken, liveCup, teamB, teamA, laterKick);
+        boolean started = false;
+        try {
+            start(adminToken, liveMatch);
+            started = true;
+            MvcResult overview = mockMvc.perform(get("/api/v1/home/overview"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.next.id").value(liveMatch))
+                    .andExpect(jsonPath("$.next.status").value("LIVE"))
+                    .andExpect(jsonPath("$.next.tournamentId").value(liveCup))
+                    .andReturn();
+            String nextId = objectMapper.readTree(overview.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                    .get("next").get("id").asText();
+            org.junit.jupiter.api.Assertions.assertNotEquals(earlyMatch, nextId);
+            org.junit.jupiter.api.Assertions.assertNotEquals(signupSooner, nextId);
+        } finally {
+            if (started) {
+                finishLive(adminToken, liveMatch);
+            }
+            finish(adminToken, earlyMatch);
+            mockMvc.perform(delete("/api/v1/matches/" + signupSooner)
+                            .header("Authorization", auth(adminToken)))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
+    private void start(String adminToken, String matchId) throws Exception {
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+    }
+
+    private void finishLive(String adminToken, String matchId) throws Exception {
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
     }
 
     private void activate(String adminToken, String tournamentId) throws Exception {
