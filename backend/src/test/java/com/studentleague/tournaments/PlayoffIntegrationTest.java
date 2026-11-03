@@ -16,6 +16,7 @@ import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -78,7 +79,9 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.qualified[0].teamId").value(north.teamId))
                 .andExpect(jsonPath("$.qualified[0].teamName").value("Север"))
                 .andExpect(jsonPath("$.qualified[0].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[0].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].place").value(2))
+                .andExpect(jsonPath("$.qualified[1].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].teamId").value(east.teamId))
                 .andExpect(jsonPath("$.qualified[1].teamName").value("Восток"));
     }
@@ -175,11 +178,19 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message", containsString("нельзя")));
 
+        String keptTableId = groupId(admin, tournamentId);
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rounds[0].slots[0].homeTeamId").value(north.teamId))
                 .andExpect(jsonPath("$.rounds[0].slots[0].awayTeamId").value(east.teamId))
-                .andExpect(jsonPath("$.rounds[0].slots[0].venue").value("Манеж"));
+                .andExpect(jsonPath("$.rounds[0].slots[0].venue").value("Манеж"))
+                .andExpect(jsonPath("$.qualified.length()").value(2))
+                .andExpect(jsonPath("$.qualified[0].teamId").value(north.teamId))
+                .andExpect(jsonPath("$.qualified[0].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[0].tableId").value(keptTableId))
+                .andExpect(jsonPath("$.qualified[1].teamId").value(east.teamId))
+                .andExpect(jsonPath("$.qualified[1].groupName").value("Группа A"))
+                .andExpect(jsonPath("$.qualified[1].tableId").value(keptTableId));
 
         Instant later = Instant.now().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
         mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff/slots/" + slotId)
@@ -221,7 +232,10 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[1].title").value("Финал"))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(nullValue()))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel").value("Победитель 1/2 №1"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel", containsString("№")))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel", not(containsString("#"))))
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayWaitingLabel").value("Победитель 1/2 №2"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].awayWaitingLabel", not(containsString("#"))))
                 .andReturn();
         JsonNode body = objectMapper.readTree(opened.getResponse().getContentAsString());
         String matchId = body.get("rounds").get(0).get("slots").get(0).get("matchId").asText();

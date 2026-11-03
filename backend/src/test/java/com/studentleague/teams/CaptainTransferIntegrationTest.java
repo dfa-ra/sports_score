@@ -116,7 +116,7 @@ class CaptainTransferIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void transferKeepsRoleWhilePlayerStillCaptainsAnotherTeam() throws Exception {
+    void secondClubRejectsACaptainWhoAlreadyHasATeam() throws Exception {
         String suffix = String.valueOf(System.nanoTime());
         String adminToken = createAdminAndLogin("capy-admin-" + suffix + "@example.com", "Str0ngPass!");
         String captainEmail = "capy-cap-" + suffix + "@example.com";
@@ -126,29 +126,38 @@ class CaptainTransferIntegrationTest extends AbstractIntegrationTest {
         String captainId = profile(captainToken, "Два", "Клуба", 4);
         String playerId = profile(playerToken, "Один", "Клуб", 5);
 
-        String alphaId = createTeam(adminToken, "Alpha " + suffix, captainId);
-        String betaId = createTeam(adminToken, "Beta " + suffix, captainId);
+        String alphaName = "Alpha " + suffix;
+        String alphaId = createTeam(adminToken, alphaName, captainId);
+        mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Beta %s","shortName":"BE","captainPlayerId":"%s"}
+                                """.formatted(suffix, captainId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «" + alphaName + "»"));
+
+        mockMvc.perform(get("/api/v1/teams/" + alphaId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.captainId").value(captainId));
+        assertCaptain(captainEmail);
+
         captainToken = loginOnly(captainEmail, "Str0ngPass!");
         addMember(captainToken, alphaId, playerId);
-
+        mockMvc.perform(post("/api/v1/teams")
+                        .header("Authorization", auth(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"East %s","shortName":"EA","captainPlayerId":"%s"}
+                                """.formatted(suffix, playerId)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Игрок уже в составе команды «" + alphaName + "»"));
         mockMvc.perform(put("/api/v1/teams/" + alphaId + "/captain")
-                        .header("Authorization", auth(captainToken))
+                        .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(captainBody(playerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.captainId").value(playerId));
-
-        mockMvc.perform(get("/api/v1/teams/" + betaId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.captainId").value(captainId));
-        assertCaptain(captainEmail);
-        assertCaptain(playerEmail);
-        mockMvc.perform(get("/api/v1/players/" + captainId + "/card"))
-                .andExpect(jsonPath("$.captainTeams.length()").value(1))
-                .andExpect(jsonPath("$.captainTeams[0].id").value(betaId));
-        mockMvc.perform(get("/api/v1/players/" + playerId + "/card"))
-                .andExpect(jsonPath("$.captainTeams.length()").value(1))
-                .andExpect(jsonPath("$.captainTeams[0].id").value(alphaId));
     }
 
     private void assertCaptain(String email) {

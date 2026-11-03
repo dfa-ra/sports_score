@@ -256,6 +256,7 @@ public class TeamService {
         if (existing != null && existing.getStatus() == TeamMemberStatus.ACTIVE) {
             throw ApiException.conflict("Игрок уже в составе этой команды");
         }
+        rejectIfActiveOnAnotherTeam(player.getId(), teamId);
 
         TeamMember member = existing == null ? new TeamMember() : existing;
         member.setTeamId(teamId);
@@ -411,11 +412,30 @@ public class TeamService {
     }
 
     private void ensureActiveMembership(UUID teamId, UUID playerId) {
+        rejectIfActiveOnAnotherTeam(playerId, teamId);
         TeamMember membership = teamMemberRepository.findByTeamIdAndPlayerId(teamId, playerId).orElseGet(TeamMember::new);
         membership.setTeamId(teamId);
         membership.setPlayerId(playerId);
         membership.setStatus(TeamMemberStatus.ACTIVE);
         teamMemberRepository.save(membership);
+    }
+
+    /**
+     * Squad membership is global: {@code teams} has no tournament id and
+     * {@code team_members} is only team + player + status. A player therefore
+     * stays on one live team. A disbanded club does not hold the player.
+     */
+    private void rejectIfActiveOnAnotherTeam(UUID playerId, UUID teamId) {
+        for (TeamMember membership : teamMemberRepository.findByPlayerIdAndStatus(playerId, TeamMemberStatus.ACTIVE)) {
+            if (teamId.equals(membership.getTeamId())) {
+                continue;
+            }
+            Team other = teamRepository.findById(membership.getTeamId()).orElse(null);
+            if (other == null || other.isDisbanded()) {
+                continue;
+            }
+            throw ApiException.conflict("Игрок уже в составе команды «" + other.getName() + "»");
+        }
     }
 
     private Team requireTeam(UUID teamId) {

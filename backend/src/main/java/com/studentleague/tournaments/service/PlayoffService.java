@@ -577,7 +577,13 @@ public class PlayoffService {
         return named;
     }
 
+    /**
+     * First-round slots keep the group name and place, not the table id.
+     * The group row is still {@code tournament_teams.table_id}; opening the
+     * playoff does not clear it, and groups stay locked afterwards.
+     */
     private List<QualifiedTeamResponse> qualifiedFromBracket(List<PlayoffSlot> slots) {
+        Map<UUID, UUID> tableByTeam = groupTableByTeam(slots);
         List<QualifiedTeamResponse> qualified = new ArrayList<>();
         for (PlayoffSlot slot : slots) {
             if (slot.getRoundNumber() != 1) {
@@ -587,7 +593,7 @@ public class PlayoffService {
                 qualified.add(new QualifiedTeamResponse(
                         slot.getHomeTeamId(),
                         null,
-                        null,
+                        tableByTeam.get(slot.getHomeTeamId()),
                         slot.getHomeGroupName(),
                         slot.getHomePlace() == null ? 0 : slot.getHomePlace()
                 ));
@@ -596,13 +602,26 @@ public class PlayoffService {
                 qualified.add(new QualifiedTeamResponse(
                         slot.getAwayTeamId(),
                         null,
-                        null,
+                        tableByTeam.get(slot.getAwayTeamId()),
                         slot.getAwayGroupName(),
                         slot.getAwayPlace() == null ? 0 : slot.getAwayPlace()
                 ));
             }
         }
         return qualified;
+    }
+
+    private Map<UUID, UUID> groupTableByTeam(List<PlayoffSlot> slots) {
+        if (slots.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, UUID> tableByTeam = new HashMap<>();
+        for (TournamentTeam entry : tournamentTeamRepository.findByTournamentId(slots.getFirst().getTournamentId())) {
+            if (entry.getTableId() != null) {
+                tableByTeam.put(entry.getTeamId(), entry.getTableId());
+            }
+        }
+        return tableByTeam;
     }
 
     private PlayoffSlotResponse toSlotResponse(
