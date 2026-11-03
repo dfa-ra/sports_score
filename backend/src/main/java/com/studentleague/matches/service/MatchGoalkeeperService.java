@@ -13,6 +13,7 @@ import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.repository.TeamMemberRepository;
+import com.studentleague.tournaments.service.TournamentRosterGuard;
 import com.studentleague.users.domain.Role;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,7 @@ public class MatchGoalkeeperService {
     private final TeamMemberRepository teamMemberRepository;
     private final MatchMapper matchMapper;
     private final StandingsBoardCache standingsBoardCache;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public MatchGoalkeeperService(
             MatchRepository matchRepository,
@@ -43,7 +45,8 @@ public class MatchGoalkeeperService {
             MatchLineupPlayerRepository lineupRepository,
             TeamMemberRepository teamMemberRepository,
             MatchMapper matchMapper,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.matchRepository = matchRepository;
         this.matchRefereeRepository = matchRefereeRepository;
@@ -51,6 +54,7 @@ public class MatchGoalkeeperService {
         this.teamMemberRepository = teamMemberRepository;
         this.matchMapper = matchMapper;
         this.standingsBoardCache = standingsBoardCache;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -93,6 +97,9 @@ public class MatchGoalkeeperService {
         UUID playerId = request.playerId();
         if (playerId != null && !onTeam(match, teamId, playerId)) {
             throw ApiException.badRequest("Вратарь должен быть в составе этой команды");
+        }
+        if (playerId != null) {
+            tournamentRosterGuard.rejectAppearanceForSecondClub(match.getTournamentId(), teamId, playerId);
         }
         if (teamId.equals(match.getHomeTeamId())) {
             match.setHomeGoalkeeperId(playerId);

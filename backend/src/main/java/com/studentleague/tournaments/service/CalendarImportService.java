@@ -59,17 +59,20 @@ public class CalendarImportService {
     private final TournamentTeamRepository tournamentTeamRepository;
     private final TeamRepository teamRepository;
     private final MatchService matchService;
+    private final TournamentRosterGuard tournamentRosterGuard;
 
     public CalendarImportService(
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
             TeamRepository teamRepository,
-            MatchService matchService
+            MatchService matchService,
+            TournamentRosterGuard tournamentRosterGuard
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
         this.teamRepository = teamRepository;
         this.matchService = matchService;
+        this.tournamentRosterGuard = tournamentRosterGuard;
     }
 
     @Transactional
@@ -129,12 +132,17 @@ public class CalendarImportService {
         }
         tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), team.getId())
                 .ifPresentOrElse(entry -> {
-                    if (entry.getStatus() != TournamentTeamStatus.APPROVED) {
-                        entry.setStatus(TournamentTeamStatus.APPROVED);
-                        entry.setApprovedAt(Instant.now());
-                        tournamentTeamRepository.save(entry);
+                    if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
+                        return;
                     }
+                    if (!TournamentRosterGuard.isEntered(entry.getStatus())) {
+                        tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
+                    }
+                    entry.setStatus(TournamentTeamStatus.APPROVED);
+                    entry.setApprovedAt(Instant.now());
+                    tournamentTeamRepository.save(entry);
                 }, () -> {
+                    tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
                     TournamentTeam entry = new TournamentTeam();
                     entry.setTournamentId(tournament.getId());
                     entry.setTeamId(team.getId());
