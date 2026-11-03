@@ -127,7 +127,7 @@ String finishConfirmQuestion({
       penaltyHome: penaltyHome,
       penaltyAway: penaltyAway,
     );
-    if (pens != null) return 'Завершить матч? Счёт $homeScore:$awayScore, пен. ${pens.home}:${pens.away}';
+    if (pens != null) return 'Завершить матч? $homeScore:$awayScore, пен. ${pens.home}:${pens.away}';
   }
   if (halfStillOpen) return 'Завершить матч до конца тайма? Счёт зафиксируется как есть.';
   return 'Завершить матч?';

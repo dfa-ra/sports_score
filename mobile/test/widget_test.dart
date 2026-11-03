@@ -196,7 +196,7 @@ void main() {
         penaltyAway: 3,
         decisive: true,
       ),
-      'Завершить матч? Счёт 1:1, пен. 5:3',
+      'Завершить матч? 1:1, пен. 5:3',
     );
     expect(
       finishConfirmQuestion(halfStillOpen: true, homeScore: 1, awayScore: 0),

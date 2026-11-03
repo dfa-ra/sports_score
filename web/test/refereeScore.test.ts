@@ -26,7 +26,7 @@ test('finish confirmation names a decided shootout and keeps the early-finish qu
     penaltyHome: 5,
     penaltyAway: 3,
     decisive: true,
-  }), 'Завершить матч? Счёт 1:1, пен. 5:3')
+  }), 'Завершить матч? 1:1, пен. 5:3')
   assert.equal(finishConfirmQuestion({
     halfStillOpen: true,
     homeScore: 2,
