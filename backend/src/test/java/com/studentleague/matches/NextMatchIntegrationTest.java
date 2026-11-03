@@ -1,12 +1,21 @@
 package com.studentleague.matches;
 
+import com.studentleague.matches.domain.MatchStatus;
+import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.support.AbstractIntegrationTest;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -15,6 +24,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class NextMatchIntegrationTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private MatchRepository matchRepository;
 
     @Test
     void nextMatchIsTheSoonestKickoffNotAnEarlierScheduledRow() throws Exception {
@@ -50,13 +62,17 @@ class NextMatchIntegrationTest extends AbstractIntegrationTest {
         Instant past = Instant.now().minus(2, ChronoUnit.DAYS);
         Instant soon = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
         Instant later = soon.plus(3, ChronoUnit.DAYS);
-        createMatch(adminToken, tournamentId, teamA, teamB, later);
+        String laterId = createMatch(adminToken, tournamentId, teamA, teamB, later);
         String soonId = createMatch(adminToken, tournamentId, teamA, teamB, soon);
-        createMatch(adminToken, tournamentId, teamA, teamB, past);
+        String pastId = createMatch(adminToken, tournamentId, teamA, teamB, past);
+        // The suite shares one database. A live match left by another test is the real next match.
+        // This fixture is three scheduled rows and nothing in play.
+        retireOtherOpenMatches(laterId, soonId, pastId);
 
         mockMvc.perform(get("/api/v1/matches/next"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(soonId));
+                .andExpect(jsonPath("$.id").value(soonId))
+                .andExpect(jsonPath("$.status").value("SCHEDULED"));
     }
 
     @Test
@@ -157,6 +173,18 @@ class NextMatchIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(openMatch))
                 .andExpect(jsonPath("$.tournamentId").value(openId));
+    }
+
+    private void retireOtherOpenMatches(String... keptMatchIds) {
+        Set<UUID> kept = Arrays.stream(keptMatchIds).map(UUID::fromString).collect(Collectors.toSet());
+        List<MatchStatus> open = List.of(MatchStatus.SCHEDULED, MatchStatus.LIVE, MatchStatus.PAUSED);
+        for (Match match : matchRepository.findByStatusIn(open)) {
+            if (kept.contains(match.getId())) {
+                continue;
+            }
+            match.setStatus(MatchStatus.CANCELLED);
+            matchRepository.save(match);
+        }
     }
 
     private String createMatch(String adminToken, String tournamentId, String homeId, String awayId, Instant kickoff) throws Exception {
