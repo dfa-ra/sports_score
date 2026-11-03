@@ -129,9 +129,16 @@ public class TournamentController {
 
     @PostMapping("/{id}/teams/{teamId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Approve team registration (ADMIN)")
+    @Operation(summary = "Approve a pending team registration (ADMIN)")
     public TournamentTeamResponse approve(@PathVariable UUID id, @PathVariable UUID teamId) {
         return tournamentService.approveTeam(id, teamId);
+    }
+
+    @PostMapping("/{id}/teams/{teamId}/restore")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Return a withdrawn entry to pending (ADMIN). Re-checks the squad the same way as registration.")
+    public TournamentTeamResponse restore(@PathVariable UUID id, @PathVariable UUID teamId) {
+        return tournamentService.restoreTeam(id, teamId);
     }
 
     @DeleteMapping("/{id}/teams/{teamId}")
@@ -143,7 +150,7 @@ public class TournamentController {
     }
 
     @GetMapping("/{id}/teams")
-    @Operation(summary = "List tournament participants")
+    @Operation(summary = "List tournament participants. Anonymous and non-admin callers do not receive WITHDRAWN entries.")
     public List<TournamentTeamResponse> teams(@PathVariable UUID id) {
         return tournamentService.listTeams(id);
     }

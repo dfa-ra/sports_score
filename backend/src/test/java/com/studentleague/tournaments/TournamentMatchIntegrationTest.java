@@ -157,7 +157,8 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(adminToken)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/teams"))
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/teams")
+                        .header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.teamId=='" + teamB + "')].status", contains("WITHDRAWN")))
                 .andExpect(jsonPath("$[?(@.teamId=='" + teamA + "')].status", contains("APPROVED")));

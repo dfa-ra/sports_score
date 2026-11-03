@@ -200,6 +200,18 @@ async function approve(id: string) {
   }
 }
 
+async function restore(id: string) {
+  pending.value = true
+  try {
+    await api.post(`/tournaments/${tournament.value.id}/teams/${id}/restore`)
+    await load()
+  } catch (e: any) {
+    error.value = apiError(e)
+  } finally {
+    pending.value = false
+  }
+}
+
 async function importCalendar() {
   if (!calendarFile.value) return
   error.value = ''
@@ -269,6 +281,7 @@ const savedTables = computed(() =>
 )
 const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 const listedTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
+const withdrawnTeams = computed(() => teams.value.filter((team) => team.status === 'WITHDRAWN'))
 const showGrid = computed(() => tournamentHasPlayoff({
   format: overview.value?.format || tournament.value?.format,
   stage: overview.value?.stage || playoff.value?.competitionStage || tournament.value?.competitionStage,
@@ -585,6 +598,17 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <button class="btn danger" :disabled="pending" @click="exclude(team)">Убрать из турнира</button>
         </div>
       </div>
+      <h2 v-if="withdrawnTeams.length">Снятые</h2>
+      <div v-for="team in withdrawnTeams" :key="`withdrawn-${team.id}`" class="row withdrawn">
+        <RouterLink class="club" :to="`/teams/${team.teamId}`">
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          {{ team.teamName }}
+        </RouterLink>
+        <StatusBadge :status="team.status" />
+        <div class="actions">
+          <button class="btn" type="button" :disabled="pending" @click="restore(team.teamId)">Вернуть</button>
+        </div>
+      </div>
 
       <h2>Календарь из Excel / CSV</h2>
       <p class="muted">Колонки: date, time, home, away. Команды подхватываются по названию и сразу попадают в турнир.</p>
@@ -709,6 +733,15 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   text-decoration: none;
 }
 .row:hover { color: var(--accent); }
+.row.withdrawn {
+  color: #8b97a6;
+  background: #f3f5f8;
+}
+.row.withdrawn .club,
+.row.withdrawn:hover,
+.row.withdrawn:hover .club {
+  color: #8b97a6;
+}
 .row.match-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
