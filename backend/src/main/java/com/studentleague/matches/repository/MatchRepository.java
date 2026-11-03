@@ -40,6 +40,27 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
             @Param("from") Instant from,
             Pageable pageable
     );
+
+    /**
+     * Same nearest-kickoff rule as {@link #findNextByKickoff}, limited to one tournament.
+     * The collection is bound twice (filter and sort). Keep both queries on that shape.
+     */
+    @Query("""
+            select m from Match m
+            where m.tournamentId = :tournamentId
+              and (m.status in :inPlay
+               or (m.status = :scheduled and m.scheduledAt >= :from))
+            order by case when m.status in :inPlay then 0 else 1 end,
+                     m.scheduledAt asc,
+                     m.id asc
+            """)
+    List<Match> findNextByKickoffForTournament(
+            @Param("tournamentId") UUID tournamentId,
+            @Param("inPlay") Collection<MatchStatus> inPlay,
+            @Param("scheduled") MatchStatus scheduled,
+            @Param("from") Instant from,
+            Pageable pageable
+    );
     List<Match> findByStatusIn(Collection<MatchStatus> statuses);
     Page<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status, Pageable pageable);
     List<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status);

@@ -12,6 +12,7 @@ import StatPlayerCell from '../components/StatPlayerCell.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { setPageMeta } from '../lib/pageMeta'
 import { matchInstant } from '../lib/match'
+import { tableRouteQuery } from '../lib/tableQuery'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 type Tab = 'table' | 'playoff' | 'results' | 'scorers' | 'assists' | 'keepers' | 'players'
@@ -131,13 +132,23 @@ onMounted(async () => {
 })
 
 watch(tournamentId, (id) => {
-  if (id && String(route.query.tournament || '') !== id) {
-    const query: Record<string, string> = { tournament: id }
-    if (tab.value !== 'table') query.tab = tab.value
-    if (fullList.value) query.list = 'all'
-    router.replace({ query })
-  }
-  void load()
+  const requested = String(route.query.tab || '')
+  const stagePlayoff = tournaments.value.find((item) => item.id === id)?.competitionStage === 'PLAYOFF'
+  const rememberPlayoff = requested === 'playoff' && !stagePlayoff
+  const listAll = fullList.value
+  void (async () => {
+    if (id && String(route.query.tournament || '') !== id) {
+      await router.replace({
+        query: tableRouteQuery({
+          tournamentId: id,
+          tab: rememberPlayoff ? 'table' : requested,
+          keepPlayoff: stagePlayoff,
+          listAll,
+        }),
+      })
+    }
+    await load({ rememberPlayoff, listAll })
+  })()
 })
 
 watch(() => String(route.query.tournament || ''), (id) => {
@@ -155,11 +166,14 @@ onUnmounted(() => inkObserver?.disconnect())
 
 function setTab(next: Tab, list?: 'all') {
   expanded.value = { scorers: false, assists: false, keepers: false }
-  const query: Record<string, string> = {}
-  if (tournamentId.value) query.tournament = tournamentId.value
-  if (next !== 'table') query.tab = next
-  if (list === 'all') query.list = 'all'
-  router.replace({ query })
+  router.replace({
+    query: tableRouteQuery({
+      tournamentId: tournamentId.value,
+      tab: next,
+      keepPlayoff: next === 'playoff',
+      listAll: list === 'all',
+    }),
+  })
   if (next === 'scorers' || next === 'assists' || next === 'keepers') {
     if (statsLoadedFor.value !== tournamentId.value) {
       statsLoading.value = true
@@ -195,7 +209,25 @@ async function loadStats() {
   }
 }
 
-async function load() {
+function syncPlayoffTab(id: string, rememberPlayoff: boolean, listAll: boolean) {
+  if (tournamentId.value !== id) return
+  const queryTab = String(route.query.tab || '')
+  if (queryTab === 'playoff' && !hasPlayoff.value) {
+    void router.replace({
+      query: tableRouteQuery({ tournamentId: id, tab: 'table', listAll }),
+    })
+    return
+  }
+  if (rememberPlayoff && hasPlayoff.value && queryTab !== 'playoff') {
+    void router.replace({
+      query: tableRouteQuery({ tournamentId: id, tab: 'playoff', keepPlayoff: true, listAll }),
+    })
+  }
+}
+
+async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) {
+  const rememberPlayoff = options?.rememberPlayoff ?? false
+  const listAll = options?.listAll ?? fullList.value
   if (!tournamentId.value) {
     playoff.value = null
     loading.value = false
@@ -234,7 +266,10 @@ async function load() {
     standings.value = []
     loadError.value = 'Таблица не загрузилась.'
   } finally {
-    if (tournamentId.value === id) loading.value = false
+    if (tournamentId.value === id) {
+      loading.value = false
+      syncPlayoffTab(id, rememberPlayoff, listAll)
+    }
   }
 }
 </script>

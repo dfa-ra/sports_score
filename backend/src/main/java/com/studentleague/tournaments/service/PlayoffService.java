@@ -635,8 +635,8 @@ public class PlayoffService {
                 teamName(teams, slot.getAwayTeamId()),
                 slot.getAwayGroupName(),
                 slot.getAwayPlace(),
-                waitingLabel(slot, true),
-                waitingLabel(slot, false),
+                waitingLabel(slot, true, rounds),
+                waitingLabel(slot, false, rounds),
                 slot.getScheduledAt(),
                 slot.getVenue(),
                 match == null ? null : match.getStatus().name(),
@@ -848,13 +848,36 @@ public class PlayoffService {
         return ShootoutRules.winner(match.getHomeTeamId(), match.getAwayTeamId(), kicks);
     }
 
-    private static String waitingLabel(PlayoffSlot slot, boolean home) {
+    /**
+     * Empty feeder side: «Победитель 1/2 #1». The round token is the source round
+     * (1/2, 1/4, 1/8, финала, …) and the index is that pair, starting at 1.
+     */
+    static String waitingLabel(PlayoffSlot slot, boolean home, int rounds) {
         UUID teamId = home ? slot.getHomeTeamId() : slot.getAwayTeamId();
         if (teamId != null || slot.getRoundNumber() <= 1) {
             return null;
         }
-        int feeder = slot.getSlotIndex() * 2 + (home ? 0 : 1);
-        return "Ожидает победителя пары " + (feeder + 1);
+        int feeder = slot.getSlotIndex() * 2 + (home ? 1 : 2);
+        return winnerSlotLabel(roundTitle(slot.getRoundNumber() - 1, rounds), feeder);
+    }
+
+    static String winnerSlotLabel(String sourceRoundTitle, int feeder) {
+        String title = shortSourceRound(sourceRoundTitle);
+        if (title.isEmpty()) {
+            title = "пары";
+        }
+        return "Победитель " + title + " #" + feeder;
+    }
+
+    static String shortSourceRound(String title) {
+        if (title == null) {
+            return "";
+        }
+        String text = title.trim();
+        if (text.equalsIgnoreCase("Финал")) {
+            return "финала";
+        }
+        return text.replaceFirst("(?i)\\s*финала\\s*$", "").trim();
     }
 
     private static String teamName(Map<UUID, Team> teams, UUID teamId) {

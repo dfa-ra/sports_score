@@ -6,6 +6,7 @@ import TeamCrest from './TeamCrest.vue'
 import { fromLocalInput, toLocalInput } from '../lib/datetime'
 import { apiError } from '../lib/errors'
 import { publicScore } from '../lib/match'
+import { winnerSlotLabel } from '../lib/playoffLabel'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const props = defineProps<{
@@ -41,19 +42,12 @@ function placeLabel(group?: string | null, place?: number | null) {
   return `${group}, ${place}-е место`
 }
 
-function shortRound(title?: string | null) {
-  return String(title || '').replace(/\s*финала\s*$/i, '').trim()
-}
-
 function placeholder(slot: any, home: boolean) {
   const roundNumber = Number(slot?.round || 0)
   const prev = props.rounds.find((round) => Number(round?.round) === roundNumber - 1)
-  if (prev) {
-    const feeder = Number(slot?.slotIndex ?? 0) * 2 + (home ? 1 : 2)
-    const title = shortRound(prev.title) || 'пары'
-    return `Победитель ${title} #${feeder}`
-  }
-  return '—'
+  if (!prev) return '—'
+  const feeder = Number(slot?.slotIndex ?? 0) * 2 + (home ? 1 : 2)
+  return winnerSlotLabel(prev?.title, feeder)
 }
 
 function showScore(slot: any) {

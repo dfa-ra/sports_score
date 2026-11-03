@@ -10,6 +10,7 @@ import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import { formatDateRange } from '../lib/format'
 import { longKickoff, matchInstant } from '../lib/match'
+import { pickNextMatch } from '../lib/nextMatch'
 import { setPageMeta } from '../lib/pageMeta'
 import { registeredName } from '../lib/playerTitle'
 
@@ -61,21 +62,32 @@ function readNextMatch(response: { status?: number; data?: unknown } | null) {
   if (!response || response.status === 204) return null
   const data = response.data
   if (!data || typeof data !== 'object') return null
-  const row = data as { id?: unknown }
-  return row.id ? data : null
+  const row = data as { id?: unknown; tournamentId?: unknown }
+  return row.id ? data as { id: string; tournamentId?: string } : null
+}
+
+async function loadNextMatch(tournamentId: string, rows: any[]) {
+  try {
+    const response = await api.get('/matches/next', { params: { tournamentId } })
+    const row = readNextMatch(response)
+    if (row?.id && (!row.tournamentId || row.tournamentId === tournamentId)) return row
+  } catch {
+    // The list below still applies the same nearest-match rule.
+  }
+  return pickNextMatch(rows, Date.now(), tournamentId)
 }
 
 onMounted(async () => {
   try {
     await teams.load()
-    const [{ data }, games, upcoming] = await Promise.all([
+    const [{ data }, games] = await Promise.all([
       api.get('/home'),
       api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
-      api.get('/matches/next').then(readNextMatch).catch(() => null),
     ])
     feed.value = data
     matches.value = games.data.content ?? []
-    nextMatch.value = upcoming
+    const openId = data?.tournament?.id as string | undefined
+    nextMatch.value = openId ? await loadNextMatch(openId, matches.value) : null
     const name = data?.tournament?.name || SITE_NAME
     setPageMeta({
       title: 'Главная',
@@ -188,7 +200,7 @@ const bannerTitle = computed(() => openTournament.value ? heroHeading(current.va
             <h1>{{ bannerTitle }}</h1>
             <p v-if="tournamentDates">{{ tournamentDates }}</p>
             <p v-if="openTournament && current?.caption">{{ current.caption }}</p>
-            <p v-if="nextMatch?.id">
+            <p v-if="openTournament && nextMatch?.id">
               Ближайший матч: {{ teams.fullName(nextMatch.homeTeamId) }} — {{ teams.fullName(nextMatch.awayTeamId) }}
               · {{ longKickoff(matchInstant(nextMatch)) }}
             </p>

@@ -92,9 +92,9 @@ public class MatchController {
     }
 
     @GetMapping("/next")
-    @Operation(summary = "Next upcoming match by kickoff: live or paused, otherwise the soonest scheduled match from now")
-    public ResponseEntity<MatchResponse> next() {
-        MatchResponse match = matchService.nextUpcoming(Instant.now());
+    @Operation(summary = "Next upcoming match by kickoff: live or paused, otherwise the soonest scheduled match from now. Optional tournamentId scopes the open tournament.")
+    public ResponseEntity<MatchResponse> next(@RequestParam(required = false) UUID tournamentId) {
+        MatchResponse match = matchService.nextUpcoming(Instant.now(), tournamentId);
         if (match == null) {
             return ResponseEntity.noContent().build();
         }

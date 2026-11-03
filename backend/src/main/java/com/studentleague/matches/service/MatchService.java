@@ -201,13 +201,22 @@ public class MatchService {
      */
     @Transactional(readOnly = true)
     public MatchResponse nextUpcoming(Instant now) {
+        return nextUpcoming(now, null);
+    }
+
+    /**
+     * Nearest match for the home banner. With a tournament id, only that tournament counts.
+     * Live or paused wins. Otherwise the soonest scheduled kickoff that is not before {@code now}.
+     * A finished match is not nearest, even when its planned kickoff is still ahead.
+     */
+    @Transactional(readOnly = true)
+    public MatchResponse nextUpcoming(Instant now, UUID tournamentId) {
         abandonedLiveMatchService.closeIdle(now);
-        List<Match> found = matchRepository.findNextByKickoff(
-                List.of(MatchStatus.LIVE, MatchStatus.PAUSED),
-                MatchStatus.SCHEDULED,
-                now,
-                PageRequest.of(0, 1)
-        );
+        List<MatchStatus> inPlay = List.of(MatchStatus.LIVE, MatchStatus.PAUSED);
+        List<Match> found = tournamentId == null
+                ? matchRepository.findNextByKickoff(inPlay, MatchStatus.SCHEDULED, now, PageRequest.of(0, 1))
+                : matchRepository.findNextByKickoffForTournament(
+                        tournamentId, inPlay, MatchStatus.SCHEDULED, now, PageRequest.of(0, 1));
         if (found.isEmpty()) {
             return null;
         }

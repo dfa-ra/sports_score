@@ -38,8 +38,6 @@ const commonLinks = [
 const extraLinks = computed(() => headerExtraLinks((role) => auth.hasRole(role)))
 const authSlot = computed(() => headerAuthSlot(auth.sessionReady, auth.isAuthenticated))
 
-const showMenuButton = computed(() => compact.value || extraLinks.value.length > 0)
-
 function syncCompact() {
   compact.value = !!compactMedia?.matches
 }
@@ -121,7 +119,7 @@ watch(compact, () => {
             <span v-else class="auth-pending" aria-hidden="true"></span>
           </div>
 
-          <div v-if="showMenuButton" ref="menuRoot" class="menu">
+          <div ref="menuRoot" class="menu" :class="{ 'has-extra': extraLinks.length }">
             <button
               class="menu-button"
               type="button"
@@ -135,7 +133,7 @@ watch(compact, () => {
               </svg>
             </button>
             <div v-if="menuOpen" class="menu-panel">
-              <template v-if="compact">
+              <div class="only-compact">
                 <RouterLink
                   v-for="item in commonLinks"
                   :key="`menu-${item.to}`"
@@ -148,14 +146,14 @@ watch(compact, () => {
                   <span>Профиль</span>
                 </RouterLink>
                 <RouterLink v-else-if="authSlot === 'login'" to="/login">Войти</RouterLink>
-              </template>
+              </div>
               <RouterLink
                 v-for="item in extraLinks"
                 :key="item.to"
                 :to="item.to"
                 active-class="on"
               >{{ item.label }}</RouterLink>
-              <button v-if="compact && authSlot === 'account'" class="menu-logout" type="button" @click="logout">Выйти</button>
+              <button v-if="authSlot === 'account'" class="menu-logout only-compact" type="button" @click="logout">Выйти</button>
             </div>
           </div>
         </div>
@@ -246,7 +244,9 @@ watch(compact, () => {
 .auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; }
 .auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
 .avatar-link { display: grid; place-items: center; }
-.menu { position: relative; flex: 0 0 auto; }
+.menu { position: relative; flex: 0 0 auto; display: none; }
+.menu.has-extra { display: block; }
+.only-compact { display: contents; }
 .menu-button {
   width: 42px;
   height: 42px;
@@ -312,6 +312,10 @@ watch(compact, () => {
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
+@media (min-width: 960px) {
+  .only-compact { display: none; }
+}
+
 @media (max-width: 1099px) {
   .nav-inner { min-height: 56px; }
   .primary a { padding: 0.35rem 0.58rem; font-size: 0.8rem; }
@@ -319,6 +323,7 @@ watch(compact, () => {
 
 @media (max-width: 959px) {
   .primary, .auth { display: none; }
+  .menu { display: block; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.82rem; }
 }

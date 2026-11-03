@@ -59,6 +59,106 @@ class NextMatchIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.id").value(soonId));
     }
 
+    @Test
+    void finishedMatchWithAFutureKickoffIsNotNearest() throws Exception {
+        String adminToken = createAdminAndLogin("next-fin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String captainEmail = "next-fin-cap-" + System.nanoTime() + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Нина","lastName":"Финиш"}
+                                """))
+                .andExpect(status().isOk());
+        String teamA = createTeam(adminToken, "Fin Home", playerId(captainToken));
+        captainToken = reLogin(captainEmail, "Str0ngPass!");
+
+        String otherEmail = "next-fin-other-" + System.nanoTime() + "@example.com";
+        String otherToken = registerAndLogin(otherEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Глеб","lastName":"Финиш"}
+                                """))
+                .andExpect(status().isOk());
+        String teamB = createTeam(adminToken, "Fin Away", playerId(otherToken));
+
+        String tournamentId = createTournament(adminToken, sportId(adminToken));
+        registerAndApprove(adminToken, captainToken, tournamentId, teamA);
+        registerAndApprove(adminToken, otherToken, tournamentId, teamB);
+
+        Instant future = Instant.now().plus(1, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+        String finishedId = createMatch(adminToken, tournamentId, teamA, teamB, future);
+        mockMvc.perform(post("/api/v1/referee/matches/" + finishedId + "/start")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + finishedId + "/finish")
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", tournamentId))
+                .andExpect(status().isNoContent());
+
+        Instant later = future.plus(2, ChronoUnit.DAYS);
+        String scheduledId = createMatch(adminToken, tournamentId, teamA, teamB, later);
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(scheduledId))
+                .andExpect(jsonPath("$.status").value("SCHEDULED"));
+    }
+
+    @Test
+    void nextMatchStaysInsideTheOpenTournament() throws Exception {
+        String adminToken = createAdminAndLogin("next-scope-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String captainEmail = "next-scope-cap-" + System.nanoTime() + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Олег","lastName":"Свой"}
+                                """))
+                .andExpect(status().isOk());
+        String teamA = createTeam(adminToken, "Scope Home", playerId(captainToken));
+        captainToken = reLogin(captainEmail, "Str0ngPass!");
+
+        String otherEmail = "next-scope-other-" + System.nanoTime() + "@example.com";
+        String otherToken = registerAndLogin(otherEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Илья","lastName":"Чужой"}
+                                """))
+                .andExpect(status().isOk());
+        String teamB = createTeam(adminToken, "Scope Away", playerId(otherToken));
+        otherToken = reLogin(otherEmail, "Str0ngPass!");
+
+        String sport = sportId(adminToken);
+        String openId = createTournament(adminToken, sport);
+        String otherId = createTournament(adminToken, sport);
+        registerAndApprove(adminToken, captainToken, openId, teamA);
+        registerAndApprove(adminToken, otherToken, openId, teamB);
+        registerAndApprove(adminToken, captainToken, otherId, teamA);
+        registerAndApprove(adminToken, otherToken, otherId, teamB);
+
+        Instant sooner = Instant.now().plus(20, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+        Instant later = sooner.plus(3, ChronoUnit.DAYS);
+        String otherMatch = createMatch(adminToken, otherId, teamA, teamB, sooner);
+        String openMatch = createMatch(adminToken, openId, teamA, teamB, later);
+
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", otherId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(otherMatch))
+                .andExpect(jsonPath("$.tournamentId").value(otherId));
+        mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", openId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(openMatch))
+                .andExpect(jsonPath("$.tournamentId").value(openId));
+    }
+
     private String createMatch(String adminToken, String tournamentId, String homeId, String awayId, Instant kickoff) throws Exception {
         MvcResult created = mockMvc.perform(post("/api/v1/matches")
                         .header("Authorization", auth(adminToken))
