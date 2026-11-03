@@ -100,9 +100,10 @@ async function save(slot: any) {
         <article v-for="slot in round.slots" :key="slot.id" class="slot">
           <component
             :is="slot.matchId ? RouterLink : 'div'"
-            class="sides"
+            class="face"
             :to="slot.matchId ? `/matches/${slot.matchId}` : undefined"
           >
+          <div class="sides">
             <div class="side">
               <template v-if="slot.homeTeamId">
                 <TeamCrest :src="names.logo(slot.homeTeamId)" :name="slot.homeTeamName" :size="22" />
@@ -127,9 +128,10 @@ async function save(slot: any) {
               </template>
               <span v-else class="wait">{{ placeholder(slot, false) }}</span>
             </div>
-          </component>
+          </div>
           <p v-if="showScore(slot)" class="score">{{ slotScore(slot) }}</p>
           <p v-else-if="slot.venue" class="meta">{{ slot.venue }}</p>
+          </component>
           <form v-if="editable && drafts[slot.id]" class="edit" @submit.prevent="save(slot)">
             <label class="field" :class="{ invalid: timeError[slot.id] }">Время
               <input
@@ -181,7 +183,17 @@ async function save(slot: any) {
   background: #fff;
   padding: 0.55rem 0.65rem 0.7rem;
   min-height: 5.4rem;
+  display: flex;
+  flex-direction: column;
 }
+.face {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  color: inherit;
+  text-decoration: none;
+}
+a.face { cursor: pointer; }
 .sides {
   display: grid;
   gap: 0.35rem;

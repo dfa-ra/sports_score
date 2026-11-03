@@ -35,7 +35,18 @@ const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
-const hasPlayoff = computed(() => (playoff.value?.rounds?.length ?? 0) > 0)
+const hasPlayoff = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (picked?.competitionStage === 'PLAYOFF') return true
+  return (playoff.value?.rounds?.length ?? 0) > 0
+})
+
+const headingName = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (picked?.name) return picked.name
+  if (!loading.value && tournament.value?.name) return tournament.value.name
+  return ''
+})
 
 const tab = computed<Tab>(() => {
   const value = String(route.query.tab || 'table')
@@ -103,17 +114,36 @@ onMounted(async () => {
   ])
   tournaments.value = data.content ?? []
   matches.value = games.data.content ?? []
-  try {
-    const current = await api.get('/tournaments/current')
-    if (current.data?.id) tournamentId.value = current.data.id
-  } catch {
-    if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+  const requested = String(route.query.tournament || '')
+  if (requested && tournaments.value.some((item) => item.id === requested)) {
+    tournamentId.value = requested
+  } else {
+    try {
+      const current = await api.get('/tournaments/current')
+      if (current.data?.id) tournamentId.value = current.data.id
+    } catch {
+      if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+    }
+    if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
   }
-  if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  await load()
+  if (!tournamentId.value) await load()
 })
 
-watch(tournamentId, load)
+watch(tournamentId, (id) => {
+  if (id && String(route.query.tournament || '') !== id) {
+    const query: Record<string, string> = { tournament: id }
+    if (tab.value !== 'table') query.tab = tab.value
+    if (fullList.value) query.list = 'all'
+    router.replace({ query })
+  }
+  void load()
+})
+
+watch(() => String(route.query.tournament || ''), (id) => {
+  if (!id || id === tournamentId.value) return
+  if (!tournaments.value.some((item) => item.id === id)) return
+  tournamentId.value = id
+})
 
 watch(tab, async () => {
   await nextTick()
@@ -125,6 +155,7 @@ onUnmounted(() => inkObserver?.disconnect())
 function setTab(next: Tab, list?: 'all') {
   expanded.value = { scorers: false, assists: false, keepers: false }
   const query: Record<string, string> = {}
+  if (tournamentId.value) query.tournament = tournamentId.value
   if (next !== 'table') query.tab = next
   if (list === 'all') query.list = 'all'
   router.replace({ query })
@@ -171,6 +202,7 @@ async function load() {
   }
   loading.value = true
   loadError.value = ''
+  tournament.value = null
   statsLoadedFor.value = ''
   playoff.value = null
   scorers.value = []
@@ -212,8 +244,8 @@ async function load() {
       <BrandMark :size="56" rounded="tile" />
       <div>
         <h1>
-          <RouterLink v-if="tournamentId && tournament?.name" class="league-title" :to="`/tournaments/${tournamentId}`">{{ tournament.name }}</RouterLink>
-          <template v-else>{{ tournament?.name || 'Таблица' }}</template>
+          <RouterLink v-if="tournamentId && headingName" class="league-title" :to="`/tournaments/${tournamentId}`">{{ headingName }}</RouterLink>
+          <template v-else>{{ loading ? 'Загрузка…' : 'Таблица' }}</template>
         </h1>
         <label class="field season">
           <select v-model="tournamentId">

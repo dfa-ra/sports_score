@@ -264,7 +264,11 @@ const grouped = computed(() => {
           :home-name="teams.fullName(m.homeTeamId)"
           :away-name="teams.fullName(m.awayTeamId)"
         />
-        <RouterLink v-if="!liveOnly" class="sheet-link" :to="`/table`">К таблице ›</RouterLink>
+        <RouterLink
+          v-if="!liveOnly"
+          class="sheet-link"
+          :to="group.id !== 'none' ? { path: '/table', query: { tournament: group.id } } : '/table'"
+        >К таблице ›</RouterLink>
       </section>
     </div>
   </section>
