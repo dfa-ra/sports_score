@@ -1,3 +1,4 @@
+import { eventOnHomeSide } from './matchMinute.ts'
 import { moscowClock, moscowDateTimeLabel, moscowDayMonth, moscowYmd } from './moscowTime.ts'
 
 export function matchOutcome(match: {
@@ -135,6 +136,41 @@ export function shortKickoff(value?: string | number | Date | null, status?: str
 export function longKickoff(value?: string | number | Date | null) {
   if (!value) return '—'
   return moscowDateTimeLabel(value) || '—'
+}
+
+type ProtocolEvent = {
+  eventType?: string | null
+  voided?: boolean
+  teamId?: string | null
+  metadata?: { ownGoal?: boolean; points?: number } | null
+}
+
+/**
+ * Board score from the protocol the pad already has. Football and futsal count
+ * goals (an own goal credits the other side). Other sports also count POINT.
+ */
+export function protocolScore(
+  match: { homeTeamId?: string | null; awayTeamId?: string | null; sportCode?: string | null },
+  events: readonly ProtocolEvent[],
+) {
+  const code = (match.sportCode || 'FOOTBALL').toUpperCase()
+  const football = code === 'FOOTBALL' || code === 'FUTSAL'
+  let home = 0
+  let away = 0
+  for (const event of events) {
+    if (event.voided || !event.teamId) continue
+    if (event.teamId !== match.homeTeamId && event.teamId !== match.awayTeamId) continue
+    let points = 0
+    if (event.eventType === 'GOAL' || event.eventType === 'OWN_GOAL') points = 1
+    else if (!football && event.eventType === 'POINT') {
+      const raw = event.metadata?.points
+      points = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.trunc(raw)) : 1
+    }
+    if (points <= 0) continue
+    if (eventOnHomeSide(event, match.homeTeamId)) home += points
+    else away += points
+  }
+  return { home, away }
 }
 
 export function matchStateLabel(status?: string | null) {
