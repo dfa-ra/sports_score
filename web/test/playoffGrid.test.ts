@@ -3,14 +3,18 @@ import test from 'node:test'
 import {
   arrivalLine,
   bracketIsEmpty,
+  championCell,
+  championHeaderCell,
   defaultRoundIndex,
   emptySideLabel,
   footerView,
   formatRoundSpan,
+  gridColumns,
   overviewMeta,
   pairWhen,
   scoreView,
   sideKind,
+  stackChampion,
   tournamentHasPlayoff,
   useRoundTabs,
   winnerSide,
@@ -25,6 +29,21 @@ test('round tabs follow team count and width', () => {
   assert.equal(useRoundTabs(16, 1180), true)
   assert.equal(useRoundTabs(16, 1181), false)
   assert.equal(useRoundTabs(16, 1440), false)
+})
+
+test('a two-team final stacks the champion under the match on a phone', () => {
+  assert.equal(stackChampion(1, 375), true)
+  assert.equal(stackChampion(1, 720), true)
+  assert.equal(stackChampion(1, 721), false)
+  assert.equal(stackChampion(2, 375), false)
+  assert.equal(stackChampion(4, 375), false)
+  assert.equal(gridColumns(1, false, false, true), 'minmax(0, 1fr)')
+  assert.equal(gridColumns(1, false, false, false), 'minmax(0, 238px) minmax(160px, 1fr)')
+  assert.equal(gridColumns(3, true, false).includes('214px'), true)
+  assert.deepEqual(championHeaderCell(1, true), { gridColumn: '1', gridRow: '3' })
+  assert.deepEqual(championCell(1, 1, true), { gridColumn: '1', gridRow: '4' })
+  assert.deepEqual(championHeaderCell(1, false), { gridColumn: '2', gridRow: '1' })
+  assert.deepEqual(championCell(3, 4, false), { gridColumn: '7', gridRow: '2 / span 4' })
 })
 
 test('empty slot keeps the source pair number', () => {

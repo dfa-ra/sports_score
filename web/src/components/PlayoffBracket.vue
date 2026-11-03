@@ -10,7 +10,8 @@ import {
   arrivalLine,
   bracketIsEmpty,
   branchKind,
-  championColumn,
+  championCell,
+  championHeaderCell,
   championWhen,
   connectorCell,
   defaultRoundIndex,
@@ -21,6 +22,7 @@ import {
   roundNote,
   segmentLabel,
   slotsOf,
+  stackChampion,
   teamCountOf,
   useRoundTabs,
   winnerSide,
@@ -60,10 +62,11 @@ const compact = computed(() => teamCount.value > 8)
 const tabMode = computed(() => !props.editable && useRoundTabs(teamCount.value, viewport.value))
 const empty = computed(() => !props.loading && !props.error && bracketIsEmpty(rounds.value))
 const squeeze = computed(() => !compact.value && !tabMode.value && viewport.value > 720 && viewport.value <= 1040)
+const stack = computed(() => stackChampion(rounds.value.length, viewport.value))
 const firstSlots = computed(() => Math.max(1, slotsOf(rounds.value[0]).length))
 const gridStyle = computed(() => ({
-  gridTemplateColumns: gridColumns(rounds.value.length, compact.value, squeeze.value),
-  gridTemplateRows: gridRows(firstSlots.value, compact.value),
+  gridTemplateColumns: gridColumns(rounds.value.length, compact.value, squeeze.value, stack.value),
+  gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value),
 }))
 const showSwitcher = computed(() => tabMode.value && rounds.value.length > 1)
 
@@ -202,6 +205,18 @@ function scrollTo(index: number, smooth: boolean) {
   void nextTick(measurePanel)
 }
 
+// Entering tab mode mounts a new scroller at scrollLeft 0. Put the active round back in view.
+watch(tabMode, (on) => {
+  if (!on) return
+  scrollTo(active.value, false)
+  requestAnimationFrame(() => scrollTo(active.value, false))
+}, { flush: 'post' })
+
+watch(viewport, () => {
+  if (!tabMode.value) return
+  scrollTo(active.value, false)
+}, { flush: 'post' })
+
 function go(index: number) {
   active.value = index
   scrollTo(index, true)
@@ -253,10 +268,8 @@ async function save(slot: PlayoffSlot) {
   }
 }
 
-const champStyle = computed(() => ({
-  gridColumn: String(championColumn(rounds.value.length)),
-  gridRow: `2 / span ${firstSlots.value}`,
-}))
+const champHeaderStyle = computed(() => championHeaderCell(rounds.value.length, stack.value))
+const champStyle = computed(() => championCell(rounds.value.length, firstSlots.value, stack.value))
 const finalLinkStyle = computed(() => ({
   gridColumn: String(rounds.value.length * 2),
   gridRow: `2 / span ${firstSlots.value}`,
@@ -273,7 +286,7 @@ const finalLinkStyle = computed(() => ({
         </p>
       </div>
 
-      <div v-if="loading" class="po-state" aria-busy="true" aria-label="Сетка загружается">
+      <div v-if="loading" class="po-state" role="status" aria-busy="true" aria-label="Сетка загружается">
         <div v-if="viewport <= 720" class="seg sk-seg" aria-hidden="true"><span></span><span></span><span></span></div>
         <div v-if="viewport <= 720" class="sk-stack">
           <div class="sk"><i class="n"></i><i></i><i></i><i class="w"></i></div>
@@ -418,7 +431,7 @@ const finalLinkStyle = computed(() => ({
         </div>
       </div>
 
-      <div v-else class="po-board" :class="{ compact, squeeze }">
+      <div v-else class="po-board" :class="{ compact, squeeze, stack }">
         <div class="po-grid" :style="gridStyle">
           <h3
             v-for="(round, roundIndex) in rounds"
@@ -430,7 +443,7 @@ const finalLinkStyle = computed(() => ({
             <small v-if="roundNote(slotsOf(round)).text">{{ roundNote(slotsOf(round)).text }}</small>
             <span v-else-if="roundNote(slotsOf(round)).live" class="st live">идёт</span>
           </h3>
-          <h3 class="rh" :style="{ gridColumn: String(championColumn(rounds.length)), gridRow: '1' }">Чемпион</h3>
+          <h3 class="rh" :style="champHeaderStyle">Чемпион</h3>
 
           <template v-for="(round, roundIndex) in rounds" :key="`c-${round.round ?? roundIndex}`">
             <div
@@ -541,6 +554,8 @@ const finalLinkStyle = computed(() => ({
 .po-card-h h2 { font-size: 1.0625rem; margin: 0; }
 .po-hint { margin: 0; font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
 .po-board { min-width: 0; max-width: 100%; overflow-x: auto; }
+.po-board.stack { overflow-x: visible; }
+.po-board.stack .po-grid { width: 100%; }
 .po-grid { display: grid; column-gap: 0; min-width: 0; }
 .po-grid > * { min-width: 0; }
 .cell { align-self: center; }
@@ -626,7 +641,6 @@ const finalLinkStyle = computed(() => ({
   background: #fff;
   color: var(--ink);
 }
-.po-grid.compact :deep(.pr) { height: 34px; }
 .po-board.compact :deep(.pr) { height: 34px; }
 .po-board.compact :deep(.pf) { min-height: 26px; padding: 0.2rem 0.6rem; }
 .po-board.compact :deep(.seed) { display: none; }

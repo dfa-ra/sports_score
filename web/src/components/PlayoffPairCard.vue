@@ -54,7 +54,7 @@ function seed(home: boolean) {
   )
 }
 
-function lit(home: boolean) {
+function rowLit(home: boolean) {
   const id = teamId(home)
   return !!id && (props.lit ?? []).includes(id)
 }
@@ -66,6 +66,7 @@ function lit(home: boolean) {
     class="pc"
     :class="{ live, final, static: !slot.matchId }"
     :to="slot.matchId ? `/matches/${slot.matchId}` : undefined"
+    :role="slot.matchId ? undefined : 'group'"
     :aria-label="aria"
     @focus="emit('focus')"
     @blur="emit('blur')"
@@ -80,7 +81,7 @@ function lit(home: boolean) {
       v-for="home in [true, false]"
       :key="home ? 'h' : 'a'"
       class="pr"
-      :class="[kind(home), { hl: lit(home) }]"
+      :class="[kind(home), { hl: rowLit(home) }]"
       @mouseenter="teamId(home) && canHover && emit('hover', teamId(home) || null)"
       @mouseleave="canHover && emit('hover', null)"
     >

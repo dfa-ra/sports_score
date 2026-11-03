@@ -75,6 +75,10 @@ async function load() {
   const id = route.params.id
   if (!tournament.value || tournament.value.id !== id) {
     tournament.value = null
+    overview.value = null
+    playoff.value = null
+    playoffLoading.value = false
+    playoffError.value = false
     missing.value = false
     error.value = ''
   }
@@ -271,9 +275,16 @@ const showGrid = computed(() => tournamentHasPlayoff({
   rounds: playoff.value?.rounds,
   hasPlayoff: overview.value?.hasPlayoff,
 }))
-const tab = computed<TourTab>(() => {
+const playoffKnown = computed(() => {
+  if (overview.value != null) return true
+  if (!tournament.value) return false
+  return !playoffLoading.value
+})
+const tab = computed<TourTab | 'pending'>(() => {
   const raw = String(route.query.tab || '')
   if (raw === 'matches' || raw === 'teams' || raw === 'rules' || raw === 'table') return raw
+  // Until the overview (or the bracket) arrives, do not paint «Таблица» and then jump to «Сетка».
+  if (!playoffKnown.value) return 'pending'
   if (raw === 'playoff') return showGrid.value ? 'playoff' : 'table'
   return showGrid.value ? 'playoff' : 'table'
 })
@@ -328,20 +339,29 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 </script>
 
 <template>
-  <section v-if="tournament" class="stack tour">
+  <section v-if="missing" class="stack">
+    <h1>Турнир не найден</h1>
+  </section>
+  <p v-else-if="!tournament && error" class="form-error">{{ error }}</p>
+  <section v-else class="stack tour">
     <nav class="crumbs" aria-label="Навигация">
       <RouterLink to="/tournaments">Турниры</RouterLink>
       <span aria-hidden="true"> › </span>
-      <span>{{ tournament.name }}</span>
+      <span v-if="tournament">{{ tournament.name }}</span>
+      <span v-else class="crumb-skel" aria-hidden="true"></span>
     </nav>
     <div class="th">
-      <div>
+      <div v-if="tournament">
         <span v-if="statusChip" class="tour-st" :class="statusChip.kind">{{ statusChip.text }}</span>
         <h1>{{ tournament.name }}</h1>
         <p v-if="metaParts.length" class="meta">
           <span v-for="part in metaParts" :key="part">{{ part }}</span>
         </p>
         <p v-if="tournament.description" class="lede">{{ tournament.description }}</p>
+      </div>
+      <div v-else class="title-pending" role="status" aria-busy="true" aria-label="Заголовок загружается">
+        <span class="title-skel"></span>
+        <span class="meta-skel"></span>
       </div>
     </div>
 
@@ -356,21 +376,25 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
 
     <div class="ttabs" role="tablist" aria-label="Разделы турнира">
-      <button v-if="showGrid" type="button" role="tab" :aria-selected="tab === 'playoff'" :class="{ on: tab === 'playoff' }" @click="setTab('playoff')">
+      <button v-if="showGrid || tab === 'pending'" type="button" role="tab" :aria-selected="tab === 'playoff'" :class="{ on: tab === 'playoff' }" @click="tab !== 'pending' && setTab('playoff')">
         Сетка
-        <span v-if="playoffLive" class="dot" aria-label="Есть live"></span>
+        <span v-if="playoffLive" class="dot" role="img" aria-label="Есть live"></span>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'table'" :class="{ on: tab === 'table' }" @click="setTab('table')">Таблица</button>
       <button type="button" role="tab" :aria-selected="tab === 'matches'" :class="{ on: tab === 'matches' }" @click="setTab('matches')">
-        Матчи <i>{{ matchesCount }}</i>
+        Матчи <i v-if="overview">{{ matchesCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'teams'" :class="{ on: tab === 'teams' }" @click="setTab('teams')">
-        Команды <i>{{ teamsCount }}</i>
+        Команды <i v-if="overview">{{ teamsCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'rules'" :class="{ on: tab === 'rules' }" @click="setTab('rules')">Регламент</button>
     </div>
 
-    <div v-if="tab === 'rules'" class="panel" role="tabpanel">
+    <div v-if="tab === 'pending' || !tournament" class="panel tour-skel" role="status" aria-busy="true" aria-label="Турнир загружается">
+      <span class="card-skel"></span>
+      <span class="card-skel short"></span>
+    </div>
+    <div v-else-if="tab === 'rules'" class="panel" role="tabpanel">
       <h2>Регламент</h2>
       <p style="white-space: pre-wrap">{{ tournament.regulations || 'Регламент ещё не опубликован.' }}</p>
     </div>
@@ -410,7 +434,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </RouterLink>
     </div>
     <PlayoffBracket
-      v-else
+      v-else-if="tab === 'playoff'"
       role="tabpanel"
       :tournament-id="tournament.id"
       :rounds="playoff?.rounds ?? []"
@@ -431,7 +455,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       @applied="onApplied"
     />
 
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа" open>
+    <AdminOnly v-if="tournament && auth.canManageLeague" title="Для админа" open>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
       <h2>Настройки турнира</h2>
@@ -538,19 +562,30 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
-  <section v-else-if="missing" class="stack">
-    <h1>Турнир не найден</h1>
-  </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>
 .tour { min-width: 0; max-width: 100%; }
 .tour > * { min-width: 0; }
-.crumbs { font-size: 0.8125rem; font-weight: 700; color: var(--muted); }
+.crumbs { font-size: 0.8125rem; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .crumbs a { color: var(--muted); }
 .crumbs a:hover { color: var(--navy); }
+.crumb-skel { display: inline-block; width: 8rem; height: 0.8rem; border-radius: 6px; background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%); background-size: 200% 100%; animation: tour-shimmer 1.4s infinite; }
 .th h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0.45rem 0 0.35rem; }
+.title-pending { display: grid; gap: 0.55rem; padding-top: 0.2rem; }
+.title-skel, .meta-skel, .card-skel {
+  display: block;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e8eef5 25%, #f4f7fb 50%, #e8eef5 75%);
+  background-size: 200% 100%;
+  animation: tour-shimmer 1.4s infinite;
+}
+.title-skel { height: 2.1rem; width: min(280px, 70%); }
+.meta-skel { height: 0.9rem; width: min(420px, 92%); }
+.tour-skel { display: grid; gap: 0.7rem; }
+.card-skel { height: 7.5rem; }
+.card-skel.short { width: 70%; height: 4.5rem; }
+@keyframes tour-shimmer { to { background-position: -200% 0; } }
 .tour-st {
   display: inline-flex;
   align-items: center;
@@ -650,8 +685,12 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   font-size: 0.82rem;
   white-space: nowrap;
 }
+@media (prefers-reduced-motion: reduce) {
+  .crumb-skel, .title-skel, .meta-skel, .card-skel { animation: none; }
+}
 @media (max-width: 720px) {
   .th h1 { font-size: 1.5rem; }
+  .title-skel { height: 1.7rem; }
   .ttabs button { padding: 0.75rem 0.8rem; }
   .meta { gap: 0.15rem 1rem; }
   .meta span + span::before { display: none; }

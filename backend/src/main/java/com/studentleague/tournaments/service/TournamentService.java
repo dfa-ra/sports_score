@@ -32,7 +32,6 @@ import com.studentleague.tournaments.dto.TournamentTableResponse;
 import com.studentleague.tournaments.dto.TournamentTableWriteRequest;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
-import com.studentleague.tournaments.entity.PlayoffSlot;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
@@ -173,21 +172,11 @@ public class TournamentService {
     @Transactional(readOnly = true)
     public TournamentOverviewResponse overview(UUID id) {
         Tournament tournament = requireTournament(id);
-        int teamsCount = 0;
-        for (TournamentTeam entry : tournamentTeamRepository.findByTournamentId(id)) {
-            if (entry.getStatus() != TournamentTeamStatus.WITHDRAWN) {
-                teamsCount++;
-            }
-        }
-        int matchesCount = matchRepository.findByTournamentId(id).size();
-        List<PlayoffSlot> slots = playoffSlotRepository.findByTournamentIdOrderByRoundNumberAscSlotIndexAsc(id);
+        int teamsCount = (int) tournamentTeamRepository.countByTournamentIdAndStatusNot(id, TournamentTeamStatus.WITHDRAWN);
+        int matchesCount = (int) matchRepository.countByTournamentId(id);
+        boolean hasSlots = playoffSlotRepository.countByTournamentId(id) > 0;
+        List<UUID> matchIds = playoffSlotRepository.findMatchIdsByTournamentId(id);
         boolean playoffLive = false;
-        List<UUID> matchIds = new ArrayList<>();
-        for (PlayoffSlot slot : slots) {
-            if (slot.getMatchId() != null) {
-                matchIds.add(slot.getMatchId());
-            }
-        }
         if (!matchIds.isEmpty()) {
             for (Match match : matchRepository.findAllById(matchIds)) {
                 if (match.getStatus() == MatchStatus.LIVE || match.getStatus() == MatchStatus.PAUSED) {
@@ -196,7 +185,7 @@ public class TournamentService {
                 }
             }
         }
-        boolean hasPlayoff = !slots.isEmpty()
+        boolean hasPlayoff = hasSlots
                 || tournament.getCompetitionStage() == CompetitionStage.PLAYOFF
                 || formatIncludesPlayoff(tournament.getFormat());
         return new TournamentOverviewResponse(

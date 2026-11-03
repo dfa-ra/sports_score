@@ -67,6 +67,11 @@ export function useRoundTabs(teamCount: number, viewportWidth: number) {
   return viewportWidth <= 720
 }
 
+/** Two teams are just the final. At phone width the champion sits under that match instead of beside it. */
+export function stackChampion(roundCount: number, viewportWidth: number) {
+  return roundCount <= 1 && viewportWidth <= 720
+}
+
 export function defaultRoundIndex(rounds: PlayoffRound[]): number {
   const live = rounds.findIndex((round) => slotsOf(round).some((slot) => isLiveStatus(slot.matchStatus)))
   if (live >= 0) return live
@@ -243,8 +248,10 @@ export function arrivalLine(feeder: PlayoffSlot | undefined, sourceTitle?: strin
   return { name, detail: `${roundBit}: ${score}${other ? `, ${other}` : ''}` }
 }
 
-export function gridColumns(roundCount: number, compact: boolean, squeeze: boolean) {
-  if (roundCount <= 1) return 'minmax(0, 238px) minmax(160px, 1fr)'
+export function gridColumns(roundCount: number, compact: boolean, squeeze: boolean, stack = false) {
+  // Side by side, 238px + a 160px champion is about 398px and scrolls a 375px phone.
+  // Stacking uses one fluid column so the board stays inside the viewport.
+  if (roundCount <= 1) return stack ? 'minmax(0, 1fr)' : 'minmax(0, 238px) minmax(160px, 1fr)'
   // 16-team tracks prefer 214px but can shrink so the champion column stays readable inside the 1120px page.
   const col = compact ? 'minmax(150px, 214px)' : squeeze ? 'minmax(190px, 238px)' : '238px'
   const link = compact ? '22px' : squeeze ? '24px' : '30px'
@@ -278,6 +285,19 @@ export function connectorCell(sourceRound: number, slotIndex: number) {
 
 export function championColumn(roundCount: number) {
   return roundCount <= 1 ? 2 : roundCount * 2 + 1
+}
+
+export function championHeaderCell(roundCount: number, stack: boolean) {
+  if (stack) return { gridColumn: '1', gridRow: '3' }
+  return { gridColumn: String(championColumn(roundCount)), gridRow: '1' }
+}
+
+export function championCell(roundCount: number, firstSlots: number, stack: boolean) {
+  if (stack) return { gridColumn: '1', gridRow: '4' }
+  return {
+    gridColumn: String(championColumn(roundCount)),
+    gridRow: `2 / span ${firstSlots}`,
+  }
 }
 
 export function headerCell(roundIndex: number, roundCount: number) {
