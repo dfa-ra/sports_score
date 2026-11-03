@@ -16,6 +16,7 @@ import {
   goalsPerMatchLabel,
   heroWhen,
   isFutureScheduled,
+  matchTournamentChips,
   leaderLine,
   matchClockLabel,
   matchDayLabel,
@@ -54,6 +55,7 @@ const nextMatch = computed(() => {
 const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
 const livePreview = computed(() => liveRows.value.slice(0, 3))
 const tournaments = computed(() => overview.value.tournaments)
+const matchChips = computed(() => matchTournamentChips(tournaments.value))
 const offseason = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length === 0)
 const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length > 0)
 const showStats = computed(() => !failed.value && (!loaded.value || !!overview.value.summary))
@@ -90,7 +92,7 @@ async function load(silent = false) {
     const { data } = await api.get<HomeOverview>('/home/overview')
     overview.value = normalize(data)
     failed.value = false
-    if (chip.value && !overview.value.tournaments.some((item) => item.id === chip.value)) chip.value = null
+    if (chip.value && !matchTournamentChips(overview.value.tournaments).some((item) => item.id === chip.value)) chip.value = null
     if (!scorerTab.value || !overview.value.scorersByTournament.some((item) => item.tournamentId === scorerTab.value)) {
       scorerTab.value = overview.value.scorersByTournament[0]?.tournamentId || ''
     }
@@ -242,12 +244,12 @@ onUnmounted(() => {
             <div class="vs">
               <div class="side">
                 <HomeCrest large :id="nextMatch?.homeTeamId" :name="nextMatch?.homeTeamName" :src="nextMatch?.homeLogoUrl" />
-                <span>{{ nextMatch?.homeTeamName }}</span>
+                <span class="team-name">{{ nextMatch?.homeTeamName }}</span>
               </div>
               <div class="x">VS</div>
               <div class="side">
                 <HomeCrest large :id="nextMatch?.awayTeamId" :name="nextMatch?.awayTeamName" :src="nextMatch?.awayLogoUrl" />
-                <span>{{ nextMatch?.awayTeamName }}</span>
+                <span class="team-name">{{ nextMatch?.awayTeamName }}</span>
               </div>
             </div>
             <div class="meta">
@@ -304,7 +306,7 @@ onUnmounted(() => {
             <div class="chips">
               <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">Все турниры</button>
               <button
-                v-for="tournament in tournaments"
+                v-for="tournament in matchChips"
                 :key="tournament.id"
                 class="chip"
                 :class="{ on: chip === tournament.id }"
@@ -533,10 +535,19 @@ onUnmounted(() => {
 .eyebrow.muted { color: var(--muted); margin-bottom: 0.6rem; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .hero-card h1 { color: #fff; font-size: 2rem; }
-.vs { display: flex; align-items: center; gap: 1.5rem; margin: 0.9rem 0 0.8rem; flex-wrap: wrap; }
-.side { display: flex; align-items: center; gap: 0.8rem; font-size: 1.6rem; font-weight: 800; text-transform: uppercase; color: #fff; min-width: 0; }
-.side span { min-width: 0; overflow-wrap: anywhere; }
-.x { color: var(--ice); font-weight: 800; font-size: 1rem; letter-spacing: 0.1em; }
+.vs {
+  display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap;
+  gap: 1.5rem; margin: 0.9rem 0 0.8rem; min-width: 0; font-size: 1.6rem;
+}
+.side {
+  display: flex; align-items: center; gap: 0.8rem; flex: 1 1 0; min-width: 0;
+  font-size: 1em; font-weight: 800; text-transform: uppercase; color: #fff;
+}
+.team-name {
+  min-width: 0; overflow: visible; text-overflow: unset; white-space: normal;
+  overflow-wrap: break-word; word-break: normal; line-height: 1.15;
+}
+.x { flex: 0 0 auto; color: var(--ice); font-weight: 800; font-size: 1em; letter-spacing: 0.1em; line-height: 1; }
 .meta, .acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
 .meta { margin-bottom: 1.2rem; }
 .stage { font-size: 0.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.03em; }
@@ -702,8 +713,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 @media (max-width: 719px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; padding: 1.25rem; }
   .hero-card { min-height: 446px; }
-  .side { font-size: 1.1rem; }
-  .vs { gap: 0.8rem; }
+  .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
+  .side { gap: 0.4rem; font-size: 1em; }
   .wm { width: 220px; right: -50px; }
   .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 44px; height: 44px; }
   .feed-list { display: none; }
@@ -742,6 +753,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 719px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
+  .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
+  .side { gap: 0.4rem; }
   .tgrid { grid-template-columns: 1fr; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; }
   .irow .sc .line { white-space: nowrap; }

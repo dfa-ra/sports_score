@@ -12,9 +12,9 @@ function match(id: string, tournamentId: string, tournamentName: string, status:
     scheduledAt,
     status,
     homeTeamId: `${id}-home`,
-    homeTeamName: 'Северная сборная факультета',
+    homeTeamName: 'Сборная севера',
     awayTeamId: `${id}-away`,
-    awayTeamName: 'Южная сборная факультета',
+    awayTeamName: 'Сборная юга',
     homeScore: 0,
     awayScore: 0,
     minute: status === 'LIVE' ? 12 : null,
@@ -28,12 +28,12 @@ const live = match('live-1', 'cup-b', 'Зимний кубок факульте�
 const lastA = match('last-a', 'cup-a', 'Осенний кубок факультетов', 'FINISHED', '2026-11-01T14:00:00Z')
 const lastB = match('last-b', 'cup-b', 'Зимний кубок факультетов', 'FINISHED', '2026-11-02T14:00:00Z')
 
-function tournament(id: string, name: string, lastMatch: ReturnType<typeof match>) {
+function tournament(id: string, name: string, lastMatch: ReturnType<typeof match>, status = 'ACTIVE') {
   return {
     id,
     name,
     shortName: name,
-    status: 'ACTIVE',
+    status,
     seasonYear: 2026,
     seasonLabel: 'Сезон 2026',
     format: 'CUP',
@@ -60,8 +60,8 @@ const overview = {
   upcoming: [next],
   recent: [lastA, lastB],
   tournaments: [
-    tournament('cup-a', 'Осенний кубок факультетов', lastA),
-    tournament('cup-b', 'Зимний кубок факультетов', lastB),
+    tournament('cup-a', 'Осенний кубок факультетов', lastA, 'ACTIVE'),
+    tournament('cup-b', 'Зимний кубок факультетов', lastB, 'REGISTRATION'),
   ],
   scorersByTournament: [],
   summary: { matchesPlayed: 2, goals: 0, goalsPerMatch: 0, teams: 4, players: 16 },
@@ -130,7 +130,50 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
       heroColumns: await columns(page, '.hero-match'),
       cardColumns: await columns(page, '.tgrid'),
     }
+    const chips = page.locator('.filters .chip')
+    await expect(chips).toHaveText(['Все турниры', 'Осенний кубок факультетов'])
+    await expect(page.locator('.tcard h3', { hasText: 'Зимний кубок факультетов' })).toBeVisible()
+
+    const vs = hero.locator('.vs')
+    const homeSide = vs.locator('.side').nth(0)
+    const awaySide = vs.locator('.side').nth(1)
+    const vsMark = vs.locator('.x')
+    const homeBox = await homeSide.boundingBox()
+    const awayBox = await awaySide.boundingBox()
+    const markBox = await vsMark.boundingBox()
+    const crestBox = await homeSide.locator('.crest').boundingBox()
+    expect(homeBox && awayBox && markBox && crestBox).toBeTruthy()
+    const homeMid = homeBox!.y + homeBox!.height / 2
+    const awayMid = awayBox!.y + awayBox!.height / 2
+    expect(Math.abs(homeMid - awayMid)).toBeLessThan(8)
+    expect(awayBox!.y).toBeLessThan(homeBox!.y + homeBox!.height)
+    expect(markBox!.x).toBeGreaterThan(homeBox!.x + 20)
+    expect(awayBox!.x).toBeGreaterThan(markBox!.x)
+    expect(Math.round(crestBox!.width)).toBe(44)
+    expect(Math.round(crestBox!.height)).toBe(44)
+    const nameStyle = await homeSide.locator('.team-name').evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { fontSize: style.fontSize, whiteSpace: style.whiteSpace, textOverflow: style.textOverflow }
+    })
+    const vsStyle = await vsMark.evaluate((el) => {
+      const style = getComputedStyle(el)
+      return { fontSize: style.fontSize, color: style.color }
+    })
+    expect(nameStyle.fontSize).toBe('17.6px')
+    expect(vsStyle.fontSize).toBe(nameStyle.fontSize)
+    expect(vsStyle.color).toBe('rgb(76, 180, 229)')
+    expect(nameStyle.whiteSpace).not.toBe('nowrap')
+    expect(nameStyle.textOverflow).not.toBe('ellipsis')
+    const nameBox = await homeSide.locator('.team-name').boundingBox()
+    expect(nameBox!.width).toBeLessThan(homeBox!.width)
+    if (width <= 512) {
+      expect(nameBox!.height).toBeGreaterThan(parseFloat(nameStyle.fontSize) * 1.4)
+    }
+
     await page.screenshot({ path: `/opt/cursor/artifacts/home-${width}.png`, fullPage: true })
+    if (width === 375) {
+      await vs.screenshot({ path: '/opt/cursor/artifacts/home-hero-teams-375.png' })
+    }
   }
 
   await page.setViewportSize({ width: 720, height: 900 })
@@ -141,6 +184,18 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
   const actsBox = await page.locator('.hero-match .acts').boundingBox()
   const liveBox = await page.locator('.hero-match .livebar').boundingBox()
   expect(liveBox!.x).toBeGreaterThan(actsBox!.x + 40)
+  const desktopCrest = await page.locator('.hero-match .vs .crest').first().boundingBox()
+  const desktopName = await page.locator('.hero-match .vs .team-name').first().evaluate((el) => getComputedStyle(el).fontSize)
+  const desktopVs = await page.locator('.hero-match .vs .x').evaluate((el) => getComputedStyle(el).fontSize)
+  expect(Math.round(desktopCrest!.width)).toBe(56)
+  expect(desktopName).toBe('25.6px')
+  expect(desktopVs).toBe(desktopName)
+  const desktopHome = await page.locator('.hero-match .vs .side').nth(0).boundingBox()
+  const desktopAway = await page.locator('.hero-match .vs .side').nth(1).boundingBox()
+  const desktopHomeMid = desktopHome!.y + desktopHome!.height / 2
+  const desktopAwayMid = desktopAway!.y + desktopAway!.height / 2
+  expect(Math.abs(desktopHomeMid - desktopAwayMid)).toBeLessThan(8)
+  expect(desktopAway!.x).toBeGreaterThan(desktopHome!.x + desktopHome!.width * 0.4)
 
   writeFileSync('/opt/cursor/artifacts/home-layout-scroll.json', JSON.stringify(scroll, null, 2))
 })

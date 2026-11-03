@@ -116,6 +116,10 @@ export type HomeOverview = {
   summary?: LeagueSummary | null
 }
 
+export function matchTournamentChips<T extends { status?: string }>(tournaments: T[]) {
+  return tournaments.filter((tournament) => tournament.status === 'ACTIVE')
+}
+
 export function emptyOverview(): HomeOverview {
   return { live: [], upcoming: [], recent: [], tournaments: [], scorersByTournament: [], summary: null, next: null }
 }
