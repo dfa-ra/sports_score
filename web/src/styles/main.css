@@ -22,6 +22,18 @@
   --danger: #e36b5b;
   --danger-soft: rgba(227, 107, 91, 0.14);
   --warning: #4cb4e5;
+  --status-live: #e36b5b;
+  --status-live-ink: #b4402f;
+  --status-live-soft: rgba(227, 107, 91, 0.14);
+  --status-ok: #1f8f6b;
+  --status-ok-soft: #dff3ec;
+  --status-warn: #c98a1b;
+  --status-warn-ink: #85560a;
+  --status-warn-soft: #fcf0d6;
+  --status-soon-ink: #1b5f8c;
+  --status-soon-soft: rgba(76, 180, 229, 0.16);
+  --status-done-ink: var(--muted);
+  --status-done-soft: #eef2f6;
   --line: rgba(0, 32, 91, 0.1);
   --line-strong: rgba(0, 32, 91, 0.18);
   --shadow:

@@ -3,9 +3,13 @@ package com.studentleague.home.controller;
 import com.studentleague.gallery.domain.GallerySlot;
 import com.studentleague.gallery.service.GalleryService;
 import com.studentleague.home.dto.HomeFeedResponse;
+import com.studentleague.home.dto.HomeOverviewResponse;
+import com.studentleague.home.service.HomeOverviewService;
 import com.studentleague.statistics.service.StatisticsService;
 import com.studentleague.tournaments.dto.TournamentResponse;
 import com.studentleague.tournaments.service.TournamentService;
+
+import java.time.Instant;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,15 +26,24 @@ public class HomeController {
     private final TournamentService tournamentService;
     private final StatisticsService statisticsService;
     private final GalleryService galleryService;
+    private final HomeOverviewService homeOverviewService;
 
     public HomeController(
             TournamentService tournamentService,
             StatisticsService statisticsService,
-            GalleryService galleryService
+            GalleryService galleryService,
+            HomeOverviewService homeOverviewService
     ) {
         this.tournamentService = tournamentService;
         this.statisticsService = statisticsService;
         this.galleryService = galleryService;
+        this.homeOverviewService = homeOverviewService;
+    }
+
+    @GetMapping("/overview")
+    @Operation(summary = "League home: live, next, upcoming, recent matches, running tournaments and scorers")
+    public HomeOverviewResponse overview() {
+        return homeOverviewService.overview(Instant.now());
     }
 
     @GetMapping

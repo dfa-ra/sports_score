@@ -7,7 +7,7 @@ const FALLBACK_DESCRIPTION = 'Турниры, таблица, календарь
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Таблица, ближайшие матчи и бомбардиры Лиги ИТМО.' } },
+    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Ближайшие матчи, идущие турниры и бомбардиры Лиги ИТМО.' } },
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { guest: true, title: 'Вход', description: 'Вход в Лигу ИТМО.' } },
     { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { guest: true, title: 'Регистрация', description: 'Регистрация в Лиге ИТМО.' } },
     { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/ForgotPasswordView.vue'), meta: { guest: true, title: 'Восстановление пароля', description: 'Ссылка для нового пароля.' } },

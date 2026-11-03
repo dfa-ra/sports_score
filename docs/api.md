@@ -226,7 +226,7 @@ Backend проверяет подпись токена, срок, issuer Google 
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET | `/matches` | Публичный — фильтры |
+| GET | `/matches` | Публичный. Фильтры `tournamentId`, `status`. `from` и `to` ограничивают `scheduledAt` включительно. Значение `YYYY-MM-DD` — календарный день Europe/Moscow (начало дня для `from`, конец дня для `to`). Момент ISO-8601 берётся как есть. Неверный формат — `400`. Без `from` и `to` список как раньше; неизвестный `sort` по-прежнему не превращается в `400` |
 | GET | `/matches/next` | Публичный. Ближайший матч: LIVE или PAUSED, иначе самый ранний SCHEDULED со стартом не раньше текущего момента. Необязательный `tournamentId` ограничивает выбор этим турниром. Сыгранный матч не берётся, даже если запланированный старт ещё впереди. Нет такого матча — 204 |
 | GET | `/matches/{id}` | Публичный. В ответе: `period`, `periodCount`, `periodLengthSeconds` (по умолчанию 2×20 мин), `clockRunningSince`, `sportCode`, `bracketRound` (номер круга плей-офф или `null`), `penaltyHome`, `penaltyAway` |
 | POST | `/matches` | ADMIN. Опционально `periodCount` (1–8), `periodLengthMinutes` (1–90, иначе 2×20) и `venue` (зал, до 120 символов) |
@@ -237,6 +237,19 @@ Backend проверяет подпись токена, срок, issuer Google 
 | GET | `/matches/{id}/referees` | Публичный |
 | GET | `/matches/{id}/lineups` | Публичный — основа и скамейка; если капитан не записал, вся заявка как скамейка |
 | PUT | `/matches/{id}/lineups` | Капитан этой команды, назначенный судья или ADMIN |
+
+---
+
+## Главная
+
+| Метод | Путь | Auth |
+|---|---|---|
+| GET | `/home` | Публичный. Прежняя лента одного турнира: таблица, бомбардиры, герои, сюжеты, фото, ссылка на альбом |
+| GET | `/home/overview` | Публичный. Одна сборка для новой главной: `generatedAt`, `next`, `live[]`, `upcoming[]`, `recent[]`, `tournaments[]`, `scorersByTournament[]`, `summary` |
+
+`next` — самый ранний `SCHEDULED` со `scheduledAt` не раньше текущего момента (live сюда не попадает). `upcoming` — такие матчи по возрастанию старта, до 24, включая `next`. `recent` — завершённые, сначала последний матч каждого турнира, затем следующий, не больше трёх на турнир и 24 всего. В матче есть `tournamentName`, `tournamentShortName`, имена и логотипы команд, `stageLabel`, `round`.
+
+`tournaments` — `ACTIVE` (по `startDate` убыв.), затем `REGISTRATION`. У карточки `shortName`, `teamsCount`, `leader`, `stageLabel`, `currentRound`, `roundsTotal`, `progress`, `lastMatch`, `nextMatch`. Для регистрации `registrationClosesOn` — дата старта, `progress` и `leader` пустые. `currentRound` для групп — номер московского дня календаря. `scorersByTournament` — только `ACTIVE`, топ-5 с голами. `summary` тот же объект, что `GET /statistics/summary` без фильтра.
 
 ---
 
@@ -264,6 +277,7 @@ Backend проверяет подпись токена, срок, issuer Google 
 | Метод | Путь | Auth |
 |---|---|---|
 | GET | `/statistics/players` | Публичный — фильтры. События матчей читаются одним запросом, не по матчу |
+| GET | `/statistics/summary` | Публичный. `{ matchesPlayed, goals, goalsPerMatch, teams, players, updatedAt }`. Считаются завершённые матчи (не отменённые), допущенные команды и активные игроки. Необязательный `tournamentId`. `goalsPerMatch` — один знак после запятой |
 | GET | `/statistics/board` | Публичный — `{ scorers, assists, goalkeepers }` за один проход. `tournamentId`, `limit` (до 100) |
 | GET | `/statistics/teams` | Публичный — фильтры |
 

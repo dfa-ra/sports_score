@@ -1,5 +1,6 @@
 package com.studentleague.statistics.controller;
 
+import com.studentleague.statistics.dto.LeagueSummaryResponse;
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
 import com.studentleague.statistics.dto.StatisticsBoardResponse;
 import com.studentleague.statistics.dto.TeamStatisticsResponse;
@@ -46,6 +47,12 @@ public class StatisticsController {
             @RequestParam(required = false) UUID teamId
     ) {
         return statisticsService.teamStatistics(tournamentId, seasonYear, teamId);
+    }
+
+    @GetMapping("/summary")
+    @Operation(summary = "League totals: finished matches, goals, approved teams, active players. Optional tournamentId.")
+    public LeagueSummaryResponse summary(@RequestParam(required = false) UUID tournamentId) {
+        return statisticsService.summary(tournamentId);
     }
 
     @GetMapping("/board")

@@ -11,6 +11,7 @@ import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.statistics.dto.LeagueSummaryResponse;
 import com.studentleague.statistics.dto.PlayerStatisticsResponse;
 import com.studentleague.statistics.dto.StatisticsBoardResponse;
 import com.studentleague.statistics.dto.TeamStatisticsResponse;
@@ -19,13 +20,18 @@ import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.entity.TeamMember;
 import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import com.studentleague.users.entity.User;
 import com.studentleague.users.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -46,6 +52,7 @@ public class StatisticsService {
     private final TeamRepository teamRepository;
     private final MatchLineupPlayerRepository lineupPlayerRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final TournamentTeamRepository tournamentTeamRepository;
     private final UserRepository userRepository;
     private final StandingsBoardCache standingsBoardCache;
 
@@ -57,6 +64,7 @@ public class StatisticsService {
             TeamRepository teamRepository,
             MatchLineupPlayerRepository lineupPlayerRepository,
             TeamMemberRepository teamMemberRepository,
+            TournamentTeamRepository tournamentTeamRepository,
             UserRepository userRepository,
             StandingsBoardCache standingsBoardCache
     ) {
@@ -67,6 +75,7 @@ public class StatisticsService {
         this.teamRepository = teamRepository;
         this.lineupPlayerRepository = lineupPlayerRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.tournamentTeamRepository = tournamentTeamRepository;
         this.userRepository = userRepository;
         this.standingsBoardCache = standingsBoardCache;
     }
@@ -187,6 +196,38 @@ public class StatisticsService {
                     rankKeepers(keeperCounts(tournamentId), stats, limit)
             );
         });
+    }
+
+    @Transactional(readOnly = true)
+    public LeagueSummaryResponse summary(UUID tournamentId) {
+        return standingsBoardCache.get(summaryKey(tournamentId), () -> loadSummary(tournamentId));
+    }
+
+    private LeagueSummaryResponse loadSummary(UUID tournamentId) {
+        long matches;
+        long goals;
+        long teams;
+        long players;
+        if (tournamentId == null) {
+            matches = matchRepository.countByStatus(MatchStatus.FINISHED);
+            goals = matchRepository.sumScoresByStatus(MatchStatus.FINISHED);
+            teams = tournamentTeamRepository.countDistinctTeamsByStatus(TournamentTeamStatus.APPROVED);
+            players = teamMemberRepository.countDistinctActivePlayers();
+        } else {
+            matches = matchRepository.countByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+            goals = matchRepository.sumScoresByTournamentAndStatus(tournamentId, MatchStatus.FINISHED);
+            teams = tournamentTeamRepository.countDistinctTeamsByTournamentAndStatus(
+                    tournamentId, TournamentTeamStatus.APPROVED);
+            players = teamMemberRepository.countDistinctActivePlayersInTournament(tournamentId);
+        }
+        BigDecimal perMatch = matches == 0
+                ? BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
+                : BigDecimal.valueOf(goals).divide(BigDecimal.valueOf(matches), 1, RoundingMode.HALF_UP);
+        return new LeagueSummaryResponse(matches, goals, perMatch, teams, players, Instant.now());
+    }
+
+    private static String summaryKey(UUID tournamentId) {
+        return "summary:" + (tournamentId == null ? "all" : tournamentId);
     }
 
     @Transactional(readOnly = true)

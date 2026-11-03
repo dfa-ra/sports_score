@@ -173,7 +173,8 @@ watch(compact, () => {
 </template>
 
 <style scoped>
-.shell { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+.shell { min-height: 100vh; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; }
+.shell > * { min-width: 0; }
 .chrome { background: var(--navy); color: #fff; }
 .nav-inner {
   display: flex;
