@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,25 @@ public interface MatchRepository extends JpaRepository<Match, UUID> {
     @Query("select m from Match m where m.tournamentId in :tournamentIds")
     List<Match> findByTournamentIdIn(@Param("tournamentIds") java.util.Collection<UUID> tournamentIds);
     Page<Match> findByStatus(MatchStatus status, Pageable pageable);
+
+    /**
+     * Next kickoff: a live or paused match first, otherwise a scheduled match that has not started.
+     * Equal kickoffs stay stable by id. A scheduled row in the past is not chosen.
+     */
+    @Query("""
+            select m from Match m
+            where m.status in :inPlay
+               or (m.status = :scheduled and m.scheduledAt >= :from)
+            order by case when m.status in :inPlay then 0 else 1 end,
+                     m.scheduledAt asc,
+                     m.id asc
+            """)
+    List<Match> findNextByKickoff(
+            @Param("inPlay") Collection<MatchStatus> inPlay,
+            @Param("scheduled") MatchStatus scheduled,
+            @Param("from") Instant from,
+            Pageable pageable
+    );
     List<Match> findByStatusIn(Collection<MatchStatus> statuses);
     Page<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status, Pageable pageable);
     List<Match> findByTournamentIdAndStatus(UUID tournamentId, MatchStatus status);

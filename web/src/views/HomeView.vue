@@ -7,7 +7,7 @@ import MatchRow from '../components/MatchRow.vue'
 import StandingGroups from '../components/StandingGroups.vue'
 import { parseStandings, standingGroupsHaveRows } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
-import { SITE_NAME } from '../lib/brand'
+import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import { formatDateRange } from '../lib/format'
 import { longKickoff } from '../lib/match'
 import { setPageMeta } from '../lib/pageMeta'
@@ -25,6 +25,7 @@ type Slide = {
 
 const feed = ref<any>(null)
 const matches = ref<any[]>([])
+const nextMatch = ref<any>(null)
 const loaded = ref(false)
 const loadError = ref('')
 const slide = ref(0)
@@ -54,23 +55,18 @@ const homeTables = computed(() => parseStandings(feed.value?.standings))
 const tournamentDates = computed(() =>
   formatDateRange(feed.value?.tournament?.startDate, feed.value?.tournament?.endDate)
 )
-const nextMatch = computed(() => {
-  const upcoming = matches.value
-    .filter((match) => match.status === 'SCHEDULED' || match.status === 'LIVE' || match.status === 'PAUSED')
-    .slice()
-    .sort((a, b) => String(a.scheduledAt).localeCompare(String(b.scheduledAt)))
-  return upcoming[0] || null
-})
 
 onMounted(async () => {
   try {
     await teams.load()
-    const [{ data }, games] = await Promise.all([
+    const [{ data }, games, upcoming] = await Promise.all([
       api.get('/home'),
       api.get('/matches', { params: { size: 40, sort: 'scheduledAt,desc' } }),
+      api.get('/matches/next').then((response) => response.data?.id ? response.data : null).catch(() => null),
     ])
     feed.value = data
     matches.value = games.data.content ?? []
+    nextMatch.value = upcoming
     const name = data?.tournament?.name || SITE_NAME
     setPageMeta({
       title: 'Главная',
@@ -81,6 +77,7 @@ onMounted(async () => {
   } catch {
     feed.value = null
     matches.value = []
+    nextMatch.value = null
     loadError.value = 'Главная не загрузилась.'
   } finally {
     loaded.value = true
@@ -172,9 +169,8 @@ function heroHeading(slide: Slide | null | undefined) {
         </div>
 
         <div v-if="!loaded" class="hero hero-pending" />
-        <div v-else class="hero" :class="{ photo: !!current?.url }">
-          <img v-if="current?.url" :src="current.url" width="1200" height="280" :alt="current.title || 'Главный кадр'" />
-          <div v-if="current?.url" class="hero-shade" />
+        <div v-else class="hero">
+          <img class="league-photo" :src="BRAND_MARK_SRC" width="512" height="512" alt="" />
           <div class="hero-copy">
             <p class="eyebrow">
               <RouterLink v-if="feed?.tournament?.id" :to="`/tournaments/${feed.tournament.id}`">{{ feed.tournament.name || SITE_NAME }}</RouterLink>
@@ -427,16 +423,28 @@ function heroHeading(slide: Slide | null | undefined) {
 .album { color: #fff; font-weight: 700; width: fit-content; }
 .album:hover { color: #fff; }
 .home-skel { min-height: 220px; }
-.hero img { width: 100%; height: 280px; object-fit: cover; display: block; }
+.hero img.league-photo {
+  position: absolute;
+  top: 50%;
+  right: 4%;
+  width: min(240px, 34%);
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: contain;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
 .hero-shade {
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, rgba(0, 20, 51, 0.82) 0%, rgba(0, 20, 51, 0.2) 70%);
 }
 .hero-copy {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 0.55rem;
-  padding: 1.25rem 1.5rem 1.35rem;
+  padding: 1.25rem min(38%, 16rem) 1.35rem 1.5rem;
   color: #fff;
 }
 .hero.photo .hero-copy {
@@ -666,7 +674,7 @@ function heroHeading(slide: Slide | null | undefined) {
 }
 @media (max-width: 719px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; }
+  .hero-copy, .hero.photo .hero-copy { padding-inline: 1rem; padding-right: 38%; }
   .hero-copy a,
   .hero-copy a:hover { color: #fff; }
   .stories-wrap { gap: 0.2rem; }
@@ -674,7 +682,7 @@ function heroHeading(slide: Slide | null | undefined) {
   .story { width: 72px; }
   .story img { width: 60px; height: 60px; }
   .hero, .hero-pending { min-height: 240px; }
-  .hero img { height: 148px; }
+  .hero img.league-photo { width: min(120px, 32%); height: auto; right: 0.6rem; }
   .hero-copy h1 { font-size: 1.25rem; }
   .hero-cta { display: none; }
   .blocks { padding-top: 0.75rem; gap: 0.7rem; }
