@@ -11,9 +11,13 @@ import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import { myTeamStub, showsMyTeamRoster } from '../lib/myTeamAccess'
+import { formatMoscowDate } from '../lib/moscowTime'
 import { registeredName } from '../lib/playerTitle'
+import { bareLogoUrl } from '../lib/teamLogo'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
 const auth = useAuthStore()
+const names = useTeamDirectory()
 const team = ref<any>(null)
 const members = ref<any[]>([])
 const matches = ref<any[]>([])
@@ -34,6 +38,11 @@ const rsvpPending = ref(false)
 
 const canEditRoster = computed(() => auth.hasRole('CAPTAIN') || auth.hasRole('ADMIN'))
 const rosterPage = computed(() => showsMyTeamRoster((role) => auth.hasRole(role)))
+const foundedLabel = computed(() => formatMoscowDate(team.value?.foundedOn) || '—')
+const headerLogo = computed(() => {
+  const id = team.value?.id
+  return (id && names.logo(id)) || team.value?.logoUrl || ''
+})
 
 const nextMatch = computed(() => {
   const now = Date.now()
@@ -126,6 +135,14 @@ async function setRsvp(status: 'GOING' | 'NOT_GOING') {
   }
 }
 
+async function onCardSaved(logoUrl?: string) {
+  if (logoUrl && team.value) team.value = { ...team.value, logoUrl }
+  await load()
+  if (logoUrl && team.value && bareLogoUrl(team.value.logoUrl) !== bareLogoUrl(logoUrl)) {
+    team.value = { ...team.value, logoUrl }
+  }
+}
+
 async function addMember() {
   pending.value = true
   error.value = ''
@@ -166,10 +183,10 @@ async function removeMember(id: string) {
   </section>
   <section v-else class="stack">
     <div class="page-title team-head">
-      <TeamCrest v-if="team" :src="team.logoUrl" :name="team.name" :size="42" />
+      <TeamCrest v-if="team" :src="headerLogo" :name="team.name" :size="42" />
       <div>
         <h1>Моя команда</h1>
-        <p v-if="team">{{ team.name }} · основана {{ team.foundedOn || '—' }}</p>
+        <p v-if="team">{{ team.name }} · основана {{ foundedLabel }}</p>
       </div>
     </div>
     <p v-if="error" class="form-error">{{ error }}</p>
@@ -183,7 +200,7 @@ async function removeMember(id: string) {
       <div v-if="canEditRoster" class="panel stack">
         <h2>Карточка</h2>
         <p class="muted">Название и логотип видят в таблице и в календаре.</p>
-        <TeamCardEditor :team="team" @saved="load" />
+        <TeamCardEditor :team="team" @saved="onCardSaved" />
       </div>
       <div class="panel" v-if="stats">
         <h2>Статистика</h2>
@@ -191,7 +208,6 @@ async function removeMember(id: string) {
       </div>
       <div class="panel">
         <h2>Состав</h2>
-        <p v-if="canEditRoster" class="muted">Добавить можно только уже зарегистрированного игрока</p>
         <ul class="stack roster">
           <li v-for="m in members" :key="m.id" class="member">
             <span class="who">
