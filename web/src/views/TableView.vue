@@ -365,7 +365,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
         </div>
         <div v-if="statsLoading" class="skeleton" />
         <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
-        <EmptyState v-else-if="!scorers.length" title="Голов ещё нет" />
+        <EmptyState v-else-if="!scorers.length" title="Голов пока нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>

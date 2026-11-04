@@ -29,16 +29,19 @@ async function mockEmptyLeague(page: Page) {
   })
 }
 
-test('empty league hides live and shows text instead of blank cards', async ({ page }) => {
+test('empty league hides the running block and keeps scorers text', async ({ page }) => {
   await mockEmptyLeague(page)
 
   for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Идут сейчас' })).toBeVisible()
-    await expect(page.getByText('Турниров пока нет')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Идут сейчас' })).toHaveCount(0)
+    await expect(page.getByText('Турниров пока нет')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Матчи' })).toBeVisible()
     await expect(page.getByText('Матчей пока нет')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Бомбардиры по турнирам' })).toBeVisible()
+    await expect(page.getByText('Голов пока нет')).toBeVisible()
+    await expect(page.getByText('Голов ещё нет')).toHaveCount(0)
     await expect(page.locator('.livebar')).toHaveCount(0)
     await expect(page.locator('.tcard')).toHaveCount(0)
     await expect(page.locator('.mrow, .mc')).toHaveCount(0)
@@ -68,5 +71,15 @@ test('empty league hides live and shows text instead of blank cards', async ({ p
     }))
     expect(scroll.scrollWidth).toBe(scroll.clientWidth)
     expect(scroll.text).not.toContain('NaN')
+    expect(scroll.text).not.toContain('Идут сейчас')
+
+    await page.goto('/table?tab=scorers')
+    await expect(page.getByText('Голов пока нет')).toBeVisible()
+    await expect(page.getByText('Голов ещё нет')).toHaveCount(0)
+    const tableScroll = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }))
+    expect(tableScroll.scrollWidth).toBe(tableScroll.clientWidth)
   }
 })
