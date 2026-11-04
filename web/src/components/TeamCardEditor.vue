@@ -17,6 +17,8 @@ const shortName = ref('')
 const pending = ref(false)
 const error = ref('')
 const ok = ref('')
+const logoInput = ref<HTMLInputElement | null>(null)
+const logoFileName = ref('')
 
 function saveError(e: any) {
   const details = e?.response?.data?.details
@@ -64,10 +66,15 @@ async function save() {
   }
 }
 
+function openLogoPicker() {
+  logoInput.value?.click()
+}
+
 async function onLogo(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  logoFileName.value = file.name
   error.value = ''
   ok.value = ''
   pending.value = true
@@ -91,11 +98,25 @@ async function onLogo(event: Event) {
   <div class="stack">
     <div class="logo-row">
       <TeamCrest :src="team.logoUrl" :name="shortName || name || team.name" :size="56" />
-      <label class="field grow">
-        Логотип
-        <input type="file" accept="image/*" :disabled="pending" @change="onLogo" />
+      <div class="field grow">
+        <span>Логотип</span>
+        <div class="logo-actions">
+          <button class="btn secondary" type="button" :disabled="pending" @click="openLogoPicker">
+            Загрузить логотип
+          </button>
+          <span class="file-caption">{{ logoFileName || 'Файл не выбран' }}</span>
+        </div>
+        <input
+          ref="logoInput"
+          class="logo-input"
+          type="file"
+          accept="image/*"
+          aria-label="Файл логотипа"
+          :disabled="pending"
+          @change="onLogo"
+        />
         <span class="field-hint">PNG или JPG. Сохраняется сразу.</span>
-      </label>
+      </div>
     </div>
     <form class="stack" novalidate @submit.prevent="save">
       <label class="field">Название
@@ -121,4 +142,27 @@ async function onLogo(event: Event) {
   gap: 0.9rem;
 }
 .grow { flex: 1; min-width: 0; }
+.logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+}
+.logo-actions .btn { justify-self: start; }
+.file-caption {
+  color: var(--ink);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+.logo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 </style>

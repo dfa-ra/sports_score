@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { DATE_PENDING, matchCardWhen, matchInstant } from '../src/lib/matchDate.ts'
-import { ymd } from '../src/lib/match.ts'
+import { unplayedCardScore, ymd } from '../src/lib/match.ts'
 
 function day(value: string | number | Date | null) {
   if (value == null) return ''
@@ -18,7 +18,7 @@ test('planned time wins for the feed, the bracket and the card, even after the m
     assert.equal(day(instant), day(scheduled))
     assert.notEqual(day(instant), day(started))
   }
-  assert.equal(matchCardWhen({ status: 'FINISHED', scheduledAt: scheduled, startedAt: started }), '25.11.2026 15:00')
+  assert.equal(matchCardWhen({ status: 'FINISHED', scheduledAt: scheduled, startedAt: started }), '25 нояб., 15:00')
 })
 
 test('a dateless match that has started or been played uses the actual start', () => {
@@ -26,7 +26,7 @@ test('a dateless match that has started or been played uses the actual start', (
     const instant = matchInstant({ status, scheduledAt: null, startedAt: started })
     assert.equal(instant, started)
     assert.equal(day(instant), '2026-11-03')
-    assert.equal(matchCardWhen({ status, scheduledAt: null, startedAt: started }), '03.11.2026 15:00')
+    assert.equal(matchCardWhen({ status, scheduledAt: null, startedAt: started }), '3 нояб., 15:00')
   }
   assert.equal(
     matchInstant({ status: 'CANCELLED', scheduledAt: null, startedAt: started }),
@@ -50,4 +50,17 @@ test('neither planned time nor an actual start shows the pending label instead o
 test('a missing match has no date', () => {
   assert.equal(matchInstant(null), null)
   assert.equal(matchInstant(undefined), null)
+})
+
+test('an autofinal that has started uses the card date, not the dotted stamp', () => {
+  const startedAt = '2026-11-04T18:14:00Z'
+  assert.equal(matchCardWhen({ status: 'LIVE', scheduledAt: null, startedAt }), '4 нояб., 21:14')
+  assert.equal(matchCardWhen({ status: 'FINISHED', scheduledAt: null, startedAt }), '4 нояб., 21:14')
+})
+
+test('a match that has not started shows dashes, and a started match keeps the score', () => {
+  assert.equal(unplayedCardScore('SCHEDULED'), '– : –')
+  assert.equal(unplayedCardScore('LIVE'), null)
+  assert.equal(unplayedCardScore('PAUSED'), null)
+  assert.equal(unplayedCardScore('FINISHED'), null)
 })

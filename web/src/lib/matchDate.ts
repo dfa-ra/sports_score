@@ -1,4 +1,4 @@
-import { moscowDateTimeLabel } from './moscowTime.ts'
+import { formatMoscowWhen } from './moscowTime.ts'
 
 export type MatchDateSource = {
   status?: string | null
@@ -32,9 +32,12 @@ export function matchInstant(match?: MatchDateSource | null): string | number | 
   return usableInstant(match.startedAt)
 }
 
-/** Card label above the score. Pending copy replaces a dash when the helper has no instant. */
+/**
+ * Card label above the score. Pending copy replaces a dash when the helper has no instant.
+ * Uses the shared Moscow formatter («4 нояб., 21:14»). The bracket keeps its own «20/11 · 19:00».
+ */
 export function matchCardWhen(match?: MatchDateSource | null): string {
   const instant = matchInstant(match)
   if (!instant) return DATE_PENDING
-  return moscowDateTimeLabel(instant) || DATE_PENDING
+  return formatMoscowWhen(instant) || DATE_PENDING
 }
