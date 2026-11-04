@@ -143,6 +143,95 @@ async function assertWholeWords(locator: Locator) {
   for (const line of info.rendered) expect(line).not.toMatch(/^\p{L}$/u)
 }
 
+async function assertHeroName(locator: Locator) {
+  const info = await locator.evaluate((el) => {
+    const style = getComputedStyle(el)
+    const box = el.getBoundingClientRect()
+    const node = [...el.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && (child.textContent || '').trim())
+    const raw = node?.textContent || ''
+    const text = raw.replace(/\s+/g, ' ').trim()
+    const range = document.createRange()
+    const buckets: { top: number; text: string }[] = []
+    if (node) {
+      for (let i = 0; i < raw.length; i += 1) {
+        range.setStart(node, i)
+        range.setEnd(node, i + 1)
+        const rect = [...range.getClientRects()].find((item) => {
+          const mid = (item.top + item.bottom) / 2
+          return item.width > 0.4 && item.height > 1 && mid >= box.top - 1 && mid <= box.bottom + 1
+        })
+        if (!rect) continue
+        let bucket = buckets.find((item) => Math.abs(item.top - rect.top) < 2)
+        if (!bucket) {
+          bucket = { top: rect.top, text: '' }
+          buckets.push(bucket)
+        }
+        bucket.text += raw[i]
+      }
+    }
+    const probe = el.cloneNode(true) as HTMLElement
+    probe.style.position = 'fixed'
+    probe.style.left = '0'
+    probe.style.top = '0'
+    probe.style.visibility = 'hidden'
+    probe.style.width = `${box.width}px`
+    probe.style.maxWidth = `${box.width}px`
+    probe.style.height = 'auto'
+    probe.style.maxHeight = 'none'
+    probe.style.display = 'block'
+    probe.style.overflow = 'visible'
+    probe.style.webkitLineClamp = 'unset'
+    probe.style.lineClamp = 'none'
+    document.body.appendChild(probe)
+    const fullHeight = probe.getBoundingClientRect().height
+    probe.remove()
+    const min = 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    return {
+      wordBreak: style.wordBreak,
+      overflowWrap: style.overflowWrap,
+      fontSize: Number.parseFloat(style.fontSize),
+      min,
+      lineClamp: style.webkitLineClamp,
+      lines: buckets.map((item) => item.text.replace(/\s+/g, ' ').trim()).filter(Boolean),
+      words: text.split(' ').filter(Boolean),
+      overflows: fullHeight > box.height + 1,
+    }
+  })
+  expect(info.wordBreak).toBe('normal')
+  expect(info.overflowWrap).toBe('break-word')
+  expect(info.fontSize).toBeGreaterThanOrEqual(info.min - 0.2)
+  expect(info.lineClamp).toBe('2')
+  expect(info.lines.length).toBeGreaterThan(0)
+  expect(info.lines.length).toBeLessThanOrEqual(2)
+  for (const line of info.lines) expect(line).not.toMatch(/^\p{L}$/u)
+  const tokens = info.lines.flatMap((line) => line.split(/\s+/).filter(Boolean))
+  let tokenIndex = 0
+  for (let wordIndex = 0; wordIndex < info.words.length; wordIndex += 1) {
+    const word = info.words[wordIndex]
+    if (tokenIndex >= tokens.length) {
+      expect(info.overflows, info.lines.join(' | ')).toBe(true)
+      break
+    }
+    if (tokens[tokenIndex] === word) {
+      tokenIndex += 1
+      continue
+    }
+    let built = ''
+    while (tokenIndex < tokens.length && word.startsWith(built + tokens[tokenIndex])) {
+      built += tokens[tokenIndex]
+      tokenIndex += 1
+      if (built === word) break
+    }
+    if (built === word) continue
+    expect(built.length, info.lines.join(' | ')).toBeGreaterThan(0)
+    expect(word.startsWith(built), info.lines.join(' | ')).toBe(true)
+    expect(tokenIndex, info.lines.join(' | ')).toBe(tokens.length)
+    expect(info.overflows, info.lines.join(' | ')).toBe(true)
+    break
+  }
+  expect(tokenIndex).toBe(tokens.length)
+}
+
 async function columns(locator: Locator) {
   return locator.evaluate((el) => getComputedStyle(el).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length)
 }
@@ -282,7 +371,7 @@ test('live cards are one column through 960px and clamp team names at two lines'
     }
 
     if (width === 768) {
-      for (const name of await page.locator('.hero-match .team-name').all()) await assertWholeWords(name)
+      for (const name of await page.locator('.hero-match .team-name').all()) await assertHeroName(name)
       for (const name of [exactName(page, fitName).first(), exactName(page, twoLineName).first()]) {
         await assertWholeWords(name)
       }

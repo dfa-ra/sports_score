@@ -574,8 +574,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   container-type: inline-size;
 }
 .team-name {
-  min-width: 0; overflow: visible; text-overflow: unset; white-space: normal;
-  word-break: normal; overflow-wrap: normal; hyphens: manual; line-height: 1.15;
+  flex: 1 1 0; min-width: 0; max-width: 100%;
+  display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; white-space: normal;
+  word-break: normal; overflow-wrap: break-word; hyphens: manual; line-height: 1.15;
   font-size: clamp(0.95rem, 11cqi, 1em);
 }
 @container hero-vs (max-width: 400px) {
