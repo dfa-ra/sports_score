@@ -266,7 +266,8 @@ public class MatchMapper {
                 player == null ? null : player.getLastName(),
                 secondary == null ? null : secondary.getFirstName(),
                 secondary == null ? null : secondary.getLastName(),
-                minuteOf(event)
+                minuteOf(event),
+                player == null ? null : player.getAvatarUrl()
         );
     }
 

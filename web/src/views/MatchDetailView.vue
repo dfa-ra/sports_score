@@ -15,6 +15,7 @@ import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
@@ -915,7 +916,13 @@ onUnmounted(() => {
               :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
             >
               <span class="who-ev">
-                <b>
+                <b class="who-name">
+                  <PlayerAvatar
+                    v-if="ev.playerId"
+                    :src="ev.playerAvatarUrl"
+                    :name="registeredName(ev) || ev.playerName"
+                    :size="28"
+                  />
                   <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
                   <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
                 </b>
@@ -1232,6 +1239,13 @@ onUnmounted(() => {
 .ev.away em { order: 1; }
 .who-ev { display: grid; gap: 0.1rem; min-width: 0; }
 .who-ev a { color: inherit; }
+.who-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-weight: 800;
+}
 .ev b { font-weight: 800; color: var(--navy); }
 .ev em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
 .line { color: var(--muted); font-size: 0.78rem; font-weight: 700; }
