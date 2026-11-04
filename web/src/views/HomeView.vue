@@ -67,7 +67,6 @@ const matchChips = computed(() => matchTournamentChips(tournaments.value))
 const offseason = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length === 0)
 const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length > 0)
 const showStats = computed(() => !failed.value && (!loaded.value || !!overview.value.summary))
-const showTournaments = computed(() => !loaded.value || failed.value || tournaments.value.length > 0)
 const scorerGroups = computed(() => overview.value.scorersByTournament)
 const showScorers = computed(() => !loaded.value || failed.value || scorerGroups.value.length > 0)
 const liveKey = computed(() => overview.value.live.slice(0, 5).map((match) => match.id).join(','))
@@ -393,7 +392,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="showTournaments" class="container block">
+    <div class="container block">
       <div class="section-title">
         <h2>Идут сейчас</h2>
         <RouterLink class="more-link" to="/tournaments">Все турниры</RouterLink>
@@ -405,6 +404,9 @@ onUnmounted(() => {
       <div v-else-if="failed" class="card block-error" role="alert">
         <p>Турниры не загрузились</p>
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
+      </div>
+      <div v-else-if="!orderedTournaments.length" class="card">
+        <p class="block-empty">Турниров пока нет</p>
       </div>
       <template v-else>
       <div class="tgrid">
@@ -781,6 +783,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .mc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
   .mc-t b { font-size: 1.125rem; margin-left: auto; }
   .mc-foot { font-size: 0.75rem; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+  .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
   .irow .h { flex-direction: row-reverse; justify-content: flex-end; text-align: left; }
@@ -807,6 +810,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 719px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
+  .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; }
