@@ -1,4 +1,5 @@
 import { formatLabel } from './format.ts'
+import { DATE_PENDING, matchInstant } from './matchDate.ts'
 import { moscowClock, moscowDayMonth, moscowParts, type InstantInput } from './moscowTime.ts'
 import { shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
 
@@ -19,6 +20,7 @@ export type PlayoffSlot = {
   homeWaitingLabel?: string | null
   awayWaitingLabel?: string | null
   scheduledAt?: string | null
+  startedAt?: string | null
   venue?: string | null
   matchStatus?: string | null
   homeScore?: number | null
@@ -164,9 +166,19 @@ export function pairWhen(value?: InstantInput): string {
   return `${day} · ${clock}`
 }
 
+/** Planned kickoff, or the actual start once a dateless match has been played. */
+export function slotInstant(slot?: PlayoffSlot | null) {
+  if (!slot) return null
+  return matchInstant({
+    status: slot.matchStatus,
+    scheduledAt: slot.scheduledAt,
+    startedAt: slot.startedAt,
+  })
+}
+
 export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done' | 'open'; label: string; right: string } {
-  const when = pairWhen(slot.scheduledAt)
-  const rightTime = when || 'Дата уточняется'
+  const when = pairWhen(slotInstant(slot))
+  const rightTime = when || DATE_PENDING
   if (slot.matchStatus === 'LIVE') {
     const label = slot.minute == null ? 'Live' : `Live ${slot.minute}′`
     return { kind: 'live', label, right: slot.venue || rightTime }
@@ -184,7 +196,7 @@ export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done' 
   }
   if (slot.matchStatus === 'FINISHED') return { kind: 'done', label: 'Завершён', right: rightTime }
   if (slot.matchStatus === 'CANCELLED') return { kind: 'done', label: 'Отменён', right: rightTime }
-  if (!when) return { kind: 'open', label: '', right: 'Дата уточняется' }
+  if (!when) return { kind: 'open', label: '', right: DATE_PENDING }
   return { kind: 'soon', label: 'Скоро', right: when }
 }
 
@@ -256,7 +268,7 @@ export function formatRoundSpan(values: InstantInput[]): string {
 
 export function roundNote(slots: PlayoffSlot[]): { live: boolean; text: string } {
   if (slots.some((slot) => isLiveStatus(slot.matchStatus))) return { live: true, text: '' }
-  const span = formatRoundSpan(slots.map((slot) => slot.scheduledAt))
+  const span = formatRoundSpan(slots.map((slot) => slotInstant(slot)))
   const finished = slots.length > 0 && slots.every((slot) => slot.matchStatus === 'FINISHED')
   if (finished && span) return { live: false, text: `${span} · завершён` }
   if (finished) return { live: false, text: 'завершён' }
@@ -264,7 +276,7 @@ export function roundNote(slots: PlayoffSlot[]): { live: boolean; text: string }
 }
 
 export function championWhen(slot?: PlayoffSlot | null) {
-  const parts = moscowParts(slot?.scheduledAt)
+  const parts = moscowParts(slotInstant(slot))
   if (!parts) return ''
   return `${parts.day} ${MONTHS[parts.month - 1]}.`
 }

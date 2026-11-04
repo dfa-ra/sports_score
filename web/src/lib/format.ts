@@ -1,3 +1,4 @@
+import { DATE_PENDING, matchInstant, type MatchDateSource } from './matchDate.ts'
 import { ageOnMoscowDate, civilDateParts, formatCivilDate, formatMoscowWhen, moscowParts } from './moscowTime.ts'
 import { registeredName } from './playerTitle.ts'
 
@@ -90,6 +91,14 @@ export function labelOf(map: Record<string, string>, value?: string | null, fall
 export function formatWhen(value?: string | number | Date | null) {
   if (!value) return '—'
   return formatMoscowWhen(value) || '—'
+}
+
+/** Feed and list time. The instant comes from the shared match-date helper. */
+export function matchListWhen(match?: MatchDateSource | null) {
+  const instant = matchInstant(match)
+  if (!instant) return DATE_PENDING
+  const text = formatWhen(instant)
+  return !text || text === '—' ? DATE_PENDING : text
 }
 
 export function ageLine(value?: string | number | Date | null) {

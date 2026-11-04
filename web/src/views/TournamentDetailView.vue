@@ -5,8 +5,8 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { APPROVE_BUTTON_LABEL, entryActionError, showApproveButton } from '../lib/tournamentEntryActions'
-import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
-import { matchInstant, matchStateLabel, publicScore } from '../lib/match'
+import { isTournamentOpenForApply, matchListWhen, tournamentDatesError } from '../lib/format'
+import { matchStateLabel, publicScore } from '../lib/match'
 import {
   overviewMeta,
   roundsHaveLive,
@@ -495,7 +495,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
         </span>
         <span class="match-meta">
-          <span>{{ formatWhen(matchInstant(m)) }}</span>
+          <span>{{ matchListWhen(m) }}</span>
           <span v-if="m.status !== 'FINISHED'">{{ matchStateLabel(m.status) }}</span>
         </span>
       </RouterLink>

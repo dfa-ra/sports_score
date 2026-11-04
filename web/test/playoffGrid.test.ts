@@ -9,6 +9,7 @@ import {
   emptySideLabel,
   footerView,
   formatRoundSpan,
+  roundNote,
   cssViewportWidth,
   gridColumns,
   gridMinWidth,
@@ -98,6 +99,26 @@ test('scores, penalties and an unplayed dash', () => {
   assert.equal(footerView({ matchStatus: 'SCHEDULED', scheduledAt: '2026-11-05T16:00:00Z' }).right, '05/11 · 19:00')
   assert.equal(pairWhen('2026-11-05T16:00:00Z'), '05/11 · 19:00')
   assert.equal(pairWhen('2026-11-04T22:30:00Z'), '05/11 · 01:30')
+  assert.equal(
+    footerView({
+      matchStatus: 'FINISHED',
+      scheduledAt: '2026-11-05T16:00:00Z',
+      startedAt: '2026-11-03T12:00:00Z',
+    }).right,
+    '05/11 · 19:00',
+  )
+  assert.equal(
+    footerView({ matchStatus: 'FINISHED', scheduledAt: null, startedAt: '2026-11-03T12:00:00Z' }).right,
+    '03/11 · 15:00',
+  )
+  assert.equal(
+    footerView({ matchStatus: 'FINISHED', scheduledAt: null, startedAt: null }).right,
+    'Дата уточняется',
+  )
+  assert.equal(
+    roundNote([{ matchStatus: 'FINISHED', scheduledAt: null, startedAt: '2026-11-03T12:00:00Z' }]).text,
+    '3 нояб · завершён',
+  )
 })
 
 test('round span, default tab and arrival line', () => {
