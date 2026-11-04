@@ -502,7 +502,7 @@ onUnmounted(() => {
                 <td class="rk">{{ index + 1 }}</td>
                 <td>
                   <RouterLink class="pl" :to="`/players/${player.playerId}`">
-                    <HomeAvatar :src="player.avatarUrl" :name="player.displayName" />
+                    <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
                     <b>{{ player.displayName }}</b>
                   </RouterLink>
                 </td>
@@ -516,7 +516,7 @@ onUnmounted(() => {
           <div class="sl-mob">
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
-              <HomeAvatar :src="player.avatarUrl" :name="player.displayName" />
+              <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
               <div><div class="nm">{{ player.displayName }}</div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
             </RouterLink>

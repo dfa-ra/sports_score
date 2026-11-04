@@ -114,7 +114,7 @@ onUnmounted(() => {
     <p v-else-if="searched && !items.length" class="muted">Ничего не найдено</p>
     <div v-else-if="items.length" class="hints">
       <RouterLink v-for="player in items" :key="player.id" class="hint" :to="`/players/${player.id}`">
-        <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :size="32" />
+        <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :first-name="player.firstName" :last-name="player.lastName" :size="32" />
         <span>
           <strong>{{ labelOf(player) }}</strong>
           <small>{{ player.position || 'Игрок' }} · №{{ player.jerseyNumber ?? '—' }}</small>
@@ -129,7 +129,7 @@ onUnmounted(() => {
         <p class="muted">Бомбардиры текущего турнира</p>
         <div class="hints">
           <RouterLink v-for="player in leaders" :key="player.playerId" class="hint" :to="`/players/${player.playerId}`">
-            <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :size="32" />
+            <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :first-name="player.firstName" :last-name="player.lastName" :size="32" />
             <span>
               <strong>{{ labelOf(player) }}</strong>
               <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} пас.` : '' }}</small>

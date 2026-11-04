@@ -233,6 +233,8 @@ async function logout() {
       <PlayerAvatar
         :src="avatarUrl || auth.user?.photoUrl"
         :name="accountName"
+        :first-name="firstName"
+        :last-name="lastName"
         :size="76"
         tile
       />
@@ -268,6 +270,8 @@ async function logout() {
               <PlayerAvatar
                 :src="avatarUrl || auth.user?.photoUrl"
                 :name="accountName"
+                :first-name="firstName"
+                :last-name="lastName"
                 :size="56"
                 tile
               />

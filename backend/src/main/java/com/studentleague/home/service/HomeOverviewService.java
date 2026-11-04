@@ -330,6 +330,8 @@ public class HomeOverviewService {
                     rows.add(new HomeScorerResponse(
                             scorer.playerId(),
                             displayName(scorer),
+                            scorer.firstName(),
+                            scorer.lastName(),
                             scorer.goals(),
                             scorer.assists(),
                             scorer.appearances(),

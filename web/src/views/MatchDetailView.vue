@@ -923,6 +923,8 @@ onUnmounted(() => {
                     v-if="ev.playerId"
                     :src="ev.playerAvatarUrl"
                     :name="registeredName(ev) || ev.playerName"
+                    :first-name="ev.playerFirstName"
+                    :last-name="ev.playerLastName"
                     :size="28"
                   />
                   <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
