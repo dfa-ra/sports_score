@@ -7,7 +7,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, formatClock, isOwnGoal, labelOf, matchListWhen, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -279,6 +279,7 @@ const assignedReferee = computed(() => {
 })
 const canUsePad = computed(() => auth.canManageLeague || assignedReferee.value)
 const shootoutScore = computed(() => (match.value && penaltyPair(match.value) ? publicScore(match.value) : ''))
+const pendingScore = computed(() => unplayedCardScore(match.value?.status))
 
 function isCaptainOf(teamId?: string) {
   if (!me.value?.id || !teamId) return false
@@ -681,7 +682,8 @@ onUnmounted(() => {
         </RouterLink>
       </div>
       <div class="center">
-        <p v-if="shootoutScore" class="score shootout">{{ shootoutScore }}</p>
+        <p v-if="pendingScore" class="score">{{ pendingScore }}</p>
+        <p v-else-if="shootoutScore" class="score shootout">{{ shootoutScore }}</p>
         <p v-else class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
         <p v-if="playerOfTheMatchName" :key="match.playerOfTheMatch.playerId" class="motm motm-enter">
           <span>Игрок матча</span>

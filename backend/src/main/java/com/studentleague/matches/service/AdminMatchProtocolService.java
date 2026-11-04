@@ -13,6 +13,7 @@ import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.live.LiveMatchPublisher;
 import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchRepository;
+import com.studentleague.matches.repository.PenaltyKickRepository;
 import com.studentleague.matches.scoring.OwnGoals;
 import com.studentleague.players.repository.PlayerProfileRepository;
 import com.studentleague.tournaments.service.PlayoffService;
@@ -52,6 +53,7 @@ public class AdminMatchProtocolService {
     private final LiveMatchPublisher liveMatchPublisher;
     private final PlayoffService playoffService;
     private final TournamentRosterGuard tournamentRosterGuard;
+    private final PenaltyKickRepository penaltyKickRepository;
 
     public AdminMatchProtocolService(
             MatchRepository matchRepository,
@@ -62,7 +64,8 @@ public class AdminMatchProtocolService {
             MatchMapper matchMapper,
             LiveMatchPublisher liveMatchPublisher,
             PlayoffService playoffService,
-            TournamentRosterGuard tournamentRosterGuard
+            TournamentRosterGuard tournamentRosterGuard,
+            PenaltyKickRepository penaltyKickRepository
     ) {
         this.matchRepository = matchRepository;
         this.matchEventRepository = matchEventRepository;
@@ -73,6 +76,7 @@ public class AdminMatchProtocolService {
         this.liveMatchPublisher = liveMatchPublisher;
         this.playoffService = playoffService;
         this.tournamentRosterGuard = tournamentRosterGuard;
+        this.penaltyKickRepository = penaltyKickRepository;
     }
 
     @Transactional
@@ -138,8 +142,31 @@ public class AdminMatchProtocolService {
         }
         event.setVoided(true);
         event.setVoidedAt(Instant.now());
-        matchEventRepository.save(event);
+        matchEventRepository.saveAndFlush(event);
+        if (event.getEventType() == MatchEventType.GOAL) {
+            matchScoreService.apply(match);
+            rejectPlayoffDrawWithoutShootout(match);
+        }
         return publish(match, event, "MATCH_EVENT_VOIDED");
+    }
+
+    /**
+     * A finished playoff match cannot be left drawn by cancelling a goal
+     * unless a penalty shootout is already stored. The caller rolls back,
+     * so the protocol and the next-round slot stay as they were.
+     * Group-stage draws are unchanged: they have no bracket round.
+     */
+    private void rejectPlayoffDrawWithoutShootout(Match match) {
+        if (match.getStatus() != MatchStatus.FINISHED || match.getBracketRound() == null) {
+            return;
+        }
+        if (match.getHomeScore() != match.getAwayScore()) {
+            return;
+        }
+        if (!penaltyKickRepository.findByMatchIdOrderByKickOrderAsc(match.getId()).isEmpty()) {
+            return;
+        }
+        throw ApiException.conflict("После отмены гола будет ничья: сначала задайте серию пенальти");
     }
 
     private MatchEventResponse publish(Match match, MatchEvent event, String type) {

@@ -63,7 +63,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
 </script>
 
 <template>
-  <div class="picker">
+  <div class="picker field">
     <p v-if="hint" class="muted">{{ hint }}</p>
     <input
       v-model="query"

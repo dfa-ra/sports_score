@@ -482,7 +482,7 @@ public class PlayoffService {
     private void requirePairs(List<QualifiedTeamResponse> qualified, List<PlayoffPairRequest> pairs) {
         int expected = qualified.size() / 2;
         if (pairs.size() != expected) {
-            throw ApiException.badRequest("Нужно назначить " + expected + " пар из вышедших команд");
+            throw ApiException.badRequest(pairsRequiredMessage(expected));
         }
         Set<UUID> allowed = new HashSet<>();
         for (QualifiedTeamResponse team : qualified) {
@@ -926,6 +926,26 @@ public class PlayoffService {
             rounds++;
         }
         return rounds;
+    }
+
+    /** Accusative after «назначить»: 1 пару, 2 пары, 5 пар, 11 пар, 21 пару. */
+    static String pairsRequiredMessage(int expected) {
+        return "Нужно назначить " + expected + " " + pairsWord(expected) + " из вышедших команд";
+    }
+
+    static String pairsWord(int count) {
+        int tail = Math.abs(count) % 100;
+        int digit = tail % 10;
+        if (tail > 10 && tail < 20) {
+            return "пар";
+        }
+        if (digit == 1) {
+            return "пару";
+        }
+        if (digit >= 2 && digit <= 4) {
+            return "пары";
+        }
+        return "пар";
     }
 
     private static String teamsWord(int count) {
