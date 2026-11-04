@@ -198,7 +198,7 @@ async function assertHeroName(locator: Locator) {
     }
   })
   expect(info.wordBreak).toBe('normal')
-  expect(info.overflowWrap).toBe('break-word')
+  expect(info.overflowWrap).toBe('normal')
   expect(info.fontSize).toBeGreaterThanOrEqual(info.min - 0.2)
   expect(info.lineClamp).toBe('2')
   expect(info.lines.length).toBeGreaterThan(0)

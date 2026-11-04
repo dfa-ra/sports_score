@@ -149,8 +149,9 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
     expect(awayBox!.y).toBeLessThan(homeBox!.y + homeBox!.height)
     expect(markBox!.x).toBeGreaterThan(homeBox!.x + 20)
     expect(awayBox!.x).toBeGreaterThan(markBox!.x)
-    expect(Math.round(crestBox!.width)).toBe(44)
-    expect(Math.round(crestBox!.height)).toBe(44)
+    const crestSize = width <= 480 ? 32 : 44
+    expect(Math.round(crestBox!.width)).toBe(crestSize)
+    expect(Math.round(crestBox!.height)).toBe(crestSize)
     const nameStyle = await homeSide.locator('.team-name').evaluate((el) => {
       const style = getComputedStyle(el)
       return { fontSize: style.fontSize, whiteSpace: style.whiteSpace, textOverflow: style.textOverflow }

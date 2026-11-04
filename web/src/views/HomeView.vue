@@ -263,12 +263,12 @@ onUnmounted(() => {
             <div class="vs">
               <div class="side">
                 <HomeCrest large :id="nextMatch?.homeTeamId" :name="nextMatch?.homeTeamName" :src="nextMatch?.homeLogoUrl" />
-                <span class="team-name">{{ nextMatch?.homeTeamName }}</span>
+                <span class="team-name" lang="ru">{{ nextMatch?.homeTeamName }}</span>
               </div>
               <div class="x">VS</div>
               <div class="side">
                 <HomeCrest large :id="nextMatch?.awayTeamId" :name="nextMatch?.awayTeamName" :src="nextMatch?.awayLogoUrl" />
-                <span class="team-name">{{ nextMatch?.awayTeamName }}</span>
+                <span class="team-name" lang="ru">{{ nextMatch?.awayTeamName }}</span>
               </div>
             </div>
             <div class="meta">
@@ -578,7 +578,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   display: -webkit-box; -webkit-box-orient: vertical;
   -webkit-line-clamp: 2; line-clamp: 2;
   overflow: hidden; white-space: normal;
-  word-break: normal; overflow-wrap: break-word; hyphens: manual; line-height: 1.15;
+  word-break: normal; overflow-wrap: normal; hyphens: auto; -webkit-hyphens: auto;
+  line-height: 1.15;
   font-size: clamp(0.95rem, 11cqi, 1em);
 }
 @container hero-vs (max-width: 400px) {
@@ -822,6 +823,24 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 960px) {
   .tgrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .hero-card { margin-inline: -0.75rem; }
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .vs { gap: 0.15rem; }
+  .side { gap: 0.15rem; }
+  .x { letter-spacing: 0; }
+  .team-name { font-size: 0.95rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
+}
+@container home (max-width: 480px) {
+  .hero-card { margin-inline: -0.75rem; }
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .vs { gap: 0.15rem; }
+  .side { gap: 0.15rem; }
+  .x { letter-spacing: 0; }
+  .team-name { font-size: 0.95rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

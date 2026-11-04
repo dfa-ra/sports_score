@@ -272,7 +272,7 @@ test('hero team name stays on two lines at 768 and 375', async ({ page }) => {
     await expect(name).toBeVisible()
     const info = await nameLines(name)
     expect(info.wordBreak).toBe('normal')
-    expect(info.overflowWrap).toBe('break-word')
+    expect(info.overflowWrap).toBe('normal')
     expect(info.fontSize).toBeGreaterThanOrEqual(info.min - 0.2)
     expect(info.flat).toEqual(info.words)
     expect(info.rendered.length).toBeGreaterThan(0)
