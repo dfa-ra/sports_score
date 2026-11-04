@@ -137,6 +137,28 @@ export function formatMoscowWhen(value: InstantInput): string {
   }).format(date)
 }
 
+/**
+ * Civil day in the same Russian short-month style as {@link formatMoscowWhen},
+ * with the year and without the clock: `1 сент. 2024`.
+ * A `YYYY-MM-DD` value stays on that calendar day.
+ */
+export function formatMoscowDate(value: InstantInput): string {
+  const parts = civilDateParts(value)
+  if (!parts) return ''
+  const noonMoscow = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 9, 0, 0))
+  const formatted = new Intl.DateTimeFormat('ru-RU', {
+    timeZone: MOSCOW_TIME_ZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).formatToParts(noonMoscow)
+  const day = formatted.find((part) => part.type === 'day')?.value
+  const month = formatted.find((part) => part.type === 'month')?.value
+  const year = formatted.find((part) => part.type === 'year')?.value
+  if (!day || !month || !year) return ''
+  return `${day} ${month} ${year}`
+}
+
 /** `datetime-local` value for a UTC instant, as Moscow wall time. */
 export function toMoscowInput(value: InstantInput): string {
   const parts = moscowParts(value)

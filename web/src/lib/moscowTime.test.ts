@@ -5,6 +5,7 @@ import { formatDateRange, formatMatchDay, formatWhen } from './format.ts'
 import { kickoffClock, kickoffDayMonth, longKickoff, ymd } from './match.ts'
 import {
   civilYear,
+  formatMoscowDate,
   formatMoscowWhen,
   moscowClock,
   moscowDottedDate,
@@ -71,6 +72,13 @@ test('an admin datetime-local round-trips Moscow wall time to a UTC instant', ()
   assert.equal(toLocalInput(fromLocalInput('2026-11-10T18:00')), '2026-11-10T18:00')
   assert.equal(toLocalInput(nextMoscowDay), '2026-11-11T00:30')
   assert.equal(fromLocalInput('2026-11-11T00:30'), '2026-11-10T21:30:00.000Z')
+})
+
+test('a founded date uses the match-date month and stays on the stored civil day', () => {
+  assert.equal(formatMoscowDate('2024-09-01'), '1 сент. 2024')
+  assert.equal(formatMoscowDate('2026-11-10T21:30:00Z'), '11 нояб. 2026')
+  assert.equal(formatMoscowDate(''), '')
+  assert.equal(formatMoscowDate(null), '')
 })
 
 test('a date-only tournament day is not shifted, and the Moscow day key can move by calendar days', () => {

@@ -8,7 +8,7 @@ import TeamCrest from './TeamCrest.vue'
 const props = defineProps<{
   team: any
 }>()
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [logoUrl?: string] }>()
 const teams = useTeamDirectory()
 
 const nameMax = 150
@@ -19,6 +19,7 @@ const error = ref('')
 const ok = ref('')
 const logoInput = ref<HTMLInputElement | null>(null)
 const logoFileName = ref('')
+const previewLogo = ref('')
 
 function saveError(e: any) {
   const details = e?.response?.data?.details
@@ -81,10 +82,16 @@ async function onLogo(event: Event) {
   try {
     const form = new FormData()
     form.append('file', file)
-    await api.post(`/uploads/teams/${props.team.id}/logo`, form)
+    const { data } = await api.post(`/uploads/teams/${props.team.id}/logo`, form)
+    const uploaded = typeof data?.url === 'string' ? data.url.trim() : ''
+    if (!uploaded) {
+      error.value = 'Логотип не загрузился.'
+      return
+    }
+    const marks = teams.rememberLogo(props.team.id, uploaded, props.team.logoUrl)
+    previewLogo.value = marks.preview
     ok.value = 'Логотип обновлён.'
-    await teams.load(true)
-    emit('saved')
+    emit('saved', marks.header)
   } catch (e: any) {
     error.value = apiError(e, 'Логотип не загрузился.')
   } finally {
@@ -97,7 +104,7 @@ async function onLogo(event: Event) {
 <template>
   <div class="stack">
     <div class="logo-row">
-      <TeamCrest :src="team.logoUrl" :name="shortName || name || team.name" :size="56" />
+      <TeamCrest :src="previewLogo || teams.logo(team.id) || team.logoUrl" :name="shortName || name || team.name" :size="56" />
       <div class="field grow">
         <span>Логотип</span>
         <div class="logo-actions">

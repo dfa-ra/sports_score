@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import api from '../api/client'
+import { applyLogoToCache } from './teamLogo'
 
 export interface TeamBrief {
   id: string
@@ -48,5 +49,12 @@ export function useTeamDirectory() {
     return hit?.logoUrl || ''
   }
 
-  return { teams: cache, load, name, fullName, logo, logoByName }
+  /** Keep the crest from the upload response. A later list fetch must not be required. */
+  function rememberLogo(id: string, uploadedUrl: string, teamLogo?: string | null) {
+    const applied = applyLogoToCache(cache.value, id, uploadedUrl, teamLogo)
+    cache.value = applied.cache
+    return applied.marks
+  }
+
+  return { teams: cache, load, name, fullName, logo, logoByName, rememberLogo }
 }
