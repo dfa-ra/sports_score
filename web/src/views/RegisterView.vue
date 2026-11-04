@@ -208,6 +208,8 @@ async function onGoogle(idToken: string) {
               v-if="photoUrl"
               :src="photoUrl"
               :name="`${lastName} ${firstName}`.trim()"
+              :first-name="firstName"
+              :last-name="lastName"
               :size="56"
               tile
             />

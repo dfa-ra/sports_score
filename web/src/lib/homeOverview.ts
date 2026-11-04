@@ -80,6 +80,8 @@ export type HomeTournament = {
 export type HomeScorer = {
   playerId: string
   displayName: string
+  firstName?: string | null
+  lastName?: string | null
   goals: number
   assists: number
   appearances: number

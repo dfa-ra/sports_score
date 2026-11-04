@@ -132,7 +132,7 @@ watch(compact, () => {
                 :aria-expanded="accountOpen"
                 @click="accountOpen = !accountOpen"
               >
-                <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :size="32" />
+                <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :first-name="auth.user?.firstName" :last-name="auth.user?.lastName" :size="32" />
               </button>
               <div v-if="accountOpen" class="menu-panel">
                 <RouterLink
