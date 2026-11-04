@@ -237,21 +237,20 @@ public class TournamentService {
     @Transactional
     public TournamentTeamResponse registerTeam(UserPrincipal principal, UUID tournamentId, RegisterTeamRequest request) {
         Tournament tournament = requireTournament(tournamentId);
-        if (tournament.getStatus() != TournamentStatus.REGISTRATION && tournament.getStatus() != TournamentStatus.DRAFT) {
-            throw ApiException.badRequest("Запись на турнир закрыта");
-        }
         Team team = teamRepository.findById(request.teamId())
                 .orElseThrow(() -> ApiException.notFound("Команда не найдена"));
-        if (team.isDisbanded()) {
-            throw ApiException.badRequest("Нельзя заявить расформированную команду");
-        }
-
         if (!principal.hasRole(Role.ADMIN)) {
             var profile = playerProfileRepository.findByUserId(principal.getId())
                     .orElseThrow(() -> ApiException.forbidden("Команду заявляет только её капитан"));
             if (!profile.getId().equals(team.getCaptainId())) {
                 throw ApiException.forbidden("Команду заявляет только её капитан");
             }
+        }
+        if (tournament.getStatus() != TournamentStatus.REGISTRATION && tournament.getStatus() != TournamentStatus.DRAFT) {
+            throw ApiException.badRequest("Запись на турнир закрыта");
+        }
+        if (team.isDisbanded()) {
+            throw ApiException.badRequest("Нельзя заявить расформированную команду");
         }
 
         Optional<TournamentTeam> existing = tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, team.getId());

@@ -60,6 +60,11 @@ async function load() {
   error.value = ''
   try {
     const { data } = await api.get('/teams/mine')
+    if (!data?.id) {
+      team.value = null
+      unassigned.value = true
+      return
+    }
     team.value = data
     const [m, cal, upcoming, st, me] = await Promise.all([
       api.get(`/teams/${data.id}/members`),

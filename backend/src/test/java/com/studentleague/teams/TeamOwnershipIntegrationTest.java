@@ -60,22 +60,24 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                         .getContentAsString()
         ).get("id").asText();
 
+        String teamName = "Campus United " + System.nanoTime();
+        String renamed = "Ломоносовские Пумы " + System.nanoTime();
         mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(captainToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Campus United","shortName":"CU"}
-                                """))
+                                {"name":"%s","shortName":"CU"}
+                                """.formatted(teamName)))
                 .andExpect(status().isForbidden());
 
         MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s","foundedOn":"2020-09-01"}
-                                """.formatted(captainPlayerId)))
+                                {"name":"%s","shortName":"CU","captainPlayerId":"%s","foundedOn":"2020-09-01"}
+                                """.formatted(teamName, captainPlayerId)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.name").value("Campus United"))
+                .andExpect(jsonPath("$.name").value(teamName))
                 .andExpect(jsonPath("$.foundedOn").value("2020-09-01"))
                 .andReturn();
         String teamId = objectMapper.readTree(teamResult.getResponse().getContentAsString()).get("id").asText();
@@ -119,17 +121,17 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(otherToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Play"))
-                .andExpect(jsonPath("$.team.name").value("Campus United"))
+                .andExpect(jsonPath("$.team.name").value(teamName))
                 .andExpect(jsonPath("$.jerseyNumber").value(7));
 
         mockMvc.perform(put("/api/v1/teams/" + teamId)
                         .header("Authorization", auth(captainToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Ломоносовские Пумы","shortName":"ЛП"}
-                                """))
+                                {"name":"%s","shortName":"ЛП"}
+                                """.formatted(renamed)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Ломоносовские Пумы"))
+                .andExpect(jsonPath("$.name").value(renamed))
                 .andExpect(jsonPath("$.shortName").value("ЛП"));
 
         mockMvc.perform(delete("/api/v1/teams/" + teamId + "/members/" + playerId)
@@ -155,12 +157,13 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                         .andReturn().getResponse().getContentAsString()
         ).get("id").asText();
 
+        String teamName = "Campus United " + System.nanoTime();
         MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s"}
-                                """.formatted(captainPlayerId)))
+                                {"name":"%s","shortName":"CU","captainPlayerId":"%s"}
+                                """.formatted(teamName, captainPlayerId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.disbanded").value(false))
                 .andReturn();
@@ -184,11 +187,11 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.disbanded").value(true));
 
-        mockMvc.perform(get("/api/v1/teams"))
+        mockMvc.perform(get("/api/v1/teams").param("q", teamName).param("size", "50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isEmpty());
 
-        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true"))
+        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true").param("q", teamName).param("size", "50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isNotEmpty())
                 .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')].disbanded").value(org.hamcrest.Matchers.hasItem(true)));
@@ -209,7 +212,7 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/teams/" + teamId))
                 .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true"))
+        mockMvc.perform(get("/api/v1/teams").param("includeDisbanded", "true").param("q", teamName).param("size", "50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[?(@.id=='" + teamId + "')]").isEmpty());
     }
@@ -301,12 +304,13 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
                         .getContentAsString()
         ).get("id").asText();
 
+        String teamName = "Campus United " + System.nanoTime();
         MvcResult teamResult = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Campus United","shortName":"CU","captainPlayerId":"%s"}
-                                """.formatted(captainPlayerId)))
+                                {"name":"%s","shortName":"CU","captainPlayerId":"%s"}
+                                """.formatted(teamName, captainPlayerId)))
                 .andExpect(status().isCreated())
                 .andReturn();
         String teamId = objectMapper.readTree(teamResult.getResponse().getContentAsString()).get("id").asText();
@@ -324,7 +328,7 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/teams/" + teamId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Campus United"));
+                .andExpect(jsonPath("$.name").value(teamName));
 
         mockMvc.perform(put("/api/v1/teams/" + teamId)
                         .header("Authorization", auth(captainToken))
@@ -334,7 +338,7 @@ class TeamOwnershipIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/teams/" + teamId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Campus United"));
+                .andExpect(jsonPath("$.name").value(teamName));
 
         String maxName = "В".repeat(150);
         mockMvc.perform(put("/api/v1/teams/" + teamId)

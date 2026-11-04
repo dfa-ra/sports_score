@@ -27,8 +27,10 @@ class RecentFormIntegrationTest extends AbstractIntegrationTest {
     @Test
     void formReturnsBothCrestsAndMatchIdInOneRow() throws Exception {
         String adminToken = createAdminAndLogin("form-admin-" + System.nanoTime() + "@example.com", "Str0ngPass!");
-        String homeId = createTeam(adminToken, "Север", "СЕВ", "/media/north.png");
-        String awayId = createTeam(adminToken, "Юг", "ЮГ", "/media/south.png");
+        String homeName = "Север " + System.nanoTime();
+        String awayName = "Юг " + System.nanoTime();
+        String homeId = createTeam(adminToken, homeName, "СЕВ", "/media/north.png");
+        String awayId = createTeam(adminToken, awayName, "ЮГ", "/media/south.png");
         String sportId = sportId(adminToken);
         String tournamentId = createTournament(adminToken, sportId);
 
@@ -44,10 +46,10 @@ class RecentFormIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$[0].id").value(latestId.toString()))
                 .andExpect(jsonPath("$[0].homeTeamId").value(homeId))
                 .andExpect(jsonPath("$[0].awayTeamId").value(awayId))
-                .andExpect(jsonPath("$[0].homeTeamName").value("Север"))
+                .andExpect(jsonPath("$[0].homeTeamName").value(homeName))
                 .andExpect(jsonPath("$[0].homeTeamShortName").value("СЕВ"))
                 .andExpect(jsonPath("$[0].homeLogoUrl").value("/media/north.png"))
-                .andExpect(jsonPath("$[0].awayTeamName").value("Юг"))
+                .andExpect(jsonPath("$[0].awayTeamName").value(awayName))
                 .andExpect(jsonPath("$[0].awayLogoUrl").value("/media/south.png"))
                 .andExpect(jsonPath("$[0].homeScore").value(2))
                 .andExpect(jsonPath("$[0].awayScore").value(1))

@@ -7,5 +7,7 @@
 	request_body {
 		max_size 8MB
 	}
-	reverse_proxy web:80
+	reverse_proxy web:80 {
+		header_up X-Real-IP {remote_host}
+	}
 }

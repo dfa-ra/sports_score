@@ -13,6 +13,7 @@ import com.studentleague.teams.dto.TeamPlayerStatResponse;
 import com.studentleague.teams.dto.TeamResponse;
 import com.studentleague.teams.dto.UpdateTeamRequest;
 import com.studentleague.teams.service.TeamService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,6 +36,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,10 +49,12 @@ public class TeamController {
 
     private final TeamService teamService;
     private final MatchService matchService;
+    private final ObjectMapper objectMapper;
 
-    public TeamController(TeamService teamService, MatchService matchService) {
+    public TeamController(TeamService teamService, MatchService matchService, ObjectMapper objectMapper) {
         this.teamService = teamService;
         this.matchService = matchService;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping
@@ -72,10 +78,13 @@ public class TeamController {
         return teamService.createTeam(principal, request);
     }
 
-    @GetMapping("/mine")
-    @Operation(summary = "Current user's team")
-    public TeamResponse mine(@AuthenticationPrincipal UserPrincipal principal) {
-        return teamService.myTeam(principal);
+    @GetMapping(value = "/mine", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Current user's team, or null when the signed-in user has none")
+    public void mine(@AuthenticationPrincipal UserPrincipal principal, HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_OK);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getOutputStream(), teamService.myTeam(principal));
     }
 
     @GetMapping("/{id}")

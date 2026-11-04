@@ -50,7 +50,7 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         String captainPlayerId = playerId(captainToken);
-        String teamA = createTeam(adminToken, "Alpha FC", captainPlayerId);
+        String teamA = createTeam(adminToken, "Alpha FC " + System.nanoTime(), captainPlayerId);
         captainToken = reLogin(captainEmail, "Str0ngPass!");
         String teamBCaptainEmail = "tb-" + System.nanoTime() + "@example.com";
         String teamBToken = registerAndLogin(teamBCaptainEmail, "Str0ngPass!");
@@ -61,7 +61,7 @@ class TournamentMatchIntegrationTest extends AbstractIntegrationTest {
                                 {"firstName":"Bee","lastName":"Captain"}
                                 """))
                 .andExpect(status().isOk());
-        String teamB = createTeam(adminToken, "Beta FC", playerId(teamBToken));
+        String teamB = createTeam(adminToken, "Beta FC " + System.nanoTime(), playerId(teamBToken));
 
         MvcResult sports = mockMvc.perform(get("/api/v1/sports").header("Authorization", auth(adminToken)))
                 .andExpect(status().isOk())

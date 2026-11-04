@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record CalendarImportResponse(
         int created,
+        int updated,
         int skipped,
         List<UUID> matchIds,
         List<String> warnings

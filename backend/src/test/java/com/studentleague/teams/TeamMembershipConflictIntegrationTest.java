@@ -24,8 +24,8 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
         String southEmail = "mem-south-" + suffix + "@example.com";
         String southCaptainId = player(southEmail, "CAPTAIN");
 
-        String northId = createTeam(admin, "Север", northCaptainId);
-        String southId = createTeam(admin, "Юг", southCaptainId);
+        String northId = createTeam(admin, "Север " + suffix, northCaptainId);
+        String southId = createTeam(admin, "Юг " + suffix, southCaptainId);
         String southToken = loginOnly(southEmail, "Str0ngPass!");
 
         mockMvc.perform(post("/api/v1/teams/" + northId + "/members")
@@ -75,7 +75,7 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
         String northCaptainId = player("bind-north-" + suffix + "@example.com", "CAPTAIN");
         String eastCaptainId = player("bind-east-" + suffix + "@example.com", "CAPTAIN");
 
-        String northId = createTeam(admin, "Север", northCaptainId);
+        String northId = createTeam(admin, "Север " + suffix, northCaptainId);
         mockMvc.perform(post("/api/v1/teams/" + northId + "/members")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,12 +86,12 @@ class TeamMembershipConflictIntegrationTest extends AbstractIntegrationTest {
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name":"Запад","shortName":"ЗА","captainPlayerId":"%s"}
-                                """.formatted(playerId)))
+                                {"name":"Запад %s","shortName":"ЗА","captainPlayerId":"%s"}
+                                """.formatted(suffix, playerId)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.captainId").value(playerId));
 
-        String eastId = createTeam(admin, "Восток", eastCaptainId);
+        String eastId = createTeam(admin, "Восток " + suffix, eastCaptainId);
         mockMvc.perform(put("/api/v1/teams/" + eastId + "/captain")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)

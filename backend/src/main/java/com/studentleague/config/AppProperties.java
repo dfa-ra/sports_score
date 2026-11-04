@@ -24,7 +24,17 @@ public record AppProperties(
     public record Jwt(String secret, long accessExpirationMs, long refreshExpirationMs) {
     }
 
-    public record RateLimit(int authRequestsPerMinute) {
+    /**
+     * {@code authRequestsPerMinute} covers register/login/google/change-password-email/reset-password/refresh.
+     * Forgot-password and photo-ticket have their own windows; docs/api.md states the numbers.
+     */
+    public record RateLimit(
+            int authRequestsPerMinute,
+            int forgotPasswordRequests,
+            int forgotPasswordWindowMinutes,
+            int photoTicketRequests,
+            int photoTicketWindowMinutes
+    ) {
     }
 
     public record Redis(boolean enabled) {

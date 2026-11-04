@@ -6,11 +6,17 @@ public class ApiException extends RuntimeException {
 
     private final String code;
     private final HttpStatus status;
+    private final Long retryAfterSeconds;
 
     public ApiException(String code, String message, HttpStatus status) {
+        this(code, message, status, null);
+    }
+
+    public ApiException(String code, String message, HttpStatus status, Long retryAfterSeconds) {
         super(message);
         this.code = code;
         this.status = status;
+        this.retryAfterSeconds = retryAfterSeconds;
     }
 
     public String getCode() {
@@ -19,6 +25,10 @@ public class ApiException extends RuntimeException {
 
     public HttpStatus getStatus() {
         return status;
+    }
+
+    public Long getRetryAfterSeconds() {
+        return retryAfterSeconds;
     }
 
     public static ApiException conflict(String message) {
@@ -42,7 +52,12 @@ public class ApiException extends RuntimeException {
     }
 
     public static ApiException rateLimited(String message) {
-        return new ApiException("RATE_LIMITED", message, HttpStatus.TOO_MANY_REQUESTS);
+        return rateLimited(message, 60);
+    }
+
+    public static ApiException rateLimited(String message, long retryAfterSeconds) {
+        long retry = Math.max(1, retryAfterSeconds);
+        return new ApiException("RATE_LIMITED", message, HttpStatus.TOO_MANY_REQUESTS, retry);
     }
 
     public static ApiException serviceUnavailable(String message) {

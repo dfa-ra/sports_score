@@ -23,10 +23,10 @@ async function load() {
   captainNeedsTeam.value = false
   if (!auth.hasRole('CAPTAIN') || auth.canManageLeague) return
   try {
-    await api.get('/teams/mine')
-  } catch (e: any) {
-    captainNeedsTeam.value = e?.response?.status === 404
-      && e?.response?.data?.message === 'Вы ещё не в команде'
+    const { data } = await api.get('/teams/mine')
+    captainNeedsTeam.value = !data?.id
+  } catch {
+    captainNeedsTeam.value = false
   }
 }
 

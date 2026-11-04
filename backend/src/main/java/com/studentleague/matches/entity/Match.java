@@ -83,6 +83,10 @@ public class Match {
     @Column(name = "bracket_round")
     private Integer bracketRound;
 
+    /** Calendar tour within a group. Separate from {@code bracketRound}. */
+    @Column(name = "round_number")
+    private Integer roundNumber;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -264,5 +268,13 @@ public class Match {
 
     public void setBracketRound(Integer bracketRound) {
         this.bracketRound = bracketRound;
+    }
+
+    public Integer getRoundNumber() {
+        return roundNumber;
+    }
+
+    public void setRoundNumber(Integer roundNumber) {
+        this.roundNumber = roundNumber;
     }
 }

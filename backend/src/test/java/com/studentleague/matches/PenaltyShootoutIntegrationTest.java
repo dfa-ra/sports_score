@@ -344,12 +344,13 @@ class PenaltyShootoutIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         String playerId = objectMapper.readTree(me.getResponse().getContentAsString()).get("id").asText();
+        String teamName = name + " " + System.nanoTime();
         MvcResult team = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","shortName":"%s","captainPlayerId":"%s"}
-                                """.formatted(name, name.substring(0, 2), playerId)))
+                                """.formatted(teamName, name.substring(0, 2), playerId)))
                 .andExpect(status().isCreated())
                 .andReturn();
         String teamId = objectMapper.readTree(team.getResponse().getContentAsString()).get("id").asText();

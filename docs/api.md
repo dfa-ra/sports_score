@@ -121,7 +121,9 @@ Auth: `Authorization: Bearer <access_token>`
 
 Запрос: `{ "refreshToken": "..." }` → новый access + refresh (старый refresh отозван).
 
-На register/login/google/forgot-password/change-password-email/reset-password/refresh действует rate limiting.
+На register/login/google/change-password-email/reset-password/refresh действует rate limiting: не больше `AUTH_RATE_LIMIT` запросов в минуту с одного адреса и отдельно с одного аккаунта (по умолчанию 10). Ответ `429`, заголовок `Retry-After`.
+
+`POST /auth/forgot-password` дополнительно не больше 5 запросов за 15 минут на пару адрес+почта. `POST /auth/photo-ticket` — не больше 10 запросов за 15 минут с адреса и, если пользователь уже вошёл, с этого аккаунта. За reverse proxy (Caddy → nginx) адрес клиента берётся из `X-Forwarded-For`: отбрасывается подставляемый nginx адрес Caddy, поддельный левый hop не используется. Если в цепочке только адреса прокси, берётся `X-Real-IP`, когда это не адрес прокси. `server.forward-headers-strategy` не включается: стандартный разбор пропускает все частные адреса и принял бы поддельный публичный адрес за клиента.
 
 ### Google
 
@@ -188,7 +190,8 @@ Backend проверяет подпись токена, срок, issuer Google 
 
 | Метод | Путь | Auth |
 |---|---|---|
-| GET/POST | `/teams` | Чтение: публичное (без расформированных; `includeDisbanded=true` — все). Создание: игрок/капитан (становится капитаном). ADMIN создавать не может |
+| GET/POST | `/teams` | Чтение: публичное (без расформированных; `includeDisbanded=true` — все). Создание: ADMIN |
+| GET | `/teams/mine` | Любая вошедшая роль. Команда пользователя или JSON `null`, если команды нет. Без входа — `401` |
 | GET/PUT | `/teams/{id}` | Изменение: капитан команды или ADMIN. Расформированную править нельзя |
 | DELETE | `/teams/{id}` | ADMIN — расформировать (состав снимается, заявки на турниры — WITHDRAWN). `?purge=true` — удалить уже расформированную команду, если у неё нет матчей |
 | GET | `/teams/{id}/members` | Публичный |

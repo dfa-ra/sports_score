@@ -121,7 +121,7 @@ class AdminBootstrapRunnerTest {
         return new AppProperties(
                 new AppProperties.Cors(List.of("http://localhost")),
                 new AppProperties.Jwt("test-secret-key-that-is-long-enough-for-hs256-algorithms-123456", 60_000, 3_600_000),
-                new AppProperties.RateLimit(30),
+                new AppProperties.RateLimit(30, 5, 15, 10, 15),
                 new AppProperties.Redis(false),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
                 new AppProperties.Admin(adminEmail, "secret", e2eEmail),

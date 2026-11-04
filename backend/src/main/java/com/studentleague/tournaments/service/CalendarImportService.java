@@ -1,16 +1,21 @@
 package com.studentleague.tournaments.service;
 
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.CreateMatchRequest;
 import com.studentleague.matches.dto.MatchResponse;
+import com.studentleague.matches.entity.Match;
+import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.matches.service.MatchService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.CalendarImportResponse;
 import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.tournaments.repository.TournamentTableRepository;
 import com.studentleague.tournaments.repository.TournamentTeamRepository;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -38,6 +43,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -59,20 +65,26 @@ public class CalendarImportService {
 
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
+    private final TournamentTableRepository tournamentTableRepository;
     private final TeamRepository teamRepository;
+    private final MatchRepository matchRepository;
     private final MatchService matchService;
     private final TournamentRosterGuard tournamentRosterGuard;
 
     public CalendarImportService(
             TournamentRepository tournamentRepository,
             TournamentTeamRepository tournamentTeamRepository,
+            TournamentTableRepository tournamentTableRepository,
             TeamRepository teamRepository,
+            MatchRepository matchRepository,
             MatchService matchService,
             TournamentRosterGuard tournamentRosterGuard
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
+        this.tournamentTableRepository = tournamentTableRepository;
         this.teamRepository = teamRepository;
+        this.matchRepository = matchRepository;
         this.matchService = matchService;
         this.tournamentRosterGuard = tournamentRosterGuard;
     }
@@ -82,7 +94,7 @@ public class CalendarImportService {
         Tournament tournament = tournamentRepository.findById(tournamentId)
                 .orElseThrow(() -> ApiException.notFound("Турнир не найден"));
         if (file == null || file.isEmpty()) {
-            throw ApiException.badRequest("Файл календаря пустой");
+            throw ApiException.badRequest("Файл не приложен");
         }
         List<SheetRow> rows = readRows(file);
         if (rows.isEmpty()) {
@@ -92,8 +104,13 @@ public class CalendarImportService {
         if (!header.hasAny("date", "дата") || !header.hasAny("home", "хозяева", "хозяин") || !header.hasAny("away", "гости", "гость")) {
             throw ApiException.badRequest("Не удалось прочитать календарь. Нужны колонки: date, time, home, away");
         }
+        boolean venueColumn = header.hasAny("venue", "зал", "площадка", "место");
+        boolean roundColumn = header.hasAny("round", "тур", "круг", "tour");
+        boolean groupColumn = header.hasAny("group", "группа", "stage", "этап", "стадия");
         List<UUID> created = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
+        int updated = 0;
+        int acknowledged = 0;
         int skipped = 0;
         for (int i = 1; i < rows.size(); i++) {
             SheetRow sheetRow = rows.get(i);
@@ -111,13 +128,27 @@ public class CalendarImportService {
                 ensureApproved(tournament, homeTeam);
                 ensureApproved(tournament, awayTeam);
                 Instant kickoff = parseKickoff(date, time);
-                MatchResponse match = matchService.create(new CreateMatchRequest(
-                        tournament.getId(), homeTeam.getId(), awayTeam.getId(), kickoff, null, null, null, null
-                ));
-                created.add(match.id());
+                String venue = venueColumn ? blankToNull(header.get(row, "venue", "зал", "площадка", "место")) : null;
+                Integer round = roundColumn ? parseRound(header.get(row, "round", "тур", "круг", "tour")) : null;
+                UUID stageId = stageOf(
+                        tournament,
+                        homeTeam,
+                        awayTeam,
+                        groupColumn ? header.get(row, "group", "группа", "stage", "этап", "стадия") : null
+                );
+                RowOutcome outcome = upsert(tournament, homeTeam, awayTeam, kickoff, venue, venueColumn, round, stageId);
+                switch (outcome.kind()) {
+                    case CREATED -> created.add(outcome.id());
+                    case UPDATED -> updated++;
+                    case UNCHANGED -> acknowledged++;
+                }
             } catch (ApiException ex) {
-                if (importMustRollBack(ex)) {
-                    throw ApiException.conflict("Строка " + sheetRow.number() + ": " + ex.getMessage());
+                if (ex.getStatus() == HttpStatus.CONFLICT) {
+                    String message = ex.getMessage() == null ? "" : ex.getMessage();
+                    if (message.startsWith("Строка ")) {
+                        throw ex;
+                    }
+                    throw ApiException.conflict("Строка " + sheetRow.number() + ": " + message);
                 }
                 skipped++;
                 warnings.add("Строка " + sheetRow.number() + ": " + ex.getMessage());
@@ -126,13 +157,147 @@ public class CalendarImportService {
                 warnings.add("Строка " + sheetRow.number() + ": " + ex.getMessage());
             }
         }
-        if (created.isEmpty()) {
+        if (created.isEmpty() && updated == 0 && acknowledged == 0) {
             String detail = warnings.isEmpty()
                     ? "В файле нет матчей"
                     : warnings.getFirst();
             throw ApiException.badRequest("Календарь не импортирован. " + detail);
         }
-        return new CalendarImportResponse(created.size(), skipped, created, warnings);
+        return new CalendarImportResponse(created.size(), updated, skipped, created, warnings);
+    }
+
+    private RowOutcome upsert(
+            Tournament tournament,
+            Team homeTeam,
+            Team awayTeam,
+            Instant kickoff,
+            String venue,
+            boolean venueColumn,
+            Integer round,
+            UUID stageId
+    ) {
+        List<Match> same = matchRepository
+                .findByTournamentIdAndHomeTeamIdAndAwayTeamId(tournament.getId(), homeTeam.getId(), awayTeam.getId())
+                .stream()
+                .filter(match -> Objects.equals(match.getTableId(), stageId))
+                .filter(match -> Objects.equals(match.getRoundNumber(), round))
+                .toList();
+        if (same.isEmpty()) {
+            MatchResponse created = matchService.create(new CreateMatchRequest(
+                    tournament.getId(),
+                    homeTeam.getId(),
+                    awayTeam.getId(),
+                    kickoff,
+                    null,
+                    null,
+                    venue,
+                    stageId
+            ));
+            if (round != null) {
+                Match entity = matchRepository.findById(created.id()).orElseThrow();
+                entity.setRoundNumber(round);
+                matchRepository.save(entity);
+            }
+            return RowOutcome.created(created.id());
+        }
+        for (Match match : same) {
+            if (playedOrLive(match) && changes(match, kickoff, venue, venueColumn)) {
+                throw ApiException.conflict("матч уже сыгран");
+            }
+        }
+        Match editable = null;
+        for (Match match : same) {
+            if (!playedOrLive(match)) {
+                editable = match;
+                break;
+            }
+        }
+        if (editable == null) {
+            return RowOutcome.unchanged();
+        }
+        editable.setScheduledAt(kickoff);
+        if (venueColumn) {
+            editable.setVenue(venue);
+        }
+        matchRepository.save(editable);
+        return RowOutcome.updated();
+    }
+
+    private UUID stageOf(Tournament tournament, Team home, Team away, String groupName) {
+        if (groupName != null && !groupName.isBlank()) {
+            String wanted = groupName.trim();
+            for (TournamentTable table : tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournament.getId())) {
+                if (table.getName() != null && table.getName().trim().equalsIgnoreCase(wanted)) {
+                    return table.getId();
+                }
+            }
+            throw ApiException.badRequest("Группа не найдена: " + wanted);
+        }
+        UUID homeTable = tableOf(tournament.getId(), home.getId());
+        UUID awayTable = tableOf(tournament.getId(), away.getId());
+        if (homeTable != null && homeTable.equals(awayTable)) {
+            return homeTable;
+        }
+        return null;
+    }
+
+    private UUID tableOf(UUID tournamentId, UUID teamId) {
+        return tournamentTeamRepository.findByTournamentIdAndTeamId(tournamentId, teamId)
+                .map(TournamentTeam::getTableId)
+                .orElse(null);
+    }
+
+    private static boolean playedOrLive(Match match) {
+        MatchStatus status = match.getStatus();
+        return status == MatchStatus.LIVE || status == MatchStatus.PAUSED || status == MatchStatus.FINISHED;
+    }
+
+    private static boolean changes(Match match, Instant kickoff, String venue, boolean venueColumn) {
+        if (!Objects.equals(match.getScheduledAt(), kickoff)) {
+            return true;
+        }
+        return venueColumn && !Objects.equals(blankToNull(match.getVenue()), venue);
+    }
+
+    private static Integer parseRound(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(raw.trim());
+            if (value < 1) {
+                throw ApiException.badRequest("Непонятный тур: " + raw);
+            }
+            return value;
+        } catch (NumberFormatException ex) {
+            throw ApiException.badRequest("Непонятный тур: " + raw);
+        }
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private enum OutcomeKind {
+        CREATED, UPDATED, UNCHANGED
+    }
+
+    private record RowOutcome(OutcomeKind kind, UUID id) {
+        static RowOutcome created(UUID id) {
+            return new RowOutcome(OutcomeKind.CREATED, id);
+        }
+
+        static RowOutcome updated() {
+            return new RowOutcome(OutcomeKind.UPDATED, null);
+        }
+
+        static RowOutcome unchanged() {
+            return new RowOutcome(OutcomeKind.UNCHANGED, null);
+        }
     }
 
     private void ensureApproved(Tournament tournament, Team team) {
@@ -159,13 +324,6 @@ public class CalendarImportService {
             entry.setApprovedAt(Instant.now());
             tournamentTeamRepository.save(entry);
         });
-    }
-
-    private static boolean importMustRollBack(ApiException ex) {
-        String message = ex.getMessage();
-        return ex.getStatus() == HttpStatus.CONFLICT
-                && message != null
-                && (message.contains("уже играет за") || message.contains("снята с турнира"));
     }
 
     private Team resolveTeam(String raw) {

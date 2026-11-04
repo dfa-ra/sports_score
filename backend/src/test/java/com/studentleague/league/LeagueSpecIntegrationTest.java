@@ -8,13 +8,14 @@ import org.springframework.mock.web.MockMultipartFile;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class LeagueSpecIntegrationTest extends AbstractIntegrationTest {
 
     @Test
-    void playerRegistrationRequiresPhotoAndFanCannotOpenMyTeam() throws Exception {
+    void playerRegistrationRequiresPhotoAndFanWithoutATeamGetsNull() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -24,7 +25,8 @@ class LeagueSpecIntegrationTest extends AbstractIntegrationTest {
 
         String fanToken = registerAndLogin("fan-mine-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         mockMvc.perform(get("/api/v1/teams/mine").header("Authorization", auth(fanToken)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk())
+                .andExpect(content().string("null"));
     }
 
     @Test

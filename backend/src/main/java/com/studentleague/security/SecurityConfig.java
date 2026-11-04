@@ -41,19 +41,22 @@ public class SecurityConfig {
     private final AppProperties appProperties;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final TeamManageAuthorizationManager teamManageAuthorizationManager;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             DisabledGalleryMediaFilter disabledGalleryMediaFilter,
             AppProperties appProperties,
             RestAuthenticationEntryPoint authenticationEntryPoint,
-            RestAccessDeniedHandler accessDeniedHandler
+            RestAccessDeniedHandler accessDeniedHandler,
+            TeamManageAuthorizationManager teamManageAuthorizationManager
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.disabledGalleryMediaFilter = disabledGalleryMediaFilter;
         this.appProperties = appProperties;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.teamManageAuthorizationManager = teamManageAuthorizationManager;
     }
 
     @Bean
@@ -101,7 +104,9 @@ public class SecurityConfig {
                                 "/media/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
-                        .requestMatchers("/api/v1/matches/*/availability").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/matches/*/availability").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/availability")
+                        .hasAnyRole("PLAYER", "CAPTAIN", "ADMIN")
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/tournaments",
                                 "/api/v1/tournaments/**",
@@ -131,6 +136,34 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/v1/admin/matches/*/goalkeeper").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/referee/matches/*/goalkeeper")
                         .hasAnyRole("REFEREE", "ADMIN")
+                        // Role checks live here so they run before @Valid. Method security is too late.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tournaments/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tournaments/*/tables").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/calendar/import").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/teams/*/approve").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/teams/*/restore").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/tournaments/*/teams/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/teams").hasAnyRole("CAPTAIN", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/playoff").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tournaments/*/playoff", "/api/v1/tournaments/*/playoff/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tournaments/*/matches/*/group").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/matches").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/matches/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/matches/*/lineups")
+                        .hasAnyRole("CAPTAIN", "REFEREE", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/matches/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/referees").hasRole("ADMIN")
+                        .requestMatchers("/api/v1/analyst/**").hasAnyRole("ANALYST", "ADMIN")
+                        .requestMatchers("/api/v1/referee/**").hasAnyRole("REFEREE", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/teams").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/teams/*").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/teams/*").access(teamManageAuthorizationManager)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/teams/*/captain").access(teamManageAuthorizationManager)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/teams/*/members").access(teamManageAuthorizationManager)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/teams/*/members/*").access(teamManageAuthorizationManager)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/uploads/teams/*/logo").access(teamManageAuthorizationManager)
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterAfter(disabledGalleryMediaFilter, JwtAuthenticationFilter.class);
