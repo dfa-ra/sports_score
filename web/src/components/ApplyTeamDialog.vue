@@ -85,7 +85,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
           <p v-else>
             Заявить «{{ selectedTeam?.name }}» на этот турнир?
           </p>
-          <p class="muted">Заявка уходит на рассмотрение. Админ ещё должен нажать «Допустить».</p>
+          <p class="muted">Заявка уходит на рассмотрение. Админ ещё должен нажать «Одобрить».</p>
           <p v-if="error" class="form-error">{{ error }}</p>
           <p v-if="ok" class="form-ok">{{ ok }}</p>
           <button

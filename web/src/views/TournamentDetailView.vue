@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
+import { APPROVE_BUTTON_LABEL, entryActionError, showApproveButton } from '../lib/tournamentEntryActions'
 import { formatWhen, isTournamentOpenForApply, tournamentDatesError } from '../lib/format'
 import { matchInstant, matchStateLabel, publicScore } from '../lib/match'
 import {
@@ -121,10 +122,15 @@ async function load() {
     if (route.params.id !== id) return
     teams.value = teamRes.data
     standings.value = parseStandings(standingRes.data)
+    const approvedIds = new Set(
+      (teamRes.data ?? [])
+        .filter((team: { status?: string }) => team.status === 'APPROVED')
+        .map((team: { teamId?: string }) => String(team.teamId)),
+    )
     tableDraft.value = (tableRes.data ?? []).map((row: any) => ({
       id: row.id,
       name: row.name,
-      teamIds: (row.teamIds ?? []).map(String),
+      teamIds: (row.teamIds ?? []).map(String).filter((id: string) => approvedIds.has(id)),
     }))
     matches.value = matchRes.data.content ?? []
     error.value = ''
@@ -189,24 +195,32 @@ async function save(event?: Event) {
 }
 
 async function approve(id: string) {
+  const tournamentId = tournament.value?.id
+  if (!tournamentId) return
+  error.value = ''
+  ok.value = ''
   pending.value = true
   try {
-    await api.post(`/tournaments/${tournament.value.id}/teams/${id}/approve`)
+    await api.post(`/tournaments/${tournamentId}/teams/${id}/approve`)
     await load()
-  } catch (e: any) {
-    error.value = apiError(e)
+  } catch (e: unknown) {
+    error.value = entryActionError(e)
   } finally {
     pending.value = false
   }
 }
 
 async function restore(id: string) {
+  const tournamentId = tournament.value?.id
+  if (!tournamentId) return
+  error.value = ''
+  ok.value = ''
   pending.value = true
   try {
-    await api.post(`/tournaments/${tournament.value.id}/teams/${id}/restore`)
+    await api.post(`/tournaments/${tournamentId}/teams/${id}/restore`)
     await load()
-  } catch (e: any) {
-    error.value = apiError(e)
+  } catch (e: unknown) {
+    error.value = entryActionError(e)
   } finally {
     pending.value = false
   }
@@ -279,7 +293,7 @@ const savedTables = computed(() =>
     .filter((table) => table.id)
     .map((table) => ({ id: table.id as string, name: table.name, teamIds: table.teamIds }))
 )
-const assignableTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
+const assignableTeams = computed(() => teams.value.filter((team) => team.status === 'APPROVED'))
 const listedTeams = computed(() => teams.value.filter((team) => team.status !== 'WITHDRAWN'))
 const withdrawnTeams = computed(() => teams.value.filter((team) => team.status === 'WITHDRAWN'))
 const showGrid = computed(() => tournamentHasPlayoff({
@@ -594,7 +608,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         </RouterLink>
         <StatusBadge :status="team.status" />
         <div class="actions">
-          <button v-if="team.status !== 'APPROVED'" class="btn" :disabled="pending" @click="approve(team.teamId)">Допустить</button>
+          <button v-if="showApproveButton(team.status)" class="btn" type="button" :disabled="pending" @click="approve(team.teamId)">{{ APPROVE_BUTTON_LABEL }}</button>
           <button class="btn danger" :disabled="pending" @click="exclude(team)">Убрать из турнира</button>
         </div>
       </div>
@@ -611,7 +625,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </div>
 
       <h2>Календарь из Excel / CSV</h2>
-      <p class="muted">Колонки: date, time, home, away. Команды подхватываются по названию и сразу попадают в турнир.</p>
+      <p class="muted">Колонки: date, time, home, away. Команды подхватываются по названию. Снятую команду файл не возвращает: сначала нажмите «Вернуть».</p>
       <form class="stack" @submit.prevent="importCalendar">
         <input type="file" accept=".csv,.xlsx,.xls" @change="calendarFile = ($event.target as HTMLInputElement).files?.[0] || null" />
         <button class="btn secondary" type="submit" :disabled="pending || !calendarFile">Загрузить календарь</button>
