@@ -38,17 +38,58 @@ public class LocalDiskStorageService implements StorageService {
 
     @Override
     public String store(String folder, MultipartFile file) {
-        String filename = UUID.randomUUID() + "-" + ImageUploads.safeFilename(file);
-        Path dir = rootDir.resolve(sanitize(folder));
+        String folderName = sanitize(folder);
+        byte[] raw;
         try {
-            Files.createDirectories(dir);
-            Path target = dir.resolve(filename);
-            Files.write(target, file.getBytes());
-            ImageVariants.writeForFolder(target, sanitize(folder));
-            return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
+            raw = file.getBytes();
         } catch (IOException e) {
             throw ApiException.badRequest("Не удалось сохранить файл");
         }
+        byte[] body = orient(folderName, raw);
+        String filename = UUID.randomUUID() + "-" + storedName(ImageUploads.safeFilename(file), raw, body);
+        Path dir = rootDir.resolve(folderName);
+        try {
+            Files.createDirectories(dir);
+            Path target = dir.resolve(filename);
+            Files.write(target, body);
+            ImageVariants.writeForFolder(target, folderName);
+            return publicBaseUrl + "/" + folderName + "/" + filename;
+        } catch (IOException e) {
+            throw ApiException.badRequest("Не удалось сохранить файл");
+        }
+    }
+
+    /**
+     * Logos are squared onto a transparent PNG. Avatars and registration photos
+     * are only turned upright. Gallery bytes stay as uploaded.
+     */
+    private static byte[] orient(String folder, byte[] raw) {
+        if ("logos".equals(folder)) {
+            return ImageOrientation.storedBytes(raw, true);
+        }
+        if ("avatars".equals(folder) || "registration".equals(folder)) {
+            return ImageOrientation.storedBytes(raw, false);
+        }
+        return raw;
+    }
+
+    private static String storedName(String filename, byte[] raw, byte[] body) {
+        if (body == raw) {
+            return filename;
+        }
+        if (ImageOrientation.isPng(body)) {
+            return withExtension(filename, "png");
+        }
+        if (ImageOrientation.isJpeg(body)) {
+            return withExtension(filename, "jpg");
+        }
+        return filename;
+    }
+
+    private static String withExtension(String filename, String extension) {
+        int dot = filename.lastIndexOf('.');
+        String stem = dot > 0 ? filename.substring(0, dot) : filename;
+        return stem + "." + extension;
     }
 
     private static String sanitize(String folder) {

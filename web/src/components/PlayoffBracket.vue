@@ -466,9 +466,8 @@ function bronzePairStyle() {
 <template>
   <div ref="root" class="po">
     <div class="po-card">
-      <div class="po-card-h">
-        <h2>Сетка плей-офф</h2>
-        <p v-if="!tabMode && !loading && !error && !empty" class="po-hint">
+      <div v-if="!tabMode && !loading && !error && !empty" class="po-card-h">
+        <p class="po-hint">
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>
@@ -859,7 +858,6 @@ function bronzePairStyle() {
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
-.po-card-h h2 { font-size: 1.0625rem; margin: 0; }
 .po-hint { margin: 0; font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
 .po-board { min-width: 0; max-width: 100%; overflow-x: auto; }
 .po-board.stack { overflow-x: visible; }

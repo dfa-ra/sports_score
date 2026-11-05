@@ -26,6 +26,7 @@ withDefaults(
 .brand-mark {
   display: block;
   object-fit: contain;
+  image-orientation: from-image;
   background: transparent;
   flex-shrink: 0;
 }

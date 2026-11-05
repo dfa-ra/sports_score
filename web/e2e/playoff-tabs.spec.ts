@@ -91,7 +91,8 @@ async function mockApi(page: Page) {
 async function openBracket(page: Page, teams: number) {
   state.teams = teams
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
-  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: roundTitles[teams][0], exact: true }).first()).toBeVisible()
 }
 
 function rounds(page: Page) {
@@ -323,7 +324,8 @@ test('a saved bracket kickoff shows on Матчи and Home without a reload', as
 
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
-  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Финал', exact: true }).first()).toBeVisible()
   const kickoff = page.locator('.bracket.admin input[type="datetime-local"]')
   await expect(kickoff).toHaveValue('2026-11-10T15:00')
 

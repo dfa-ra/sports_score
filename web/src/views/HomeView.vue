@@ -664,7 +664,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .mmain { display: grid; gap: 0.35rem; min-width: 0; }
 .mmeta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .mmeta .l, .mteam, .mc-t { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.mteam, .mc-t { gap: 0.6rem; font-weight: 700; color: var(--ink); }
+.mteam, .mc-t { gap: 8px; font-weight: 700; color: var(--ink); }
 .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .irow .n {
   display: -webkit-box;
@@ -773,7 +773,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; font-size: 1em; }
   .wm { width: 220px; right: -50px; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 44px; height: 44px; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; }
   .feed-list { display: none; }
   .feed-cards { display: flex; gap: 0.75rem; overflow-x: auto; padding: 1rem; scroll-snap-type: x mandatory; scrollbar-width: none; min-width: 0; width: 100%; }
   .feed-cards::-webkit-scrollbar { display: none; }
