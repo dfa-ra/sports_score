@@ -353,6 +353,22 @@ public class TournamentService {
     }
 
     /**
+     * Only an approved entry may sit in a group. Checked before any tableId write.
+     */
+    private static String tableAssignmentRefusal(TournamentTeamStatus status) {
+        if (status == TournamentTeamStatus.WITHDRAWN) {
+            return "Команда снята с турнира";
+        }
+        if (status == TournamentTeamStatus.REJECTED) {
+            return "Заявка отклонена";
+        }
+        if (status == TournamentTeamStatus.PENDING) {
+            return "Заявка ещё на рассмотрении";
+        }
+        return "В таблицу попадают только одобренные команды";
+    }
+
+    /**
      * A tournament with a single group puts every newly approved club into it.
      * Several groups stay a manual assignment, same as a club approved for the first time.
      */
@@ -418,8 +434,12 @@ public class TournamentService {
                 if (!seen.add(teamId)) {
                     throw ApiException.badRequest("Команда не может быть сразу в двух таблицах");
                 }
-                if (!byTeamId.containsKey(teamId)) {
+                TournamentTeam entry = byTeamId.get(teamId);
+                if (entry == null) {
                     throw ApiException.badRequest("Команда не заявлена в этот турнир");
+                }
+                if (entry.getStatus() != TournamentTeamStatus.APPROVED) {
+                    throw ApiException.conflict(tableAssignmentRefusal(entry.getStatus()));
                 }
             }
         }

@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -115,7 +116,7 @@ public class CalendarImportService {
                 ));
                 created.add(match.id());
             } catch (ApiException ex) {
-                if (rosterConflict(ex)) {
+                if (importMustRollBack(ex)) {
                     throw ApiException.conflict("Строка " + sheetRow.number() + ": " + ex.getMessage());
                 }
                 skipped++;
@@ -135,33 +136,36 @@ public class CalendarImportService {
     }
 
     private void ensureApproved(Tournament tournament, Team team) {
+        Optional<TournamentTeam> existing = tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), team.getId());
+        if (existing.isPresent() && existing.get().getStatus() == TournamentTeamStatus.WITHDRAWN) {
+            throw ApiException.conflict("команда «" + team.getName() + "» снята с турнира, сначала верните её");
+        }
         if (team.isDisbanded()) {
             throw ApiException.badRequest("Команда «" + team.getName() + "» расформирована");
         }
         tournamentRosterGuard.rejectSquadAlreadyInTournament(tournament.getId(), team.getId());
-        tournamentTeamRepository.findByTournamentIdAndTeamId(tournament.getId(), team.getId())
-                .ifPresentOrElse(entry -> {
-                    if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
-                        return;
-                    }
-                    entry.setStatus(TournamentTeamStatus.APPROVED);
-                    entry.setApprovedAt(Instant.now());
-                    tournamentTeamRepository.save(entry);
-                }, () -> {
-                    TournamentTeam entry = new TournamentTeam();
-                    entry.setTournamentId(tournament.getId());
-                    entry.setTeamId(team.getId());
-                    entry.setStatus(TournamentTeamStatus.APPROVED);
-                    entry.setApprovedAt(Instant.now());
-                    tournamentTeamRepository.save(entry);
-                });
+        existing.ifPresentOrElse(entry -> {
+            if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
+                return;
+            }
+            entry.setStatus(TournamentTeamStatus.APPROVED);
+            entry.setApprovedAt(Instant.now());
+            tournamentTeamRepository.save(entry);
+        }, () -> {
+            TournamentTeam entry = new TournamentTeam();
+            entry.setTournamentId(tournament.getId());
+            entry.setTeamId(team.getId());
+            entry.setStatus(TournamentTeamStatus.APPROVED);
+            entry.setApprovedAt(Instant.now());
+            tournamentTeamRepository.save(entry);
+        });
     }
 
-    private static boolean rosterConflict(ApiException ex) {
+    private static boolean importMustRollBack(ApiException ex) {
         String message = ex.getMessage();
         return ex.getStatus() == HttpStatus.CONFLICT
                 && message != null
-                && message.contains("уже играет за");
+                && (message.contains("уже играет за") || message.contains("снята с турнира"));
     }
 
     private Team resolveTeam(String raw) {
