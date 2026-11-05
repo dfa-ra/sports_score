@@ -702,7 +702,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   text-transform: uppercase; white-space: nowrap; line-height: 1.5;
 }
 .st.today, .st.soon { background: var(--status-soon-soft); color: var(--status-soon-ink); }
-.st.done { background: var(--status-done-soft); color: var(--status-done-ink); }
+.st.done { background: var(--status-done-soft); color: var(--status-done-ink); text-transform: none; letter-spacing: 0; }
 .st.ok { background: var(--status-ok-soft); color: var(--status-ok); }
 .st.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
 .st.live { background: var(--status-live-soft); color: var(--status-live-ink); }

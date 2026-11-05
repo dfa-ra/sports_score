@@ -16,6 +16,7 @@ const props = defineProps<{
     endDate?: string | null
     competitionStage?: string | null
   }
+  sportName?: string
 }>()
 const emit = defineEmits<{ apply: [] }>()
 
@@ -29,14 +30,10 @@ const showApply = computed(() =>
   && (!auth.isAuthenticated || auth.hasRole('CAPTAIN') || auth.canManageLeague)
 )
 const meta = computed(() => {
-  const stage = props.tournament.competitionStage === 'PLAYOFF'
-    ? 'Плей-офф'
-    : labelOf(formatLabel, props.tournament.format, '')
-  const parts = [
-    props.tournament.seasonYear ? `сезон ${props.tournament.seasonYear}` : '',
-    stage,
-  ].filter(Boolean)
-  return parts.join(' · ')
+  const raw = (props.sportName || '').trim()
+  const sport = raw === 'Футбол' ? 'Футзал' : raw
+  const format = labelOf(formatLabel, props.tournament.format, '')
+  return [sport, format].filter(Boolean).join(' · ')
 })
 const dates = computed(() => formatDateRange(props.tournament.startDate, props.tournament.endDate))
 

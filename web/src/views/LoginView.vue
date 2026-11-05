@@ -4,7 +4,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 import { useAuthStore } from '../stores/auth'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
-import { googleClientId } from '../lib/googleIdentity'
 import { loginFieldErrors, type LoginFieldErrors } from '../lib/loginFields'
 import { safeInternalPath } from '../lib/redirect'
 
@@ -100,7 +99,6 @@ async function onGoogle(idToken: string) {
         </form>
         <GoogleSignInButton @success="onGoogle" @error="googleError = $event" />
         <p v-if="googleError" class="form-error">{{ googleError }}</p>
-        <p v-if="googleClientId" class="muted">Новый аккаунт через Google создаётся как болельщик.</p>
         <p class="muted">Ещё без аккаунта?</p>
         <RouterLink class="btn secondary" to="/register">Создать аккаунт</RouterLink>
       </div>

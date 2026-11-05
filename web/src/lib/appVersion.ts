@@ -6,9 +6,7 @@ export const appVersion = version
 export const appRevision = revision
 export const appChannel = channel
 
-/** Short build label for the footer, e.g. `v0.2.62 · 4bd85f3`. */
-export const appVersionLabel = revision && revision !== 'local'
-  ? `v${version} · ${revision}`
-  : `v${version}`
+/** Footer label: version only, without the commit hash. */
+export const appVersionLabel = `v${version}`
 
-export const appVersionTitle = `${channel} · v${version} · ${revision}`
+export const appVersionTitle = `v${version}`

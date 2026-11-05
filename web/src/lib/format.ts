@@ -6,7 +6,7 @@ export const statusLabel: Record<string, string> = {
   SCHEDULED: 'Скоро',
   LIVE: 'Live',
   PAUSED: 'Пауза',
-  FINISHED: 'Финал',
+  FINISHED: 'Завершён',
   CANCELLED: 'Отменён',
   DRAFT: 'Черновик',
   REGISTRATION: 'Набор',

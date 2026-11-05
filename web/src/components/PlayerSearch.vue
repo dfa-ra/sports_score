@@ -96,17 +96,17 @@ onUnmounted(() => {
 
 <template>
   <div class="search">
-    <label class="field">Имя
+    <label class="field">
       <input
         v-model="query"
         type="search"
-        placeholder="Начните вводить фамилию"
+        placeholder="Поиск игрока"
+        aria-label="Поиск игрока"
         autocomplete="off"
         @input="schedule"
       />
     </label>
-    <p v-if="query.trim().length < 2" class="muted">Введите хотя бы 2 буквы — покажем подсказки.</p>
-    <p v-else-if="pending" class="pending">
+    <p v-if="pending" class="pending">
       <span class="spin" aria-hidden="true" />
       Ищем…
     </p>

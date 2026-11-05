@@ -434,7 +434,7 @@ a.panel:hover {
   background: var(--live);
   box-shadow: 0 0 0 4px rgba(76, 180, 229, 0.22);
 }
-.badge.done { color: var(--muted); }
+.badge.done { color: var(--muted); text-transform: none; letter-spacing: 0; }
 .badge.warn { color: var(--white); border-color: rgba(76, 180, 229, 0.4); background: var(--accent-soft); }
 
 .empty {

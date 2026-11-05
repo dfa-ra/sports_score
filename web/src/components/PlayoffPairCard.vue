@@ -289,7 +289,7 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   background: var(--danger);
 }
 .st.soon { background: rgba(76, 180, 229, 0.16); color: #1b5f8c; }
-.st.done { background: #eef2f6; color: var(--muted); }
+.st.done { background: #eef2f6; color: var(--muted); text-transform: none; letter-spacing: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .st.live::before { animation: po-pulse 1.6s infinite; }
 }

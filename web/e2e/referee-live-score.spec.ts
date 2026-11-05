@@ -279,5 +279,5 @@ test('referee pad applies its own goal and void without a reload', async ({ page
   expect(counts.voids).toBe(1)
   await expect(viewer.locator('.board .score')).toHaveText(/0\s*-\s*0/)
   await expect(viewer.locator('.sheet')).not.toContainText('Иванов')
-  await expect(viewer.locator('.empty-line')).toHaveText('Событий нет.')
+  await expect(viewer.locator('.empty-line')).toHaveText('Событий пока нет')
 })
