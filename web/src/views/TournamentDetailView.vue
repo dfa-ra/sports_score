@@ -234,7 +234,7 @@ async function importCalendar() {
     const form = new FormData()
     form.append('file', calendarFile.value)
     const { data } = await api.post(`/tournaments/${tournament.value.id}/calendar/import`, form)
-    ok.value = `Календарь: создано ${data.created}, пропущено ${data.skipped}.`
+    ok.value = `Календарь: создано ${data.created}, обновлено ${data.updated ?? 0}, пропущено ${data.skipped}.`
     await load()
   } catch (e: any) {
     error.value = apiError(e)
@@ -625,7 +625,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </div>
 
       <h2>Календарь из Excel / CSV</h2>
-      <p class="muted">Колонки: date, time, home, away. Команды подхватываются по названию. Снятую команду файл не возвращает: сначала нажмите «Вернуть».</p>
+      <p class="muted">Колонки: date, time, home, away. Необязательно: venue (зал), round (тур), group (группа). Повтор той же пары в том же туре и группе обновляет дату и зал. Снятую команду файл не возвращает: сначала нажмите «Вернуть».</p>
       <form class="stack" @submit.prevent="importCalendar">
         <input type="file" accept=".csv,.xlsx,.xls" @change="calendarFile = ($event.target as HTMLInputElement).files?.[0] || null" />
         <button class="btn secondary" type="submit" :disabled="pending || !calendarFile">Загрузить календарь</button>

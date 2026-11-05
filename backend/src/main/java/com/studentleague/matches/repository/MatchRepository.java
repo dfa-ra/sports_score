@@ -18,6 +18,7 @@ import java.util.UUID;
 public interface MatchRepository extends JpaRepository<Match, UUID>, JpaSpecificationExecutor<Match> {
     Page<Match> findByTournamentId(UUID tournamentId, Pageable pageable);
     List<Match> findByTournamentId(UUID tournamentId);
+    List<Match> findByTournamentIdAndHomeTeamIdAndAwayTeamId(UUID tournamentId, UUID homeTeamId, UUID awayTeamId);
     long countByTournamentId(UUID tournamentId);
 
     @Query("select m from Match m where m.tournamentId in :tournamentIds")

@@ -95,8 +95,10 @@ public class TeamService {
             throw ApiException.forbidden("Команду создаёт только админ");
         }
 
+        String name = request.name().trim();
+        assertNameAvailable(name, null);
         Team team = new Team();
-        team.setName(request.name().trim());
+        team.setName(name);
         team.setShortName(request.shortName());
         team.setLogoUrl(request.logoUrl());
         team.setFoundedOn(request.foundedOn());
@@ -121,27 +123,25 @@ public class TeamService {
         return toTeamResponse(requireTeam(teamId));
     }
 
+    /**
+     * Any signed-in role. No team (and no player profile) is an empty result, not 403/404.
+     * The web reads a single team object ({@code data.id}); null is the empty shape.
+     */
     @Transactional(readOnly = true)
     public TeamResponse myTeam(UserPrincipal principal) {
         if (principal == null) {
             throw ApiException.unauthorized("Нужно войти");
         }
-        if (!principal.hasAnyRole(Role.PLAYER, Role.CAPTAIN, Role.ADMIN, Role.REFEREE)) {
-            throw ApiException.forbidden("У болельщика нет вкладки «Моя команда»");
-        }
         PlayerProfile profile = playerProfileRepository.findByUserId(principal.getId()).orElse(null);
         if (profile == null) {
-            if (principal.hasRole(Role.ADMIN) || principal.hasRole(Role.REFEREE)) {
-                throw ApiException.notFound("Вы ещё не в команде");
-            }
-            throw ApiException.notFound("Сначала заполните профиль игрока");
+            return null;
         }
         return teamMemberRepository.findByPlayerIdAndStatus(profile.getId(), TeamMemberStatus.ACTIVE).stream()
                 .map(member -> teamRepository.findById(member.getTeamId()).orElse(null))
                 .filter(team -> team != null && !team.isDisbanded())
                 .findFirst()
                 .map(this::toTeamResponse)
-                .orElseThrow(() -> ApiException.notFound("Вы ещё не в команде"));
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -165,8 +165,13 @@ public class TeamService {
         Team team = requireActiveTeam(teamId);
         assertCanManageTeam(principal, team);
 
-        if (request.name() != null && !request.name().isBlank()) {
-            team.setName(request.name().trim());
+        if (request.name() != null) {
+            if (request.name().isBlank()) {
+                throw ApiException.badRequest("Название не может быть пустым");
+            }
+            String name = request.name().trim();
+            assertNameAvailable(name, team.getId());
+            team.setName(name);
         }
         if (request.shortName() != null) {
             team.setShortName(request.shortName());
@@ -400,6 +405,19 @@ public class TeamService {
     private PlayerProfile requireCaptainCandidate(UUID playerId) {
         return playerProfileRepository.findById(playerId)
                 .orElseThrow(() -> ApiException.notFound("Игрок не найден"));
+    }
+
+    /**
+     * Case-insensitive, ignoring leading and trailing spaces.
+     * No unique index: dev already has duplicate names, and a partial index that
+     * skips those rows would still allow a new team with the same name.
+     */
+    private void assertNameAvailable(String name, UUID exceptTeamId) {
+        for (UUID id : teamRepository.findIdsByNormalizedName(name)) {
+            if (exceptTeamId == null || !exceptTeamId.equals(id)) {
+                throw ApiException.conflict("Команда с таким названием уже есть");
+            }
+        }
     }
 
     private void assertCanManageTeam(UserPrincipal principal, Team team) {

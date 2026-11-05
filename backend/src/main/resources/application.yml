@@ -46,6 +46,12 @@ app:
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}
   rate-limit:
     auth-requests-per-minute: ${AUTH_RATE_LIMIT:10}
+    # docs/api.md: forgot-password has a limit but no numbers. 5 per 15 minutes per IP+email.
+    forgot-password-requests: ${FORGOT_PASSWORD_RATE_LIMIT:5}
+    forgot-password-window-minutes: ${FORGOT_PASSWORD_RATE_WINDOW_MINUTES:15}
+    # photo-ticket was not mentioned with numbers. 10 per 15 minutes per IP and per signed-in user.
+    photo-ticket-requests: ${PHOTO_TICKET_RATE_LIMIT:10}
+    photo-ticket-window-minutes: ${PHOTO_TICKET_RATE_WINDOW_MINUTES:15}
   redis:
     enabled: ${APP_REDIS_ENABLED:false}
   local-storage:

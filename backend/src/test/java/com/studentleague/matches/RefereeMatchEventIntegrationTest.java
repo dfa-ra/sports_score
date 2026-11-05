@@ -372,12 +372,13 @@ class RefereeMatchEventIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String createTeam(String adminToken, String name, String captainPlayerId) throws Exception {
+        String teamName = name + " " + System.nanoTime();
         MvcResult result = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(adminToken))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","shortName":"%s","captainPlayerId":"%s"}
-                                """.formatted(name, name.substring(0, 2).toUpperCase(), captainPlayerId)))
+                                """.formatted(teamName, name.substring(0, 2).toUpperCase(), captainPlayerId)))
                 .andExpect(status().isCreated()).andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
     }

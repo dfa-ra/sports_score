@@ -86,6 +86,18 @@ class AuthRateLimiterTest {
     }
 
     @Test
+    void usesRealIpWhenForwardedChainIsOnlyProxies() {
+        MockHttpServletRequest request = request("172.18.0.5");
+        request.addHeader("X-Forwarded-For", "172.18.0.4");
+        request.addHeader("X-Real-IP", "198.51.100.70");
+        assertThat(AuthRateLimiter.clientKey(request)).isEqualTo("198.51.100.70");
+
+        MockHttpServletRequest spoofedRealIp = proxied("203.0.113.40, 172.18.0.4");
+        spoofedRealIp.addHeader("X-Real-IP", "198.51.100.1");
+        assertThat(AuthRateLimiter.clientKey(spoofedRealIp)).isEqualTo("203.0.113.40");
+    }
+
+    @Test
     void fallsBackToMemoryWhenRedisIsDown() {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> values = mock(ValueOperations.class);
@@ -103,7 +115,7 @@ class AuthRateLimiterTest {
         AppProperties properties = new AppProperties(
                 new AppProperties.Cors(List.of("http://localhost:5173")),
                 new AppProperties.Jwt("test-secret-key-that-is-long-enough-for-hs256-algorithms-123456", 60_000, 3_600_000),
-                new AppProperties.RateLimit(capacity),
+                new AppProperties.RateLimit(capacity, 5, 15, 10, 15),
                 new AppProperties.Redis(redis != null),
                 new AppProperties.LocalStorage("./data/uploads-test", "/media"),
                 new AppProperties.Admin("", "", null),

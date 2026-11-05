@@ -17,6 +17,8 @@ import com.studentleague.auth.service.RegistrationUploadTicketService;
 import com.studentleague.security.UserPrincipal;
 import com.studentleague.storage.ImageUploads;
 import com.studentleague.storage.StorageService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -79,7 +81,7 @@ public class AuthController {
     @PostMapping("/photo-ticket")
     @Operation(summary = "Одноразовый код загрузки фото до создания аккаунта")
     public Map<String, String> registrationPhotoTicket(HttpServletRequest httpRequest) {
-        authRateLimiter.check(httpRequest);
+        authRateLimiter.checkPhotoTicket(httpRequest, currentUserId());
         return Map.of("token", registrationUploadTickets.issue());
     }
 
@@ -124,7 +126,7 @@ public class AuthController {
             @Valid @RequestBody ForgotPasswordRequest request,
             HttpServletRequest httpRequest
     ) {
-        authRateLimiter.check(httpRequest, request.email());
+        authRateLimiter.checkForgotPassword(httpRequest, request.email());
         passwordResetService.requestReset(request.email());
         return ResponseEntity.noContent().build();
     }
@@ -171,6 +173,14 @@ public class AuthController {
     @Operation(summary = "Current authenticated user")
     public UserResponse me(@AuthenticationPrincipal UserPrincipal principal) {
         return authService.me(principal.getId());
+    }
+
+    private static String currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
+            return null;
+        }
+        return principal.getId().toString();
     }
 
     private static AuthResponse toResponse(AuthService.AuthTokens tokens) {

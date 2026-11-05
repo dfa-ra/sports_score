@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApiException(ApiException ex, HttpServletRequest request) {
-        return ResponseEntity.status(ex.getStatus()).body(error(ex.getCode(), ex.getMessage(), List.of(), request));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.getStatus());
+        if (ex.getRetryAfterSeconds() != null) {
+            response.header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()));
+        }
+        return response.body(error(ex.getCode(), ex.getMessage(), List.of(), request));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -93,6 +98,9 @@ public class GlobalExceptionHandler {
             HttpMediaTypeNotSupportedException ex,
             HttpServletRequest request
     ) {
+        if (isCalendarImport(request)) {
+            return missingCalendarFile(request);
+        }
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(error("UNSUPPORTED_MEDIA_TYPE", "Нужен запрос в формате JSON", List.of(), request));
     }
@@ -119,12 +127,24 @@ public class GlobalExceptionHandler {
             MissingServletRequestPartException ex,
             HttpServletRequest request
     ) {
+        if (isCalendarImport(request) && "file".equals(ex.getRequestPartName())) {
+            return missingCalendarFile(request);
+        }
         return ResponseEntity.badRequest().body(error(
                 "BAD_REQUEST",
                 "Не хватает части запроса",
                 List.of(new ApiError.FieldErrorDetail(ex.getRequestPartName(), "Обязательная часть")),
                 request
         ));
+    }
+
+    private static ResponseEntity<ApiError> missingCalendarFile(HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(error("BAD_REQUEST", "Файл не приложен", List.of(), request));
+    }
+
+    private static boolean isCalendarImport(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        return uri != null && uri.contains("/calendar/import");
     }
 
     @ExceptionHandler(ServletRequestBindingException.class)

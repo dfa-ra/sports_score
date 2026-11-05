@@ -79,13 +79,13 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.qualified.length()").value(2))
                 .andExpect(jsonPath("$.qualified[0].place").value(1))
                 .andExpect(jsonPath("$.qualified[0].teamId").value(north.teamId))
-                .andExpect(jsonPath("$.qualified[0].teamName").value("Север"))
+                .andExpect(jsonPath("$.qualified[0].teamName").value(north.name))
                 .andExpect(jsonPath("$.qualified[0].groupName").value("Группа A"))
                 .andExpect(jsonPath("$.qualified[0].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].place").value(2))
                 .andExpect(jsonPath("$.qualified[1].tableId").value(groupId))
                 .andExpect(jsonPath("$.qualified[1].teamId").value(east.teamId))
-                .andExpect(jsonPath("$.qualified[1].teamName").value("Восток"));
+                .andExpect(jsonPath("$.qualified[1].teamName").value(east.name));
     }
 
     @Test
@@ -262,7 +262,7 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId))
-                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value("Альфа"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value(alpha.name))
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(nullValue()))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeWaitingLabel").value(nullValue()))
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayWaitingLabel").value("Победитель 1/2 №2"));
@@ -374,7 +374,7 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         scoreAndFinish(admin, secondMatch, gamma);
         MvcResult assembled = mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
                 .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamId").value(alpha.teamId))
-                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value("Альфа"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].homeTeamName").value(alpha.name))
                 .andExpect(jsonPath("$.rounds[1].slots[0].awayTeamId").value(gamma.teamId))
                 .andExpect(jsonPath("$.rounds[1].slots[0].matchStatus").value("SCHEDULED"))
                 .andReturn();
@@ -535,13 +535,13 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/matches/" + matchId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.homeTeamName").value("Альфа"))
-                .andExpect(jsonPath("$.awayTeamName").value("Бета"))
+                .andExpect(jsonPath("$.homeTeamName").value(alpha.name))
+                .andExpect(jsonPath("$.awayTeamName").value(beta.name))
                 .andExpect(jsonPath("$.tournamentName").value("Плей-офф"))
                 .andExpect(jsonPath("$.minute").value(nullValue()));
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/matches"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[?(@.id == '%s')].homeTeamName".formatted(matchId)).value(hasItem("Альфа")))
+                .andExpect(jsonPath("$.content[?(@.id == '%s')].homeTeamName".formatted(matchId)).value(hasItem(alpha.name)))
                 .andExpect(jsonPath("$.content[?(@.id == '%s')].tournamentName".formatted(matchId)).value(hasItem("Плей-офф")));
 
         Instant finalKick = Instant.parse("2026-11-07T15:00:00Z");
@@ -704,12 +704,13 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn();
         String playerId = objectMapper.readTree(me.getResponse().getContentAsString()).get("id").asText();
+        String teamName = name + " " + System.nanoTime();
         MvcResult team = mockMvc.perform(post("/api/v1/teams")
                         .header("Authorization", auth(admin))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"%s","shortName":"%s","captainPlayerId":"%s"}
-                                """.formatted(name, name.substring(0, 2), playerId)))
+                                """.formatted(teamName, name.substring(0, 2), playerId)))
                 .andExpect(status().isCreated())
                 .andReturn();
         String teamId = objectMapper.readTree(team.getResponse().getContentAsString()).get("id").asText();
@@ -721,7 +722,7 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/teams/" + teamId + "/approve")
                         .header("Authorization", auth(admin)))
                 .andExpect(status().isOk());
-        return new Squad(teamId, playerId);
+        return new Squad(teamId, playerId, teamName);
     }
 
     private String scoreAndFinish(String admin, String matchId, Squad winner) throws Exception {
@@ -775,7 +776,7 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         return "{\"pairs\":[" + String.join(",", pairs) + "]}";
     }
 
-    private record Squad(String teamId, String playerId) {
+    private record Squad(String teamId, String playerId, String name) {
     }
 
     private record Opened(
