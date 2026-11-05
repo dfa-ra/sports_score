@@ -268,16 +268,18 @@ watch(compact, () => {
 .auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
 .account { position: relative; display: none; }
 .profile-button {
-  width: 42px;
-  height: 42px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 50%;
   background: transparent;
   color: #fff;
   cursor: pointer;
   padding: 0;
+  overflow: hidden;
+  box-shadow: none;
 }
 .profile-button:hover { background: rgba(255,255,255,0.08); }
 .menu { position: relative; flex: 0 0 auto; display: none; }

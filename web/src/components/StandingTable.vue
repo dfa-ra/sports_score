@@ -46,7 +46,7 @@ function advances(index: number) {
         <span class="rank" :class="rankClass(i)">{{ i + 1 }}</span>
       </span>
       <span class="club">
-        <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
+        <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="28" />
         <b>{{ row.teamName }}</b>
       </span>
       <span>{{ row.played }}</span>
@@ -92,7 +92,7 @@ function advances(index: number) {
 .line:last-child { border-bottom: 0; }
 .club {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 0.45rem;
   align-items: center;
   min-width: 0;

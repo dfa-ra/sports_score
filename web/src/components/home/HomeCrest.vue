@@ -1,24 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { initials } from '../../lib/format'
 import { crestClass } from '../../lib/homeOverview'
+import TeamCrest from '../TeamCrest.vue'
 
-const props = defineProps<{
+defineProps<{
   src?: string | null
   name?: string | null
   id?: string | null
   large?: boolean
 }>()
-
-const broken = ref(false)
-watch(() => props.src, () => { broken.value = false })
-const letters = computed(() => initials(props.name || ''))
 </script>
 
 <template>
   <span class="crest" :class="[crestClass(id), { lg: large }]">
-    <img v-if="src && !broken" :src="src" alt="" @error="broken = true" />
-    <template v-else>{{ letters }}</template>
+    <TeamCrest fill :src="src" :name="name" :size="large ? 56 : 28" />
   </span>
 </template>
 
@@ -27,6 +21,9 @@ const letters = computed(() => initials(props.name || ''))
   flex: 0 0 auto;
   width: 28px;
   height: 28px;
+  min-width: 0;
+  max-width: 28px;
+  max-height: 28px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -37,8 +34,13 @@ const letters = computed(() => initials(props.name || ''))
   letter-spacing: 0;
   line-height: 1;
 }
-.crest.lg { width: 56px; height: 56px; font-size: 1.05rem; }
-.crest img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.crest.lg {
+  width: 56px;
+  height: 56px;
+  max-width: 56px;
+  max-height: 56px;
+  font-size: 1.05rem;
+}
 .c0 { background: var(--navy); color: #fff; }
 .c1 { background: var(--ice); color: var(--navy); }
 .c2 { background: var(--ink); color: var(--ice); }

@@ -43,7 +43,7 @@ public class LocalDiskStorageService implements StorageService {
         try {
             Files.createDirectories(dir);
             Path target = dir.resolve(filename);
-            Files.write(target, file.getBytes());
+            Files.write(target, ImageOrient.apply(file.getBytes()));
             ImageVariants.writeForFolder(target, sanitize(folder));
             return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
         } catch (IOException e) {

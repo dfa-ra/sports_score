@@ -113,6 +113,17 @@ PostgreSQL остаётся единственным durable source of truth.
 
 Аватары и логотипы сохраняются **на диск сервера** (`LOCAL_STORAGE_DIR`, в Docker — `/app/data/uploads`) и отдаются по URL `/media/...`.
 
+JPEG логотипов и фото игроков при загрузке поворачиваются по EXIF (`ImageOrient`, тот же смысл, что ImageMagick `-auto-orient`) и пишутся уже прямыми пикселями. Повторная обработка файла с ориентацией 1 ничего не меняет. Старые файлы в каталоге медиа можно поправить одноразово — команда переписывает только JPEG с ориентацией не 1 и удаляет рядом превью `.__v128.` / `.__v1600.`, чтобы сервер собрал их заново. Базу, команды и матчи она не трогает:
+
+```
+cd backend
+./mvnw -q -DskipTests org.codehaus.mojo:exec-maven-plugin:3.5.0:java \
+  -Dexec.mainClass=com.studentleague.storage.ImageOrient \
+  -Dexec.args="/app/data/uploads"
+```
+
+На проде из этого изменения её не запускали. URL файлов те же, а браузерный кэш `/media` стоит `immutable` на год, поэтому уже открытые картинки у части клиентов обновятся не сразу.
+
 ## Уведомления
 
 Интерфейсы `NotificationService` / `PushNotificationProvider` позволяют менять FCM, APNs или no-op. Доменные сервисы эмитят intents; провайдеры доставляют асинхронно.

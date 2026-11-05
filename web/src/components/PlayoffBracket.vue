@@ -93,6 +93,7 @@ const gridStyle = computed(() => ({
   gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value),
 }))
 const showSwitcher = computed(() => tabMode.value && panels.value.length > 1)
+const showHint = computed(() => !props.loading && !props.error && !empty.value && !tabMode.value)
 
 function sameStamp(left?: string | null, right?: string | null) {
   if (!left && !right) return true
@@ -466,9 +467,8 @@ function bronzePairStyle() {
 <template>
   <div ref="root" class="po">
     <div class="po-card">
-      <div class="po-card-h">
-        <h2>Сетка плей-офф</h2>
-        <p v-if="!tabMode && !loading && !error && !empty" class="po-hint">
+      <div v-if="showHint" class="po-card-h">
+        <p class="po-hint">
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>

@@ -23,10 +23,10 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
       :name="label"
       :first-name="player.playerFirstName ?? player.firstName"
       :last-name="player.playerLastName ?? player.lastName"
-      :size="40"
+      :size="36"
     />
     <span class="name">{{ label }}</span>
-    <TeamCrest v-if="player.teamLogoUrl" :src="player.teamLogoUrl" name="" :size="18" />
+    <TeamCrest v-if="player.teamLogoUrl" :src="player.teamLogoUrl" name="" :size="28" />
   </RouterLink>
 </template>
 

@@ -58,7 +58,7 @@ void props.tile
   <span
     class="player-avatar"
     :class="[tone, { 'is-covered': covered }]"
-    :style="{ width: `${size}px`, height: `${size}px` }"
+    :style="{ width: `${size}px`, height: `${size}px`, minWidth: `${size}px`, minHeight: `${size}px`, flex: `0 0 ${size}px` }"
   >
     <span class="letters" aria-hidden="true">{{ letters }}</span>
     <img
@@ -105,8 +105,13 @@ void props.tile
   grid-area: 1 / 1;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  object-fit: contain;
   object-position: center;
+  image-orientation: from-image;
   display: block;
   border: 0;
   opacity: 0;

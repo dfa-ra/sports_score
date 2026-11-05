@@ -305,11 +305,11 @@ async function logout() {
     <div class="sheet">
       <div class="league-head">Команды</div>
       <RouterLink v-if="card?.team" class="fav" :to="`/teams/${card.team.id}`">
-        <TeamCrest :src="card.team.logoUrl" :name="card.team.name" :size="22" />
+        <TeamCrest :src="card.team.logoUrl" :name="card.team.name" :size="28" />
         {{ card.team.name }}
       </RouterLink>
       <RouterLink v-for="team in favTeams" :key="team.id" class="fav" :to="`/teams/${team.id}`">
-        <TeamCrest :src="team.logo" :name="team.name" :size="22" />
+        <TeamCrest :src="team.logo" :name="team.name" :size="28" />
         {{ team.name }}
       </RouterLink>
       <p v-if="isCaptain && !card?.team" class="empty-line">Команду назначает администратор</p>

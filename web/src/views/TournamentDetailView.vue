@@ -480,7 +480,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <EmptyState v-if="!listedTeams.length" title="Заявок нет" />
       <div v-for="team in listedTeams" :key="team.id" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
-          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="28" />
           {{ team.teamName }}
         </RouterLink>
         <StatusBadge :status="team.status" />
@@ -491,13 +491,13 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <EmptyState v-if="!matches.length" title="Матчей нет" />
       <RouterLink v-for="m in matches" :key="m.id" class="row match-row" :to="`/matches/${m.id}`">
         <span class="match-side">
-          <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="22" />
+          <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="28" />
           <span>{{ m.homeTeamName || names.fullName(m.homeTeamId) }}</span>
         </span>
         <span class="match-score">{{ publicScore(m) }}</span>
         <span class="match-side away">
           <span>{{ m.awayTeamName || names.fullName(m.awayTeamId) }}</span>
-          <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
+          <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="28" />
         </span>
         <span class="match-meta">
           <MatchStageNote :match="m" />
@@ -609,7 +609,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <h2>Заявки</h2>
       <div v-for="team in listedTeams" :key="`admin-${team.id}`" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
-          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="28" />
           {{ team.teamName }}
         </RouterLink>
         <StatusBadge :status="team.status" />
@@ -621,7 +621,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <h2 v-if="withdrawnTeams.length">Снятые</h2>
       <div v-for="team in withdrawnTeams" :key="`withdrawn-${team.id}`" class="row withdrawn">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
-          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
+          <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="28" />
           {{ team.teamName }}
         </RouterLink>
         <StatusBadge :status="team.status" />

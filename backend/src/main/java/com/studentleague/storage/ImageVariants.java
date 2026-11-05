@@ -109,6 +109,7 @@ public final class ImageVariants {
 
     private static boolean writeOnce(Path original, Path derived, Path skip, Variant variant) throws IOException {
         BufferedImage src;
+        int orientation = ImageOrient.readOrientation(original);
         try {
             src = ImageIO.read(original.toFile());
         } catch (IOException ex) {
@@ -119,10 +120,11 @@ public final class ImageVariants {
             markSkipped(skip, derived);
             return false;
         }
-        BufferedImage fitted = fit(src, variant.maxWidth(), variant.maxHeight());
+        BufferedImage upright = ImageOrient.rotate(src, orientation);
+        BufferedImage fitted = fit(upright, variant.maxWidth(), variant.maxHeight());
         Path tmp = derived.resolveSibling(derived.getFileName().toString() + ".part");
         try {
-            if (fitted == src) {
+            if (upright == src && fitted == upright) {
                 Files.copy(original, tmp, StandardCopyOption.REPLACE_EXISTING);
             } else if (!writeImage(fitted, extension(original.getFileName().toString()), tmp)) {
                 markSkipped(skip, derived);
