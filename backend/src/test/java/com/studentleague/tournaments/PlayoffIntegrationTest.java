@@ -697,9 +697,9 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[2].slots[1].roundTitle").value("Матч за 3-е место"))
                 .andExpect(jsonPath("$.rounds[2].slots[1].roundTitle", not(containsString("Финал"))))
                 .andExpect(jsonPath("$.rounds[2].slots[1].homeTeamId").value(squads[2].teamId))
-                .andExpect(jsonPath("$.rounds[2].slots[1].homeTeamName").value("Гамма"))
+                .andExpect(jsonPath("$.rounds[2].slots[1].homeTeamName").value(squads[2].name))
                 .andExpect(jsonPath("$.rounds[2].slots[1].awayTeamId").value(squads[6].teamId))
-                .andExpect(jsonPath("$.rounds[2].slots[1].awayTeamName").value("Эта"))
+                .andExpect(jsonPath("$.rounds[2].slots[1].awayTeamName").value(squads[6].name))
                 .andExpect(jsonPath("$.rounds[2].slots[1].scheduledAt").value(nullValue()))
                 .andReturn();
         JsonNode bronzeSlot = objectMapper.readTree(bronzeView.getResponse().getContentAsString())
