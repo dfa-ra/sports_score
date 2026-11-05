@@ -385,7 +385,7 @@ const finalLinkStyle = computed(() => ({
       <div v-else-if="empty" class="msg">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h5v5H3zM3 14h5v5H3zM16 9.5h5v5h-5zM8 7.5h4v9M12 12h4" /></svg>
         <b>Сетка ещё не сформирована</b>
-        <p>Плей-офф начнётся после группового этапа. Следите за таблицей.</p>
+        <p>Сетка появится после групп</p>
         <button class="po-action" type="button" @click="emit('show-table')">К таблице</button>
       </div>
 

@@ -4,6 +4,7 @@ import { labelOf, statusLabel } from '../lib/format'
 
 const props = defineProps<{ status?: string | null; scope?: 'tournament' | 'match'; at?: string | null }>()
 const text = computed(() => {
+  if (props.status === 'APPROVED') return ''
   if (props.scope === 'tournament' && props.status === 'FINISHED') return 'Завершён'
   if (props.status === 'SCHEDULED' && props.at === null) return 'Дата уточняется'
   return labelOf(statusLabel, props.status)
@@ -17,5 +18,5 @@ const klass = computed(() => {
 </script>
 
 <template>
-  <span :class="klass">{{ text }}</span>
+  <span v-if="text" :class="klass">{{ text }}</span>
 </template>

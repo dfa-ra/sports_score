@@ -14,7 +14,7 @@ const { enabled, requestAlerts } = useMatchAlerts()
     :class="{ on: enabled }"
     :aria-pressed="enabled"
     @click="requestAlerts"
-  >Сообщать о голах</button>
+  >Уведомлять о голах</button>
 </template>
 
 <style scoped>

@@ -709,7 +709,7 @@ onUnmounted(() => {
         ><span class="star-glyph" :key="awayStarTap" :class="{ 'star-tap': awayStarTap }">★</span></button>
       </div>
       <div class="under">
-        <p class="state">
+        <p class="state" :class="{ done: match.status === 'FINISHED' }">
           <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
           {{ matchStateLabel(match.status) }}
         </p>
@@ -943,7 +943,7 @@ onUnmounted(() => {
             </div>
           </section>
         </template>
-        <p v-else class="empty-line">Событий нет.</p>
+        <p v-else class="empty-line">Событий пока нет</p>
       </div>
       <div class="stack recent">
         <div class="panel">
@@ -1033,7 +1033,7 @@ onUnmounted(() => {
     <div v-else-if="tab === 'protocol'" class="panel">
       <h2>Протокол</h2>
       <p v-if="shootoutScore" class="shootout-line">{{ shootoutScore }}</p>
-      <p v-if="!timeline.length" class="muted">Событий нет.</p>
+      <p v-if="!timeline.length" class="muted">Событий пока нет</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
           <span v-if="shownMinute(ev) != null" class="t">{{ shownMinute(ev) }}'</span>
@@ -1192,6 +1192,7 @@ onUnmounted(() => {
   letter-spacing: 0.06em;
   font-weight: 800;
 }
+.state.done { text-transform: none; letter-spacing: 0; }
 .score {
   margin: 0.15rem 0;
   font-size: clamp(2rem, 5.4vw, 2.75rem);

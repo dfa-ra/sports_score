@@ -183,7 +183,7 @@ export function protocolScore(
 }
 
 export function matchStateLabel(status?: string | null) {
-  if (status === 'FINISHED') return 'Завершен'
+  if (status === 'FINISHED') return 'Завершён'
   if (status === 'LIVE') return 'Live'
   if (status === 'PAUSED') return 'Пауза'
   if (status === 'CANCELLED') return 'Отменён'

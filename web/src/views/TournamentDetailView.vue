@@ -496,7 +496,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         </span>
         <span class="match-meta">
           <span>{{ matchListWhen(m) }}</span>
-          <span v-if="m.status !== 'FINISHED'">{{ matchStateLabel(m.status) }}</span>
+          <span v-if="matchStateLabel(m.status)">{{ matchStateLabel(m.status) }}</span>
         </span>
       </RouterLink>
     </div>
@@ -684,7 +684,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 }
 .tour-st.ok { background: #dff3ec; color: #1f8f6b; }
 .tour-st.soon { background: rgba(76, 180, 229, 0.16); color: #1b5f8c; }
-.tour-st.done { background: #eef2f6; color: var(--muted); }
+.tour-st.done { background: #eef2f6; color: var(--muted); text-transform: none; letter-spacing: 0; }
 .meta {
   display: flex;
   gap: 0.3rem 1rem;

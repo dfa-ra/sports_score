@@ -147,30 +147,30 @@ async function onGoogle(idToken: string) {
     <div class="panel stack card">
       <div class="page-title">
         <h1>Регистрация</h1>
-        <p>ФИО и почта обязательны. Можно выбрать несколько ролей. Игрок, капитан и судья прикладывают фото. Роли подтверждает админ.</p>
       </div>
       <GoogleSignInButton @success="onGoogle" @error="error = $event" />
-      <p v-if="googleClientId" class="muted">Войти через Google. Новый аккаунт будет болельщиком. Игрок, капитан и судья регистрируются формой ниже — для них нужно фото.</p>
+      <p v-if="googleClientId" class="muted">Через Google — только болельщик</p>
       <form class="stack" novalidate @submit.prevent="submit">
-        <label class="field" :class="{ invalid: fieldErrors.firstName }">Имя
-          <input v-model="firstName" maxlength="100" autocomplete="given-name" @input="clearField('firstName')" />
+        <label class="field" :class="{ invalid: fieldErrors.firstName }">Имя *
+          <input v-model="firstName" maxlength="100" autocomplete="given-name" required @input="clearField('firstName')" />
           <span v-if="fieldErrors.firstName" class="field-error">{{ fieldErrors.firstName }}</span>
         </label>
-        <label class="field" :class="{ invalid: fieldErrors.lastName }">Фамилия
-          <input v-model="lastName" maxlength="100" autocomplete="family-name" @input="clearField('lastName')" />
+        <label class="field" :class="{ invalid: fieldErrors.lastName }">Фамилия *
+          <input v-model="lastName" maxlength="100" autocomplete="family-name" required @input="clearField('lastName')" />
           <span v-if="fieldErrors.lastName" class="field-error">{{ fieldErrors.lastName }}</span>
         </label>
-        <label class="field" :class="{ invalid: fieldErrors.email }">Email
-          <input v-model="email" type="email" maxlength="320" autocomplete="username" placeholder="you@league.local" @input="clearField('email')" />
+        <label class="field" :class="{ invalid: fieldErrors.email }">Email *
+          <input v-model="email" type="email" maxlength="320" autocomplete="username" required placeholder="name@niuitmo.ru" @input="clearField('email')" />
           <span v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</span>
         </label>
-        <label class="field" :class="{ invalid: fieldErrors.password }">Пароль
+        <label class="field" :class="{ invalid: fieldErrors.password }">Пароль *
           <span class="pass-row">
             <input
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
               maxlength="100"
               autocomplete="new-password"
+              required
               @input="clearField('password')"
             />
             <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
@@ -186,19 +186,19 @@ async function onGoogle(idToken: string) {
         <div class="role-pick" role="group" aria-label="Роли">
           <button type="button" class="role-card" :class="{ active: hasRole('FAN') }" :aria-pressed="hasRole('FAN')" @click="toggleRole('FAN')">
             <strong>Болельщик</strong>
-            <span>Смотрит матчи и таблицу. Вкладки «Моя команда» нет.</span>
+            <span>Без заявки и фото</span>
           </button>
           <button type="button" class="role-card" :class="{ active: hasRole('PLAYER') }" :aria-pressed="hasRole('PLAYER')" @click="toggleRole('PLAYER')">
             <strong>Игрок</strong>
-            <span>После подтверждения админом капитан может взять в состав.</span>
+            <span>Нужно фото, подтверждает админ</span>
           </button>
           <button type="button" class="role-card" :class="{ active: hasRole('CAPTAIN') }" :aria-pressed="hasRole('CAPTAIN')" @click="toggleRole('CAPTAIN')">
             <strong>Капитан</strong>
-            <span>Назначает только админ. Здесь — заявка на роль.</span>
+            <span>Нужно фото, подтверждает админ</span>
           </button>
           <button type="button" class="role-card" :class="{ active: hasRole('REFEREE') }" :aria-pressed="hasRole('REFEREE')" @click="toggleRole('REFEREE')">
             <strong>Судья</strong>
-            <span>Live-протокол после подтверждения и назначения на матч.</span>
+            <span>Ведёт протокол матча</span>
           </button>
         </div>
 
