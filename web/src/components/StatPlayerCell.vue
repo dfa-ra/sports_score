@@ -26,7 +26,7 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
       :size="40"
     />
     <span class="name">{{ label }}</span>
-    <TeamCrest v-if="player.teamLogoUrl" :src="player.teamLogoUrl" name="" :size="18" />
+    <TeamCrest v-if="player.teamLogoUrl" class="scorer-crest" :src="player.teamLogoUrl" name="" :size="24" />
   </RouterLink>
 </template>
 
@@ -51,5 +51,11 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+@media (max-width: 720px) {
+  .stat-player :deep(.scorer-crest) {
+    width: 22px !important;
+    height: 22px !important;
+  }
 }
 </style>

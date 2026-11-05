@@ -22,9 +22,6 @@ watch(
 
 const showImage = computed(() => Boolean(props.src) && !broken.value)
 const label = computed(() => initials(props.name || ''))
-const radius = computed(() => (props.size < 28 ? 4 : 8))
-/** Keep the whole crest inside the rounded square; 0.3×radius clears the corner arc. */
-const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
 </script>
 
 <template>
@@ -36,14 +33,14 @@ const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
     :alt="name || 'Эмблема'"
     :width="size"
     :height="size"
-    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, padding: `${inset}px` }"
+    :style="{ width: `${size}px`, height: `${size}px` }"
     @error="broken = true"
   />
   <span
     v-else
     class="team-crest team-crest--fallback"
     :class="{ 'crest-enter': enterOnce }"
-    :style="{ width: `${size}px`, height: `${size}px`, borderRadius: `${radius}px`, fontSize: `${Math.max(8, size * 0.38)}px` }"
+    :style="{ width: `${size}px`, height: `${size}px`, fontSize: `${Math.max(8, size * 0.38)}px` }"
     aria-hidden="true"
   >{{ label }}</span>
 </template>
@@ -55,12 +52,15 @@ const inset = computed(() => Math.max(1, Math.ceil(radius.value * 0.3)))
   box-sizing: border-box;
   object-fit: contain;
   object-position: center;
-  background: var(--surface, #fff);
+  image-orientation: from-image;
+  background: var(--accent-soft, #eef3f8);
+  border-radius: 50%;
+  padding: 2px;
 }
 .team-crest--fallback {
   display: grid;
   place-items: center;
-  background: var(--accent-soft);
+  background: var(--accent-soft, #eef3f8);
   color: var(--navy);
   font-weight: 800;
   font-style: normal;

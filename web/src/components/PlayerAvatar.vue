@@ -107,6 +107,7 @@ void props.tile
   height: 100%;
   object-fit: cover;
   object-position: center;
+  image-orientation: from-image;
   display: block;
   border: 0;
   opacity: 0;
