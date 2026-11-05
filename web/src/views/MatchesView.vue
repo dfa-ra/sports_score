@@ -5,6 +5,7 @@ import api from '../api/client'
 import KickoffWhen from '../components/KickoffWhen.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import EmptyState from '../components/EmptyState.vue'
+import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const items = ref<any[]>([])
@@ -56,7 +57,8 @@ const visible = computed(() => {
         :class="{ 'live-pulse': m.status === 'LIVE' }"
         :to="`/matches/${m.id}`"
       >
-        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
+        <MatchStageNote :match="m" />
+        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
         <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
         <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
         <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" :minute="m.minute" align="start" />

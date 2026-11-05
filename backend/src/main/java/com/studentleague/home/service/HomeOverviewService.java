@@ -20,6 +20,7 @@ import com.studentleague.statistics.service.StatisticsService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.domain.CompetitionStage;
+import com.studentleague.tournaments.domain.PlayoffSlotKind;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.StandingRow;
@@ -124,16 +125,16 @@ public class HomeOverviewService {
         }
 
         Map<UUID, Team> teams = loadTeams(corpus, running);
-        Map<UUID, Integer> bracketRounds = bracketRounds(tournamentIds);
+        BracketIndex bracket = bracketIndex(tournamentIds);
         Map<UUID, MatchResponse> mapped = mapMatches(displayMatches(liveEntities, upcomingEntities, recentEntities, running, byTournament));
 
-        HomeMatchResponse next = nearest(now, corpus, tournamentsById, teams, byTournament, mapped, bracketRounds);
+        HomeMatchResponse next = nearest(now, corpus, tournamentsById, teams, byTournament, mapped, bracket);
 
         List<HomeTournamentResponse> cards = new ArrayList<>();
         List<HomeScorersResponse> scorers = new ArrayList<>();
         for (Tournament tournament : running) {
             List<Match> matches = byTournament.getOrDefault(tournament.getId(), List.of());
-            cards.add(card(tournament, matches, now, tournamentsById, teams, mapped, bracketRounds));
+            cards.add(card(tournament, matches, now, tournamentsById, teams, mapped, bracket));
             if (tournament.getStatus() == TournamentStatus.ACTIVE) {
                 scorers.add(scorersOf(tournament, teams));
             }
@@ -143,9 +144,9 @@ public class HomeOverviewService {
         return new HomeOverviewResponse(
                 now,
                 next,
-                toHomeList(liveEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
-                toHomeList(upcomingEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
-                toHomeList(recentEntities, tournamentsById, teams, byTournament, mapped, bracketRounds),
+                toHomeList(liveEntities, tournamentsById, teams, byTournament, mapped, bracket),
+                toHomeList(upcomingEntities, tournamentsById, teams, byTournament, mapped, bracket),
+                toHomeList(recentEntities, tournamentsById, teams, byTournament, mapped, bracket),
                 cards,
                 scorers,
                 summary
@@ -164,7 +165,7 @@ public class HomeOverviewService {
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
             Map<UUID, MatchResponse> mapped,
-            Map<UUID, Integer> bracketRounds
+            BracketIndex bracket
     ) {
         Match chosen = matches.stream()
                 .filter(match -> match.getStatus() == MatchStatus.SCHEDULED)
@@ -178,18 +179,25 @@ public class HomeOverviewService {
         if (chosen == null) {
             return null;
         }
-        return toHome(chosen, tournaments, teams, byTournament, mapped, bracketRounds);
+        return toHome(chosen, tournaments, teams, byTournament, mapped, bracket);
     }
 
-    private Map<UUID, Integer> bracketRounds(Set<UUID> tournamentIds) {
+    private BracketIndex bracketIndex(Set<UUID> tournamentIds) {
         Map<UUID, Integer> rounds = new HashMap<>();
+        Set<UUID> thirdPlaceMatchIds = new HashSet<>();
         if (tournamentIds.isEmpty()) {
-            return rounds;
+            return new BracketIndex(rounds, thirdPlaceMatchIds);
         }
         for (PlayoffSlot slot : playoffSlotRepository.findByTournamentIdIn(tournamentIds)) {
+            if (slot.getKind() == PlayoffSlotKind.THIRD) {
+                if (slot.getMatchId() != null) {
+                    thirdPlaceMatchIds.add(slot.getMatchId());
+                }
+                continue;
+            }
             rounds.merge(slot.getTournamentId(), slot.getRoundNumber(), Math::max);
         }
-        return rounds;
+        return new BracketIndex(rounds, thirdPlaceMatchIds);
     }
 
     private List<Tournament> runningTournaments() {
@@ -230,10 +238,15 @@ public class HomeOverviewService {
             Map<UUID, Tournament> tournamentsById,
             Map<UUID, Team> teams,
             Map<UUID, MatchResponse> mapped,
-            Map<UUID, Integer> bracketRounds
+            BracketIndex bracket
     ) {
-        int rounds = bracketRounds.getOrDefault(tournament.getId(), 0);
-        RoundPlan plan = HomeLabels.plan(matches, tournament.getCompetitionStage(), rounds);
+        int rounds = bracket.rounds().getOrDefault(tournament.getId(), 0);
+        RoundPlan plan = HomeLabels.plan(
+                matches,
+                tournament.getCompetitionStage(),
+                rounds,
+                bracket.thirdPlaceMatchIds()
+        );
         int teamsCount = (int) tournamentTeamRepository.findByTournamentId(tournament.getId()).stream()
                 .filter(entry -> entry.getStatus() == TournamentTeamStatus.APPROVED)
                 .count();
@@ -272,8 +285,8 @@ public class HomeOverviewService {
                 playoff ? plan.playedPairs() : null,
                 playoff ? plan.totalPairs() : null,
                 tournament.getStatus() == TournamentStatus.REGISTRATION ? tournament.getStartDate() : null,
-                last == null ? null : toHome(last, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracketRounds),
-                next == null ? null : toHome(next, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracketRounds)
+                last == null ? null : toHome(last, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracket),
+                next == null ? null : toHome(next, tournamentsById, teams, Map.of(tournament.getId(), matches), mapped, bracket)
         );
     }
 
@@ -433,11 +446,11 @@ public class HomeOverviewService {
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
             Map<UUID, MatchResponse> mapped,
-            Map<UUID, Integer> bracketRounds
+            BracketIndex bracket
     ) {
         List<HomeMatchResponse> rows = new ArrayList<>();
         for (Match match : matches) {
-            rows.add(toHome(match, tournaments, teams, byTournament, mapped, bracketRounds));
+            rows.add(toHome(match, tournaments, teams, byTournament, mapped, bracket));
         }
         return rows;
     }
@@ -448,7 +461,7 @@ public class HomeOverviewService {
             Map<UUID, Team> teams,
             Map<UUID, List<Match>> byTournament,
             Map<UUID, MatchResponse> mapped,
-            Map<UUID, Integer> bracketRounds
+            BracketIndex bracket
     ) {
         MatchResponse response = mapped.get(match.getId());
         if (response == null) {
@@ -487,7 +500,12 @@ public class HomeOverviewService {
                 response.bracketRound(),
                 response.penaltyHome(),
                 response.penaltyAway(),
-                HomeLabels.matchStageLabel(match, siblings, bracketRounds.getOrDefault(match.getTournamentId(), 0)),
+                HomeLabels.matchStageLabel(
+                        match,
+                        siblings,
+                        bracket.rounds().getOrDefault(match.getTournamentId(), 0),
+                        bracket.thirdPlaceMatchIds().contains(match.getId())
+                ),
                 match.getBracketRound() != null ? match.getBracketRound() : HomeLabels.groupRoundOf(match, siblings)
         );
     }
@@ -517,6 +535,9 @@ public class HomeOverviewService {
             return team.getShortName();
         }
         return HomeLabels.shortName(fallback);
+    }
+
+    private record BracketIndex(Map<UUID, Integer> rounds, Set<UUID> thirdPlaceMatchIds) {
     }
 
     private static String blankToNull(String value) {

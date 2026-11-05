@@ -13,6 +13,7 @@ import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import { useAuthStore } from '../../stores/auth'
 import AnalystAssignForm from '../../components/AnalystAssignForm.vue'
 import FutsalBoard from '../../components/FutsalBoard.vue'
+import MatchStageNote from '../../components/MatchStageNote.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import TeamCrest from '../../components/TeamCrest.vue'
 
@@ -618,7 +619,8 @@ onUnmounted(() => {
     </div>
 
     <div class="panel scoreboard" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" />
+      <MatchStageNote variant="protocol" :match="match" />
+      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" :third-place="!!match.thirdPlace" />
       <p class="period">{{ periodLabel(match.period, match.sportCode, match.periodCount) }}</p>
       <div class="clock" :class="{ expired }">{{ formatClock(remaining) }}</div>
       <p class="muted">осталось из {{ formatClock(cap) }} · прошло {{ formatClock(elapsed) }}</p>

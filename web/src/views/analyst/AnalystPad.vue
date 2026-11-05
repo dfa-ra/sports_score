@@ -9,6 +9,7 @@ import { formatClock, periodLabel } from '../../lib/format'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import { useAuthStore } from '../../stores/auth'
+import MatchStageNote from '../../components/MatchStageNote.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import TeamCrest from '../../components/TeamCrest.vue'
 
@@ -227,7 +228,8 @@ onUnmounted(() => {
     <div class="panel scoreboard">
       <div class="clock">{{ clockText }}</div>
       <p v-if="clockCaption" class="clock-caption">{{ clockCaption }}</p>
-      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" />
+      <MatchStageNote variant="protocol" :match="match" />
+      <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" :third-place="!!match.thirdPlace" />
       <p v-if="!closed && !coverage" class="closed">Вы не назначены на этот матч</p>
       <div class="sides">
         <strong class="club">

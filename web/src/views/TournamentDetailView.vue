@@ -21,6 +21,7 @@ import EmptyState from '../components/EmptyState.vue'
 import PlayoffAdmin from '../components/PlayoffAdmin.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import StandingGroups from '../components/StandingGroups.vue'
+import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
@@ -495,6 +496,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
         </span>
         <span class="match-meta">
+          <MatchStageNote :match="m" />
           <span>{{ matchListWhen(m) }}</span>
           <span v-if="matchStateLabel(m.status)">{{ matchStateLabel(m.status) }}</span>
         </span>

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,6 +78,22 @@ class HomeLabelsTest {
         HomeLabels.RoundPlan plan = HomeLabels.plan(List.of(first), CompetitionStage.PLAYOFF, rounds);
         assertEquals(titles[0], plan.roundTitle());
         assertEquals(rounds, plan.roundsTotal());
+    }
+
+    @Test
+    void thirdPlaceCardIsNotCalledTheFinal() {
+        Match bronze = match(Instant.parse("2026-11-20T12:00:00Z"), MatchStatus.SCHEDULED, 3);
+        Match cupFinal = match(Instant.parse("2026-11-20T15:00:00Z"), MatchStatus.SCHEDULED, 3);
+        assertEquals("Матч за 3-е", HomeLabels.matchStageLabel(bronze, List.of(bronze, cupFinal), 3, true));
+        assertEquals("Финал", HomeLabels.matchStageLabel(cupFinal, List.of(bronze, cupFinal), 3, false));
+        HomeLabels.RoundPlan plan = HomeLabels.plan(
+                List.of(bronze, cupFinal),
+                CompetitionStage.PLAYOFF,
+                3,
+                Set.of(bronze.getId())
+        );
+        assertEquals("Финал", plan.roundTitle());
+        assertEquals(1, plan.totalPairs());
     }
 
     @Test

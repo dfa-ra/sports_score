@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { matchCardStage, protocolStage } from '../src/lib/playoffLabel.ts'
 import {
   arrivalLine,
   bracketIsEmpty,
+  columnSlots,
+  linkSlots,
+  thirdPlaceSlots,
   championCell,
   championHeaderCell,
   defaultRoundIndex,
@@ -157,4 +161,19 @@ test('empty bracket, playoff tab and header meta skip blanks', () => {
     stage: 'PLAYOFF',
   }), ['Сезон 2026', 'Группы + плей-офф', '8 команд', '01.08 – 15.12.2026', 'Стадия: плей-офф'])
   assert.deepEqual(overviewMeta({ format: 'CUP', teamsCount: 1 }), ['Кубок / плей-офф', '1 команда'])
+})
+
+test('third-place slot is not a final column or a bracket link', () => {
+  const finalSlot = { slotIndex: 0, roundTitle: 'Финал', kind: 'MAIN' }
+  const bronze = { slotIndex: 1, roundTitle: 'Матч за 3-е место', kind: 'THIRD' }
+  const semis = [{ slotIndex: 0 }, { slotIndex: 1 }]
+  assert.deepEqual(columnSlots([finalSlot, bronze], true), [finalSlot])
+  assert.deepEqual(linkSlots([finalSlot, bronze]), [finalSlot])
+  assert.deepEqual(thirdPlaceSlots([finalSlot, bronze]), [bronze])
+  assert.equal(linkSlots(semis).length, 2)
+  assert.equal(matchCardStage({ thirdPlace: true, stageLabel: 'За 3-е место' }), 'Матч за 3-е')
+  assert.equal(protocolStage({ thirdPlace: true, stageLabel: 'Финал' }), 'За 3-е место')
+  assert.equal(protocolStage({ thirdPlace: false, stageLabel: 'Финал' }), 'Финал')
+  assert.equal(matchCardStage({ thirdPlace: false, stageLabel: 'Финал' }), '')
+  assert.notEqual(matchCardStage({ thirdPlace: true }), 'Финал')
 })

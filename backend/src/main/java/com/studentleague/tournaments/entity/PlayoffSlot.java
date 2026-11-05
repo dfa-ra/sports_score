@@ -1,7 +1,10 @@
 package com.studentleague.tournaments.entity;
 
+import com.studentleague.tournaments.domain.PlayoffSlotKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -24,6 +27,10 @@ public class PlayoffSlot {
 
     @Column(name = "slot_index", nullable = false)
     private int slotIndex;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private PlayoffSlotKind kind = PlayoffSlotKind.MAIN;
 
     @Column(name = "match_id")
     private UUID matchId;
@@ -57,6 +64,9 @@ public class PlayoffSlot {
         if (id == null) {
             id = UUID.randomUUID();
         }
+        if (kind == null) {
+            kind = PlayoffSlotKind.MAIN;
+        }
     }
 
     public UUID getId() {
@@ -89,6 +99,14 @@ public class PlayoffSlot {
 
     public void setSlotIndex(int slotIndex) {
         this.slotIndex = slotIndex;
+    }
+
+    public PlayoffSlotKind getKind() {
+        return kind;
+    }
+
+    public void setKind(PlayoffSlotKind kind) {
+        this.kind = kind;
     }
 
     public UUID getMatchId() {
