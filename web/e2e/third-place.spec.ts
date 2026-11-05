@@ -54,11 +54,11 @@ function bracket() {
           slotIndex: 1,
           kind: 'THIRD',
           roundTitle: 'Матч за 3-е место',
-          matchId: 'match-bronze',
-          homeTeamId: 'bronze-h',
-          homeTeamName: 'Гамма',
-          awayTeamId: 'bronze-a',
-          awayTeamName: 'Эта',
+          matchId: null,
+          homeTeamId: null,
+          homeTeamName: null,
+          awayTeamId: null,
+          awayTeamName: null,
           matchStatus: 'SCHEDULED',
           homeScore: 0,
           awayScore: 0,
@@ -111,27 +111,50 @@ async function mockApi(page: Page) {
   })
 }
 
-test('third-place slot is labeled on a phone bracket', async ({ page }) => {
+test('third-place slot is its own phone round between the semis and the final', async ({ page }) => {
   mkdirSync('/opt/cursor/artifacts', { recursive: true })
   await page.setViewportSize({ width: 375, height: 812 })
   await mockApi(page)
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
   await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
-  await page.getByRole('tab', { name: 'Финал', exact: true }).click()
-  const bronze = page.getByText('Матч за 3-е место', { exact: true })
-  await expect(bronze).toBeVisible()
-  await expect(page.getByText('Финал', { exact: true }).first()).toBeVisible()
+  const rounds = page.getByRole('tablist', { name: 'Раунды' })
+  const labels = (await rounds.getByRole('tab').allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru'))
+  expect(labels).toEqual(['1/4', '1/2', 'за 3-е', 'финал'])
+  await rounds.getByRole('tab', { name: /за 3-е/i }).click()
+  await expect(page.locator('.po-panel.on').getByRole('heading', { name: 'Матч за 3-е место', exact: true })).toBeVisible()
+  await expect(page.getByText('Проигравший 1/2 №1', { exact: true })).toBeVisible()
+  await expect(page.getByText('Проигравший 1/2 №2', { exact: true })).toBeVisible()
+  await expect(page.locator('.po-panel.on').getByRole('heading', { name: 'Финал', exact: true })).toHaveCount(0)
+  await expect(rounds.getByRole('tab', { name: /за 3-е/i })).toHaveAttribute('aria-selected', 'true')
   await page.locator('.po-card').screenshot({ path: '/opt/cursor/artifacts/third-place-375.png' })
 })
 
-test('third-place slot is labeled on a desktop bracket', async ({ page }) => {
+test('third-place card sits under the semifinals and left of the final', async ({ page }) => {
   mkdirSync('/opt/cursor/artifacts', { recursive: true })
   await page.setViewportSize({ width: 1440, height: 900 })
   await mockApi(page)
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
   await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
   await expect(page.locator('.po-grid')).toBeVisible()
-  await expect(page.getByText('Матч за 3-е место', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Финал', exact: true })).toBeVisible()
+  const bronze = page.locator('[data-bronze]')
+  const finalCard = page.locator('.pc.final')
+  const lowerSemi = page.locator('[data-round="1"]').last()
+  await expect(bronze.getByText('Матч за 3-е место', { exact: true })).toBeVisible()
+  await expect(bronze.getByText('Проигравший 1/2 №1', { exact: true })).toBeVisible()
+  await expect(bronze.getByText('Проигравший 1/2 №2', { exact: true })).toBeVisible()
+  await expect(bronze.getByText('Дата уточняется', { exact: true })).toBeVisible()
+  await expect(bronze.locator('svg')).toHaveCount(0)
+  await expect(page.locator('.champ-cell .pc.bronze')).toHaveCount(0)
+  const bronzeBox = await bronze.boundingBox()
+  const finalBox = await finalCard.boundingBox()
+  const semiBox = await lowerSemi.boundingBox()
+  expect(bronzeBox).toBeTruthy()
+  expect(finalBox).toBeTruthy()
+  expect(semiBox).toBeTruthy()
+  expect(bronzeBox!.y).toBeGreaterThanOrEqual(semiBox!.y + semiBox!.height - 1)
+  expect(bronzeBox!.x + bronzeBox!.width).toBeLessThanOrEqual(finalBox!.x + 1)
+  const home = bronze.getByText('Проигравший 1/2 №1', { exact: true })
+  const clipped = await home.evaluate((el) => el.scrollWidth > el.clientWidth + 1)
+  expect(clipped).toBe(false)
   await page.locator('.po-card').screenshot({ path: '/opt/cursor/artifacts/third-place-1440.png' })
 })

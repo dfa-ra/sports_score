@@ -61,6 +61,56 @@ export function columnSlots(slots: PlayoffSlot[], lastRound: boolean): PlayoffSl
   return lastRound ? main.slice(0, 1) : main
 }
 
+/** Phone switcher step. The 3rd-place match is its own step, not a final tab. */
+export type BracketPanel = {
+  key: string
+  title: string
+  tab: string
+  slots: PlayoffSlot[]
+  roundIndex: number
+  thirdPlace: boolean
+  champion: boolean
+}
+
+/**
+ * Public and admin rounds, with the 3rd-place match inserted after the
+ * semifinals and before the final. Rounds without that slot stay unchanged.
+ */
+export function bracketPanels(rounds: PlayoffRound[]): BracketPanel[] {
+  const panels: BracketPanel[] = []
+  rounds.forEach((round, roundIndex) => {
+    const slots = slotsOf(round)
+    const bronze = thirdPlaceSlots(slots)
+    const main = linkSlots(slots)
+    const last = roundIndex === rounds.length - 1
+    if (last && bronze.length > 0) {
+      panels.push({
+        key: `third-${round.round ?? roundIndex}`,
+        title: 'Матч за 3-е место',
+        tab: 'За 3-е',
+        slots: bronze,
+        roundIndex,
+        thirdPlace: true,
+        champion: false,
+      })
+    }
+    panels.push({
+      key: `round-${round.round ?? roundIndex}`,
+      title: round.title || '',
+      tab: segmentLabel(round.title),
+      slots: last ? main : slots,
+      roundIndex,
+      thirdPlace: false,
+      champion: last,
+    })
+  })
+  return panels
+}
+
+export function defaultPanelIndex(panels: BracketPanel[]): number {
+  return defaultRoundIndex(panels.map((panel) => ({ slots: panel.slots })))
+}
+
 export function teamCountOf(rounds: PlayoffRound[]): number {
   return slotsOf(rounds[0]).length * 2
 }
@@ -219,6 +269,7 @@ export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done' 
 }
 
 export function emptySideLabel(slot: PlayoffSlot, home: boolean, previousTitle?: string | null) {
+  if (isThirdPlaceSlot(slot)) return home ? 'Проигравший 1/2 №1' : 'Проигравший 1/2 №2'
   const fromApi = home ? slot.homeWaitingLabel : slot.awayWaitingLabel
   if (fromApi) return fromApi
   if (!previousTitle) return '—'
@@ -328,9 +379,20 @@ export function gridColumns(roundCount: number, compact: boolean, squeeze: boole
   return parts.join(' ')
 }
 
-export function gridRows(firstSlots: number, compact: boolean) {
+export function gridRows(firstSlots: number, compact: boolean, extraRow = false) {
   const row = compact ? '112px' : '142px'
-  return `auto repeat(${Math.max(1, firstSlots)}, ${row})`
+  const tracks = `auto repeat(${Math.max(1, firstSlots)}, ${row})`
+  return extraRow ? `${tracks} auto` : tracks
+}
+
+/** Under the semifinals and left of the final. No span into the champion column. */
+export function bronzeCell(roundCount: number, firstSlots: number) {
+  const semiRoundIndex = Math.max(0, roundCount - 2)
+  const column = roundCount <= 1 ? 1 : semiRoundIndex * 2 + 1
+  return {
+    gridColumn: String(column),
+    gridRow: String(Math.max(1, firstSlots) + 2),
+  }
 }
 
 export function matchCell(roundIndex: number, slotIndex: number, roundCount: number) {

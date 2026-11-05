@@ -1023,7 +1023,13 @@ public class PlayoffService {
      */
     static String waitingLabel(PlayoffSlot slot, boolean home, int rounds) {
         UUID teamId = home ? slot.getHomeTeamId() : slot.getAwayTeamId();
-        if (teamId != null || slot.getRoundNumber() <= 1) {
+        if (teamId != null) {
+            return null;
+        }
+        if (isThird(slot)) {
+            return home ? "Проигравший 1/2 №1" : "Проигравший 1/2 №2";
+        }
+        if (slot.getRoundNumber() <= 1) {
             return null;
         }
         int feeder = slot.getSlotIndex() * 2 + (home ? 1 : 2);

@@ -4,7 +4,10 @@ import { matchCardStage, protocolStage } from '../src/lib/playoffLabel.ts'
 import {
   arrivalLine,
   bracketIsEmpty,
+  bracketPanels,
+  bronzeCell,
   columnSlots,
+  gridRows,
   linkSlots,
   thirdPlaceSlots,
   championCell,
@@ -176,4 +179,30 @@ test('third-place slot is not a final column or a bracket link', () => {
   assert.equal(protocolStage({ thirdPlace: false, stageLabel: 'Финал' }), 'Финал')
   assert.equal(matchCardStage({ thirdPlace: false, stageLabel: 'Финал' }), '')
   assert.notEqual(matchCardStage({ thirdPlace: true }), 'Финал')
+  assert.equal(emptySideLabel({ kind: 'THIRD', slotIndex: 1, homeWaitingLabel: 'Победитель 1/2 №3' }, true, 'Финал'), 'Проигравший 1/2 №1')
+  assert.equal(emptySideLabel({ kind: 'THIRD', slotIndex: 1 }, false, 'Финал'), 'Проигравший 1/2 №2')
+  assert.deepEqual(bronzeCell(3, 4), { gridColumn: '3', gridRow: '6' })
+  assert.deepEqual(bronzeCell(2, 2), { gridColumn: '1', gridRow: '4' })
+  assert.equal(gridRows(4, false, true), 'auto repeat(4, 142px) auto')
+  const panels = bracketPanels([
+    { round: 1, title: '1/4 финала', slots: [{ slotIndex: 0 }] },
+    { round: 2, title: '1/2 финала', slots: [{ slotIndex: 0 }, { slotIndex: 1 }] },
+    {
+      round: 3,
+      title: 'Финал',
+      slots: [
+        { slotIndex: 0, kind: 'MAIN', roundTitle: 'Финал' },
+        { slotIndex: 1, kind: 'THIRD', roundTitle: 'Матч за 3-е место' },
+      ],
+    },
+  ])
+  assert.deepEqual(panels.map((panel) => panel.tab), ['1/4', '1/2', 'За 3-е', 'Финал'])
+  assert.equal(panels[2].title, 'Матч за 3-е место')
+  assert.equal(panels[2].thirdPlace, true)
+  assert.equal(panels[3].champion, true)
+  assert.equal(panels[3].slots.length, 1)
+  assert.deepEqual(bracketPanels([
+    { title: '1/2 финала', slots: [{}] },
+    { title: 'Финал', slots: [{ kind: 'MAIN' }] },
+  ]).map((panel) => panel.tab), ['1/2', 'Финал'])
 })

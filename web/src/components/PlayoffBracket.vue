@@ -10,20 +10,20 @@ import {
   advancedTeamId,
   arrivalLine,
   bracketIsEmpty,
+  bracketPanels,
   branchKind,
+  bronzeCell,
   championCell,
   championHeaderCell,
   championWhen,
   connectorCell,
-  defaultRoundIndex,
+  defaultPanelIndex,
   gridColumns,
   gridRows,
   headerCell,
   matchCell,
   roundNote,
-  segmentLabel,
   columnSlots,
-  isThirdPlaceSlot,
   linkSlots,
   slotsOf,
   thirdPlaceSlots,
@@ -71,6 +71,7 @@ let boardObserver: ResizeObserver | null = null
 let panelObserver: ResizeObserver | null = null
 
 const rounds = computed(() => props.rounds ?? [])
+const panels = computed(() => bracketPanels(rounds.value))
 const teamCount = computed(() => teamCountOf(rounds.value))
 const compact = computed(() => teamCount.value > 8)
 const tabMode = computed(() => !props.editable && useRoundTabs(teamCount.value, viewport.value, containerWidth.value))
@@ -78,11 +79,12 @@ const empty = computed(() => !props.loading && !props.error && bracketIsEmpty(ro
 const squeeze = computed(() => !compact.value && !tabMode.value && viewport.value > 720 && viewport.value <= 1040)
 const stack = computed(() => stackChampion(rounds.value.length, viewport.value))
 const firstSlots = computed(() => Math.max(1, slotsOf(rounds.value[0]).length))
+const hasBronze = computed(() => rounds.value.some((round) => thirdPlaceSlots(slotsOf(round)).length > 0))
 const gridStyle = computed(() => ({
   gridTemplateColumns: gridColumns(rounds.value.length, compact.value, squeeze.value, stack.value),
-  gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value),
+  gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value, hasBronze.value),
 }))
-const showSwitcher = computed(() => tabMode.value && rounds.value.length > 1)
+const showSwitcher = computed(() => tabMode.value && panels.value.length > 1)
 
 function sameStamp(left?: string | null, right?: string | null) {
   if (!left && !right) return true
@@ -117,7 +119,7 @@ watch(
         }
       }
     }
-    active.value = defaultRoundIndex(next ?? [])
+    active.value = defaultPanelIndex(bracketPanels(next ?? []))
     void nextTick(() => scrollTo(active.value, false))
   },
   { immediate: true },
@@ -277,7 +279,7 @@ function onSwipe() {
   const el = scroller.value
   if (!el || el.clientWidth <= 0) return
   const index = Math.round(el.scrollLeft / el.clientWidth)
-  if (index !== active.value && index >= 0 && index < rounds.value.length) {
+  if (index !== active.value && index >= 0 && index < panels.value.length) {
     active.value = index
     void nextTick(measurePanel)
   }
@@ -298,7 +300,7 @@ function onTouchEnd(event: TouchEvent) {
   const dy = touch.clientY - start.y
   if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return
   const toward = dx < 0 ? start.index + 1 : start.index - 1
-  const next = Math.max(0, Math.min(rounds.value.length - 1, toward))
+  const next = Math.max(0, Math.min(panels.value.length - 1, toward))
   if (next !== active.value) go(next)
 }
 
@@ -306,7 +308,7 @@ function onTabKey(event: KeyboardEvent) {
   if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
   event.preventDefault()
   const next = event.key === 'ArrowRight'
-    ? Math.min(rounds.value.length - 1, active.value + 1)
+    ? Math.min(panels.value.length - 1, active.value + 1)
     : Math.max(0, active.value - 1)
   go(next)
   void nextTick(() => {
@@ -353,6 +355,7 @@ const finalLinkStyle = computed(() => ({
   gridColumn: String(rounds.value.length * 2),
   gridRow: `2 / span ${firstSlots.value}`,
 }))
+const bronzeStyle = computed(() => bronzeCell(rounds.value.length, firstSlots.value))
 </script>
 
 <template>
@@ -394,15 +397,15 @@ const finalLinkStyle = computed(() => ({
       </div>
 
       <div v-else-if="editable" class="bracket admin">
-        <section v-for="(round, roundIndex) in rounds" :key="round.round ?? roundIndex" class="round">
-          <h3>{{ round.title }}</h3>
-          <article v-for="slot in slotsOf(round)" :key="slot.id" class="admin-slot">
+        <section v-for="panel in panels" :key="panel.key" class="round">
+          <h3>{{ panel.title }}</h3>
+          <article v-for="slot in panel.slots" :key="slot.id" class="admin-slot">
             <PlayoffPairCard
               :slot="viewSlot(slot)"
-              :previous-title="previousTitle(roundIndex)"
-              :first-round="roundIndex === 0"
+              :previous-title="previousTitle(panel.roundIndex)"
+              :first-round="panel.roundIndex === 0 && !panel.thirdPlace"
               :compact="compact"
-              :final="roundIndex === rounds.length - 1 && !isThirdPlaceSlot(slot) && Number(slot.slotIndex ?? 0) === 0"
+              :final="panel.champion && Number(slot.slotIndex ?? 0) === 0"
               :lit="lit"
               :can-hover="canHover"
               :logo="logo"
@@ -438,9 +441,9 @@ const finalLinkStyle = computed(() => ({
           @keydown="onTabKey"
         >
           <button
-            v-for="(round, index) in rounds"
+            v-for="(panel, index) in panels"
             :id="`po-tab-${index}`"
-            :key="round.round ?? index"
+            :key="panel.key"
             type="button"
             role="tab"
             :aria-selected="index === active"
@@ -449,8 +452,8 @@ const finalLinkStyle = computed(() => ({
             :class="{ on: index === active }"
             @click="go(index)"
           >
-            <span v-if="roundNote(slotsOf(round)).live" class="dotl" aria-hidden="true"></span>
-            {{ segmentLabel(round.title) }}
+            <span v-if="roundNote(panel.slots).live" class="dotl" aria-hidden="true"></span>
+            {{ panel.tab }}
           </button>
         </div>
         <p v-if="showSwitcher" class="swipe">← свайп между раундами → · время МСК</p>
@@ -464,38 +467,38 @@ const finalLinkStyle = computed(() => ({
           @touchcancel.passive="onTouchEnd"
         >
           <section
-            v-for="(round, roundIndex) in rounds"
-            :id="`po-panel-${roundIndex}`"
-            :key="round.round ?? roundIndex"
+            v-for="(panel, panelIndex) in panels"
+            :id="`po-panel-${panelIndex}`"
+            :key="panel.key"
             class="po-panel"
             role="tabpanel"
-            :aria-labelledby="`po-tab-${roundIndex}`"
-            :class="{ on: roundIndex === active }"
+            :aria-labelledby="`po-tab-${panelIndex}`"
+            :class="{ on: panelIndex === active }"
           >
             <h3 class="rh">
-              {{ round.title }}
-              <small v-if="roundNote(slotsOf(round)).text">{{ roundNote(slotsOf(round)).text }}</small>
-              <span v-else-if="roundNote(slotsOf(round)).live" class="st live">идёт</span>
+              {{ panel.title }}
+              <small v-if="roundNote(panel.slots).text">{{ roundNote(panel.slots).text }}</small>
+              <span v-else-if="roundNote(panel.slots).live" class="st live">идёт</span>
             </h3>
             <div class="pair-stack">
-              <div v-for="slot in slotsOf(round)" :key="slot.id" class="pair-block">
+              <div v-for="slot in panel.slots" :key="slot.id" class="pair-block">
                 <PlayoffPairCard
                   :slot="viewSlot(slot)"
-                  :previous-title="previousTitle(roundIndex)"
-                  :first-round="roundIndex === 0"
-                  :final="roundIndex === rounds.length - 1 && !isThirdPlaceSlot(slot) && Number(slot.slotIndex ?? 0) === 0"
+                  :previous-title="previousTitle(panel.roundIndex)"
+                  :first-round="panel.roundIndex === 0 && !panel.thirdPlace"
+                  :final="panel.champion && Number(slot.slotIndex ?? 0) === 0"
                   :lit="lit"
                   :can-hover="false"
                   :logo="logo"
                 />
-                <ul v-if="arrivals(roundIndex, slot).length" class="how">
-                  <li v-for="line in arrivals(roundIndex, slot)" :key="line.name + line.detail">
+                <ul v-if="!panel.thirdPlace && arrivals(panel.roundIndex, slot).length" class="how">
+                  <li v-for="line in arrivals(panel.roundIndex, slot)" :key="line.name + line.detail">
                     <b>{{ line.name }}</b> · {{ line.detail }}
                   </li>
                 </ul>
               </div>
             </div>
-            <div v-if="roundIndex === rounds.length - 1" class="champ-block">
+            <div v-if="panel.champion" class="champ-block">
               <div v-if="champion" class="champ won">
                 <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
                 <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
@@ -508,7 +511,7 @@ const finalLinkStyle = computed(() => ({
                 </div>
               </div>
             </div>
-            <p v-else-if="nextHint(roundIndex)" class="next-hint">{{ nextHint(roundIndex) }}</p>
+            <p v-else-if="!panel.thirdPlace && nextHint(panel.roundIndex)" class="next-hint">{{ nextHint(panel.roundIndex) }}</p>
           </section>
         </div>
       </div>
@@ -522,8 +525,8 @@ const finalLinkStyle = computed(() => ({
             :style="headerCell(roundIndex, rounds.length)"
           >
             {{ round.title }}
-            <small v-if="roundNote(slotsOf(round)).text">{{ roundNote(slotsOf(round)).text }}</small>
-            <span v-else-if="roundNote(slotsOf(round)).live" class="st live">идёт</span>
+            <small v-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text">{{ roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text }}</small>
+            <span v-else-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).live" class="st live">идёт</span>
           </h3>
           <h3 class="rh" :style="champHeaderStyle">Чемпион</h3>
 
@@ -532,6 +535,7 @@ const finalLinkStyle = computed(() => ({
               v-for="slot in columnSlots(slotsOf(round), roundIndex === rounds.length - 1)"
               :key="slot.id"
               class="cell"
+              :data-round="roundIndex"
               :style="matchCell(roundIndex, Number(slot.slotIndex ?? 0), rounds.length)"
             >
               <PlayoffPairCard
@@ -583,6 +587,25 @@ const finalLinkStyle = computed(() => ({
             </svg>
           </div>
 
+          <div
+            v-for="slot in extraFinalSlots"
+            :key="slot.id"
+            class="cell bronze-cell"
+            data-bronze
+            :style="bronzeStyle"
+          >
+            <PlayoffPairCard
+              :slot="viewSlot(slot)"
+              :previous-title="previousTitle(rounds.length - 1)"
+              :lit="lit"
+              :can-hover="canHover"
+              :logo="logo"
+              @hover="light"
+              @focus="lightSlot(slot)"
+              @blur="clearLight"
+            />
+          </div>
+
           <div class="cell champ-cell" :style="champStyle">
             <div v-if="champion" class="champ won">
               <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
@@ -595,18 +618,6 @@ const finalLinkStyle = computed(() => ({
                 <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
               </div>
             </div>
-            <PlayoffPairCard
-              v-for="slot in extraFinalSlots"
-              :key="slot.id"
-              :slot="viewSlot(slot)"
-              :previous-title="previousTitle(rounds.length - 1)"
-              :lit="lit"
-              :can-hover="canHover"
-              :logo="logo"
-              @hover="light"
-              @focus="lightSlot(slot)"
-              @blur="clearLight"
-            />
           </div>
         </div>
       </div>
@@ -641,6 +652,7 @@ const finalLinkStyle = computed(() => ({
 .po-grid { display: grid; column-gap: 0; min-width: 0; }
 .po-grid > * { min-width: 0; }
 .cell { align-self: center; }
+.bronze-cell { align-self: start; padding-top: 0.85rem; }
 .cellc { align-self: stretch; padding: 0; }
 .champ-cell { align-self: center; display: grid; gap: 0.7rem; }
 .rh {
