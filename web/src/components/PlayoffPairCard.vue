@@ -135,7 +135,7 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
 .pc.live .pf { background: rgba(227, 107, 91, 0.08); }
 .pc.live .ps { color: var(--ink); }
 .pc.final { border: 2px solid var(--navy); }
-.pc.bronze { border: 2px solid #8a5a2b; }
+.pc.bronze { border: 2px solid var(--navy); }
 .fh {
   display: flex;
   align-items: center;
@@ -149,7 +149,6 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   text-transform: uppercase;
 }
 .fh.bronze {
-  background: #8a5a2b;
   letter-spacing: 0.02em;
   text-transform: none;
 }
