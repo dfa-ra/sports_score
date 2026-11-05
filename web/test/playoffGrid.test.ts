@@ -5,7 +5,13 @@ import {
   arrivalLine,
   bracketIsEmpty,
   bracketPanels,
-  bronzeCell,
+  bronzeBoardColumns,
+  bronzeChampionCell,
+  bronzeEarlyCell,
+  bronzeFinalCell,
+  bronzeMatchRows,
+  bronzeSemiCell,
+  bronzeThirdRow,
   columnSlots,
   gridRows,
   linkSlots,
@@ -181,9 +187,15 @@ test('third-place slot is not a final column or a bracket link', () => {
   assert.notEqual(matchCardStage({ thirdPlace: true }), 'Финал')
   assert.equal(emptySideLabel({ kind: 'THIRD', slotIndex: 1, homeWaitingLabel: 'Победитель 1/2 №3' }, true, 'Финал'), 'Проигравший 1/2 №1')
   assert.equal(emptySideLabel({ kind: 'THIRD', slotIndex: 1 }, false, 'Финал'), 'Проигравший 1/2 №2')
-  assert.deepEqual(bronzeCell(3, 4), { gridColumn: '3', gridRow: '6' })
-  assert.deepEqual(bronzeCell(2, 2), { gridColumn: '1', gridRow: '4' })
-  assert.equal(gridRows(4, false, true), 'auto repeat(4, 142px) auto')
+  assert.equal(bronzeBoardColumns(3, false, false), '238px 30px 238px 30px 238px')
+  assert.equal(bronzeMatchRows(4, 2), 4)
+  assert.deepEqual(bronzeEarlyCell(3, 4, 4), { gridRow: '5 / span 1' })
+  assert.deepEqual(bronzeSemiCell(0, 2, 4), { gridRow: '2 / span 2' })
+  assert.deepEqual(bronzeSemiCell(1, 2, 4), { gridRow: '4 / span 1' })
+  assert.equal(bronzeThirdRow(4), '5')
+  assert.deepEqual(bronzeFinalCell(4), { gridRow: '2 / span 2' })
+  assert.deepEqual(bronzeChampionCell(4), { gridRow: '4 / span 2' })
+  assert.equal(gridRows(4, false), 'auto repeat(4, 142px)')
   const panels = bracketPanels([
     { round: 1, title: '1/4 финала', slots: [{ slotIndex: 0 }] },
     { round: 2, title: '1/2 финала', slots: [{ slotIndex: 0 }, { slotIndex: 1 }] },

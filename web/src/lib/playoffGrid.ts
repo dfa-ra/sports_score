@@ -385,14 +385,64 @@ export function gridRows(firstSlots: number, compact: boolean, extraRow = false)
   return extraRow ? `${tracks} auto` : tracks
 }
 
-/** Under the semifinals and left of the final. No span into the champion column. */
-export function bronzeCell(roundCount: number, firstSlots: number) {
-  const semiRoundIndex = Math.max(0, roundCount - 2)
-  const column = roundCount <= 1 ? 1 : semiRoundIndex * 2 + 1
-  return {
-    gridColumn: String(column),
-    gridRow: String(Math.max(1, firstSlots) + 2),
+/**
+ * 1/4, 1/2, final — the champion is not a column.
+ * Links sit between those columns.
+ */
+export function bronzeBoardColumns(roundCount: number, compact: boolean, squeeze: boolean) {
+  const col = compact ? 'minmax(150px, 214px)' : squeeze ? 'minmax(190px, 238px)' : '238px'
+  const link = compact ? '22px' : squeeze ? '24px' : '30px'
+  const parts: string[] = []
+  for (let i = 0; i < roundCount; i += 1) {
+    if (i > 0) parts.push(link)
+    parts.push(col)
   }
+  return parts.join(' ')
+}
+
+export function bronzeRoundColumn(roundIndex: number) {
+  return String(roundIndex * 2 + 1)
+}
+
+/** Match rows, keeping the last one free for the 3rd-place card. */
+export function bronzeMatchRows(firstSlots: number, semiCount: number) {
+  return Math.max(firstSlots, semiCount + 1)
+}
+
+export function bronzeEarlyCell(slotIndex: number, slotCount: number, matchRows: number) {
+  const span = Math.max(1, Math.floor(matchRows / Math.max(1, slotCount)))
+  return { gridRow: `${slotIndex * span + 2} / span ${span}` }
+}
+
+/** Semifinals use every match row except the last, which holds the 3rd-place card. */
+export function bronzeSemiCell(slotIndex: number, semiCount: number, matchRows: number) {
+  const available = Math.max(1, matchRows - 1)
+  const count = Math.max(1, semiCount)
+  const base = Math.floor(available / count)
+  const extra = available % count
+  let start = 0
+  for (let i = 0; i < slotIndex; i += 1) start += base + (i < extra ? 1 : 0)
+  const span = Math.max(1, base + (slotIndex < extra ? 1 : 0))
+  return { gridRow: `${start + 2} / span ${span}` }
+}
+
+export function bronzeThirdRow(matchRows: number) {
+  return String(matchRows + 1)
+}
+
+/** Final on top, champion directly under it in the same column. */
+export function bronzeFinalCell(matchRows: number) {
+  const top = Math.max(1, Math.floor(matchRows / 2))
+  return { gridRow: `2 / span ${top}` }
+}
+
+export function bronzeChampionCell(matchRows: number) {
+  const top = Math.max(1, Math.floor(matchRows / 2))
+  return { gridRow: `${2 + top} / span ${Math.max(1, matchRows - top)}` }
+}
+
+export function bronzeLinkCell(matchRows: number) {
+  return { gridRow: `2 / span ${matchRows}` }
 }
 
 export function matchCell(roundIndex: number, slotIndex: number, roundCount: number) {
