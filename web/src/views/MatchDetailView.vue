@@ -10,6 +10,7 @@ import { registeredName } from '../lib/playerTitle'
 import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
+import MatchStageNote from '../components/MatchStageNote.vue'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -664,6 +665,7 @@ onUnmounted(() => {
     </RouterLink>
     <p v-else class="league-bar">{{ tournament?.name || 'Матч' }}</p>
 
+    <MatchStageNote variant="protocol" :match="match" />
     <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">

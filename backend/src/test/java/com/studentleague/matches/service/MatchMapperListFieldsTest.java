@@ -13,6 +13,7 @@ import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,9 @@ class MatchMapperListFieldsTest {
 
     @Mock
     TournamentRepository tournamentRepository;
+
+    @Mock
+    PlayoffSlotRepository playoffSlotRepository;
 
     @Test
     void responseCarriesLastGoalScorerAndMinute() {
@@ -109,7 +113,8 @@ class MatchMapperListFieldsTest {
                 matchEventRepository,
                 penaltyKickRepository,
                 teamRepository,
-                tournamentRepository
+                tournamentRepository,
+                playoffSlotRepository
         );
         MatchResponse response = mapper.toResponse(match);
 
@@ -120,5 +125,7 @@ class MatchMapperListFieldsTest {
         assertThat(response.homeTeamName()).isEqualTo("Физтех");
         assertThat(response.awayTeamName()).isEqualTo("Юристы");
         assertThat(response.tournamentName()).isEqualTo("Студенческий кубок");
+        assertThat(response.thirdPlace()).isFalse();
+        assertThat(response.stageLabel()).isNull();
     }
 }

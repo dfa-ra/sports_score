@@ -22,7 +22,11 @@ import {
   matchCell,
   roundNote,
   segmentLabel,
+  columnSlots,
+  isThirdPlaceSlot,
+  linkSlots,
   slotsOf,
+  thirdPlaceSlots,
   cssViewportWidth,
   stackChampion,
   teamCountOf,
@@ -200,8 +204,8 @@ function nextHint(roundIndex: number) {
 }
 
 const finalRound = computed(() => rounds.value[rounds.value.length - 1])
-const finalSlot = computed(() => slotsOf(finalRound.value)[0])
-const extraFinalSlots = computed(() => slotsOf(finalRound.value).slice(1))
+const finalSlot = computed(() => linkSlots(slotsOf(finalRound.value))[0])
+const extraFinalSlots = computed(() => thirdPlaceSlots(slotsOf(finalRound.value)))
 const champion = computed(() => {
   const slot = finalSlot.value
   const side = slot ? winnerSide(slot) : null
@@ -398,7 +402,7 @@ const finalLinkStyle = computed(() => ({
               :previous-title="previousTitle(roundIndex)"
               :first-round="roundIndex === 0"
               :compact="compact"
-              :final="roundIndex === rounds.length - 1 && slot.slotIndex === 0"
+              :final="roundIndex === rounds.length - 1 && !isThirdPlaceSlot(slot) && Number(slot.slotIndex ?? 0) === 0"
               :lit="lit"
               :can-hover="canHover"
               :logo="logo"
@@ -479,7 +483,7 @@ const finalLinkStyle = computed(() => ({
                   :slot="viewSlot(slot)"
                   :previous-title="previousTitle(roundIndex)"
                   :first-round="roundIndex === 0"
-                  :final="roundIndex === rounds.length - 1 && Number(slot.slotIndex ?? 0) === 0"
+                  :final="roundIndex === rounds.length - 1 && !isThirdPlaceSlot(slot) && Number(slot.slotIndex ?? 0) === 0"
                   :lit="lit"
                   :can-hover="false"
                   :logo="logo"
@@ -525,7 +529,7 @@ const finalLinkStyle = computed(() => ({
 
           <template v-for="(round, roundIndex) in rounds" :key="`c-${round.round ?? roundIndex}`">
             <div
-              v-for="slot in (roundIndex === rounds.length - 1 ? slotsOf(round).slice(0, 1) : slotsOf(round))"
+              v-for="slot in columnSlots(slotsOf(round), roundIndex === rounds.length - 1)"
               :key="slot.id"
               class="cell"
               :style="matchCell(roundIndex, Number(slot.slotIndex ?? 0), rounds.length)"
@@ -548,7 +552,7 @@ const finalLinkStyle = computed(() => ({
 
           <template v-for="(round, roundIndex) in rounds.slice(0, -1)" :key="`k-${round.round ?? roundIndex}`">
             <div
-              v-for="slot in slotsOf(rounds[roundIndex + 1])"
+              v-for="slot in linkSlots(slotsOf(rounds[roundIndex + 1]))"
               :key="`svg-${roundIndex}-${slot.id}`"
               class="cellc"
               :style="connectorCell(roundIndex, Number(slot.slotIndex ?? 0))"

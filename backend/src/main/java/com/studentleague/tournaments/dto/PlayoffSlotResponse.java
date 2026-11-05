@@ -27,6 +27,7 @@ public record PlayoffSlotResponse(
         Integer penaltyHome,
         Integer penaltyAway,
         Integer minute,
-        Instant startedAt
+        Instant startedAt,
+        String kind
 ) {
 }

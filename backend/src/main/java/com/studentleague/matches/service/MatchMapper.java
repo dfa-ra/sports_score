@@ -17,8 +17,12 @@ import com.studentleague.sports.entity.Sport;
 import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.domain.PlayoffSlotKind;
+import com.studentleague.tournaments.entity.PlayoffSlot;
 import com.studentleague.tournaments.entity.Tournament;
+import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
+import com.studentleague.tournaments.service.PlayoffService;
 import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
@@ -43,6 +47,7 @@ public class MatchMapper {
     private final PenaltyKickRepository penaltyKickRepository;
     private final TeamRepository teamRepository;
     private final TournamentRepository tournamentRepository;
+    private final PlayoffSlotRepository playoffSlotRepository;
 
     public MatchMapper(
             SportRepository sportRepository,
@@ -50,7 +55,8 @@ public class MatchMapper {
             MatchEventRepository matchEventRepository,
             PenaltyKickRepository penaltyKickRepository,
             TeamRepository teamRepository,
-            TournamentRepository tournamentRepository
+            TournamentRepository tournamentRepository,
+            PlayoffSlotRepository playoffSlotRepository
     ) {
         this.sportRepository = sportRepository;
         this.playerProfileRepository = playerProfileRepository;
@@ -58,6 +64,7 @@ public class MatchMapper {
         this.penaltyKickRepository = penaltyKickRepository;
         this.teamRepository = teamRepository;
         this.tournamentRepository = tournamentRepository;
+        this.playoffSlotRepository = playoffSlotRepository;
     }
 
     public MatchResponse toResponse(Match match) {
@@ -76,7 +83,7 @@ public class MatchMapper {
 
     public MatchResponse toResponse(Match match, String lastGoalScorer, ShootoutRules.Tally shootout) {
         List<Match> one = List.of(match);
-        return build(match, lastGoalScorer, shootout, teamNames(one), tournamentNames(one));
+        return build(match, lastGoalScorer, shootout, teamNames(one), tournamentNames(one), stageFacts(one));
     }
 
     private Function<Match, MatchResponse> named(List<Match> matches) {
@@ -84,7 +91,8 @@ public class MatchMapper {
         Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
         Map<UUID, String> teams = teamNames(matches);
         Map<UUID, String> tournaments = tournamentNames(matches);
-        return match -> build(match, scorers.get(match.getId()), penalties.get(match.getId()), teams, tournaments);
+        StageFacts stages = stageFacts(matches);
+        return match -> build(match, scorers.get(match.getId()), penalties.get(match.getId()), teams, tournaments, stages);
     }
 
     private MatchResponse build(
@@ -92,7 +100,8 @@ public class MatchMapper {
             String lastGoalScorer,
             ShootoutRules.Tally shootout,
             Map<UUID, String> teams,
-            Map<UUID, String> tournaments
+            Map<UUID, String> tournaments,
+            StageFacts stages
     ) {
         String sportCode = sportRepository.findById(match.getSportId())
                 .map(Sport::getCode)
@@ -103,6 +112,12 @@ public class MatchMapper {
             penaltyHome = shootout.homeScored();
             penaltyAway = shootout.awayScored();
         }
+        boolean thirdPlace = match.getId() != null && stages.thirdPlaceMatchIds().contains(match.getId());
+        String stageLabel = PlayoffService.protocolStageLabel(
+                thirdPlace,
+                match.getBracketRound(),
+                stages.rounds().getOrDefault(match.getTournamentId(), 0)
+        );
         return new MatchResponse(
                 match.getId(),
                 match.getTournamentId(),
@@ -133,8 +148,40 @@ public class MatchMapper {
                 penaltyAway,
                 match.getHomeTeamId() == null ? null : teams.get(match.getHomeTeamId()),
                 match.getAwayTeamId() == null ? null : teams.get(match.getAwayTeamId()),
-                match.getTournamentId() == null ? null : tournaments.get(match.getTournamentId())
+                match.getTournamentId() == null ? null : tournaments.get(match.getTournamentId()),
+                thirdPlace,
+                stageLabel
         );
+    }
+
+    private StageFacts stageFacts(Collection<Match> matches) {
+        Set<UUID> tournamentIds = new HashSet<>();
+        for (Match match : matches) {
+            if (match.getBracketRound() != null && match.getTournamentId() != null) {
+                tournamentIds.add(match.getTournamentId());
+            }
+        }
+        if (tournamentIds.isEmpty()) {
+            return StageFacts.empty();
+        }
+        Map<UUID, Integer> rounds = new HashMap<>();
+        Set<UUID> thirdPlaceMatchIds = new HashSet<>();
+        for (PlayoffSlot slot : playoffSlotRepository.findByTournamentIdIn(tournamentIds)) {
+            if (slot.getKind() == PlayoffSlotKind.THIRD) {
+                if (slot.getMatchId() != null) {
+                    thirdPlaceMatchIds.add(slot.getMatchId());
+                }
+                continue;
+            }
+            rounds.merge(slot.getTournamentId(), slot.getRoundNumber(), Math::max);
+        }
+        return new StageFacts(rounds, thirdPlaceMatchIds);
+    }
+
+    private record StageFacts(Map<UUID, Integer> rounds, Set<UUID> thirdPlaceMatchIds) {
+        static StageFacts empty() {
+            return new StageFacts(Map.of(), Set.of());
+        }
     }
 
     private Map<UUID, String> teamNames(Collection<Match> matches) {

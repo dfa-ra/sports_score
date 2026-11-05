@@ -1,13 +1,14 @@
 import { formatLabel } from './format.ts'
 import { DATE_PENDING, matchInstant } from './matchDate.ts'
 import { moscowClock, moscowDayMonth, moscowParts, type InstantInput } from './moscowTime.ts'
-import { shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
+import { isThirdPlaceSlot, shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
 
 export type PlayoffSlot = {
   id?: string
   round?: number
   slotIndex?: number
   roundTitle?: string | null
+  kind?: string | null
   matchId?: string | null
   homeTeamId?: string | null
   homeTeamName?: string | null
@@ -41,6 +42,23 @@ const PLAYOFF_FORMATS = new Set(['CUP', 'GROUPS_PLAYOFF', 'DOUBLE_ELIMINATION', 
 
 export function slotsOf(round?: PlayoffRound | null): PlayoffSlot[] {
   return round?.slots ?? []
+}
+
+export { isThirdPlaceSlot }
+
+/** Bracket lines follow the main pairs. The 3rd-place slot is not a feeder. */
+export function linkSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
+  return slots.filter((slot) => !isThirdPlaceSlot(slot))
+}
+
+export function thirdPlaceSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
+  return slots.filter((slot) => isThirdPlaceSlot(slot))
+}
+
+/** Last column keeps the final only. Earlier rounds keep every main pair. */
+export function columnSlots(slots: PlayoffSlot[], lastRound: boolean): PlayoffSlot[] {
+  const main = linkSlots(slots)
+  return lastRound ? main.slice(0, 1) : main
 }
 
 export function teamCountOf(rounds: PlayoffRound[]): number {

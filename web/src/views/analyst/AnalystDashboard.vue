@@ -6,6 +6,7 @@ import KickoffWhen from '../../components/KickoffWhen.vue'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 import { useAuthStore } from '../../stores/auth'
 import EmptyState from '../../components/EmptyState.vue'
+import MatchStageNote from '../../components/MatchStageNote.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 
 const matches = ref<any[]>([])
@@ -47,7 +48,8 @@ onMounted(async () => {
     />
     <div v-else class="grid cards">
       <RouterLink v-for="m in ordered" :key="m.id" class="panel card-link" :to="`/analyst/matches/${m.id}`">
-        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
+        <MatchStageNote :match="m" />
+        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
         <p v-if="m.status === 'FINISHED'" class="note">Завершён</p>
         <p v-else-if="m.status === 'CANCELLED'" class="note">Отменён</p>
         <p v-if="sideLabel(m.coverage)" class="note">{{ sideLabel(m.coverage) }}</p>

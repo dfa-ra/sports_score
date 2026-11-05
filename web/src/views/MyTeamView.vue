@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/auth'
 import KickoffWhen from '../components/KickoffWhen.vue'
 import { apiError } from '../lib/errors'
 import EmptyState from '../components/EmptyState.vue'
+import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
@@ -277,7 +278,8 @@ async function removeMember(id: string) {
         <h2>Календарь команды</h2>
         <EmptyState v-if="!matches.length" title="Матчей нет" />
         <RouterLink v-for="m in matches" :key="m.id" class="row" :to="`/matches/${m.id}`">
-          <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
+          <MatchStageNote :match="m" />
+          <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
           <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" align="start" />
           <span>{{ m.homeScore }}:{{ m.awayScore }}</span>
         </RouterLink>
