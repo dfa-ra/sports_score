@@ -9,7 +9,11 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -42,10 +46,19 @@ class DemoDataSeederIntegrationTest {
         mockMvc.perform(get("/api/v1/home"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tournament.name").value("Студенческий кубок 2026"))
+                .andExpect(jsonPath("$.tournament.description").value(nullValue()))
+                .andExpect(content().string(not(containsString("Демо-сезон"))))
+                .andExpect(content().string(not(containsString("пустыми"))))
                 .andExpect(jsonPath("$.standings.length()").value(1))
                 .andExpect(jsonPath("$.standings[0].rows.length()").value(8))
                 .andExpect(jsonPath("$.scorers.length()").value(5))
                 .andExpect(jsonPath("$.assists.length()").value(5));
+
+        mockMvc.perform(get("/api/v1/tournaments/current"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Студенческий кубок 2026"))
+                .andExpect(jsonPath("$.description").value(nullValue()))
+                .andExpect(content().string(not(containsString("Демо-сезон"))));
 
         mockMvc.perform(get("/api/v1/statistics/goalkeepers").param("limit", "10"))
                 .andExpect(status().isOk())

@@ -14,6 +14,7 @@ import {
   tournamentStatusChip,
 } from '../lib/playoffGrid'
 import { setPageMeta } from '../lib/pageMeta'
+import { publicTournamentDescription } from '../lib/tournamentCopy'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
@@ -32,6 +33,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const names = useTeamDirectory()
 const tournament = ref<any>(null)
+const publicDescription = computed(() => publicTournamentDescription(tournament.value?.description))
 const teams = ref<any[]>([])
 const standings = ref<StandingGroup[]>([])
 const tableDraft = ref<{ id?: string; name: string; teamIds: string[] }[]>([])
@@ -111,6 +113,8 @@ async function load() {
   }
   if (route.params.id !== id) return
   missing.value = false
+  const visibleDescription = publicTournamentDescription(detail.description)
+  detail = { ...detail, description: visibleDescription }
   tournament.value = detail
   const playoffTask = loadPlayoff(String(id))
   try {
@@ -147,7 +151,7 @@ async function load() {
     path: `/tournaments/${id}`,
   })
   name.value = detail.name
-  description.value = detail.description || ''
+  description.value = visibleDescription
   status.value = detail.status
   format.value = detail.format
   regulations.value = detail.regulations || ''
@@ -418,7 +422,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <p v-if="metaParts.length" class="meta">
           <span v-for="part in metaParts" :key="part">{{ part }}</span>
         </p>
-        <p v-if="tournament.description" class="lede">{{ tournament.description }}</p>
+        <p v-if="publicDescription" class="lede">{{ publicDescription }}</p>
       </div>
       <div v-else class="title-pending" role="status" aria-busy="true" aria-label="Заголовок загружается">
         <span class="chip-skel"></span>

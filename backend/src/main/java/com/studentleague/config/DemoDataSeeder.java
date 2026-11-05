@@ -138,6 +138,7 @@ public class DemoDataSeeder implements ApplicationRunner {
 
         Tournament tournament = new Tournament();
         tournament.setName("Студенческий кубок 2026");
+        // Description stays empty. Do not store a demo blurb on the cup.
         tournament.setSportId(football.getId());
         tournament.setSeasonYear(2026);
         tournament.setStartDate(LocalDate.of(2026, 8, 1));
