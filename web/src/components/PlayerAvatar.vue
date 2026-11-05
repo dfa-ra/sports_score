@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { initials } from '../lib/format'
-import { avatarPhotoCovers, trimmedPhotoSrc } from '../lib/personAvatar'
+import { avatarPhotoCovers, personInitials, trimmedPhotoSrc } from '../lib/personAvatar'
 
 const props = withDefaults(
   defineProps<{
     src?: string | null
     name?: string | null
+    firstName?: string | null
+    lastName?: string | null
     size?: number
     /** Accepted so older call sites compile. The photo is always a plain circle. */
     tile?: boolean
@@ -27,7 +28,7 @@ watch(
   },
 )
 
-const letters = computed(() => initials(props.name || ''))
+const letters = computed(() => personInitials(props.firstName, props.lastName))
 const photoSrc = computed(() => trimmedPhotoSrc(props.src))
 const showPhoto = computed(() => photoSrc.value.length > 0 && !failed.value)
 const covered = computed(() => avatarPhotoCovers(props.src, ready.value, failed.value))

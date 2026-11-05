@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { initials } from '../src/lib/format.ts'
-import { avatarPhotoCovers } from '../src/lib/personAvatar.ts'
+import { avatarPhotoCovers, personInitials } from '../src/lib/personAvatar.ts'
 
 test('initials come from the first letters of the name', () => {
   assert.equal(initials('Максим Волков'), 'МВ')
@@ -9,6 +9,15 @@ test('initials come from the first letters of the name', () => {
   assert.equal(initials('Белов'), 'Б')
   assert.equal(initials(''), 'SL')
   assert.equal(initials(null), 'SL')
+})
+
+test('person avatar letters are the given name then the surname', () => {
+  assert.equal(personInitials('Максим', 'Волков'), 'МВ')
+  assert.equal(personInitials(' максим ', ' волков '), 'МВ')
+  assert.equal(personInitials('Максим', null), 'М')
+  assert.equal(personInitials(null, 'Волков'), 'В')
+  assert.equal(personInitials('', '  '), 'SL')
+  assert.equal(personInitials(null, null), 'SL')
 })
 
 test('a photo covers initials only after it has loaded', () => {

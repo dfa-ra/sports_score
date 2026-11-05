@@ -16,6 +16,7 @@ import TeamCrest from '../components/TeamCrest.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { setPageMeta } from '../lib/pageMeta'
 import { matchInstant } from '../lib/match'
+import { formatMoscowDate } from '../lib/moscowTime'
 import { registeredName } from '../lib/playerTitle'
 
 const route = useRoute()
@@ -51,6 +52,7 @@ function tapStar() {
   starTap.value += 1
 }
 
+const foundedOnLabel = computed(() => formatMoscowDate(team.value?.foundedOn))
 const isCaptain = computed(() => me.value && team.value && me.value.id === team.value.captainId)
 const canManage = computed(() => !team.value?.disbanded && (auth.canManageLeague || isCaptain.value))
 
@@ -190,7 +192,7 @@ async function deleteTeam() {
       <div>
         <h1>{{ team.name }}</h1>
         <p v-if="team.disbanded">Команда расформирована. История матчей остаётся.</p>
-        <p v-else-if="team.shortName || team.foundedOn">{{ team.shortName }}{{ team.shortName && team.foundedOn ? ' · ' : '' }}{{ team.foundedOn ? 'осн. ' + team.foundedOn : '' }}</p>
+        <p v-else-if="team.shortName || team.foundedOn">{{ team.shortName }}{{ team.shortName && foundedOnLabel ? ' · ' : '' }}{{ foundedOnLabel ? 'осн. ' + foundedOnLabel : '' }}</p>
       </div>
       <button
         class="star"
@@ -291,7 +293,7 @@ async function deleteTeam() {
             <tr v-for="row in stats" :key="row.playerId">
               <td>
                 <div class="who">
-                  <PlayerAvatar :src="row.photoUrl" :name="registeredName(row)" :size="40" />
+                  <PlayerAvatar :src="row.photoUrl" :name="registeredName(row)" :first-name="row.firstName" :last-name="row.lastName" :size="40" />
                   <RouterLink :to="`/players/${row.playerId}`">{{ registeredName(row) }}</RouterLink>
                   <span v-if="row.playerId === team.captainId" class="captain-badge">Капитан</span>
                 </div>

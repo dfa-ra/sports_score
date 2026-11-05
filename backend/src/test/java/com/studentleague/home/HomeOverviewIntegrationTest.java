@@ -129,6 +129,8 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
             var row = group.get("scorers").get(0);
             org.junit.jupiter.api.Assertions.assertEquals(1, row.get("goals").asInt());
             org.junit.jupiter.api.Assertions.assertEquals("Пумы " + stamp, row.get("teamName").asText());
+            org.junit.jupiter.api.Assertions.assertEquals("Илья", row.get("firstName").asText());
+            org.junit.jupiter.api.Assertions.assertEquals("Орлов", row.get("lastName").asText());
             scorerFound = true;
         }
         org.junit.jupiter.api.Assertions.assertTrue(scorerFound, "alpha scorers missing");

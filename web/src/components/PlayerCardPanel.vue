@@ -91,7 +91,7 @@ function marks(row: MatchRow) {
 <template>
   <div class="wrap">
     <div class="identity">
-      <PlayerAvatar :src="card.avatarUrl" :name="name" :size="76" tile />
+      <PlayerAvatar :src="card.avatarUrl" :name="name" :first-name="card.firstName" :last-name="card.lastName" :size="76" tile />
       <div class="who">
         <h1>{{ name }}</h1>
         <p v-if="header.shirt" class="shirt">{{ header.shirt }}</p>
