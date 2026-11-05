@@ -35,6 +35,8 @@ public record MatchResponse(
         Integer penaltyAway,
         String homeTeamName,
         String awayTeamName,
-        String tournamentName
+        String tournamentName,
+        boolean thirdPlace,
+        String stageLabel
 ) {
 }

@@ -21,6 +21,7 @@ import com.studentleague.notifications.NotificationService;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.domain.CompetitionStage;
+import com.studentleague.tournaments.domain.PlayoffSlotKind;
 import com.studentleague.tournaments.domain.TournamentStatus;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
 import com.studentleague.tournaments.dto.AssignGroupMatchRequest;
@@ -56,12 +57,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
 @Service
 public class PlayoffService {
+
+    /** Slot header in the bracket and in the admin grid. */
+    public static final String THIRD_PLACE_SLOT_TITLE = "Матч за 3-е место";
+    /** Home and list cards. Shorter than the slot header, and not «Финал». */
+    public static final String THIRD_PLACE_CARD_LABEL = "Матч за 3-е";
+    /** Protocol and the match page. */
+    public static final String THIRD_PLACE_PROTOCOL_LABEL = "За 3-е место";
+    /** Beside the final (slot 0) in the same round, so round numbers stay put. */
+    static final int THIRD_PLACE_SLOT_INDEX = 1;
 
     private final TournamentRepository tournamentRepository;
     private final TournamentTeamRepository tournamentTeamRepository;
@@ -265,13 +276,18 @@ public class PlayoffService {
         );
     }
 
+    /**
+     * Winners still walk the bracket that was built at open. Finishing the final
+     * does not move the tournament to FINISHED — an admin does that by hand.
+     * When both semifinals have a loser, those losers fill the 3rd-place match.
+     */
     @Transactional
     public void advance(Match match) {
         if (match.getBracketRound() == null || match.getStatus() != MatchStatus.FINISHED) {
             return;
         }
         PlayoffSlot source = playoffSlotRepository.findByMatchId(match.getId()).orElse(null);
-        if (source == null) {
+        if (source == null || isThird(source)) {
             return;
         }
         PlayoffSlot next = playoffSlotRepository.findByTournamentIdAndRoundNumberAndSlotIndex(
@@ -279,11 +295,11 @@ public class PlayoffService {
                 source.getRoundNumber() + 1,
                 source.getSlotIndex() / 2
         ).orElse(null);
-        if (next == null) {
-            return;
+        if (next != null && !isThird(next)) {
+            boolean homeSide = source.getSlotIndex() % 2 == 0;
+            placeWinner(next, homeSide, winnerOf(match));
         }
-        boolean homeSide = source.getSlotIndex() % 2 == 0;
-        placeWinner(next, homeSide, winnerOf(match));
+        syncThirdPlace(source);
     }
 
     public void syncVenue(Match match) {
@@ -294,6 +310,113 @@ public class PlayoffService {
             slot.setVenue(match.getVenue());
             playoffSlotRepository.save(slot);
         });
+    }
+
+    /**
+     * Both semifinals must be finished. One known loser is not enough: the slot
+     * stays hidden instead of showing a guessed team. Losers, not winners.
+     */
+    private void syncThirdPlace(PlayoffSlot source) {
+        int finalRound = mainRoundCount(source.getTournamentId());
+        int semiRound = finalRound - 1;
+        if (semiRound < 1 || source.getRoundNumber() != semiRound) {
+            return;
+        }
+        List<PlayoffSlot> semis = playoffSlotRepository
+                .findByTournamentIdOrderByRoundNumberAscSlotIndexAsc(source.getTournamentId())
+                .stream()
+                .filter(slot -> slot.getRoundNumber() == semiRound && !isThird(slot))
+                .toList();
+        if (semis.size() != 2) {
+            return;
+        }
+        UUID homeLoser = loserOfSlot(semis.get(0));
+        UUID awayLoser = loserOfSlot(semis.get(1));
+        Optional<PlayoffSlot> atIndex = playoffSlotRepository.findByTournamentIdAndRoundNumberAndSlotIndex(
+                source.getTournamentId(),
+                finalRound,
+                THIRD_PLACE_SLOT_INDEX
+        );
+        boolean bothKnown = homeLoser != null && awayLoser != null && !homeLoser.equals(awayLoser);
+        if (!bothKnown) {
+            if (atIndex.isPresent() && isThird(atIndex.get())) {
+                removeThirdPlace(atIndex.get());
+            }
+            return;
+        }
+        if (atIndex.isPresent() && !isThird(atIndex.get())) {
+            return;
+        }
+        PlayoffSlot slot = atIndex.orElseGet(() -> {
+            PlayoffSlot created = newSlot(source.getTournamentId(), finalRound, THIRD_PLACE_SLOT_INDEX);
+            created.setKind(PlayoffSlotKind.THIRD);
+            return created;
+        });
+        placeLosers(slot, homeLoser, awayLoser);
+    }
+
+    private void placeLosers(PlayoffSlot slot, UUID homeLoser, UUID awayLoser) {
+        if (Objects.equals(slot.getHomeTeamId(), homeLoser) && Objects.equals(slot.getAwayTeamId(), awayLoser)) {
+            ensureMatch(slot);
+            return;
+        }
+        Match existing = slot.getMatchId() == null
+                ? null
+                : matchRepository.findById(slot.getMatchId()).orElse(null);
+        if (existing != null && nextPairLocked(existing)) {
+            throw ApiException.conflict(
+                    "Следующий матч плей-офф уже начался, состав пары не меняется. "
+                            + "Нельзя убрать или изменить событие, которое меняет победителя."
+            );
+        }
+        slot.setKind(PlayoffSlotKind.THIRD);
+        slot.setHomeTeamId(homeLoser);
+        slot.setAwayTeamId(awayLoser);
+        playoffSlotRepository.save(slot);
+        ensureMatch(slot);
+    }
+
+    private void removeThirdPlace(PlayoffSlot slot) {
+        if (!isThird(slot)) {
+            return;
+        }
+        Match match = slot.getMatchId() == null ? null : matchRepository.findById(slot.getMatchId()).orElse(null);
+        if (match != null && nextPairLocked(match)) {
+            throw ApiException.conflict(
+                    "Следующий матч плей-офф уже начался, состав пары не меняется. "
+                            + "Нельзя убрать или изменить событие, которое меняет победителя."
+            );
+        }
+        if (match != null) {
+            dropUnstartedNextMatch(slot, match);
+        }
+        playoffSlotRepository.delete(slot);
+        playoffSlotRepository.flush();
+    }
+
+    private UUID loserOfSlot(PlayoffSlot slot) {
+        if (slot.getMatchId() == null) {
+            return null;
+        }
+        Match match = matchRepository.findById(slot.getMatchId()).orElse(null);
+        if (match == null || match.getStatus() != MatchStatus.FINISHED) {
+            return null;
+        }
+        return loserOf(match);
+    }
+
+    private UUID loserOf(Match match) {
+        UUID winner = winnerOf(match);
+        if (winner == null) {
+            return null;
+        }
+        if (winner.equals(match.getHomeTeamId())) {
+            return match.getAwayTeamId();
+        }
+        if (winner.equals(match.getAwayTeamId())) {
+            return match.getHomeTeamId();
+        }
+        return null;
     }
 
     private void placeWinner(PlayoffSlot next, boolean homeSide, UUID winner) {
@@ -533,7 +656,7 @@ public class PlayoffService {
         qualified = withNames(qualified, teams);
         Map<UUID, Match> matches = loadMatches(slots);
         Map<UUID, ShootoutRules.Tally> penalties = penaltiesOf(matches);
-        int rounds = slots.isEmpty() ? 0 : slots.getLast().getRoundNumber();
+        int rounds = mainRounds(slots);
         Map<Integer, List<PlayoffSlotResponse>> byRound = new LinkedHashMap<>();
         for (PlayoffSlot slot : slots) {
             byRound.computeIfAbsent(slot.getRoundNumber(), ignored -> new ArrayList<>())
@@ -641,7 +764,7 @@ public class PlayoffService {
                 slot.getId(),
                 slot.getRoundNumber(),
                 slot.getSlotIndex(),
-                roundTitle(slot.getRoundNumber(), rounds),
+                isThird(slot) ? THIRD_PLACE_SLOT_TITLE : roundTitle(slot.getRoundNumber(), rounds),
                 slot.getMatchId(),
                 slot.getHomeTeamId(),
                 teamName(teams, slot.getHomeTeamId()),
@@ -661,7 +784,8 @@ public class PlayoffService {
                 penaltyHome,
                 penaltyAway,
                 match == null ? null : MatchListFields.minute(match, Instant.now()),
-                match == null ? null : match.getStartedAt()
+                match == null ? null : match.getStartedAt(),
+                slot.getKind() == null ? PlayoffSlotKind.MAIN.name() : slot.getKind().name()
         );
     }
 
@@ -760,10 +884,36 @@ public class PlayoffService {
     }
 
     private int roundCountOf(UUID tournamentId) {
-        return playoffSlotRepository.findByTournamentIdOrderByRoundNumberAscSlotIndexAsc(tournamentId).stream()
-                .mapToInt(PlayoffSlot::getRoundNumber)
-                .max()
-                .orElse(0);
+        return mainRoundCount(tournamentId);
+    }
+
+    private int mainRoundCount(UUID tournamentId) {
+        return mainRounds(playoffSlotRepository.findByTournamentIdOrderByRoundNumberAscSlotIndexAsc(tournamentId));
+    }
+
+    private static int mainRounds(List<PlayoffSlot> slots) {
+        int rounds = 0;
+        for (PlayoffSlot slot : slots) {
+            if (!isThird(slot)) {
+                rounds = Math.max(rounds, slot.getRoundNumber());
+            }
+        }
+        return rounds;
+    }
+
+    private static boolean isThird(PlayoffSlot slot) {
+        return slot.getKind() == PlayoffSlotKind.THIRD;
+    }
+
+    public static String protocolStageLabel(boolean thirdPlace, Integer bracketRound, int rounds) {
+        if (thirdPlace) {
+            return THIRD_PLACE_PROTOCOL_LABEL;
+        }
+        if (bracketRound == null) {
+            return null;
+        }
+        int total = rounds > 0 ? rounds : bracketRound;
+        return roundTitle(bracketRound, total);
     }
 
     private void requireBothTeamsInTable(UUID tournamentId, UUID tableId, Match match) {
@@ -846,6 +996,7 @@ public class PlayoffService {
         slot.setTournamentId(tournamentId);
         slot.setRoundNumber(round);
         slot.setSlotIndex(index);
+        slot.setKind(PlayoffSlotKind.MAIN);
         return slot;
     }
 
@@ -872,7 +1023,13 @@ public class PlayoffService {
      */
     static String waitingLabel(PlayoffSlot slot, boolean home, int rounds) {
         UUID teamId = home ? slot.getHomeTeamId() : slot.getAwayTeamId();
-        if (teamId != null || slot.getRoundNumber() <= 1) {
+        if (teamId != null) {
+            return null;
+        }
+        if (isThird(slot)) {
+            return home ? "Проигравший 1/2 №1" : "Проигравший 1/2 №2";
+        }
+        if (slot.getRoundNumber() <= 1) {
             return null;
         }
         int feeder = slot.getSlotIndex() * 2 + (home ? 1 : 2);

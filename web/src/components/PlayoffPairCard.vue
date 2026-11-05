@@ -11,6 +11,7 @@ import {
   sideName,
   type PlayoffSlot,
 } from '../lib/playoffGrid'
+import { isThirdPlaceSlot, THIRD_PLACE_SLOT_LABEL } from '../lib/playoffLabel'
 
 const props = defineProps<{
   slot: PlayoffSlot
@@ -26,8 +27,13 @@ const props = defineProps<{
 const emit = defineEmits<{ hover: [id: string | null]; focus: []; blur: [] }>()
 
 const live = computed(() => props.slot.matchStatus === 'LIVE' || props.slot.matchStatus === 'PAUSED')
+const thirdPlace = computed(() => isThirdPlaceSlot(props.slot))
+const showFinal = computed(() => !!props.final && !thirdPlace.value)
 const footer = computed(() => footerView(props.slot))
-const aria = computed(() => pairAria(props.slot, props.previousTitle))
+const aria = computed(() => {
+  const pair = pairAria(props.slot, props.previousTitle)
+  return thirdPlace.value ? `${THIRD_PLACE_SLOT_LABEL}. ${pair}` : pair
+})
 const showSeed = computed(() => !!props.firstRound && !props.compact)
 
 function teamId(home: boolean) {
@@ -64,14 +70,15 @@ function rowLit(home: boolean) {
   <component
     :is="slot.matchId ? RouterLink : 'div'"
     class="pc"
-    :class="{ live, final, compact, static: !slot.matchId }"
+    :class="{ live, final: showFinal, bronze: thirdPlace, compact, static: !slot.matchId }"
     :to="slot.matchId ? `/matches/${slot.matchId}` : undefined"
     :role="slot.matchId ? undefined : 'group'"
     :aria-label="aria"
     @focus="emit('focus')"
     @blur="emit('blur')"
   >
-    <div v-if="final" class="fh">
+    <div v-if="thirdPlace" class="fh bronze">{{ THIRD_PLACE_SLOT_LABEL }}</div>
+    <div v-else-if="showFinal" class="fh">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8" />
       </svg>
@@ -128,6 +135,7 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
 .pc.live .pf { background: rgba(227, 107, 91, 0.08); }
 .pc.live .ps { color: var(--ink); }
 .pc.final { border: 2px solid var(--navy); }
+.pc.bronze { border: 2px solid var(--navy); }
 .fh {
   display: flex;
   align-items: center;
@@ -139,6 +147,10 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+.fh.bronze {
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 .fh svg {
   width: 16px;
@@ -227,6 +239,7 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   align-self: center;
 }
 .pr.empty .pn { font-size: 0.875rem; }
+.pc.bronze .pr.empty .pn { font-size: 0.75rem; letter-spacing: -0.01em; }
 .pc.compact .pr {
   height: auto;
   min-height: 34px;

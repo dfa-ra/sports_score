@@ -1,13 +1,14 @@
 import { formatLabel } from './format.ts'
 import { DATE_PENDING, matchInstant } from './matchDate.ts'
 import { moscowClock, moscowDayMonth, moscowParts, type InstantInput } from './moscowTime.ts'
-import { shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
+import { isThirdPlaceSlot, shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
 
 export type PlayoffSlot = {
   id?: string
   round?: number
   slotIndex?: number
   roundTitle?: string | null
+  kind?: string | null
   matchId?: string | null
   homeTeamId?: string | null
   homeTeamName?: string | null
@@ -41,6 +42,73 @@ const PLAYOFF_FORMATS = new Set(['CUP', 'GROUPS_PLAYOFF', 'DOUBLE_ELIMINATION', 
 
 export function slotsOf(round?: PlayoffRound | null): PlayoffSlot[] {
   return round?.slots ?? []
+}
+
+export { isThirdPlaceSlot }
+
+/** Bracket lines follow the main pairs. The 3rd-place slot is not a feeder. */
+export function linkSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
+  return slots.filter((slot) => !isThirdPlaceSlot(slot))
+}
+
+export function thirdPlaceSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
+  return slots.filter((slot) => isThirdPlaceSlot(slot))
+}
+
+/** Last column keeps the final only. Earlier rounds keep every main pair. */
+export function columnSlots(slots: PlayoffSlot[], lastRound: boolean): PlayoffSlot[] {
+  const main = linkSlots(slots)
+  return lastRound ? main.slice(0, 1) : main
+}
+
+/** Phone switcher step. The 3rd-place match is its own step, not a final tab. */
+export type BracketPanel = {
+  key: string
+  title: string
+  tab: string
+  slots: PlayoffSlot[]
+  roundIndex: number
+  thirdPlace: boolean
+  champion: boolean
+}
+
+/**
+ * Public and admin rounds, with the 3rd-place match inserted after the
+ * semifinals and before the final. Rounds without that slot stay unchanged.
+ */
+export function bracketPanels(rounds: PlayoffRound[]): BracketPanel[] {
+  const panels: BracketPanel[] = []
+  rounds.forEach((round, roundIndex) => {
+    const slots = slotsOf(round)
+    const bronze = thirdPlaceSlots(slots)
+    const main = linkSlots(slots)
+    const last = roundIndex === rounds.length - 1
+    if (last && bronze.length > 0) {
+      panels.push({
+        key: `third-${round.round ?? roundIndex}`,
+        title: 'Матч за 3-е место',
+        tab: 'За 3-е',
+        slots: bronze,
+        roundIndex,
+        thirdPlace: true,
+        champion: false,
+      })
+    }
+    panels.push({
+      key: `round-${round.round ?? roundIndex}`,
+      title: round.title || '',
+      tab: segmentLabel(round.title),
+      slots: last ? main : slots,
+      roundIndex,
+      thirdPlace: false,
+      champion: last,
+    })
+  })
+  return panels
+}
+
+export function defaultPanelIndex(panels: BracketPanel[]): number {
+  return defaultRoundIndex(panels.map((panel) => ({ slots: panel.slots })))
 }
 
 export function teamCountOf(rounds: PlayoffRound[]): number {
@@ -201,6 +269,7 @@ export function footerView(slot: PlayoffSlot): { kind: 'live' | 'soon' | 'done' 
 }
 
 export function emptySideLabel(slot: PlayoffSlot, home: boolean, previousTitle?: string | null) {
+  if (isThirdPlaceSlot(slot)) return home ? 'Проигравший 1/2 №1' : 'Проигравший 1/2 №2'
   const fromApi = home ? slot.homeWaitingLabel : slot.awayWaitingLabel
   if (fromApi) return fromApi
   if (!previousTitle) return '—'
@@ -310,9 +379,70 @@ export function gridColumns(roundCount: number, compact: boolean, squeeze: boole
   return parts.join(' ')
 }
 
-export function gridRows(firstSlots: number, compact: boolean) {
+export function gridRows(firstSlots: number, compact: boolean, extraRow = false) {
   const row = compact ? '112px' : '142px'
-  return `auto repeat(${Math.max(1, firstSlots)}, ${row})`
+  const tracks = `auto repeat(${Math.max(1, firstSlots)}, ${row})`
+  return extraRow ? `${tracks} auto` : tracks
+}
+
+/**
+ * 1/4, 1/2, final — the champion is not a column.
+ * Links sit between those columns.
+ */
+export function bronzeBoardColumns(roundCount: number, compact: boolean, squeeze: boolean) {
+  const col = compact ? 'minmax(150px, 214px)' : squeeze ? 'minmax(190px, 238px)' : '238px'
+  const link = compact ? '22px' : squeeze ? '24px' : '30px'
+  const parts: string[] = []
+  for (let i = 0; i < roundCount; i += 1) {
+    if (i > 0) parts.push(link)
+    parts.push(col)
+  }
+  return parts.join(' ')
+}
+
+export function bronzeRoundColumn(roundIndex: number) {
+  return String(roundIndex * 2 + 1)
+}
+
+/** Match rows, keeping the last one free for the 3rd-place card. */
+export function bronzeMatchRows(firstSlots: number, semiCount: number) {
+  return Math.max(firstSlots, semiCount + 1)
+}
+
+export function bronzeEarlyCell(slotIndex: number, slotCount: number, matchRows: number) {
+  const span = Math.max(1, Math.floor(matchRows / Math.max(1, slotCount)))
+  return { gridRow: `${slotIndex * span + 2} / span ${span}` }
+}
+
+/** Semifinals use every match row except the last, which holds the 3rd-place card. */
+export function bronzeSemiCell(slotIndex: number, semiCount: number, matchRows: number) {
+  const available = Math.max(1, matchRows - 1)
+  const count = Math.max(1, semiCount)
+  const base = Math.floor(available / count)
+  const extra = available % count
+  let start = 0
+  for (let i = 0; i < slotIndex; i += 1) start += base + (i < extra ? 1 : 0)
+  const span = Math.max(1, base + (slotIndex < extra ? 1 : 0))
+  return { gridRow: `${start + 2} / span ${span}` }
+}
+
+export function bronzeThirdRow(matchRows: number) {
+  return String(matchRows + 1)
+}
+
+/** Final on top, champion directly under it in the same column. */
+export function bronzeFinalCell(matchRows: number) {
+  const top = Math.max(1, Math.floor(matchRows / 2))
+  return { gridRow: `2 / span ${top}` }
+}
+
+export function bronzeChampionCell(matchRows: number) {
+  const top = Math.max(1, Math.floor(matchRows / 2))
+  return { gridRow: `${2 + top} / span ${Math.max(1, matchRows - top)}` }
+}
+
+export function bronzeLinkCell(matchRows: number) {
+  return { gridRow: `2 / span ${matchRows}` }
 }
 
 export function matchCell(roundIndex: number, slotIndex: number, roundCount: number) {

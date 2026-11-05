@@ -10,19 +10,31 @@ import {
   advancedTeamId,
   arrivalLine,
   bracketIsEmpty,
+  bracketPanels,
   branchKind,
+  bronzeBoardColumns,
+  bronzeChampionCell,
+  bronzeEarlyCell,
+  bronzeFinalCell,
+  bronzeLinkCell,
+  bronzeMatchRows,
+  bronzeRoundColumn,
+  bronzeSemiCell,
+  bronzeThirdRow,
   championCell,
   championHeaderCell,
   championWhen,
   connectorCell,
-  defaultRoundIndex,
+  defaultPanelIndex,
   gridColumns,
   gridRows,
   headerCell,
   matchCell,
   roundNote,
-  segmentLabel,
+  columnSlots,
+  linkSlots,
   slotsOf,
+  thirdPlaceSlots,
   cssViewportWidth,
   stackChampion,
   teamCountOf,
@@ -67,6 +79,7 @@ let boardObserver: ResizeObserver | null = null
 let panelObserver: ResizeObserver | null = null
 
 const rounds = computed(() => props.rounds ?? [])
+const panels = computed(() => bracketPanels(rounds.value))
 const teamCount = computed(() => teamCountOf(rounds.value))
 const compact = computed(() => teamCount.value > 8)
 const tabMode = computed(() => !props.editable && useRoundTabs(teamCount.value, viewport.value, containerWidth.value))
@@ -74,11 +87,12 @@ const empty = computed(() => !props.loading && !props.error && bracketIsEmpty(ro
 const squeeze = computed(() => !compact.value && !tabMode.value && viewport.value > 720 && viewport.value <= 1040)
 const stack = computed(() => stackChampion(rounds.value.length, viewport.value))
 const firstSlots = computed(() => Math.max(1, slotsOf(rounds.value[0]).length))
+const hasBronze = computed(() => rounds.value.some((round) => thirdPlaceSlots(slotsOf(round)).length > 0))
 const gridStyle = computed(() => ({
   gridTemplateColumns: gridColumns(rounds.value.length, compact.value, squeeze.value, stack.value),
   gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value),
 }))
-const showSwitcher = computed(() => tabMode.value && rounds.value.length > 1)
+const showSwitcher = computed(() => tabMode.value && panels.value.length > 1)
 
 function sameStamp(left?: string | null, right?: string | null) {
   if (!left && !right) return true
@@ -113,8 +127,11 @@ watch(
         }
       }
     }
-    active.value = defaultRoundIndex(next ?? [])
-    void nextTick(() => scrollTo(active.value, false))
+    active.value = defaultPanelIndex(bracketPanels(next ?? []))
+    void nextTick(() => {
+      scrollTo(active.value, false)
+      measureLinks()
+    })
   },
   { immediate: true },
 )
@@ -142,10 +159,14 @@ onMounted(() => {
     boardObserver = new ResizeObserver(() => {
       measureContainer()
       measurePanel()
+      measureLinks()
     })
     boardObserver.observe(root.value)
   }
-  void nextTick(() => scrollTo(active.value, false))
+  void nextTick(() => {
+    scrollTo(active.value, false)
+    measureLinks()
+  })
 })
 
 onUnmounted(() => {
@@ -200,8 +221,8 @@ function nextHint(roundIndex: number) {
 }
 
 const finalRound = computed(() => rounds.value[rounds.value.length - 1])
-const finalSlot = computed(() => slotsOf(finalRound.value)[0])
-const extraFinalSlots = computed(() => slotsOf(finalRound.value).slice(1))
+const finalSlot = computed(() => linkSlots(slotsOf(finalRound.value))[0])
+const extraFinalSlots = computed(() => thirdPlaceSlots(slotsOf(finalRound.value)))
 const champion = computed(() => {
   const slot = finalSlot.value
   const side = slot ? winnerSide(slot) : null
@@ -273,7 +294,7 @@ function onSwipe() {
   const el = scroller.value
   if (!el || el.clientWidth <= 0) return
   const index = Math.round(el.scrollLeft / el.clientWidth)
-  if (index !== active.value && index >= 0 && index < rounds.value.length) {
+  if (index !== active.value && index >= 0 && index < panels.value.length) {
     active.value = index
     void nextTick(measurePanel)
   }
@@ -294,7 +315,7 @@ function onTouchEnd(event: TouchEvent) {
   const dy = touch.clientY - start.y
   if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy)) return
   const toward = dx < 0 ? start.index + 1 : start.index - 1
-  const next = Math.max(0, Math.min(rounds.value.length - 1, toward))
+  const next = Math.max(0, Math.min(panels.value.length - 1, toward))
   if (next !== active.value) go(next)
 }
 
@@ -302,7 +323,7 @@ function onTabKey(event: KeyboardEvent) {
   if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
   event.preventDefault()
   const next = event.key === 'ArrowRight'
-    ? Math.min(rounds.value.length - 1, active.value + 1)
+    ? Math.min(panels.value.length - 1, active.value + 1)
     : Math.max(0, active.value - 1)
   go(next)
   void nextTick(() => {
@@ -349,6 +370,97 @@ const finalLinkStyle = computed(() => ({
   gridColumn: String(rounds.value.length * 2),
   gridRow: `2 / span ${firstSlots.value}`,
 }))
+const semiRoundIndex = computed(() => Math.max(0, rounds.value.length - 2))
+const bronzeRows = computed(() => bronzeMatchRows(firstSlots.value, linkSlots(slotsOf(rounds.value[semiRoundIndex.value])).length || 2))
+const bronzeBoardStyle = computed(() => ({
+  gridTemplateColumns: bronzeBoardColumns(rounds.value.length, compact.value, squeeze.value),
+  gridTemplateRows: `auto repeat(${bronzeRows.value}, auto)`,
+}))
+
+type LinkSeg = { d: string; kind: string; ids: Array<string | null | undefined> }
+const linkPaths = ref<LinkSeg[][]>([])
+
+function measureLinks() {
+  const board = root.value?.querySelector('.bronze-board') as HTMLElement | null
+  if (!board) {
+    linkPaths.value = []
+    return
+  }
+  const links = [...board.querySelectorAll<HTMLElement>('.b-link')]
+  const next: LinkSeg[][] = []
+  links.forEach((link, roundIndex) => {
+    const box = link.getBoundingClientRect()
+    const cards = (index: number) => [...board.querySelectorAll<HTMLElement>(`[data-round="${index}"] .pc`)]
+      .filter((el) => !el.closest('[data-bronze]'))
+    const fromCards = cards(roundIndex)
+    const toCards = cards(roundIndex + 1)
+    if (box.height < 1 || !toCards.length) {
+      next.push([])
+      return
+    }
+    const yOf = (el: HTMLElement) => {
+      const rect = el.getBoundingClientRect()
+      const y = ((rect.top + rect.height / 2 - box.top) / box.height) * 100
+      return Math.max(0, Math.min(100, y))
+    }
+    const segs: LinkSeg[] = []
+    toCards.forEach((target, index) => {
+      const upper = fromCards[index * 2]
+      const lower = fromCards[index * 2 + 1]
+      if (!upper || !lower) return
+      const teams = connectorTeams(roundIndex, index)
+      const yTop = yOf(upper)
+      const yBottom = yOf(lower)
+      const yTarget = yOf(target)
+      segs.push(
+        { d: `M0 ${yTop} H50 V${yTarget}`, kind: teams.upperKind, ids: [teams.upperId] },
+        { d: `M0 ${yBottom} H50 V${yTarget}`, kind: teams.lowerKind, ids: [teams.lowerId] },
+        {
+          d: `M50 ${yTarget} H100`,
+          kind: exitKind(teams.upperKind, teams.lowerKind),
+          ids: [teams.upperId, teams.lowerId],
+        },
+      )
+    })
+    next.push(segs)
+  })
+  linkPaths.value = next
+}
+
+function earlyStyle(roundIndex: number, slotIndex: number, slotCount: number) {
+  return {
+    gridColumn: bronzeRoundColumn(roundIndex),
+    ...bronzeEarlyCell(slotIndex, slotCount, bronzeRows.value),
+  }
+}
+
+function semiStyle(slotIndex: number, semiCount: number) {
+  return {
+    gridColumn: bronzeRoundColumn(semiRoundIndex.value),
+    ...bronzeSemiCell(slotIndex, semiCount, bronzeRows.value),
+  }
+}
+
+function finalPairStyle() {
+  return {
+    gridColumn: bronzeRoundColumn(rounds.value.length - 1),
+    ...bronzeFinalCell(bronzeRows.value),
+  }
+}
+
+function championPairStyle() {
+  return {
+    gridColumn: bronzeRoundColumn(rounds.value.length - 1),
+    ...bronzeChampionCell(bronzeRows.value),
+  }
+}
+
+function bronzePairStyle() {
+  return {
+    gridColumn: bronzeRoundColumn(semiRoundIndex.value),
+    gridRow: bronzeThirdRow(bronzeRows.value),
+  }
+}
 </script>
 
 <template>
@@ -390,15 +502,15 @@ const finalLinkStyle = computed(() => ({
       </div>
 
       <div v-else-if="editable" class="bracket admin">
-        <section v-for="(round, roundIndex) in rounds" :key="round.round ?? roundIndex" class="round">
-          <h3>{{ round.title }}</h3>
-          <article v-for="slot in slotsOf(round)" :key="slot.id" class="admin-slot">
+        <section v-for="panel in panels" :key="panel.key" class="round">
+          <h3>{{ panel.title }}</h3>
+          <article v-for="slot in panel.slots" :key="slot.id" class="admin-slot">
             <PlayoffPairCard
               :slot="viewSlot(slot)"
-              :previous-title="previousTitle(roundIndex)"
-              :first-round="roundIndex === 0"
+              :previous-title="previousTitle(panel.roundIndex)"
+              :first-round="panel.roundIndex === 0 && !panel.thirdPlace"
               :compact="compact"
-              :final="roundIndex === rounds.length - 1 && slot.slotIndex === 0"
+              :final="panel.champion && Number(slot.slotIndex ?? 0) === 0"
               :lit="lit"
               :can-hover="canHover"
               :logo="logo"
@@ -434,9 +546,9 @@ const finalLinkStyle = computed(() => ({
           @keydown="onTabKey"
         >
           <button
-            v-for="(round, index) in rounds"
+            v-for="(panel, index) in panels"
             :id="`po-tab-${index}`"
-            :key="round.round ?? index"
+            :key="panel.key"
             type="button"
             role="tab"
             :aria-selected="index === active"
@@ -445,8 +557,8 @@ const finalLinkStyle = computed(() => ({
             :class="{ on: index === active }"
             @click="go(index)"
           >
-            <span v-if="roundNote(slotsOf(round)).live" class="dotl" aria-hidden="true"></span>
-            {{ segmentLabel(round.title) }}
+            <span v-if="roundNote(panel.slots).live" class="dotl" aria-hidden="true"></span>
+            {{ panel.tab }}
           </button>
         </div>
         <p v-if="showSwitcher" class="swipe">← свайп между раундами → · время МСК</p>
@@ -460,38 +572,38 @@ const finalLinkStyle = computed(() => ({
           @touchcancel.passive="onTouchEnd"
         >
           <section
-            v-for="(round, roundIndex) in rounds"
-            :id="`po-panel-${roundIndex}`"
-            :key="round.round ?? roundIndex"
+            v-for="(panel, panelIndex) in panels"
+            :id="`po-panel-${panelIndex}`"
+            :key="panel.key"
             class="po-panel"
             role="tabpanel"
-            :aria-labelledby="`po-tab-${roundIndex}`"
-            :class="{ on: roundIndex === active }"
+            :aria-labelledby="`po-tab-${panelIndex}`"
+            :class="{ on: panelIndex === active }"
           >
             <h3 class="rh">
-              {{ round.title }}
-              <small v-if="roundNote(slotsOf(round)).text">{{ roundNote(slotsOf(round)).text }}</small>
-              <span v-else-if="roundNote(slotsOf(round)).live" class="st live">идёт</span>
+              {{ panel.title }}
+              <small v-if="roundNote(panel.slots).text">{{ roundNote(panel.slots).text }}</small>
+              <span v-else-if="roundNote(panel.slots).live" class="st live">идёт</span>
             </h3>
             <div class="pair-stack">
-              <div v-for="slot in slotsOf(round)" :key="slot.id" class="pair-block">
+              <div v-for="slot in panel.slots" :key="slot.id" class="pair-block">
                 <PlayoffPairCard
                   :slot="viewSlot(slot)"
-                  :previous-title="previousTitle(roundIndex)"
-                  :first-round="roundIndex === 0"
-                  :final="roundIndex === rounds.length - 1 && Number(slot.slotIndex ?? 0) === 0"
+                  :previous-title="previousTitle(panel.roundIndex)"
+                  :first-round="panel.roundIndex === 0 && !panel.thirdPlace"
+                  :final="panel.champion && Number(slot.slotIndex ?? 0) === 0"
                   :lit="lit"
                   :can-hover="false"
                   :logo="logo"
                 />
-                <ul v-if="arrivals(roundIndex, slot).length" class="how">
-                  <li v-for="line in arrivals(roundIndex, slot)" :key="line.name + line.detail">
+                <ul v-if="!panel.thirdPlace && arrivals(panel.roundIndex, slot).length" class="how">
+                  <li v-for="line in arrivals(panel.roundIndex, slot)" :key="line.name + line.detail">
                     <b>{{ line.name }}</b> · {{ line.detail }}
                   </li>
                 </ul>
               </div>
             </div>
-            <div v-if="roundIndex === rounds.length - 1" class="champ-block">
+            <div v-if="panel.champion" class="champ-block">
               <div v-if="champion" class="champ won">
                 <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
                 <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
@@ -504,13 +616,142 @@ const finalLinkStyle = computed(() => ({
                 </div>
               </div>
             </div>
-            <p v-else-if="nextHint(roundIndex)" class="next-hint">{{ nextHint(roundIndex) }}</p>
+            <p v-else-if="!panel.thirdPlace && nextHint(panel.roundIndex)" class="next-hint">{{ nextHint(panel.roundIndex) }}</p>
           </section>
         </div>
       </div>
 
       <div v-else class="po-board" :class="{ compact, squeeze, stack }">
-        <div class="po-grid" :style="gridStyle">
+        <div v-if="hasBronze" class="bronze-board" :style="bronzeBoardStyle">
+          <h3
+            v-for="(round, roundIndex) in rounds"
+            :key="`bh-${round.round ?? roundIndex}`"
+            class="rh"
+            :style="{ gridColumn: bronzeRoundColumn(roundIndex), gridRow: '1' }"
+          >
+            {{ round.title }}
+            <small v-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text">{{ roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text }}</small>
+            <span v-else-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).live" class="st live">идёт</span>
+          </h3>
+
+          <template v-for="(round, roundIndex) in rounds" :key="`bcol-${round.round ?? roundIndex}`">
+            <template v-if="roundIndex < semiRoundIndex">
+              <div
+                v-for="slot in columnSlots(slotsOf(round), false)"
+                :key="slot.id"
+                class="b-slot"
+                :data-round="roundIndex"
+                :style="earlyStyle(roundIndex, Number(slot.slotIndex ?? 0), columnSlots(slotsOf(round), false).length)"
+              >
+                <PlayoffPairCard
+                  :slot="viewSlot(slot)"
+                  :previous-title="previousTitle(roundIndex)"
+                  :first-round="roundIndex === 0"
+                  :compact="compact"
+                  :lit="lit"
+                  :can-hover="canHover"
+                  :logo="logo"
+                  @hover="light"
+                  @focus="lightSlot(slot)"
+                  @blur="clearLight"
+                />
+              </div>
+            </template>
+            <template v-else-if="roundIndex === semiRoundIndex">
+              <div
+                v-for="slot in linkSlots(slotsOf(round))"
+                :key="slot.id"
+                class="b-slot"
+                :data-round="roundIndex"
+                :style="semiStyle(Number(slot.slotIndex ?? 0), linkSlots(slotsOf(round)).length)"
+              >
+                <PlayoffPairCard
+                  :slot="viewSlot(slot)"
+                  :previous-title="previousTitle(roundIndex)"
+                  :compact="compact"
+                  :lit="lit"
+                  :can-hover="canHover"
+                  :logo="logo"
+                  @hover="light"
+                  @focus="lightSlot(slot)"
+                  @blur="clearLight"
+                />
+              </div>
+              <div
+                v-for="slot in extraFinalSlots"
+                :key="slot.id"
+                class="b-slot b-bronze"
+                data-bronze
+                :data-round="roundIndex"
+                :style="bronzePairStyle()"
+              >
+                <PlayoffPairCard
+                  :slot="viewSlot(slot)"
+                  :previous-title="previousTitle(roundIndex)"
+                  :compact="compact"
+                  :lit="lit"
+                  :can-hover="canHover"
+                  :logo="logo"
+                  @hover="light"
+                  @focus="lightSlot(slot)"
+                  @blur="clearLight"
+                />
+              </div>
+            </template>
+            <template v-else>
+              <div
+                v-for="slot in columnSlots(slotsOf(round), true)"
+                :key="slot.id"
+                class="b-slot"
+                :data-round="roundIndex"
+                :style="finalPairStyle()"
+              >
+                <PlayoffPairCard
+                  :slot="viewSlot(slot)"
+                  :previous-title="previousTitle(roundIndex)"
+                  :compact="compact"
+                  final
+                  :lit="lit"
+                  :can-hover="canHover"
+                  :logo="logo"
+                  @hover="light"
+                  @focus="lightSlot(slot)"
+                  @blur="clearLight"
+                />
+              </div>
+              <div class="b-champ" :data-round="roundIndex" :style="championPairStyle()">
+                <div v-if="champion" class="champ won">
+                  <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
+                  <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
+                </div>
+                <div v-else class="champ">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8" /></svg>
+                  <div>
+                    <b>Чемпион</b>
+                    <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </template>
+
+          <div
+            v-for="(round, roundIndex) in rounds.slice(0, -1)"
+            :key="`blink-${round.round ?? roundIndex}`"
+            class="b-link"
+            :style="{ gridColumn: String(roundIndex * 2 + 2), ...bronzeLinkCell(bronzeRows) }"
+          >
+            <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <path
+                v-for="(seg, segIndex) in linkPaths[roundIndex] || []"
+                :key="segIndex"
+                :class="[seg.kind, { hl: pathLit(seg.ids) }]"
+                :d="seg.d"
+              />
+            </svg>
+          </div>
+        </div>
+        <div v-else class="po-grid" :style="gridStyle">
           <h3
             v-for="(round, roundIndex) in rounds"
             :key="`h-${round.round ?? roundIndex}`"
@@ -518,16 +759,17 @@ const finalLinkStyle = computed(() => ({
             :style="headerCell(roundIndex, rounds.length)"
           >
             {{ round.title }}
-            <small v-if="roundNote(slotsOf(round)).text">{{ roundNote(slotsOf(round)).text }}</small>
-            <span v-else-if="roundNote(slotsOf(round)).live" class="st live">идёт</span>
+            <small v-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text">{{ roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text }}</small>
+            <span v-else-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).live" class="st live">идёт</span>
           </h3>
           <h3 class="rh" :style="champHeaderStyle">Чемпион</h3>
 
           <template v-for="(round, roundIndex) in rounds" :key="`c-${round.round ?? roundIndex}`">
             <div
-              v-for="slot in (roundIndex === rounds.length - 1 ? slotsOf(round).slice(0, 1) : slotsOf(round))"
+              v-for="slot in columnSlots(slotsOf(round), roundIndex === rounds.length - 1)"
               :key="slot.id"
               class="cell"
+              :data-round="roundIndex"
               :style="matchCell(roundIndex, Number(slot.slotIndex ?? 0), rounds.length)"
             >
               <PlayoffPairCard
@@ -548,7 +790,7 @@ const finalLinkStyle = computed(() => ({
 
           <template v-for="(round, roundIndex) in rounds.slice(0, -1)" :key="`k-${round.round ?? roundIndex}`">
             <div
-              v-for="slot in slotsOf(rounds[roundIndex + 1])"
+              v-for="slot in linkSlots(slotsOf(rounds[roundIndex + 1]))"
               :key="`svg-${roundIndex}-${slot.id}`"
               class="cellc"
               :style="connectorCell(roundIndex, Number(slot.slotIndex ?? 0))"
@@ -591,18 +833,6 @@ const finalLinkStyle = computed(() => ({
                 <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
               </div>
             </div>
-            <PlayoffPairCard
-              v-for="slot in extraFinalSlots"
-              :key="slot.id"
-              :slot="viewSlot(slot)"
-              :previous-title="previousTitle(rounds.length - 1)"
-              :lit="lit"
-              :can-hover="canHover"
-              :logo="logo"
-              @hover="light"
-              @focus="lightSlot(slot)"
-              @blur="clearLight"
-            />
           </div>
         </div>
       </div>
@@ -637,6 +867,15 @@ const finalLinkStyle = computed(() => ({
 .po-grid { display: grid; column-gap: 0; min-width: 0; }
 .po-grid > * { min-width: 0; }
 .cell { align-self: center; }
+.bronze-board {
+  display: grid;
+  column-gap: 0;
+  row-gap: 0.45rem;
+  align-items: stretch;
+}
+.b-slot, .b-champ { align-self: center; min-width: 0; }
+.b-link { align-self: stretch; min-width: 0; min-height: 0; }
+.b-link .cn { width: 100%; height: 100%; }
 .cellc { align-self: stretch; padding: 0; }
 .champ-cell { align-self: center; display: grid; gap: 0.7rem; }
 .rh {

@@ -11,6 +11,7 @@ import CreateMatchForm from '../../components/CreateMatchForm.vue'
 import PlayerSearch from '../../components/PlayerSearch.vue'
 import CreateTeamForm from '../../components/CreateTeamForm.vue'
 import CreateTournamentForm from '../../components/CreateTournamentForm.vue'
+import MatchStageNote from '../../components/MatchStageNote.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 
 const ASSIGNABLE_ROLES = [
@@ -476,7 +477,8 @@ async function deleteTeam(team: any) {
             {{ names.name(m.homeTeamId) }} {{ m.homeScore }}:{{ m.awayScore }} {{ names.name(m.awayTeamId) }}
           </RouterLink>
           <span class="match-actions">
-            <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" />
+            <MatchStageNote :match="m" />
+            <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
             <button class="btn danger" type="button" :disabled="pending" @click="deleteMatch(m)">Удалить</button>
           </span>
         </div>

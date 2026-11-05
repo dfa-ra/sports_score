@@ -13,7 +13,9 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.UUID;
 
 /**
  * Short labels and round numbers for the home overview.
@@ -75,8 +77,17 @@ public final class HomeLabels {
     }
 
     public static RoundPlan plan(List<Match> matches, CompetitionStage stage, int bracketRounds) {
+        return plan(matches, stage, bracketRounds, Set.of());
+    }
+
+    public static RoundPlan plan(
+            List<Match> matches,
+            CompetitionStage stage,
+            int bracketRounds,
+            Set<UUID> thirdPlaceMatchIds
+    ) {
         if (stage == CompetitionStage.PLAYOFF) {
-            return playoffPlan(matches, bracketRounds);
+            return playoffPlan(matches, bracketRounds, thirdPlaceMatchIds == null ? Set.of() : thirdPlaceMatchIds);
         }
         return groupPlan(matches);
     }
@@ -112,8 +123,23 @@ public final class HomeLabels {
      *                      highest round that already has a match
      */
     public static String matchStageLabel(Match match, List<Match> tournamentMatches, int bracketRounds) {
+        return matchStageLabel(match, tournamentMatches, bracketRounds, false);
+    }
+
+    /**
+     * Cards use the short 3rd-place label. The final in the same round stays «Финал».
+     */
+    public static String matchStageLabel(
+            Match match,
+            List<Match> tournamentMatches,
+            int bracketRounds,
+            boolean thirdPlace
+    ) {
         if (match == null) {
             return null;
+        }
+        if (thirdPlace) {
+            return PlayoffService.THIRD_PLACE_CARD_LABEL;
         }
         if (match.getBracketRound() != null) {
             int total = bracketRounds > 0 ? bracketRounds : tournamentMatches.stream()
@@ -176,9 +202,10 @@ public final class HomeLabels {
         return RoundPlan.group(current, days.size());
     }
 
-    private static RoundPlan playoffPlan(List<Match> matches, int bracketRounds) {
+    private static RoundPlan playoffPlan(List<Match> matches, int bracketRounds, Set<UUID> thirdPlaceMatchIds) {
         List<Match> bracket = matches.stream()
                 .filter(match -> match.getBracketRound() != null && match.getStatus() != MatchStatus.CANCELLED)
+                .filter(match -> match.getId() == null || !thirdPlaceMatchIds.contains(match.getId()))
                 .toList();
         if (bracket.isEmpty()) {
             return RoundPlan.playoff(null, null, null, null, null);

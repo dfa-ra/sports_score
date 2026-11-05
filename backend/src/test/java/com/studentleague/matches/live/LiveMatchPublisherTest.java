@@ -41,7 +41,8 @@ class LiveMatchPublisherTest {
                 matchId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 Instant.now(), Instant.now(), null, MatchStatus.LIVE, 2, 1, 90, 1,
                 2, 1200, Instant.now(), "FOOTBALL", null, null, null, null, null, null, null,
-                null, null, null, null, null, null
+                null, null, null, null, null, null,
+                false, null
         );
 
         publisher.publishMatchUpdate(match, null, "MATCH_EVENT");
