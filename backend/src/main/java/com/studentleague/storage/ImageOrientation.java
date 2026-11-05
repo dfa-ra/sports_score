@@ -37,6 +37,14 @@ public final class ImageOrientation {
         if (raw == null || raw.length == 0) {
             return raw;
         }
+        int orientation = orientation(raw);
+        boolean turn = orientation >= 2 && orientation <= 8;
+        // Re-encoding an already upright file changes Content-Length. The public
+        // original must stay the uploaded bytes unless Exif says to rotate, or
+        // a new logo is placed on a square canvas.
+        if (!squareLogo && !turn) {
+            return raw;
+        }
         BufferedImage decoded;
         try {
             decoded = ImageIO.read(new ByteArrayInputStream(raw));
@@ -46,7 +54,7 @@ public final class ImageOrientation {
         if (decoded == null) {
             return raw;
         }
-        BufferedImage upright = apply(decoded, orientation(raw));
+        BufferedImage upright = apply(decoded, orientation);
         try {
             if (squareLogo) {
                 return write(square(upright), "png");

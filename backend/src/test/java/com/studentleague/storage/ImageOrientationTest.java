@@ -23,15 +23,18 @@ class ImageOrientationTest {
     void exifLessJpegAndPngKeepThePixelOrientationTheyArrivedIn() throws Exception {
         byte[] jpeg = wideRedLeftJpeg();
         assertEquals(1, ImageOrientation.orientation(jpeg));
-        assertWideRedLeft(ImageOrientation.storedBytes(jpeg, false));
+        assertSame(jpeg, ImageOrientation.storedBytes(jpeg, false));
+        assertWideRedLeft(jpeg);
 
         byte[] png = wideRedLeftPng();
         assertEquals(1, ImageOrientation.orientation(png));
-        assertWideRedLeft(ImageOrientation.storedBytes(png, false));
+        assertSame(png, ImageOrientation.storedBytes(png, false));
+        assertWideRedLeft(png);
 
         byte[] tall = tallRedTopJpeg();
         assertEquals(1, ImageOrientation.orientation(tall));
-        BufferedImage stored = ImageIO.read(new ByteArrayInputStream(ImageOrientation.storedBytes(tall, false)));
+        assertSame(tall, ImageOrientation.storedBytes(tall, false));
+        BufferedImage stored = ImageIO.read(new ByteArrayInputStream(tall));
         assertEquals(4, stored.getWidth());
         assertEquals(8, stored.getHeight());
         assertTrue(mostlyRed(stored.getRGB(2, 1)));
@@ -44,8 +47,10 @@ class ImageOrientationTest {
         byte[] big = withOrientation(wideRedLeftJpeg(), 1, false);
         assertEquals(1, ImageOrientation.orientation(little));
         assertEquals(1, ImageOrientation.orientation(big));
-        assertWideRedLeft(ImageOrientation.storedBytes(little, false));
-        assertWideRedLeft(ImageOrientation.storedBytes(big, false));
+        assertSame(little, ImageOrientation.storedBytes(little, false));
+        assertSame(big, ImageOrientation.storedBytes(big, false));
+        assertWideRedLeft(little);
+        assertWideRedLeft(big);
     }
 
     @Test
