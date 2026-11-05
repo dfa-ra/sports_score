@@ -132,7 +132,7 @@ watch(compact, () => {
                 :aria-expanded="accountOpen"
                 @click="accountOpen = !accountOpen"
               >
-                <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :first-name="auth.user?.firstName" :last-name="auth.user?.lastName" :size="32" />
+                <PlayerAvatar :src="auth.user?.photoUrl" :name="[auth.user?.lastName, auth.user?.firstName].filter(Boolean).join(' ') || auth.user?.email" :first-name="auth.user?.firstName" :last-name="auth.user?.lastName" :size="40" />
               </button>
               <div v-if="accountOpen" class="menu-panel">
                 <RouterLink
@@ -268,18 +268,24 @@ watch(compact, () => {
 .auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
 .account { position: relative; display: none; }
 .profile-button {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 12px;
+  border-radius: 50%;
   background: transparent;
   color: #fff;
   cursor: pointer;
   padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
-.profile-button:hover { background: rgba(255,255,255,0.08); }
+.profile-button:hover { background: rgba(255,255,255,0.14); }
+.profile-button :deep(.player-avatar) {
+  width: 100% !important;
+  height: 100% !important;
+}
 .menu { position: relative; flex: 0 0 auto; display: none; }
 .menu-sep {
   height: 1px;
@@ -372,5 +378,6 @@ watch(compact, () => {
   .account { display: none; }
   .nav-inner { min-height: 52px; }
   .brand-name { font-size: 0.82rem; }
+  .profile-button { width: 36px; height: 36px; }
 }
 </style>

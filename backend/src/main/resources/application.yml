@@ -57,6 +57,10 @@ app:
   local-storage:
     root-dir: ${LOCAL_STORAGE_DIR:./data/uploads}
     public-base-url: ${LOCAL_STORAGE_PUBLIC_BASE_URL:/media}
+  # One-shot rewrite of logos and player photos already under /media that still carry EXIF orientation.
+  # Dev only until Захар says да + backup. Default off. Not a Flyway migration. Do not point this at production /media.
+  media:
+    orient-backfill: ${APP_MEDIA_ORIENT_BACKFILL:false}
   admin:
     email: ${ADMIN_EMAIL:}
     password: ${ADMIN_PASSWORD:}

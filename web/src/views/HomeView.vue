@@ -5,6 +5,7 @@ import { Client } from '@stomp/stompjs'
 import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
+import TeamCrest from '../components/TeamCrest.vue'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import {
   badgeClass,
@@ -504,6 +505,7 @@ onUnmounted(() => {
                   <RouterLink class="pl" :to="`/players/${player.playerId}`">
                     <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
                     <b>{{ player.displayName }}</b>
+                    <TeamCrest v-if="player.teamName || player.teamLogoUrl" :src="player.teamLogoUrl" :name="player.teamName" size="sm" />
                   </RouterLink>
                 </td>
                 <td class="tm">{{ player.teamName }}</td>
@@ -517,7 +519,7 @@ onUnmounted(() => {
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
               <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
-              <div><div class="nm">{{ player.displayName }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <div class="who"><div class="nm">{{ player.displayName }}<TeamCrest v-if="player.teamName || player.teamLogoUrl" :src="player.teamLogoUrl" :name="player.teamName" size="sm" /></div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
             </RouterLink>
           </div>
@@ -663,8 +665,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .mtime b { color: var(--navy); font-weight: 800; }
 .mmain { display: grid; gap: 0.35rem; min-width: 0; }
 .mmeta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
-.mmeta .l, .mteam, .mc-t { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.mteam, .mc-t { gap: 0.6rem; font-weight: 700; color: var(--ink); }
+.mmeta .l, .mteam, .mc-t { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mteam, .mc-t { font-weight: 700; color: var(--ink); }
+.mteam :deep(.crest), .mc-t :deep(.crest) { flex: 0 0 28px; }
 .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .irow .n {
   display: -webkit-box;
@@ -755,8 +758,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .stbl .rk, .srow .rk { width: 40px; text-align: center; font-weight: 800; color: var(--muted); }
 .stbl .tm { color: var(--muted); font-weight: 600; }
 .stbl .g { font-weight: 800; font-size: 1.125rem; color: var(--navy); }
-.pl { display: flex; align-items: center; gap: 0.7rem; }
+.pl { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pl b, .srow .nm { color: var(--ink); font-weight: 700; }
+.srow .nm { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.srow .who { min-width: 0; }
 .sl-mob { display: none; }
 .srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 1rem; border-top: 1px solid var(--line); }
 .srow .tm { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
@@ -773,7 +778,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; font-size: 1em; }
   .wm { width: 220px; right: -50px; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 44px; height: 44px; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) {
+    flex-basis: 44px; width: 44px; height: 44px; min-width: 44px; max-width: 44px; min-height: 44px; max-height: 44px;
+  }
   .feed-list { display: none; }
   .feed-cards { display: flex; gap: 0.75rem; overflow-x: auto; padding: 1rem; scroll-snap-type: x mandatory; scrollbar-width: none; min-width: 0; width: 100%; }
   .feed-cards::-webkit-scrollbar { display: none; }
@@ -831,7 +838,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .side { gap: 0.15rem; }
   .x { letter-spacing: 0; }
   .team-name { font-size: 0.95rem; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) {
+    flex-basis: 32px; width: 32px; height: 32px; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; font-size: 0.7rem;
+  }
 }
 @container home (max-width: 480px) {
   .hero-card { margin-inline: -0.75rem; }
@@ -840,7 +849,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .side { gap: 0.15rem; }
   .x { letter-spacing: 0; }
   .team-name { font-size: 0.95rem; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) {
+    flex-basis: 32px; width: 32px; height: 32px; min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px; font-size: 0.7rem;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

@@ -38,14 +38,21 @@ public class LocalDiskStorageService implements StorageService {
 
     @Override
     public String store(String folder, MultipartFile file) {
+        String folderName = sanitize(folder);
         String filename = UUID.randomUUID() + "-" + ImageUploads.safeFilename(file);
-        Path dir = rootDir.resolve(sanitize(folder));
+        Path dir = rootDir.resolve(folderName);
         try {
+            byte[] raw = file.getBytes();
+            ImageOrientation.Prepared prepared = ImageOrientation.prepare(raw, folderName, true);
+            if (prepared.changed()) {
+                filename = ImageOrientation.withExtension(filename, prepared.extension());
+                raw = prepared.bytes();
+            }
             Files.createDirectories(dir);
             Path target = dir.resolve(filename);
-            Files.write(target, file.getBytes());
-            ImageVariants.writeForFolder(target, sanitize(folder));
-            return publicBaseUrl + "/" + sanitize(folder) + "/" + filename;
+            Files.write(target, raw);
+            ImageVariants.writeForFolder(target, folderName);
+            return publicBaseUrl + "/" + folderName + "/" + filename;
         } catch (IOException e) {
             throw ApiException.badRequest("Не удалось сохранить файл");
         }

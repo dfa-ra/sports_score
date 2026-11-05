@@ -10,6 +10,7 @@ const props = defineProps<{
     playerId: string
     avatarUrl?: string | null
     teamLogoUrl?: string | null
+    teamName?: string | null
   }
 }>()
 
@@ -26,7 +27,12 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
       :size="40"
     />
     <span class="name">{{ label }}</span>
-    <TeamCrest v-if="player.teamLogoUrl" :src="player.teamLogoUrl" name="" :size="18" />
+    <TeamCrest
+      v-if="player.teamLogoUrl || player.teamName"
+      :src="player.teamLogoUrl"
+      :name="player.teamName"
+      size="sm"
+    />
   </RouterLink>
 </template>
 
@@ -34,7 +40,7 @@ const label = computed(() => registeredName(props.player) || 'Игрок')
 .stat-player {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;

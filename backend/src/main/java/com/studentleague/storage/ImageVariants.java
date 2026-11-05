@@ -119,10 +119,14 @@ public final class ImageVariants {
             markSkipped(skip, derived);
             return false;
         }
+        BufferedImage decoded = src;
+        if (variant == Variant.AVATAR) {
+            src = ImageOrientation.upright(src, ImageOrientation.jpegOrientation(Files.readAllBytes(original)));
+        }
         BufferedImage fitted = fit(src, variant.maxWidth(), variant.maxHeight());
         Path tmp = derived.resolveSibling(derived.getFileName().toString() + ".part");
         try {
-            if (fitted == src) {
+            if (fitted == decoded) {
                 Files.copy(original, tmp, StandardCopyOption.REPLACE_EXISTING);
             } else if (!writeImage(fitted, extension(original.getFileName().toString()), tmp)) {
                 markSkipped(skip, derived);

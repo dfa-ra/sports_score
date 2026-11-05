@@ -466,9 +466,8 @@ function bronzePairStyle() {
 <template>
   <div ref="root" class="po">
     <div class="po-card">
-      <div class="po-card-h">
-        <h2>Сетка плей-офф</h2>
-        <p v-if="!tabMode && !loading && !error && !empty" class="po-hint">
+      <div v-if="!loading && !error && !empty && !tabMode" class="po-card-h">
+        <p class="po-hint">
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>
