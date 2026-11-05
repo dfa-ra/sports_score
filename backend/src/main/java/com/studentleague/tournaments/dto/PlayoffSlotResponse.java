@@ -26,6 +26,7 @@ public record PlayoffSlotResponse(
         Integer awayScore,
         Integer penaltyHome,
         Integer penaltyAway,
-        Integer minute
+        Integer minute,
+        Instant startedAt
 ) {
 }

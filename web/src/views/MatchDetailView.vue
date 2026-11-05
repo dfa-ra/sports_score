@@ -5,9 +5,9 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventLabel, formatClock, formatWhen, isOwnGoal, labelOf, periodLabel, playerTag } from '../lib/format'
+import { eventLabel, formatClock, isOwnGoal, labelOf, matchListWhen, periodLabel, playerTag } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, longKickoff, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -15,6 +15,7 @@ import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
@@ -665,7 +666,7 @@ onUnmounted(() => {
     <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
 
     <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <p class="when">{{ longKickoff(matchInstant(match)) }}</p>
+      <p class="when">{{ matchCardWhen(match) }}</p>
       <div class="club">
         <button
           class="star"
@@ -915,7 +916,13 @@ onUnmounted(() => {
               :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
             >
               <span class="who-ev">
-                <b>
+                <b class="who-name">
+                  <PlayerAvatar
+                    v-if="ev.playerId"
+                    :src="ev.playerAvatarUrl"
+                    :name="registeredName(ev) || ev.playerName"
+                    :size="28"
+                  />
                   <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
                   <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
                 </b>
@@ -952,7 +959,7 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
+            <span class="recent-when">{{ matchListWhen(f) }}</span>
           </RouterLink>
           <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
@@ -973,7 +980,7 @@ onUnmounted(() => {
               <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
               <span class="recent-name">{{ formSide(f, 'away').name }}</span>
             </span>
-            <span class="recent-when">{{ formatWhen(matchInstant(f)) }}</span>
+            <span class="recent-when">{{ matchListWhen(f) }}</span>
           </RouterLink>
           <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
         </div>
@@ -983,7 +990,7 @@ onUnmounted(() => {
             <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
             {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
             <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
-            · {{ formatWhen(matchInstant(f)) }}
+            · {{ matchListWhen(f) }}
           </RouterLink>
           <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
         </div>
@@ -1232,6 +1239,13 @@ onUnmounted(() => {
 .ev.away em { order: 1; }
 .who-ev { display: grid; gap: 0.1rem; min-width: 0; }
 .who-ev a { color: inherit; }
+.who-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-weight: 800;
+}
 .ev b { font-weight: 800; color: var(--navy); }
 .ev em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
 .line { color: var(--muted); font-size: 0.78rem; font-weight: 700; }

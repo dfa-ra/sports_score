@@ -653,14 +653,15 @@ public class PlayoffService {
                 slot.getAwayPlace(),
                 waitingLabel(slot, true, rounds),
                 waitingLabel(slot, false, rounds),
-                slot.getScheduledAt(),
+                match != null ? match.getScheduledAt() : slot.getScheduledAt(),
                 slot.getVenue(),
                 match == null ? null : match.getStatus().name(),
                 match == null ? null : match.getHomeScore(),
                 match == null ? null : match.getAwayScore(),
                 penaltyHome,
                 penaltyAway,
-                match == null ? null : MatchListFields.minute(match, Instant.now())
+                match == null ? null : MatchListFields.minute(match, Instant.now()),
+                match == null ? null : match.getStartedAt()
         );
     }
 

@@ -1,5 +1,8 @@
 import { eventOnHomeSide } from './matchMinute.ts'
+import { DATE_PENDING, matchCardWhen, matchInstant, type MatchDateSource } from './matchDate.ts'
 import { moscowClock, moscowDateTimeLabel, moscowDayMonth, moscowYmd } from './moscowTime.ts'
+
+export { DATE_PENDING, matchCardWhen, matchInstant, type MatchDateSource }
 
 export function matchOutcome(match: {
   status?: string
@@ -187,5 +190,3 @@ export { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eve
 export function ymd(value?: string | number | Date | null) {
   return moscowYmd(value)
 }
-
-export { matchInstant, type MatchDateSource } from './matchDate.ts'

@@ -5,6 +5,7 @@ import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 import { useAuthStore } from '../stores/auth'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import { googleClientId } from '../lib/googleIdentity'
+import { loginFieldErrors, type LoginFieldErrors } from '../lib/loginFields'
 import { safeInternalPath } from '../lib/redirect'
 
 const email = ref('')
@@ -13,21 +14,29 @@ const error = ref('')
 const googleError = ref('')
 const showPassword = ref(false)
 const pending = ref(false)
-const touched = ref(false)
+const fieldErrors = ref<LoginFieldErrors>({})
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const emailInvalid = computed(() => touched.value && email.value.length > 0 && !email.value.includes('@'))
 const passwordUpdated = computed(() => route.query.reset === '1')
 
+function clearField(key: keyof LoginFieldErrors) {
+  if (!fieldErrors.value[key]) return
+  const next = { ...fieldErrors.value }
+  delete next[key]
+  fieldErrors.value = next
+}
+
 async function submit() {
-  touched.value = true
   error.value = ''
   googleError.value = ''
+  const next = loginFieldErrors(email.value, password.value)
+  fieldErrors.value = next
+  if (next.email || next.password) return
   pending.value = true
   try {
-    await auth.login(email.value, password.value)
+    await auth.login(email.value.trim(), password.value)
     router.push(safeInternalPath(route.query.redirect))
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Неверный email или пароль.'
@@ -60,25 +69,27 @@ async function onGoogle(idToken: string) {
       </aside>
       <div class="panel stack card">
         <h2>Вход</h2>
-        <form class="stack" @submit.prevent="submit">
-          <label class="field" :class="{ invalid: emailInvalid }">
+        <form class="stack" novalidate @submit.prevent="submit">
+          <label class="field" :class="{ invalid: fieldErrors.email }">
             Email
-            <input v-model="email" type="email" required autocomplete="username" @blur="touched = true" />
+            <input v-model="email" type="email" maxlength="320" autocomplete="username" @input="clearField('email')" />
+            <span v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</span>
           </label>
-          <label class="field">
+          <label class="field" :class="{ invalid: fieldErrors.password }">
             Пароль
             <span class="pass-row">
               <input
                 v-model="password"
                 :type="showPassword ? 'text' : 'password'"
-                required
-                minlength="8"
+                maxlength="100"
                 autocomplete="current-password"
+                @input="clearField('password')"
               />
               <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
                 {{ showPassword ? 'Скрыть' : 'Показать' }}
               </button>
             </span>
+            <span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
           </label>
           <RouterLink class="forgot" to="/forgot-password">Забыли пароль?</RouterLink>
           <p v-if="passwordUpdated" class="form-ok">Пароль обновлён. Войдите с новым паролем.</p>

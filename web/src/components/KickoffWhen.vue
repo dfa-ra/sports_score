@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatClock } from '../lib/format'
-import { eventMinute, kickoffClock, kickoffDayMonth, matchInstant } from '../lib/match'
+import { DATE_PENDING, eventMinute, kickoffClock, kickoffDayMonth, matchInstant } from '../lib/match'
 import { useMatchClock } from '../lib/useMatchClock'
 
 const props = withDefaults(defineProps<{
@@ -31,25 +31,24 @@ const isLive = computed(() => props.status === 'LIVE' || props.status === 'PAUSE
 const hasClock = computed(() =>
   props.gameTimeSeconds != null || !!props.clockRunningSince || props.period != null,
 )
-const dateLabel = computed(() => kickoffDayMonth(matchInstant({
+const instant = computed(() => matchInstant({
   status: props.status,
   scheduledAt: props.at,
   startedAt: props.startedAt,
-})))
+}))
+const dateLabel = computed(() => kickoffDayMonth(instant.value))
 const timeLabel = computed(() => {
-  if (props.status === 'FINISHED') return 'Завершён'
-  if (!isLive.value) {
-    const clock = kickoffClock(props.at)
-    if (clock) return clock
-    if (props.status === 'SCHEDULED' || !props.status) return 'Дата уточняется'
-    return '—'
+  if (isLive.value) {
+    const fromClock = eventMinute(kickoff.value, props.period, props.periodLengthSeconds)
+    const minute = hasClock.value ? fromClock : props.minute
+    if (minute != null && minute > 0) return `${minute}'`
+    if (hasClock.value && (elapsed.value > 0 || kickoff.value > 0)) return formatClock(kickoff.value)
+    if (props.minute != null && props.minute > 0) return `${props.minute}'`
+    return props.status === 'PAUSED' ? 'Пауза' : 'LIVE'
   }
-  const fromClock = eventMinute(kickoff.value, props.period, props.periodLengthSeconds)
-  const minute = hasClock.value ? fromClock : props.minute
-  if (minute != null && minute > 0) return `${minute}'`
-  if (hasClock.value && (elapsed.value > 0 || kickoff.value > 0)) return formatClock(kickoff.value)
-  if (props.minute != null && props.minute > 0) return `${props.minute}'`
-  return props.status === 'PAUSED' ? 'Пауза' : 'LIVE'
+  if (!instant.value) return DATE_PENDING
+  if (props.status === 'FINISHED') return 'Завершён'
+  return kickoffClock(instant.value) || DATE_PENDING
 })
 </script>
 

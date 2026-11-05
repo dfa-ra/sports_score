@@ -192,9 +192,12 @@ async function removeMember(id: string) {
       <div class="panel">
         <h2>Состав</h2>
         <p v-if="canEditRoster" class="muted">Добавить можно только уже зарегистрированного игрока</p>
-        <ul class="stack">
-          <li v-for="m in members" :key="m.id">
-            <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>
+        <ul class="stack roster">
+          <li v-for="m in members" :key="m.id" class="member">
+            <span class="who">
+              <RouterLink :to="`/players/${m.playerId}`">{{ registeredName(m) || 'Игрок' }}</RouterLink>
+              <span v-if="m.playerId === team.captainId" class="captain-badge">Капитан</span>
+            </span>
             <button v-if="canEditRoster && m.playerId !== team.captainId" class="btn ghost" type="button" :disabled="pending" @click="removeMember(m.playerId)">Убрать</button>
           </li>
         </ul>
@@ -269,6 +272,20 @@ async function removeMember(id: string) {
 
 <style scoped>
 .team-head { display: flex; align-items: center; gap: 0.8rem; }
+.roster { list-style: none; margin: 0; padding: 0; }
+.member { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; }
+.who { display: flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.captain-badge {
+  flex: 0 0 auto;
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ice) 18%, #fff);
+  color: var(--navy);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+}
 .toolbar { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; margin-top: 0.8rem; }
 .row { display: flex; gap: 0.7rem; align-items: center; padding: 0.45rem 0; }
 .rsvp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.7rem; }

@@ -420,6 +420,10 @@ class PlayoffIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(post("/api/v1/referee/matches/" + finalMatch + "/start")
                         .header("Authorization", auth(bracket.admin)))
                 .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/tournaments/" + bracket.tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].scheduledAt").value(nullValue()))
+                .andExpect(jsonPath("$.rounds[1].slots[0].matchStatus").value("LIVE"))
+                .andExpect(jsonPath("$.rounds[1].slots[0].startedAt", not(nullValue())));
         try {
             mockMvc.perform(get("/api/v1/matches/next").param("tournamentId", bracket.tournamentId))
                     .andExpect(status().isOk())

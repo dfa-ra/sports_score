@@ -28,6 +28,7 @@ public record MatchEventResponse(
         String playerLastName,
         String secondaryPlayerFirstName,
         String secondaryPlayerLastName,
-        Integer minute
+        Integer minute,
+        String playerAvatarUrl
 ) {
 }
