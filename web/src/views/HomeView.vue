@@ -664,9 +664,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .mmain { display: grid; gap: 0.35rem; min-width: 0; }
 .mmeta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; }
 .mmeta .l, .mteam, .mc-t { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-.mteam { gap: 8px; }
-.mteam, .mc-t { font-weight: 700; color: var(--ink); }
-.mc-t { gap: 0.6rem; }
+.mteam, .mc-t { gap: 8px; font-weight: 700; color: var(--ink); }
 .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .irow .n {
   display: -webkit-box;

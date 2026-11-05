@@ -1,5 +1,5 @@
 const env = import.meta.env ?? {}
-const version = env.VITE_APP_VERSION || '0.2.63'
+const version = env.VITE_APP_VERSION || '0.2.64'
 const revision = env.VITE_APP_REVISION || 'local'
 const channel = env.VITE_APP_CHANNEL || 'local'
 

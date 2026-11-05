@@ -20,6 +20,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ImageOrientationTest {
 
     @Test
+    void exifLessJpegAndPngKeepThePixelOrientationTheyArrivedIn() throws Exception {
+        byte[] jpeg = wideRedLeftJpeg();
+        assertEquals(1, ImageOrientation.orientation(jpeg));
+        assertWideRedLeft(ImageOrientation.storedBytes(jpeg, false));
+
+        byte[] png = wideRedLeftPng();
+        assertEquals(1, ImageOrientation.orientation(png));
+        assertWideRedLeft(ImageOrientation.storedBytes(png, false));
+
+        byte[] tall = tallRedTopJpeg();
+        assertEquals(1, ImageOrientation.orientation(tall));
+        BufferedImage stored = ImageIO.read(new ByteArrayInputStream(ImageOrientation.storedBytes(tall, false)));
+        assertEquals(4, stored.getWidth());
+        assertEquals(8, stored.getHeight());
+        assertTrue(mostlyRed(stored.getRGB(2, 1)));
+        assertTrue(mostlyBlue(stored.getRGB(2, 6)));
+    }
+
+    @Test
+    void orientation1IsNotRotated() throws Exception {
+        byte[] little = withOrientation(wideRedLeftJpeg(), 1, true);
+        byte[] big = withOrientation(wideRedLeftJpeg(), 1, false);
+        assertEquals(1, ImageOrientation.orientation(little));
+        assertEquals(1, ImageOrientation.orientation(big));
+        assertWideRedLeft(ImageOrientation.storedBytes(little, false));
+        assertWideRedLeft(ImageOrientation.storedBytes(big, false));
+    }
+
+    @Test
+    void squareLogoCentersWithoutRotating() throws Exception {
+        BufferedImage square = ImageIO.read(new ByteArrayInputStream(
+                ImageOrientation.storedBytes(wideRedLeftPng(), true)));
+        assertEquals(8, square.getWidth());
+        assertEquals(8, square.getHeight());
+        assertEquals(0, square.getRGB(0, 0) >>> 24);
+        assertTrue(mostlyRed(square.getRGB(1, 4)));
+        assertTrue(mostlyBlue(square.getRGB(6, 4)));
+    }
+
+    @Test
     void orientation6TurnsWideRedLeftImageIntoTallImage() throws Exception {
         byte[] little = withOrientation(wideRedLeftJpeg(), 6, true);
         byte[] big = withOrientation(wideRedLeftJpeg(), 6, false);
@@ -104,13 +144,45 @@ class ImageOrientationTest {
         }
     }
 
+    private static void assertWideRedLeft(byte[] stored) throws Exception {
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(stored));
+        assertEquals(8, image.getWidth());
+        assertEquals(4, image.getHeight());
+        assertTrue(mostlyRed(image.getRGB(1, 2)));
+        assertTrue(mostlyBlue(image.getRGB(6, 2)));
+    }
+
     private static byte[] wideRedLeftJpeg() throws Exception {
+        return jpeg(wideRedLeft());
+    }
+
+    private static byte[] tallRedTopJpeg() throws Exception {
+        BufferedImage image = new BufferedImage(4, 8, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 4; x++) {
+                image.setRGB(x, y, y < 4 ? 0xFF0000 : 0x0000FF);
+            }
+        }
+        return jpeg(image);
+    }
+
+    private static byte[] wideRedLeftPng() throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        assertTrue(ImageIO.write(wideRedLeft(), "png", out));
+        return out.toByteArray();
+    }
+
+    private static BufferedImage wideRedLeft() {
         BufferedImage image = new BufferedImage(8, 4, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < 4; y++) {
             for (int x = 0; x < 8; x++) {
                 image.setRGB(x, y, x < 4 ? 0xFF0000 : 0x0000FF);
             }
         }
+        return image;
+    }
+
+    private static byte[] jpeg(BufferedImage image) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         assertTrue(ImageIO.write(image, "jpeg", out));
         return out.toByteArray();
