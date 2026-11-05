@@ -198,7 +198,13 @@ watch(compact, () => {
 <style scoped>
 .shell { min-height: 100vh; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; }
 .shell > * { min-width: 0; }
-.chrome { background: var(--navy); color: #fff; }
+.chrome {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--navy);
+  color: #fff;
+}
 .nav-inner {
   display: flex;
   align-items: center;
