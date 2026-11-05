@@ -240,6 +240,7 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   align-self: center;
 }
 .pr.empty .pn { font-size: 0.875rem; }
+.pc.bronze .pr.empty .pn { font-size: 0.75rem; letter-spacing: -0.01em; }
 .pc.compact .pr {
   height: auto;
   min-height: 34px;
