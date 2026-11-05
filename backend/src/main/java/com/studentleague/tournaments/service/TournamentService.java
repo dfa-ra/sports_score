@@ -16,6 +16,7 @@ import com.studentleague.security.UserPrincipal;
 import com.studentleague.sports.repository.SportRepository;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.teams.repository.TeamRepository;
+import com.studentleague.tournaments.TournamentCopy;
 import com.studentleague.tournaments.domain.CompetitionStage;
 import com.studentleague.tournaments.domain.TournamentFormat;
 import com.studentleague.tournaments.domain.TournamentStatus;
@@ -121,7 +122,7 @@ public class TournamentService {
         requireChronologicalDates(request.startDate(), request.endDate());
         Tournament tournament = new Tournament();
         tournament.setName(request.name().trim());
-        tournament.setDescription(request.description());
+        tournament.setDescription(TournamentCopy.storedDescription(request.description()));
         tournament.setRegulations(request.regulations());
         tournament.setSportId(request.sportId());
         tournament.setSeasonYear(request.seasonYear());
@@ -143,7 +144,7 @@ public class TournamentService {
             tournament.setName(request.name().trim());
         }
         if (request.description() != null) {
-            tournament.setDescription(request.description());
+            tournament.setDescription(TournamentCopy.storedDescription(request.description()));
         }
         if (request.regulations() != null) {
             tournament.setRegulations(request.regulations());
@@ -546,7 +547,7 @@ public class TournamentService {
 
     private TournamentResponse toResponse(Tournament t) {
         return new TournamentResponse(
-                t.getId(), t.getName(), t.getDescription(), t.getRegulations(), t.getSportId(), t.getSeasonYear(),
+                t.getId(), t.getName(), TournamentCopy.storedDescription(t.getDescription()), t.getRegulations(), t.getSportId(), t.getSeasonYear(),
                 t.getStartDate(), t.getEndDate(), t.getStatus(), t.getFormat(), t.getMaxSquadSize(),
                 t.getCreatedAt(), t.getUpdatedAt(), t.getCompetitionStage()
         );
