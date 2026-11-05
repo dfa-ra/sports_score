@@ -60,6 +60,7 @@ services:
       LOCAL_STORAGE_DIR: /app/data/uploads
       LOCAL_STORAGE_PUBLIC_BASE_URL: /media
       JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx1024m -XX:+UseG1GC}
+      APP_DEMO_DATA: ${APP_DEMO_DATA:-false}
     volumes:
       - uploads_data:/app/data/uploads
     mem_limit: 2048m
