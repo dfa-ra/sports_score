@@ -69,7 +69,6 @@ const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.val
 const showStats = computed(() => !failed.value && (!loaded.value || !!overview.value.summary))
 const showTournaments = computed(() => !loaded.value || failed.value || tournaments.value.length > 0)
 const scorerGroups = computed(() => overview.value.scorersByTournament)
-const showScorers = computed(() => !loaded.value || failed.value || scorerGroups.value.length > 0)
 const liveKey = computed(() => overview.value.live.slice(0, 5).map((match) => match.id).join(','))
 const upcoming = computed(() => feedUpcoming(overview.value, chip.value, nextMatch.value?.id))
 const recent = computed(() => feedRecent(overview.value, chip.value))
@@ -264,12 +263,12 @@ onUnmounted(() => {
             <div class="vs">
               <div class="side">
                 <HomeCrest large :id="nextMatch?.homeTeamId" :name="nextMatch?.homeTeamName" :src="nextMatch?.homeLogoUrl" />
-                <span class="team-name">{{ nextMatch?.homeTeamName }}</span>
+                <span class="team-name" lang="ru">{{ nextMatch?.homeTeamName }}</span>
               </div>
               <div class="x">VS</div>
               <div class="side">
                 <HomeCrest large :id="nextMatch?.awayTeamId" :name="nextMatch?.awayTeamName" :src="nextMatch?.awayLogoUrl" />
-                <span class="team-name">{{ nextMatch?.awayTeamName }}</span>
+                <span class="team-name" lang="ru">{{ nextMatch?.awayTeamName }}</span>
               </div>
             </div>
             <div class="meta">
@@ -472,7 +471,7 @@ onUnmounted(() => {
       </template>
     </div>
 
-    <div v-if="showScorers" class="container block">
+    <div class="container block">
       <div class="section-title">
         <h2>Бомбардиры по турнирам</h2>
         <RouterLink class="more-link" :to="statsLink(activeScorers?.tournamentId)">Вся статистика</RouterLink>
@@ -483,7 +482,7 @@ onUnmounted(() => {
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
       </div>
       <div v-else class="card">
-        <div class="tabs">
+        <div v-if="scorerGroups.length" class="tabs">
           <button
             v-for="group in scorerGroups"
             :key="group.tournamentId"
@@ -575,8 +574,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   container-type: inline-size;
 }
 .team-name {
-  min-width: 0; overflow: visible; text-overflow: unset; white-space: normal;
-  word-break: normal; overflow-wrap: normal; hyphens: manual; line-height: 1.15;
+  flex: 1 1 0; min-width: 0; max-width: 100%;
+  display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; line-clamp: 2;
+  overflow: hidden; white-space: normal;
+  word-break: normal; overflow-wrap: normal; hyphens: auto; -webkit-hyphens: auto;
+  line-height: 1.15;
   font-size: clamp(0.95rem, 11cqi, 1em);
 }
 @container hero-vs (max-width: 400px) {
@@ -781,6 +784,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .mc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
   .mc-t b { font-size: 1.125rem; margin-left: auto; }
   .mc-foot { font-size: 0.75rem; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.5rem; }
+  .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
   .irow .h { flex-direction: row-reverse; justify-content: flex-end; text-align: left; }
@@ -807,6 +811,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 719px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
+  .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; }
@@ -818,6 +823,24 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 960px) {
   .tgrid { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .hero-card { margin-inline: -0.75rem; }
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .vs { gap: 0.15rem; }
+  .side { gap: 0.15rem; }
+  .x { letter-spacing: 0; }
+  .team-name { font-size: 0.95rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
+}
+@container home (max-width: 480px) {
+  .hero-card { margin-inline: -0.75rem; }
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .vs { gap: 0.15rem; }
+  .side { gap: 0.15rem; }
+  .x { letter-spacing: 0; }
+  .team-name { font-size: 0.95rem; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }
