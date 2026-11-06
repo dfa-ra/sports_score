@@ -230,7 +230,7 @@ test('16-team full grid wraps 1/8 names and keeps placeholder circles inside the
   await mockApi(page, null)
   await page.setViewportSize({ width: 1180, height: 900 })
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
-  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '1/8 финала' }).first()).toBeVisible()
   await expect(page.getByRole('tablist', { name: 'Раунды' })).toBeVisible()
   await expect(page.locator('.po-grid')).toHaveCount(0)

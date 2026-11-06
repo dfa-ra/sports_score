@@ -1,4 +1,5 @@
 import { eventMinute } from './matchMinute'
+import { heroLiveTail } from './heroLive.ts'
 import {
   MOSCOW_TIME_ZONE,
   civilDateParts,
@@ -249,7 +250,8 @@ export function isToday(value?: string | null, now: Date = new Date()) {
 }
 
 export function statusChip(match: { status?: string; scheduledAt?: string | null }, now: Date = new Date()) {
-  if (match.status === 'LIVE' || match.status === 'PAUSED') return 'live'
+  if (match.status === 'PAUSED') return 'paused'
+  if (match.status === 'LIVE') return 'live'
   if (match.status === 'FINISHED') return 'done'
   if (isToday(match.scheduledAt, now)) return 'today'
   return 'soon'
@@ -259,9 +261,8 @@ export function statusText(
   match: { status?: string; scheduledAt?: string | null; minute?: number | null },
   now: Date = new Date(),
 ) {
-  if (match.status === 'LIVE' || match.status === 'PAUSED') {
-    return match.minute == null ? 'Live' : `Live ${match.minute}′`
-  }
+  if (match.status === 'PAUSED') return heroLiveTail(match)
+  if (match.status === 'LIVE') return match.minute == null ? 'Live' : `Live ${match.minute}′`
   if (match.status === 'FINISHED') return 'Завершён'
   if (isToday(match.scheduledAt, now)) return 'Сегодня'
   return 'Скоро'
