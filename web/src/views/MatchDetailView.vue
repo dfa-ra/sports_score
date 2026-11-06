@@ -12,7 +12,7 @@ import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { cardScoreText } from '../lib/calendarFeed'
-import { aboutStage, formMarks, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import { aboutStage, classifyFormPayload, formMarks, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
 import NotFoundView from './NotFoundView.vue'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -42,6 +42,7 @@ const lineups = ref<any>(null)
 const homeForm = ref<any[]>([])
 const awayForm = ref<any[]>([])
 const formError = ref(false)
+const formReady = ref(false)
 const tournament = ref<any>(null)
 const loading = ref(true)
 const me = ref<any>(null)
@@ -100,8 +101,8 @@ const timeline = computed(() =>
     .filter((event) => !event.voided)
     .sort(compareMatchEvents),
 )
-const homeMarks = computed(() => formMarks(homeForm.value, match.value?.homeTeamId))
-const awayMarks = computed(() => formMarks(awayForm.value, match.value?.awayTeamId))
+const homeMarks = computed(() => formMarks(homeForm.value, match.value?.homeTeamId, match.value?.id))
+const awayMarks = computed(() => formMarks(awayForm.value, match.value?.awayTeamId, match.value?.id))
 const publicReferees = computed(() => refereeNames(referees.value))
 const stageText = computed(() => aboutStage(match.value, tournament.value))
 const placeText = computed(() => venueLabel(match.value?.venue))
@@ -292,18 +293,24 @@ function typedMinute(eventId: string) {
   return Number(value)
 }
 
+let pageTicket = 0
 async function load() {
-  const id = route.params.id
+  const ticket = ++pageTicket
+  const id = String(route.params.id || '')
   missing.value = false
+  if (!match.value) loading.value = true
   try {
   await teams.load()
+  if (ticket !== pageTicket) return
   const [m, e, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/referees`),
     api.get(`/matches/${id}/lineups`),
   ])
+  if (ticket !== pageTicket || String(route.params.id || '') !== id) return
   match.value = m.data
+  error.value = ''
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
   const publish = () => setPageMeta({
@@ -337,6 +344,7 @@ async function load() {
     }
   }
   await loadForms(m.data.homeTeamId, m.data.awayTeamId)
+  if (ticket !== pageTicket) return
   try {
     const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
     tournament.value = data
@@ -361,7 +369,10 @@ async function load() {
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
   }
+  if (ticket !== pageTicket) return
+  error.value = ''
   } catch (e: any) {
+    if (ticket !== pageTicket) return
     const status = e?.response?.status
     if (status === 400 || status === 404) {
       match.value = null
@@ -371,7 +382,7 @@ async function load() {
     }
     if (!match.value) error.value = 'Матч не загрузился'
   } finally {
-    loading.value = false
+    if (ticket === pageTicket) loading.value = false
   }
 }
 
@@ -379,12 +390,14 @@ let formTicket = 0
 async function loadForms(homeTeamId?: string, awayTeamId?: string) {
   const ticket = ++formTicket
   const matchId = String(route.params.id || '')
-  formError.value = false
+  const stillThisMatch = () => ticket === formTicket && matchId === String(route.params.id || '')
   if (!homeTeamId || !awayTeamId) {
     const empty = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), [] as any[])
     if (!empty) return
     homeForm.value = []
     awayForm.value = []
+    formError.value = false
+    formReady.value = true
     return
   }
   try {
@@ -392,17 +405,23 @@ async function loadForms(homeTeamId?: string, awayTeamId?: string) {
       api.get(`/teams/${homeTeamId}/form`, { params: { limit: 5 } }),
       api.get(`/teams/${awayTeamId}/form`, { params: { limit: 5 } }),
     ])
-    const homeRows = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), hf.data ?? [])
-    const awayRows = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), af.data ?? [])
-    if (!homeRows || !awayRows) return
-    if (match.value && (match.value.homeTeamId !== homeTeamId || match.value.awayTeamId !== awayTeamId)) return
-    homeForm.value = homeRows
-    awayForm.value = awayRows
+    const homeRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), hf.data)
+    const awayRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), af.data)
+    if (homeRaw == null || awayRaw == null || !stillThisMatch()) return
+    if (match.value && (String(match.value.homeTeamId) !== String(homeTeamId) || String(match.value.awayTeamId) !== String(awayTeamId))) return
+    const home = classifyFormPayload(homeRaw, homeTeamId, matchId)
+    const away = classifyFormPayload(awayRaw, awayTeamId, matchId)
+    if (!stillThisMatch()) return
+    if (!home.ok || !away.ok) {
+      formError.value = true
+      return
+    }
+    homeForm.value = home.rows
+    awayForm.value = away.rows
+    formError.value = false
+    formReady.value = true
   } catch {
-    const failed = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), true)
-    if (!failed) return
-    homeForm.value = []
-    awayForm.value = []
+    if (!stillThisMatch()) return
     formError.value = true
   }
 }
@@ -426,17 +445,19 @@ function eventSignature(list: any[]) {
 
 async function refreshLive() {
   if (pending.value || !route.params.id) return
-  const id = route.params.id
+  const id = String(route.params.id || '')
   const [m, e] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
   ])
+  if (String(route.params.id || '') !== id) return
   match.value = { ...match.value, ...m.data }
   const next = e.data ?? []
   if (eventSignature(next) !== eventSignature(events.value)) {
     events.value = next
     syncDrafts()
   }
+  error.value = ''
 }
 
 function mergeLive(live: any) {
@@ -708,7 +729,7 @@ onUnmounted(() => {
 
 <template>
   <MatchGoalAlerts headless />
-  <section v-if="loading && !match" class="match-state" role="status">
+  <section v-if="loading" class="match-state" role="status">
     <p>Загрузка матча…</p>
     <span class="bar"></span>
     <span class="bar short"></span>
@@ -967,6 +988,7 @@ onUnmounted(() => {
             <p>Форма не загрузилась</p>
             <button class="btn secondary" type="button" @click="loadForms(match.homeTeamId, match.awayTeamId)">Повторить</button>
           </div>
+          <p v-else-if="!formReady" class="muted">Загрузка…</p>
           <template v-else>
             <div class="form-row">
               <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />

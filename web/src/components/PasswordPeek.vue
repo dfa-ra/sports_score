@@ -23,7 +23,8 @@ const emit = defineEmits<{ input: [] }>()
       type="button"
       :aria-label="visible ? 'Скрыть пароль' : 'Показать пароль'"
       :aria-pressed="visible"
-      @click="visible = !visible"
+      @mousedown.prevent
+      @click.stop.prevent="visible = !visible"
     >
       <svg v-if="!visible" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" />
@@ -40,15 +41,16 @@ const emit = defineEmits<{ input: [] }>()
 </template>
 
 <style scoped>
-.pass-field { position: relative; display: block; width: 100%; }
-.pass-field input { width: 100%; padding-right: 2.7rem; }
+.pass-field { position: relative; z-index: 1; display: block; width: 100%; }
+.pass-field input { position: relative; z-index: 0; width: 100%; padding-right: 3.25rem; }
 .peek {
   position: absolute;
+  z-index: 2;
   top: 50%;
-  right: 0.35rem;
+  right: 0.2rem;
   transform: translateY(-50%);
-  width: 2.15rem;
-  height: 2.15rem;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -57,6 +59,8 @@ const emit = defineEmits<{ input: [] }>()
   color: var(--muted);
   padding: 0;
   cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .peek svg {
   width: 1.2rem;

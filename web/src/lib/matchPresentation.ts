@@ -10,6 +10,19 @@ export type FormRow = {
   awayScore?: number | null
   penaltyHome?: number | null
   penaltyAway?: number | null
+  startedAt?: string | null
+  scheduledAt?: string | null
+}
+
+const FORM_LIMIT = 5
+
+function sameId(left?: string | null, right?: string | null) {
+  return !!left && !!right && left.toLowerCase() === right.toLowerCase()
+}
+
+function formInstant(row: FormRow) {
+  const ms = Date.parse(row.startedAt || row.scheduledAt || '')
+  return Number.isFinite(ms) ? ms : 0
 }
 
 /**
@@ -27,11 +40,57 @@ export function keepFormPayload<T>(
   return rows
 }
 
+/**
+ * Last finished matches for this team, newest first.
+ * The match on screen is not part of its own form. A draw is only a finished
+ * match with equal scores. Live and unplayed rows are dropped, even at 0:0.
+ */
+export function prepareFormRows(
+  rows: FormRow[] | null | undefined,
+  teamId?: string | null,
+  currentMatchId?: string | null,
+  limit = FORM_LIMIT,
+): FormRow[] {
+  if (!teamId || !Array.isArray(rows)) return []
+  const mine = rows.filter((row) => {
+    if (!row || row.status !== 'FINISHED') return false
+    if (sameId(row.id, currentMatchId)) return false
+    return sameId(row.homeTeamId, teamId) || sameId(row.awayTeamId, teamId)
+  })
+  mine.sort((a, b) => {
+    const byTime = formInstant(b) - formInstant(a)
+    if (byTime) return byTime
+    return String(b.id || '').localeCompare(String(a.id || ''))
+  })
+  return mine.slice(0, limit)
+}
+
+/**
+ * An empty list means this team has no finished matches.
+ * A body that is not a list, or a list for another team, must not be painted
+ * as «нет матчей».
+ */
+function isFormRow(row: unknown): row is FormRow {
+  return !!row && typeof row === 'object'
+}
+
+export function classifyFormPayload(
+  rows: unknown,
+  teamId?: string | null,
+  currentMatchId?: string | null,
+): { ok: true; rows: FormRow[] } | { ok: false } {
+  if (!teamId || !Array.isArray(rows)) return { ok: false }
+  const list = rows.filter(isFormRow)
+  if (rows.length === 0) return { ok: true, rows: [] }
+  const belongs = list.some((row) => sameId(row.homeTeamId, teamId) || sameId(row.awayTeamId, teamId))
+  if (!belongs) return { ok: false }
+  return { ok: true, rows: prepareFormRows(list, teamId, currentMatchId) }
+}
+
 /** Letters the form endpoint actually returned. Shorter than five stays shorter. */
-export function formMarks(rows: FormRow[], teamId?: string | null): string[] {
-  if (!teamId) return []
+export function formMarks(rows: FormRow[] | null | undefined, teamId?: string | null, currentMatchId?: string | null): string[] {
   const marks: string[] = []
-  for (const row of rows) {
+  for (const row of prepareFormRows(rows, teamId, currentMatchId)) {
     const outcome = matchOutcome({
       status: row.status ?? undefined,
       homeTeamId: row.homeTeamId ?? undefined,
