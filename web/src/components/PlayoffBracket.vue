@@ -466,8 +466,9 @@ function bronzePairStyle() {
 <template>
   <div ref="root" class="po">
     <div class="po-card">
-      <div v-if="!tabMode && !loading && !error && !empty" class="po-card-h">
-        <p class="po-hint">
+      <div class="po-card-h">
+        <h2>Сетка плей-офф</h2>
+        <p v-if="!tabMode && !loading && !error && !empty" class="po-hint">
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>
@@ -496,7 +497,7 @@ function bronzePairStyle() {
       <div v-else-if="empty" class="msg">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h5v5H3zM3 14h5v5H3zM16 9.5h5v5h-5zM8 7.5h4v9M12 12h4" /></svg>
         <b>Сетка ещё не сформирована</b>
-        <p>Сетка появится после групп</p>
+        <p>Плей-офф начнётся после группового этапа. Следите за таблицей.</p>
         <button class="po-action" type="button" @click="emit('show-table')">К таблице</button>
       </div>
 
@@ -858,6 +859,7 @@ function bronzePairStyle() {
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
+.po-card-h h2 { font-size: 1.0625rem; margin: 0; color: var(--navy); }
 .po-hint { margin: 0; font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
 .po-board { min-width: 0; max-width: 100%; overflow-x: auto; }
 .po-board.stack { overflow-x: visible; }
