@@ -35,6 +35,7 @@ import {
   type HomeOverview,
   type HomeTournament,
 } from '../lib/homeOverview'
+import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
 import { setPageMeta } from '../lib/pageMeta'
 import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
@@ -59,7 +60,7 @@ const nextMatch = computed(() => {
 })
 const runningTournamentCap = 4
 const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
-const livePreview = computed(() => liveRows.value.slice(0, 3))
+const livePreview = computed(() => heroLivePreview(liveRows.value))
 const tournaments = computed(() => overview.value.tournaments)
 const orderedTournaments = computed(() => orderRunningTournaments(tournaments.value, overview.value.live))
 const visibleTournaments = computed(() => orderedTournaments.value.slice(0, runningTournamentCap))
@@ -249,9 +250,9 @@ onUnmounted(() => {
           </div>
           <div v-if="plainHero && livePreview.length" class="livebar">
             <span class="st live on-dark">Live сейчас</span>
-            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="st paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -282,9 +283,9 @@ onUnmounted(() => {
           </div>
           <div v-if="livePreview.length" class="livebar">
             <span class="st live on-dark">Live сейчас</span>
-            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="st paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -615,6 +616,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   border-left: 3px solid var(--status-live);
   background-image: linear-gradient(90deg, rgba(227, 107, 91, 0.07), transparent 60%);
 }
+.lv.paused {
+  border-left-color: rgba(255, 255, 255, 0.35);
+  background-image: none;
+}
 .lv span, .all-live { font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); font-weight: 600; }
 .all-live { justify-self: end; text-decoration: none; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .stats { padding: 0.9rem 1.4rem 1.2rem; }
@@ -706,6 +711,17 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .st.ok { background: var(--status-ok-soft); color: var(--status-ok); }
 .st.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
 .st.live { background: var(--status-live-soft); color: var(--status-live-ink); }
+.st.paused {
+  background: var(--status-done-soft);
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.lv .st.paused {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.86);
+}
 .st.live::before {
   content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--status-live);
   box-shadow: 0 0 0 0 rgba(227, 107, 91, 0.6); animation: hv-pulse 1.6s infinite;
