@@ -482,14 +482,52 @@ async function installApi(page: Page, options?: { matchesFail?: boolean; statsFa
   })
 }
 
-async function stamp(page: Page) {
-  await page.evaluate(() => {
+async function stamp(page: Page, side: 'left' | 'right' = 'right') {
+  await page.evaluate((edge) => {
     const note = document.createElement('div')
     note.id = 'fixture-stamp'
     note.textContent = 'Тестовый стенд · фикстура, не прод'
-    note.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:10000;background:#fff;color:#00205b;border-radius:8px;padding:4px 8px;font:700 12px/1.2 Tektur,sans-serif;box-shadow:0 2px 8px rgba(0,32,91,.15);'
+    note.style.cssText = `position:fixed;${edge}:8px;bottom:8px;z-index:10000;background:#fff;color:#00205b;border-radius:8px;padding:4px 8px;font:700 12px/1.2 Tektur,sans-serif;box-shadow:0 2px 8px rgba(0,32,91,.15);`
     document.body.appendChild(note)
+  }, side)
+}
+
+async function expectTabLabelsReadable(page: Page, selector: string, oneRow?: boolean) {
+  const report = await page.locator(selector).evaluate((bar) => {
+    const buttons = [...bar.querySelectorAll('button')].filter((node): node is HTMLElement => {
+      if (!(node instanceof HTMLElement)) return false
+      const style = getComputedStyle(node)
+      return style.display !== 'none' && style.visibility !== 'hidden' && node.getClientRects().length > 0
+    })
+    const barBox = bar.getBoundingClientRect()
+    const items = buttons.map((button) => {
+      const box = button.getBoundingClientRect()
+      return {
+        text: (button.innerText || '').replace(/\s+/g, ' ').trim(),
+        labelClipped: button.scrollWidth > button.clientWidth + 1,
+        fullyVisible: box.width > 0
+          && box.left >= barBox.left - 1
+          && box.right <= barBox.right + 1
+          && box.top >= barBox.top - 1
+          && box.bottom <= barBox.bottom + 1,
+        top: box.top,
+      }
+    })
+    const tops = items.map((item) => item.top)
+    return {
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      items,
+      oneRow: tops.length === 0 || Math.max(...tops) - Math.min(...tops) < 4,
+    }
   })
+  expect(report.pageOverflow).toBe(false)
+  expect(report.items.length).toBeGreaterThan(1)
+  if (oneRow !== undefined) expect(report.oneRow).toBe(oneRow)
+  for (const item of report.items) {
+    expect(item.labelClipped, item.text).toBe(false)
+    expect(item.fullyVisible, item.text).toBe(true)
+    expect(item.text.length).toBeGreaterThan(1)
+  }
 }
 
 test('calendar keeps one set, separates live and paused, and hides undated from the day', async ({ page }) => {
@@ -730,6 +768,98 @@ test('incomplete calendar does not invent a total', async ({ page }) => {
   await page.goto('/calendar')
   await expect(page.getByText('Показаны не все матчи').first()).toBeVisible()
   await expect(page.locator('.meta span')).toHaveCount(0)
+})
+
+test('narrow tabs stay readable and the header keeps room for login', async ({ page }) => {
+  mkdirSync(outDir, { recursive: true })
+  await installApi(page)
+
+  await page.setViewportSize({ width: 375, height: 900 })
+  await page.goto('/matches/m-fin')
+  await expect(page.getByRole('button', { name: 'Протокол' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.match-tabs')
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'sticky')
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/match-tabs-375.png` })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/matches/m-fin')
+  await expect(page.getByRole('button', { name: 'Статистика' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.match-tabs', true)
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/match-tabs-1440.png` })
+
+  await page.setViewportSize({ width: 375, height: 900 })
+  await page.goto('/tournaments/liga-1')
+  await expect(page.getByRole('tab', { name: /Команды/ })).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Регламент' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.ttabs')
+  const tournamentFooter = await page.locator('.foot-ver').evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    return {
+      text: (el.textContent || '').trim(),
+      clipped: el.scrollWidth > el.clientWidth + 1,
+      left: box.left,
+      right: box.right,
+      view: window.innerWidth,
+    }
+  })
+  expect(tournamentFooter.clipped).toBe(false)
+  expect(tournamentFooter.left).toBeGreaterThanOrEqual(0)
+  expect(tournamentFooter.right).toBeLessThanOrEqual(tournamentFooter.view - 1)
+  expect(tournamentFooter.text).toMatch(/^v\d/)
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/tournament-tabs-375.png` })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/tournaments/liga-1')
+  await expect(page.getByRole('tab', { name: 'Регламент' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.ttabs', true)
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/tournament-tabs-1440.png` })
+
+  await page.setViewportSize({ width: 375, height: 900 })
+  await page.goto('/table?tournament=liga-1')
+  await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.league-tabs')
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/table-tabs-375.png` })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/table?tournament=liga-1')
+  await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+  await expectTabLabelsReadable(page, '.league-tabs', true)
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/table-tabs-1440.png` })
+
+  await page.setViewportSize({ width: 375, height: 1400 })
+  await page.goto('/')
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+  const header = await page.evaluate(() => {
+    const login = document.querySelector('.login-pill')!.getBoundingClientRect()
+    const burger = document.querySelector('.menu-button')!.getBoundingClientRect()
+    const ver = document.querySelector('.foot-ver') as HTMLElement
+    const box = ver.getBoundingClientRect()
+    return {
+      gap: burger.left - login.right,
+      burgerRight: burger.right,
+      loginLeft: login.left,
+      view: window.innerWidth,
+      verLeft: box.left,
+      verRight: box.right,
+      verText: (ver.textContent || '').trim(),
+      verClipped: ver.scrollWidth > ver.clientWidth + 1,
+    }
+  })
+  expect(header.gap).toBeGreaterThanOrEqual(18)
+  expect(header.loginLeft).toBeGreaterThan(40)
+  expect(header.burgerRight).toBeLessThanOrEqual(header.view - 4)
+  expect(header.verClipped).toBe(false)
+  expect(header.verLeft).toBeGreaterThanOrEqual(0)
+  expect(header.verRight).toBeLessThanOrEqual(header.view - 4)
+  expect(header.verText).toMatch(/^v\d/)
+  await stamp(page, 'left')
+  await page.screenshot({ path: `${outDir}/header-footer-375.png`, fullPage: true })
 })
 
 test('fixture screenshots of calendar, match and table', async ({ page }) => {

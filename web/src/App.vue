@@ -374,6 +374,7 @@ const stickyChrome = computed(() => {
   color: #3a4c63;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  max-width: 100%;
 }
 @media (min-width: 1024px) {
   .menu { display: none; }
@@ -390,9 +391,20 @@ const stickyChrome = computed(() => {
   .menu { display: block; }
   .account { display: none; }
   .nav-inner { min-height: 52px; }
-  .brand-name { font-size: 0.82rem; }
+  .brand { min-width: 0; }
+  .brand-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .login-pill { white-space: nowrap; flex-shrink: 0; }
+  .menu, .menu-button { flex-shrink: 0; margin-left: 0; }
+  .menu { margin-left: 0.5rem; }
 }
 @media (max-width: 720px) {
   .profile-button { width: 36px; height: 36px; }
+  .foot-inner { min-width: 0; padding-right: 0.15rem; }
+  .foot-ver {
+    min-width: 0;
+    white-space: normal;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

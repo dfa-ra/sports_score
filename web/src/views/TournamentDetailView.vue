@@ -843,7 +843,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 .figures .ls { display: none; }
 .fig-skel { width: 4.2rem; height: 2.6rem; border-radius: 10px; background: rgba(255,255,255,0.12); }
 .fig-error { display: grid; gap: 0.4rem; justify-items: end; color: #fff; }
-.tab-card { background: #fff; border-radius: 18px; padding: 0.2rem 0.6rem 0; }
+.tab-card { background: #fff; border-radius: 18px; padding: 0.2rem 0.6rem 0; min-width: 0; max-width: 100%; }
 .table-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 0.85rem; align-items: start; min-width: 0; }
 .card-block { background: #fff; border-radius: 18px; padding: 0.85rem 0.9rem 1rem; min-width: 0; overflow: hidden; }
 .table-side { display: grid; gap: 0.75rem; }
@@ -1029,10 +1029,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .ttabs button { padding: 0.75rem 0.8rem; }
   .meta { gap: 0.15rem 1rem; }
   .meta span + span::before { display: none; }
-  .ttabs {
-    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent);
-    mask-image: linear-gradient(90deg, #000 82%, transparent);
-  }
+  .ttabs { flex-wrap: wrap; overflow: visible; }
   .row.match-row {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }

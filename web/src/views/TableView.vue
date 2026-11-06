@@ -66,7 +66,7 @@ const tab = computed<Tab>(() => {
 })
 
 const tabBar = ref<HTMLElement | null>(null)
-const ink = ref({ x: 0, w: 0, slide: false })
+const ink = ref({ x: 0, y: 0, w: 0, slide: false })
 let inkObserver: ResizeObserver | null = null
 
 function placeInk(slide: boolean) {
@@ -75,6 +75,7 @@ function placeInk(slide: boolean) {
   if (!bar || !btn) return
   ink.value = {
     x: btn.offsetLeft,
+    y: btn.offsetTop + btn.offsetHeight - 3,
     w: btn.offsetWidth,
     slide: slide && ink.value.w > 0,
   }
@@ -314,7 +315,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <span
         class="tab-ink"
         :class="{ slide: ink.slide, ready: ink.w > 0 }"
-        :style="{ transform: `translateX(${ink.x}px)`, width: `${ink.w}px` }"
+        :style="{ transform: `translate(${ink.x}px, ${ink.y}px)`, width: `${ink.w}px` }"
       />
     </div>
 
@@ -468,7 +469,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 .tab-ink {
   position: absolute;
   left: 0;
-  bottom: 0;
+  top: 0;
   height: 3px;
   background: var(--ice);
   pointer-events: none;

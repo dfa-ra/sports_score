@@ -1517,6 +1517,8 @@ h2 a { color: inherit; }
   display: flex;
   gap: 0.2rem;
   overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
   position: sticky;
   top: 56px;
   z-index: 4;
@@ -1533,6 +1535,7 @@ h2 a { color: inherit; }
   padding: 0.7rem 0.4rem;
   border-bottom: 3px solid transparent;
   cursor: pointer;
+  white-space: nowrap;
 }
 .match-tabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
 .match-tabs .short { display: none; }
@@ -1602,6 +1605,8 @@ h2 a { color: inherit; }
 .empty-events { padding: 0.6rem 0; }
 @media (max-width: 720px) {
   .overview { grid-template-columns: 1fr; }
+  .match-tabs { flex-wrap: wrap; overflow: visible; }
+  .match-tabs button { flex: 1 1 auto; min-width: max-content; }
   .match-tabs .full { display: none; }
   .match-tabs .short { display: inline; }
   .pitch { border-radius: 18px; }
