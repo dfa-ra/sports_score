@@ -258,23 +258,6 @@ onMounted(() => {
       </label>
     </header>
 
-    <div v-if="!searching" class="chips-sticky">
-      <ScrollFade solid arrows fade="#e8eef4" :watch-key="chipId || 'all'">
-        <div class="chips" role="group" aria-label="Турнир статистики">
-          <button type="button" class="chip" :class="{ on: !chipId }" :aria-pressed="!chipId" @click="pickChip(null)">Все турниры</button>
-          <button
-            v-for="chip in chips"
-            :key="chip.id"
-            type="button"
-            class="chip"
-            :class="{ on: chipId === chip.id }"
-            :aria-pressed="chipId === chip.id"
-            @click="pickChip(chip.id)"
-          >{{ chip.name }}</button>
-        </div>
-      </ScrollFade>
-    </div>
-
     <template v-if="searching">
       <div v-if="searchState === 'loading'" class="sheet" aria-hidden="true">
         <div v-for="n in 4" :key="n" class="skel">
@@ -295,7 +278,7 @@ onMounted(() => {
         <p class="found">Найдено · {{ hits.length }}</p>
         <RouterLink v-for="hit in hits" :key="hit.id" class="hit" :to="`/players/${hit.id}`">
           <PlayerAvatar :src="hit.avatarUrl" :first-name="hit.firstName" :last-name="hit.lastName" :name="hit.name" :size="36" />
-          <span class="who">
+          <span class="who name-team">
             <span class="player-name">
               <template v-for="(part, index) in highlightParts(hit.name, query)" :key="index">
                 <mark v-if="part.hit">{{ part.text }}</mark>
@@ -304,7 +287,7 @@ onMounted(() => {
             </span>
             <span v-if="hit.team" class="club">
               <TeamCrest :name="hit.team" :src="hit.logo" :size="16" />
-              {{ hit.team }}
+              <span class="club-name">{{ hit.team }}</span>
             </span>
           </span>
           <span class="goals">{{ goalsAside(hit.goals) }}</span>
@@ -329,11 +312,11 @@ onMounted(() => {
           <p>Бомбардир</p>
           <div v-if="scorer" class="leader-row">
             <PlayerAvatar :src="scorer.avatarUrl" :first-name="scorer.firstName" :last-name="scorer.lastName" :name="nameOf(scorer)" :size="40" />
-            <span class="who">
+            <span class="who name-team">
               <RouterLink :to="`/players/${scorer.playerId}`">{{ nameOf(scorer) }}</RouterLink>
               <span v-if="teamName(scorer.teamId)" class="club">
                 <TeamCrest :name="teamName(scorer.teamId)" :src="scorer.teamLogoUrl || teams.logo(scorer.teamId)" :size="16" />
-                {{ teamName(scorer.teamId) }}
+                <span class="club-name">{{ teamName(scorer.teamId) }}</span>
               </span>
             </span>
             <span class="score"><b>{{ scorer.goals ?? 0 }}</b><small>{{ unitWord(scorer.goals || 0, 'goals') }}</small></span>
@@ -343,16 +326,33 @@ onMounted(() => {
           <p>Ассистент</p>
           <div v-if="assist" class="leader-row">
             <PlayerAvatar :src="assist.avatarUrl" :first-name="assist.firstName" :last-name="assist.lastName" :name="nameOf(assist)" :size="40" />
-            <span class="who">
+            <span class="who name-team">
               <RouterLink :to="`/players/${assist.playerId}`">{{ nameOf(assist) }}</RouterLink>
               <span v-if="teamName(assist.teamId)" class="club">
                 <TeamCrest :name="teamName(assist.teamId)" :src="assist.teamLogoUrl || teams.logo(assist.teamId)" :size="16" />
-                {{ teamName(assist.teamId) }}
+                <span class="club-name">{{ teamName(assist.teamId) }}</span>
               </span>
             </span>
             <span class="score"><b>{{ assist.assists ?? 0 }}</b><small>{{ unitWord(assist.assists || 0, 'assists') }}</small></span>
           </div>
         </article>
+      </div>
+
+      <div class="chips-sticky">
+        <ScrollFade solid arrows fade="#e8eef4" :watch-key="chipId || 'all'">
+          <div class="chips" role="group" aria-label="Турнир статистики">
+            <button type="button" class="chip" :class="{ on: !chipId }" :aria-pressed="!chipId" @click="pickChip(null)">Все турниры</button>
+            <button
+              v-for="chip in chips"
+              :key="chip.id"
+              type="button"
+              class="chip"
+              :class="{ on: chipId === chip.id }"
+              :aria-pressed="chipId === chip.id"
+              @click="pickChip(chip.id)"
+            >{{ chip.name }}</button>
+          </div>
+        </ScrollFade>
       </div>
 
       <div class="sheet">
@@ -382,11 +382,11 @@ onMounted(() => {
             <span class="place">{{ index + 1 }}</span>
             <span class="who row-who">
               <PlayerAvatar :src="row.avatarUrl" :first-name="row.firstName" :last-name="row.lastName" :name="nameOf(row)" :size="32" />
-              <span>
+              <span class="name-team">
                 <span class="player-name">{{ nameOf(row) }}</span>
                 <span v-if="teamName(row.teamId) || row.teamLogoUrl" class="club">
-                  <TeamCrest :name="teamName(row.teamId) || 'Команда'" :src="row.teamLogoUrl || teams.logo(row.teamId)" :size="24" />
-                  {{ teamName(row.teamId) }}
+                  <TeamCrest :name="teamName(row.teamId) || 'Команда'" :src="row.teamLogoUrl || teams.logo(row.teamId)" :size="16" />
+                  <span class="club-name">{{ teamName(row.teamId) }}</span>
                 </span>
               </span>
             </span>
@@ -425,7 +425,7 @@ onMounted(() => {
   opacity: 0.16;
   pointer-events: none;
 }
-.hero h1 { margin: 0; font-size: 2rem; letter-spacing: 0.04em; }
+.hero h1 { margin: 0; font-size: 2rem; letter-spacing: 0.04em; color: #fff; }
 .search { position: relative; display: block; }
 .search input {
   width: 100%;
@@ -469,9 +469,27 @@ onMounted(() => {
 .leader { padding: 0.75rem 0.85rem; }
 .leader p { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8b97a8; }
 .leader-row, .hit { display: flex; align-items: center; gap: 0.55rem; }
-.who { min-width: 0; display: grid; flex: 1; }
-.player-name, .who a { font-weight: 700; color: var(--navy); }
-.club { display: inline-flex; align-items: center; gap: 0.3rem; color: #6d7b8c; font-size: 0.75rem; }
+.who, .name-team {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+}
+.player-name, .who a { font-weight: 700; color: var(--navy); line-height: 1.2; min-width: 0; overflow-wrap: break-word; }
+.club {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  min-width: 0;
+  color: #6d7b8c;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+.club :deep(.team-crest),
+.club-name { line-height: 1.2; }
+.club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .score { text-align: right; }
 .score b { display: block; font-family: var(--font-display); font-size: 1.45rem; line-height: 1; color: var(--navy); }
 .score small { color: #8b97a8; font-size: 0.68rem; }

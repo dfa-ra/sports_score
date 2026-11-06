@@ -314,7 +314,7 @@ onMounted(() => {
   pointer-events: none;
 }
 .hero-top { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; padding-right: 4.5rem; }
-.hero h1 { margin: 0; font-size: 2rem; letter-spacing: 0.04em; }
+.hero h1 { margin: 0; font-size: 2rem; letter-spacing: 0.04em; color: #fff; }
 .figures { display: flex; gap: 1.15rem; }
 .figure { margin: 0; text-align: center; }
 .figure b { display: block; font-family: var(--font-display); font-size: 1.7rem; line-height: 1; }
