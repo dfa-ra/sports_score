@@ -252,7 +252,7 @@ onUnmounted(() => {
             <span class="st live on-dark">Live сейчас</span>
             <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="st paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="badge paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -285,7 +285,7 @@ onUnmounted(() => {
             <span class="st live on-dark">Live сейчас</span>
             <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="st paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="badge paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -718,9 +718,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   text-transform: none;
   letter-spacing: 0;
 }
-.lv .st.paused {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.86);
+.lv .badge.paused {
+  background: var(--status-warn-soft);
+  color: var(--status-warn-ink);
+  border-color: transparent;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .st.live::before {
   content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--status-live);
