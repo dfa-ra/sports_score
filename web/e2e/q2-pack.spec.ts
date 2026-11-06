@@ -379,6 +379,59 @@ test('players board, search highlight, and phone column', async ({ page }) => {
   await expect(page.getByText('Бомбардир')).toHaveCount(0)
 })
 
+test('player search count uses totalElements and show more loads the next page', async ({ page }) => {
+  const sizes: number[] = []
+  const people = [
+    ...Array.from({ length: 15 }, (_, index) => ({
+      id: `a${index}`,
+      firstName: 'Толян',
+      lastName: `Альфа${String(index).padStart(2, '0')}`,
+    })),
+    { id: 'cap', firstName: 'Толян', lastName: 'Капитанов' },
+    { id: 'free', firstName: 'Толян', lastName: 'Свободный' },
+  ]
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    if (path === '/api/v1/auth/me' || path === '/api/v1/auth/refresh') return json(route, { message: 'no' }, 401)
+    if (path === '/api/v1/players') {
+      const size = Number(url.searchParams.get('size') || '10')
+      sizes.push(size)
+      const sorted = [...people].sort((a, b) => a.lastName.localeCompare(b.lastName, 'ru'))
+      return json(route, {
+        content: sorted.slice(0, size),
+        totalElements: people.length,
+        totalPages: Math.ceil(people.length / size),
+      })
+    }
+    if (path.endsWith('/card')) return json(route, {})
+    return json(route, { content: [] })
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/players')
+  await page.getByLabel('Поиск игрока').fill('Толян')
+  await expect(page.getByText('Найдено · 17')).toBeVisible()
+  await expect(page.locator('.hit')).toHaveCount(10)
+  await expect(page.getByText('Капитанов Толян')).toHaveCount(0)
+  await expect(page.getByText('Свободный Толян')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Показать ещё' })).toBeVisible()
+  await shot(page, 'q2-players-search-more-1440')
+
+  await page.setViewportSize({ width: 375, height: 812 })
+  await noHorizontalScroll(page)
+  await shot(page, 'q2-players-search-more-375')
+
+  await page.getByRole('button', { name: 'Показать ещё' }).click()
+  await expect(page.getByText('Найдено · 17')).toBeVisible()
+  await expect(page.locator('.hit')).toHaveCount(17)
+  await expect(page.getByText('Капитанов Толян')).toBeVisible()
+  await expect(page.getByText('Свободный Толян')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Показать ещё' })).toHaveCount(0)
+  expect(sizes[0]).toBe(10)
+  expect(sizes.at(-1)).toBe(20)
+})
+
 test('login copy, field errors, and the phone plate', async ({ page }) => {
   let loginMode: 'ok' | 'pair' | 'down' | 'hold' = 'pair'
   let releaseLogin: () => void = () => {}

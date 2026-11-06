@@ -55,6 +55,8 @@ const limit = ref(10)
 const loading = ref(true)
 const error = ref('')
 const hits = ref<Hit[]>([])
+const searchLimit = ref(10)
+const searchTotal = ref(0)
 const searchState = ref<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle')
 let boardTicket = 0
 let searchTicket = 0
@@ -65,6 +67,7 @@ const tableRows = computed(() => (mode.value === 'goals' ? scorers.value : assis
 const scorer = computed(() => scorers.value[0] || null)
 const assist = computed(() => assists.value[0] || null)
 const canMore = computed(() => tableRows.value.length >= limit.value && tableRows.value.length > 0)
+const searchCanMore = computed(() => hits.value.length > 0 && hits.value.length < searchTotal.value)
 
 function nameOf(person?: Person | null) {
   return registeredName(person) || 'Игрок'
@@ -172,27 +175,34 @@ async function pool<T>(list: T[], limitSize: number, job: (item: T) => Promise<v
   await Promise.all(Array.from({ length: width }, () => worker()))
 }
 
-async function search() {
+async function search(more = false) {
   const q = query.value.trim()
   if (q.length < 2) {
     searchState.value = 'idle'
     hits.value = []
+    searchTotal.value = 0
     return
   }
   const mine = ++searchTicket
-  searchState.value = 'loading'
+  if (!more) searchState.value = 'loading'
   try {
-    const { data } = await api.get('/players', { params: { q, size: 12, sort: 'lastName,asc' } })
+    const { data } = await api.get('/players', { params: { q, size: searchLimit.value, sort: 'lastName,asc' } })
     if (mine !== searchTicket || query.value.trim() !== q) return
     const content = pageContent(data) as Person[]
+    const reported = Number((data as { totalElements?: unknown } | null)?.totalElements)
+    searchTotal.value = Number.isFinite(reported) ? reported : content.length
     const board = new Map<string, Person>()
     for (const row of [...scorers.value, ...assists.value]) {
       if (row.playerId) board.set(row.playerId, row)
     }
+    const kept = new Map(hits.value.map((hit) => [hit.id, hit]))
     const next: Hit[] = content.map((person) => {
       const id = String(person.id || person.playerId || '')
       const prior = board.get(id)
-      const extra = prior ? knownHit(prior) : { team: '', logo: '', goals: null as number | null }
+      const remembered = kept.get(id)
+      const extra = prior
+        ? knownHit(prior)
+        : { team: remembered?.team || '', logo: remembered?.logo || '', goals: remembered?.goals ?? null }
       return {
         id,
         name: nameOf(person),
@@ -210,8 +220,14 @@ async function search() {
   } catch {
     if (mine !== searchTicket || query.value.trim() !== q) return
     hits.value = []
+    searchTotal.value = 0
     searchState.value = 'error'
   }
+}
+
+function showMoreSearch() {
+  searchLimit.value += 10
+  void search(true)
 }
 
 function scheduleSearch() {
@@ -220,9 +236,12 @@ function scheduleSearch() {
   if (q.length < 2) {
     searchTicket += 1
     hits.value = []
+    searchTotal.value = 0
+    searchLimit.value = 10
     searchState.value = 'idle'
     return
   }
+  searchLimit.value = 10
   searchState.value = 'loading'
   searchTimer = window.setTimeout(() => { void search() }, 200)
 }
@@ -268,14 +287,14 @@ onMounted(() => {
       </div>
       <div v-else-if="searchState === 'error'" class="sheet note">
         <p>Игроки не загрузились</p>
-        <button class="btn" type="button" @click="search">Повторить</button>
+        <button class="btn" type="button" @click="search()">Повторить</button>
       </div>
       <div v-else-if="searchState === 'empty'" class="sheet note">
         <p>Игроков с таким именем нет</p>
         <p class="quiet">Проверьте написание</p>
       </div>
       <div v-else class="sheet">
-        <p class="found">Найдено · {{ hits.length }}</p>
+        <p class="found">Найдено · {{ searchTotal }}</p>
         <RouterLink v-for="hit in hits" :key="hit.id" class="hit" :to="`/players/${hit.id}`">
           <PlayerAvatar :src="hit.avatarUrl" :first-name="hit.firstName" :last-name="hit.lastName" :name="hit.name" :size="36" />
           <span class="who name-team">
@@ -292,6 +311,7 @@ onMounted(() => {
           </span>
           <span class="goals">{{ goalsAside(hit.goals) }}</span>
         </RouterLink>
+        <button v-if="searchCanMore" class="more" type="button" @click="showMoreSearch">Показать ещё</button>
       </div>
     </template>
 
