@@ -101,11 +101,19 @@ watch(compact, () => {
   closeMenus()
 })
 
+const stickyChrome = computed(() => {
+  const name = String(route.name || '')
+  if (name === 'calendar' || name === 'live' || name === 'match') return true
+  if (name === 'table') return String(route.query.tab || 'table') !== 'playoff'
+  if (name === 'tournament') return String(route.query.tab || '') === 'table'
+  return false
+})
+
 </script>
 
 <template>
   <div class="shell" :data-mood="mood">
-    <header class="chrome">
+    <header class="chrome" :class="{ pin: stickyChrome }">
       <div class="nav-bar">
         <div class="container nav-inner">
           <RouterLink class="brand" to="/" :title="SITE_NAME">
@@ -199,6 +207,11 @@ watch(compact, () => {
 .shell { min-height: 100vh; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; }
 .shell > * { min-width: 0; }
 .chrome { background: var(--navy); color: #fff; }
+.chrome.pin {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
 .nav-inner {
   display: flex;
   align-items: center;
@@ -361,6 +374,7 @@ watch(compact, () => {
   color: #3a4c63;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  max-width: 100%;
 }
 @media (min-width: 1024px) {
   .menu { display: none; }
@@ -377,9 +391,20 @@ watch(compact, () => {
   .menu { display: block; }
   .account { display: none; }
   .nav-inner { min-height: 52px; }
-  .brand-name { font-size: 0.82rem; }
+  .brand { min-width: 0; }
+  .brand-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .login-pill { white-space: nowrap; flex-shrink: 0; }
+  .menu, .menu-button { flex-shrink: 0; margin-left: 0; }
+  .menu { margin-left: 0.5rem; }
 }
 @media (max-width: 720px) {
   .profile-button { width: 36px; height: 36px; }
+  .foot-inner { min-width: 0; padding-right: 0.15rem; }
+  .foot-ver {
+    min-width: 0;
+    white-space: normal;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

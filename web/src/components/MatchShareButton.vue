@@ -6,9 +6,10 @@ const props = defineProps<{
   awayName: string
   homeScore: number
   awayScore: number
+  scoreText?: string
 }>()
 
-const text = computed(() => `${props.homeName} ${props.homeScore}:${props.awayScore} ${props.awayName}`)
+const text = computed(() => `${props.homeName} ${props.scoreText || `${props.homeScore}:${props.awayScore}`} ${props.awayName}`)
 
 async function share() {
   const url = window.location.href
@@ -32,12 +33,13 @@ async function share() {
 
 <style scoped>
 .share {
-  margin-top: 0.35rem;
-  border: 1px solid var(--line);
-  background: #fff;
+  margin-top: 0.7rem;
+  border: 0;
+  background: var(--ice);
   color: var(--navy);
   border-radius: 999px;
-  padding: 0.22rem 0.7rem;
+  padding: 0.4rem 0.95rem;
+  font-weight: 800;
   font-size: 0.72rem;
   font-weight: 800;
   cursor: pointer;

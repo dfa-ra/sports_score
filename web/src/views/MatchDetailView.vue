@@ -5,18 +5,18 @@ import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventLabel, formatClock, isOwnGoal, labelOf, matchListWhen, periodLabel, playerTag } from '../lib/format'
+import { eventLabel, isOwnGoal, labelOf, periodLabel, playerTag, statusLabel } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
-import MatchStageNote from '../components/MatchStageNote.vue'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
+import { cardScoreText } from '../lib/calendarFeed'
+import { aboutStage, formMarks, refereeNames, venueLabel } from '../lib/matchPresentation'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
-import PlayerAvatar from '../components/PlayerAvatar.vue'
 import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
@@ -25,7 +25,6 @@ import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
 import PenaltyShootoutAdmin from '../components/PenaltyShootoutAdmin.vue'
-import ScorePop from '../components/ScorePop.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import MatchAnalystStats from '../components/MatchAnalystStats.vue'
 
@@ -41,8 +40,9 @@ const referees = ref<any[]>([])
 const lineups = ref<any>(null)
 const homeForm = ref<any[]>([])
 const awayForm = ref<any[]>([])
-const allMatches = ref<any[]>([])
+const formError = ref(false)
 const tournament = ref<any>(null)
+const loading = ref(true)
 const me = ref<any>(null)
 const users = ref<any[]>([])
 const refereeId = ref('')
@@ -75,7 +75,7 @@ const pending = ref(false)
 const missing = ref(false)
 const teams = useTeamDirectory()
 const fav = useFavorites()
-const { minute, expired, cap } = useMatchClock(match)
+const { minute, expired } = useMatchClock(match)
 let client: Client | null = null
 let pollTimer = 0
 
@@ -84,30 +84,14 @@ const timeline = computed(() =>
     .filter((event) => !event.voided)
     .sort(compareMatchEvents),
 )
-const headToHead = computed(() => {
-  if (!match.value) return []
-  const a = match.value.homeTeamId
-  const b = match.value.awayTeamId
-  return allMatches.value
-    .filter((row) =>
-      (row.status === 'FINISHED' || row.status === 'CANCELLED')
-      && row.id !== match.value.id
-      && ((row.homeTeamId === a && row.awayTeamId === b) || (row.homeTeamId === b && row.awayTeamId === a))
-    )
-    .slice()
-    .sort((x, y) => String(matchInstant(y) || '').localeCompare(String(matchInstant(x) || '')))
-    .slice(0, 5)
-})
+const homeMarks = computed(() => formMarks(homeForm.value, match.value?.homeTeamId))
+const awayMarks = computed(() => formMarks(awayForm.value, match.value?.awayTeamId))
+const publicReferees = computed(() => refereeNames(referees.value))
+const stageText = computed(() => aboutStage(match.value, tournament.value))
+const placeText = computed(() => venueLabel(match.value?.venue))
+const heroScore = computed(() => match.value ? cardScoreText(match.value) : '')
+const tournamentTitle = computed(() => tournament.value?.name || match.value?.tournamentName || 'Турнир')
 
-function formSide(row: any, side: 'home' | 'away') {
-  const id = side === 'home' ? row.homeTeamId : row.awayTeamId
-  const apiName = side === 'home' ? row.homeTeamName : row.awayTeamName
-  const apiLogo = side === 'home' ? row.homeLogoUrl : row.awayLogoUrl
-  return {
-    name: apiName || teams.fullName(id),
-    logo: apiLogo || teams.logo(id),
-  }
-}
 const protocolMinuteMax = computed(() =>
   protocolMinuteLimit(match.value?.periodLengthSeconds, match.value?.periodCount),
 )
@@ -139,8 +123,6 @@ function playersOf(teamId: string) {
 }
 
 const protocolPlayers = computed(() => playersOf(protocolTeamId.value))
-
-const playerOfTheMatchName = computed(() => registeredName(match.value?.playerOfTheMatch))
 
 const goalPlayerOptions = computed(() => {
   if (!match.value) return []
@@ -336,20 +318,7 @@ async function load() {
       awayRoster.value = []
     }
   }
-  try {
-    const [hf, af, games] = await Promise.all([
-      api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
-      api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
-      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
-    ])
-    homeForm.value = [...(hf.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
-    awayForm.value = [...(af.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
-    allMatches.value = games.data.content ?? []
-  } catch {
-    homeForm.value = []
-    awayForm.value = []
-    allMatches.value = []
-  }
+  await loadForms(m.data.homeTeamId, m.data.awayTeamId)
   try {
     const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
     tournament.value = data
@@ -379,10 +348,47 @@ async function load() {
     if (status === 400 || status === 404) {
       match.value = null
       missing.value = true
+      error.value = ''
       return
     }
-    error.value = apiError(e, 'Матч не загрузился.')
+    if (!match.value) error.value = 'Матч не загрузился'
+  } finally {
+    loading.value = false
   }
+}
+
+async function loadForms(homeTeamId?: string, awayTeamId?: string) {
+  formError.value = false
+  if (!homeTeamId || !awayTeamId) {
+    homeForm.value = []
+    awayForm.value = []
+    return
+  }
+  try {
+    const [hf, af] = await Promise.all([
+      api.get(`/teams/${homeTeamId}/form`, { params: { limit: 5 } }),
+      api.get(`/teams/${awayTeamId}/form`, { params: { limit: 5 } }),
+    ])
+    homeForm.value = hf.data ?? []
+    awayForm.value = af.data ?? []
+  } catch {
+    homeForm.value = []
+    awayForm.value = []
+    formError.value = true
+  }
+}
+
+function markClass(mark: string) {
+  if (mark === 'В') return 'win'
+  if (mark === 'Н') return 'draw'
+  return 'loss'
+}
+
+function blockScore(value?: string | null) {
+  if (!value) return ''
+  const parts = String(value).split('-')
+  if (parts.length !== 2) return value
+  return `${parts[0]} : ${parts[1]}`
 }
 
 function eventSignature(list: any[]) {
@@ -658,73 +664,50 @@ onUnmounted(() => {
 
 <template>
   <MatchGoalAlerts headless />
-  <section v-if="match" class="stack">
-    <RouterLink v-if="match.tournamentId" class="league-bar" :to="`/tournaments/${match.tournamentId}`">
-      {{ tournament?.name || 'Турнир' }}
-      <span>›</span>
-    </RouterLink>
-    <p v-else class="league-bar">{{ tournament?.name || 'Матч' }}</p>
-
-    <MatchStageNote variant="protocol" :match="match" />
-    <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
-
-    <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <p class="when">{{ matchCardWhen(match) }}</p>
-      <div class="club">
-        <button
-          class="star"
-          type="button"
-          :class="{ on: fav.hasTeam(match.homeTeamId) }"
-          :aria-label="teams.fullName(match.homeTeamId)"
-          @click="tapTeamStar('home', match.homeTeamId)"
-        ><span class="star-glyph" :key="homeStarTap" :class="{ 'star-tap': homeStarTap }">★</span></button>
-        <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
-          <TeamCrest enter-once :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="crestSize" />
-          <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
-        </RouterLink>
+  <section v-if="loading && !match" class="match-state" role="status">
+    <p>Загрузка матча…</p>
+    <span class="bar"></span>
+    <span class="bar short"></span>
+  </section>
+  <section v-else-if="match" class="stack match-page">
+    <header class="pitch">
+      <div class="pitch-top">
+        <RouterLink v-if="match.tournamentId" :to="`/tournaments/${match.tournamentId}`">‹ {{ tournamentTitle }}</RouterLink>
+        <span v-else>‹ {{ tournamentTitle }}</span>
+        <i class="pill" :class="(match.status || '').toLowerCase()">{{ statusLabel[match.status] || match.status }}</i>
       </div>
-      <div class="center">
-        <p v-if="pendingScore" class="score">{{ pendingScore }}</p>
-        <p v-else-if="shootoutScore" class="score shootout">{{ shootoutScore }}</p>
-        <p v-else class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
-        <p v-if="playerOfTheMatchName" :key="match.playerOfTheMatch.playerId" class="motm motm-enter">
-          <span>Игрок матча</span>
-          <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
-        </p>
-        <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
-          <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
-        </p>
-        <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
-          {{ match.periodCount }} × {{ formatClock(cap) }}
-        </p>
+      <div class="pitch-score">
+        <div class="pitch-side">
+          <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.homeTeamId) }" :aria-label="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" @click="tapTeamStar('home', match.homeTeamId)">★</button>
+          <RouterLink class="pitch-who" :to="`/teams/${match.homeTeamId}`">
+            <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="72" />
+            <strong>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</strong>
+          </RouterLink>
+        </div>
+        <div class="nums">
+          <b>{{ heroScore }}</b>
+          <p v-if="shootoutScore && !pendingScore" class="pens">{{ shootoutScore }}</p>
+          <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
+            <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
+          </p>
+        </div>
+        <div class="pitch-side away">
+          <RouterLink class="pitch-who" :to="`/teams/${match.awayTeamId}`">
+            <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="72" />
+            <strong>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</strong>
+          </RouterLink>
+          <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.awayTeamId) }" @click="tapTeamStar('away', match.awayTeamId)">★</button>
+        </div>
       </div>
-      <div class="club away">
-        <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
-          <TeamCrest enter-once :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="crestSize" />
-          <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
-        </RouterLink>
-        <button
-          class="star"
-          type="button"
-          :class="{ on: fav.hasTeam(match.awayTeamId) }"
-          @click="tapTeamStar('away', match.awayTeamId)"
-        ><span class="star-glyph" :key="awayStarTap" :class="{ 'star-tap': awayStarTap }">★</span></button>
-      </div>
-      <div class="under">
-        <p class="state" :class="{ done: match.status === 'FINISHED' }">
-          <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
-          {{ matchStateLabel(match.status) }}
-        </p>
-        <MatchShareButton
-          :home-name="teams.fullName(match.homeTeamId)"
-          :away-name="teams.fullName(match.awayTeamId)"
-          :home-score="match.homeScore"
-          :away-score="match.awayScore"
-        />
-      </div>
-    </div>
-
-    <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
+      <p class="pitch-meta">{{ matchCardWhen(match) }} · {{ placeText }}</p>
+      <MatchShareButton
+        :home-name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
+        :away-name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
+        :home-score="match.homeScore"
+        :away-score="match.awayScore"
+        :score-text="heroScore"
+      />
+    </header>
 
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
@@ -892,121 +875,85 @@ onUnmounted(() => {
       </form>
     </AdminOnly>
 
-    <div class="fs-tabs">
+    <div class="match-tabs" role="tablist">
       <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'"><span class="full">Статистика</span><span class="short">Стат.</span></button>
       <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
       <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
     </div>
 
-    <div v-if="tab === 'overview'" class="stack">
-      <FutsalBoard
-        :match="match"
-        :events="events"
-        :home-label="teams.fullName(match.homeTeamId)"
-        :away-label="teams.fullName(match.awayTeamId)"
-      />
-      <div class="sheet">
-        <template v-if="periodBlocks.length">
-          <section v-for="block in periodBlocks" :key="block.period">
-            <div class="half-head">
-              <span>{{ block.label }}</span>
-              <span>{{ block.score }}</span>
-            </div>
-            <div
-              v-for="ev in block.items"
-              :key="ev.id"
-              class="ev"
-              :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
-            >
-              <span class="who-ev">
-                <b class="who-name">
-                  <PlayerAvatar
-                    v-if="ev.playerId"
-                    :src="ev.playerAvatarUrl"
-                    :name="registeredName(ev) || ev.playerName"
-                    :first-name="ev.playerFirstName"
-                    :last-name="ev.playerLastName"
-                    :size="28"
-                  />
-                  <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
-                  <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
-                </b>
-                <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
-                <span v-if="ev.eventType === 'GOAL' && !isOwnGoal(ev) && registeredName(ev, 'secondary')" class="line">
-                  пас
-                  <RouterLink v-if="ev.secondaryPlayerId" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
-                  <template v-else>{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template>
-                </span>
-                <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
+    <div v-if="tab === 'overview'" class="overview">
+      <div class="stack">
+        <FutsalBoard
+          :match="match"
+          :events="events"
+          :home-label="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
+          :away-label="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
+        />
+        <section class="card events">
+          <header><b>События</b><span>{{ heroScore }}</span></header>
+          <p v-if="!periodBlocks.length" class="muted empty-events">Событий пока нет</p>
+          <template v-else>
+            <section v-for="block in periodBlocks" :key="block.period">
+              <div class="half">
+                <span>{{ block.label }}</span>
+                <span>{{ blockScore(block.score) }}</span>
+              </div>
+              <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
+                <div class="who">
+                  <b>
+                    <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
+                    <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
+                  </b>
+                  <span v-if="isOwnGoal(ev)">Автогол</span>
+                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')">пас · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-if="ev.scoreline" class="run">{{ blockScore(ev.scoreline) }}</span>
+                </div>
+                <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
+              </div>
+            </section>
+            <div class="total"><span>Итог</span><b>{{ heroScore }}</b></div>
+          </template>
+        </section>
+      </div>
+      <aside class="rail">
+        <section class="card">
+          <header><b>Форма</b><span>последние 5</span></header>
+          <div v-if="formError" class="fail">
+            <p>Форма не загрузилась</p>
+            <button class="btn secondary" type="button" @click="loadForms(match.homeTeamId, match.awayTeamId)">Повторить</button>
+          </div>
+          <template v-else>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</b>
+              <span class="marks">
+                <i v-for="(mark, index) in homeMarks" :key="`h-${index}`" :class="markClass(mark)">{{ mark }}</i>
+                <em v-if="!homeMarks.length">нет матчей</em>
               </span>
-              <i class="mark" :class="ev.eventType.toLowerCase()" />
-              <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
             </div>
-          </section>
-        </template>
-        <p v-else class="empty-line">Событий пока нет</p>
-      </div>
-      <div class="stack recent">
-        <div class="panel">
-          <h2>Последние игры <RouterLink :to="`/teams/${match.homeTeamId}`">{{ teams.fullName(match.homeTeamId) }}</RouterLink></h2>
-          <RouterLink
-            v-for="f in homeForm"
-            :key="f.id"
-            class="recent-row"
-            :to="`/matches/${f.id}`"
-          >
-            <span class="recent-side home">
-              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
-            </span>
-            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
-            <span class="recent-side away">
-              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
-            </span>
-            <span class="recent-when">{{ matchListWhen(f) }}</span>
-          </RouterLink>
-          <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
-        </div>
-        <div class="panel">
-          <h2>Последние игры <RouterLink :to="`/teams/${match.awayTeamId}`">{{ teams.fullName(match.awayTeamId) }}</RouterLink></h2>
-          <RouterLink
-            v-for="f in awayForm"
-            :key="f.id"
-            class="recent-row"
-            :to="`/matches/${f.id}`"
-          >
-            <span class="recent-side home">
-              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
-            </span>
-            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
-            <span class="recent-side away">
-              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
-            </span>
-            <span class="recent-when">{{ matchListWhen(f) }}</span>
-          </RouterLink>
-          <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
-        </div>
-        <div class="panel">
-          <h2>Очные встречи</h2>
-          <RouterLink v-for="f in headToHead" :key="f.id" class="muted recent-line" :to="`/matches/${f.id}`">
-            <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
-            {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
-            <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
-            · {{ matchListWhen(f) }}
-          </RouterLink>
-          <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
-        </div>
-      </div>
-      <div v-if="referees.length || auth.canOfficiate" class="panel stack">
-        <h2>Бригада</h2>
-        <p v-for="r in referees" :key="r.id" class="muted">Судья {{ registeredName(r) || r.email || r.refereeId }}</p>
-        <p v-if="!referees.length" class="muted">Судья не назначен.</p>
-        <RouterLink v-if="canUsePad" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
-      </div>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</b>
+              <span class="marks">
+                <i v-for="(mark, index) in awayMarks" :key="`a-${index}`" :class="markClass(mark)">{{ mark }}</i>
+                <em v-if="!awayMarks.length">нет матчей</em>
+              </span>
+            </div>
+          </template>
+        </section>
+        <section class="card about">
+          <header><b>О матче</b></header>
+          <dl>
+            <div><dt>Турнир</dt><dd><RouterLink v-if="match.tournamentId" :to="`/tournaments/${match.tournamentId}`">{{ tournamentTitle }}</RouterLink><template v-else>{{ tournamentTitle }}</template></dd></div>
+            <div><dt>Стадия</dt><dd>{{ stageText }}</dd></div>
+            <div><dt>Дата</dt><dd>{{ matchCardWhen(match) }}</dd></div>
+            <div><dt>Место</dt><dd>{{ placeText }}</dd></div>
+            <div><dt>Судьи</dt><dd>{{ publicReferees.length ? publicReferees.join(', ') : 'Судьи не назначены' }}</dd></div>
+          </dl>
+          <RouterLink v-if="canUsePad" class="btn secondary pad" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
+        </section>
+      </aside>
     </div>
 
     <div v-else-if="tab === 'stats'">
@@ -1064,10 +1011,13 @@ onUnmounted(() => {
     </div>
 
   </section>
-  <section v-else-if="missing" class="stack">
+  <section v-else-if="missing" class="match-state">
     <h1>Матч не найден</h1>
   </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
+  <section v-else-if="error" class="match-state">
+    <strong>Матч не загрузился</strong>
+    <button class="btn secondary" type="button" @click="load">Повторить</button>
+  </section>
 </template>
 
 <style scoped>
@@ -1480,5 +1430,186 @@ h2 a { color: inherit; }
     gap: 0.35rem 0.3rem;
   }
   .score { font-size: 1.75rem; }
+}
+.match-state {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 1.4rem 1rem;
+  background: #fff;
+  border-radius: 18px;
+  text-align: center;
+}
+.match-state h1 { font-size: 1.4rem; text-transform: none; }
+.bar {
+  display: block;
+  width: min(100%, 28rem);
+  height: 4.5rem;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #d5e0ec 25%, #eef3f8 50%, #d5e0ec 75%);
+  background-size: 200% 100%;
+}
+.bar.short { width: min(100%, 16rem); height: 2.2rem; }
+.pitch {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 22px;
+  padding: 1rem 1.1rem 1.15rem;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.pitch-top, .pitch-score {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.pitch-top a, .pitch-top span { color: var(--ice); font-weight: 800; text-decoration: none; }
+.pill {
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.pill.live { background: var(--status-live-soft); color: #ffd2cb; }
+.pill.paused { background: var(--status-warn-soft); color: #ffe0a8; }
+.pill.finished { background: rgba(255,255,255,0.14); }
+.pill.cancelled { color: rgba(255,255,255,0.65); }
+.pitch-score { margin-top: 0.8rem; align-items: flex-start; }
+.pitch-side { display: grid; justify-items: center; gap: 0.35rem; min-width: 0; flex: 1; }
+.pitch-who {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: #fff;
+  text-decoration: none;
+  min-width: 0;
+}
+.pitch-who strong {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: none;
+}
+.nums b {
+  display: block;
+  color: #fff;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.pens, .clock { margin: 0.15rem 0 0; color: rgba(255,255,255,0.75); font-size: 0.85rem; }
+.pitch-meta { margin: 0.75rem 0 0; color: rgba(255,255,255,0.78); }
+.fav-star {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.fav-star.on { color: var(--ice); }
+.match-tabs {
+  display: flex;
+  gap: 0.2rem;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  background: #fff;
+  border-radius: 18px;
+  padding: 0.25rem;
+}
+.match-tabs button {
+  flex: 1 1 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 0.7rem 0.4rem;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.match-tabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
+.match-tabs .short { display: none; }
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 0.9rem;
+  align-items: start;
+}
+.card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem 1rem;
+  min-width: 0;
+}
+.card header, .half, .total {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+.card header b, .half span, .total span { color: var(--navy); }
+.half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
+.ev { display: flex; justify-content: space-between; gap: 0.6rem; }
+.ev .who { display: grid; justify-items: end; text-align: right; min-width: 0; }
+.ev.away .who { justify-items: start; text-align: left; }
+.ev b a { color: inherit; text-decoration: none; }
+.run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
+.total {
+  margin-top: 0.35rem;
+  background: #eef5fb;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+}
+.total b { color: var(--navy); font-variant-numeric: tabular-nums; }
+.rail { display: grid; gap: 0.75rem; }
+.form-row, .about dl div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.4rem 0;
+}
+.about dl { margin: 0; }
+.about dl div { grid-template-columns: 5.5rem minmax(0, 1fr); }
+.about dt { color: var(--muted); font-weight: 700; }
+.about dd { margin: 0; text-align: right; color: var(--navy); font-weight: 700; }
+.marks { display: flex; gap: 0.25rem; }
+.marks i {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: var(--muted);
+}
+.marks i.win { background: var(--status-ok); }
+.marks i.draw { background: var(--status-warn); }
+.marks i.loss { background: var(--danger); }
+.marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
+.fail { display: grid; justify-items: center; gap: 0.5rem; }
+.pad { justify-self: start; margin-top: 0.6rem; }
+.empty-events { padding: 0.6rem 0; }
+@media (max-width: 720px) {
+  .overview { grid-template-columns: 1fr; }
+  .match-tabs { flex-wrap: wrap; overflow: visible; }
+  .match-tabs button { flex: 1 1 auto; min-width: max-content; }
+  .match-tabs .full { display: none; }
+  .match-tabs .short { display: inline; }
+  .pitch { border-radius: 18px; }
+  .pitch-who strong { font-size: 0.85rem; }
 }
 </style>

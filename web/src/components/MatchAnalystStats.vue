@@ -1,66 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import api from '../api/client'
+import { analystRows } from '../lib/matchPresentation'
 
 const props = defineProps<{ matchId: string }>()
 const stats = ref<any>(null)
 const ready = ref(false)
+const failed = ref(false)
 let timer = 0
 
-const visible = computed(() => {
-  const current = stats.value
-  if (!current) return false
-  if (current.possessionTracked) return true
-  return [current.home, current.away].some((side) => side && (
-    side.shots || side.shotsOnTarget || side.saves || side.corners
-    || side.fouls || side.freeKicks || side.kickIns || side.woodwork
-  ))
-})
-
-type StatRow = { label: string; hint?: string; home: string | number; away: string | number }
-
-const rows = computed<StatRow[]>(() => {
-  const home = stats.value?.home ?? {}
-  const away = stats.value?.away ?? {}
-  return [
-    {
-      label: 'Удары',
-      hint: 'в створ',
-      home: `${home.shots ?? 0} / ${home.shotsOnTarget ?? 0}`,
-      away: `${away.shots ?? 0} / ${away.shotsOnTarget ?? 0}`,
-    },
-    { label: 'Сейвы', home: home.saves ?? 0, away: away.saves ?? 0 },
-    { label: 'Угловые', home: home.corners ?? 0, away: away.corners ?? 0 },
-    { label: 'Фолы', home: home.fouls ?? 0, away: away.fouls ?? 0 },
-    { label: 'Штрафные', home: home.freeKicks ?? 0, away: away.freeKicks ?? 0 },
-    { label: 'Ауты', home: home.kickIns ?? 0, away: away.kickIns ?? 0 },
-    { label: 'Каркас', home: home.woodwork ?? 0, away: away.woodwork ?? 0 },
-  ]
-})
-
-const homeWidth = computed(() => {
-  const total = (stats.value?.homePossessionSeconds ?? 0) + (stats.value?.awayPossessionSeconds ?? 0)
-  if (!total) return 0
-  return stats.value?.homePossessionPercent ?? 0
-})
-
-const awayWidth = computed(() => {
-  const total = (stats.value?.homePossessionSeconds ?? 0) + (stats.value?.awayPossessionSeconds ?? 0)
-  if (!total) return 0
-  return stats.value?.awayPossessionPercent ?? 0
-})
+const view = computed(() => (stats.value ? analystRows(stats.value) : null))
 
 async function load() {
   if (!props.matchId) {
     stats.value = null
     ready.value = true
+    failed.value = false
     return
   }
   try {
     const { data } = await api.get(`/matches/${props.matchId}/analyst-stats`)
     stats.value = data
+    failed.value = false
   } catch {
     stats.value = null
+    failed.value = true
   } finally {
     ready.value = true
   }
@@ -73,6 +37,7 @@ onMounted(() => {
 onUnmounted(() => window.clearInterval(timer))
 watch(() => props.matchId, () => {
   ready.value = false
+  failed.value = false
   load()
 })
 </script>
@@ -81,27 +46,33 @@ watch(() => props.matchId, () => {
   <section class="panel analyst">
     <h2>Статистика</h2>
     <p v-if="!ready" class="muted quiet">Загрузка…</p>
-    <p v-else-if="!visible" class="muted quiet">Статистики пока нет.</p>
-    <template v-else>
-    <div v-for="row in rows" :key="row.label" class="line">
-      <strong>{{ row.home }}</strong>
-      <span>
-        {{ row.label }}
-        <small v-if="row.hint">{{ row.hint }}</small>
-      </span>
-      <strong>{{ row.away }}</strong>
+    <div v-else-if="failed" class="fail">
+      <strong>Статистика не загрузилась</strong>
+      <button class="btn secondary" type="button" @click="load">Повторить</button>
     </div>
-    <div v-if="stats.possessionTracked" class="poss">
-      <div class="bar">
-        <i class="home" :style="{ width: homeWidth + '%' }" />
-        <i class="away" :style="{ width: awayWidth + '%' }" />
+    <template v-else-if="view">
+      <div v-for="row in view.rows" :key="row.label" class="line">
+        <strong>{{ row.home }}</strong>
+        <span>
+          {{ row.label }}
+          <small v-if="row.hint">{{ row.hint }}</small>
+        </span>
+        <strong>{{ row.away }}</strong>
       </div>
-      <div class="pct">
-        <b>{{ stats.homePossessionPercent ?? 0 }}%</b>
-        <span>Владение</span>
-        <b>{{ stats.awayPossessionPercent ?? 0 }}%</b>
+      <div class="poss">
+        <template v-if="view.possession.kind === 'nums'">
+          <div class="bar">
+            <i class="home" :style="{ width: view.possession.home + '%' }" />
+            <i class="away" :style="{ width: view.possession.away + '%' }" />
+          </div>
+          <div class="pct">
+            <b>{{ view.possession.home }}%</b>
+            <span>Владение</span>
+            <b>{{ view.possession.away }}%</b>
+          </div>
+        </template>
+        <p v-else class="quiet">Владение — нет данных</p>
       </div>
-    </div>
     </template>
   </section>
 </template>
@@ -109,6 +80,7 @@ watch(() => props.matchId, () => {
 <style scoped>
 .analyst { display: grid; gap: 0.15rem; }
 .quiet { margin: 0; font-size: 0.9rem; }
+.fail { display: grid; justify-items: center; gap: 0.6rem; padding: 0.8rem 0; }
 h2 { font-size: 1.05rem; margin: 0 0 0.35rem; }
 .line {
   display: grid;
