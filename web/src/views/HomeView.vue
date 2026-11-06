@@ -754,7 +754,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .stbl th.num,
 .stbl td.num {
   width: 5.5rem;
-  text-align: right;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+  text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -764,11 +766,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .stbl td.tm { width: 11rem; }
 .stbl .tm { color: var(--muted); font-weight: 600; }
 .stbl td:nth-child(2) { overflow: hidden; }
+.stbl th.num:last-child,
 .stbl td.num.g {
   margin: 0;
   width: 5.5rem;
   padding: 0.6rem 0.8rem;
+  text-align: center;
   font-variant-numeric: tabular-nums;
+}
+.stbl td.num.g {
   font-weight: 800;
   font-size: 1.125rem;
   color: var(--navy);

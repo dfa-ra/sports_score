@@ -382,17 +382,18 @@ test('home fixture matches the approved blocks on desktop and phone', async ({ p
     await expect(page.getByText('Тур 6')).toHaveCount(0)
     if (width === 1440) {
       const edges = await page.locator('.stbl').evaluate((table) => {
-        const inkRight = (el: Element) => {
+        const inkCenter = (el: Element) => {
           const range = document.createRange()
           range.selectNodeContents(el)
-          return range.getBoundingClientRect().right
+          const rect = range.getBoundingClientRect()
+          return (rect.left + rect.right) / 2
         }
         const headers = [...table.querySelectorAll('th.num')]
-        const cells = [...table.querySelectorAll('tbody tr:first-child td.num')]
+        const rows = [...table.querySelectorAll('tbody tr')].map((row) => [...row.querySelectorAll('td.num')])
         const box = (el: Element) => {
           const style = getComputedStyle(el)
           return {
-            right: inkRight(el),
+            center: inkCenter(el),
             width: el.getBoundingClientRect().width,
             tabular: style.fontVariantNumeric,
             margin: style.margin,
@@ -401,29 +402,35 @@ test('home fixture matches the approved blocks on desktop and phone', async ({ p
           }
         }
         return {
-          columns: headers.map((header, index) => ({ header: box(header), cell: box(cells[index]) })),
+          columns: headers.map((header, index) => ({
+            header: box(header),
+            cells: rows.map((row) => box(row[index])),
+          })),
           player: getComputedStyle(table.querySelector('tbody td:nth-child(2)')!).textAlign,
           team: getComputedStyle(table.querySelector('tbody td.tm')!).textAlign,
         }
       })
-      const widths = edges.columns.flatMap((column) => [column.header.width, column.cell.width])
+      const widths = edges.columns.flatMap((column) => [column.header.width, ...column.cells.map((cell) => cell.width)])
       expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1)
       for (const column of edges.columns) {
-        expect(Math.abs(column.header.right - column.cell.right)).toBeLessThanOrEqual(2)
         expect(column.header.tabular).toBe('tabular-nums')
-        expect(column.cell.tabular).toBe('tabular-nums')
-        expect(column.header.align).toBe('right')
-        expect(column.cell.align).toBe('right')
+        expect(column.header.align).toBe('center')
+        for (const cell of column.cells) {
+          expect(Math.abs(column.header.center - cell.center)).toBeLessThanOrEqual(2)
+          expect(cell.tabular).toBe('tabular-nums')
+          expect(cell.align).toBe('center')
+        }
       }
-      const goals = edges.columns[2].cell
-      const assists = edges.columns[1].cell
-      expect(goals.margin).toBe('0px')
-      expect(goals.padding).toBe(assists.padding)
-      expect(goals.width).toBe(assists.width)
+      const goals = edges.columns[2]
+      const assists = edges.columns[1].cells[0]
+      expect(goals.header.padding).toBe(goals.cells[0].padding)
+      expect(goals.cells[0].margin).toBe('0px')
+      expect(goals.cells[0].padding).toBe(assists.padding)
+      expect(goals.cells[0].width).toBe(assists.width)
       expect(edges.player).toBe('start')
       expect(edges.team).toBe('start')
       await page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Бомбардиры по турнирам' }) })
-        .screenshot({ path: `${OUT}/home-scorers-desktop-aligned.png` })
+        .screenshot({ path: `${OUT}/home-scorers-desktop-centered.png` })
     }
     if (width === 375) await noOverflow(page)
     await page.screenshot({ path: `${OUT}/home-a-${width === 1440 ? 'desktop' : 'mobile'}-fixture.png`, fullPage: true })
