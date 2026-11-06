@@ -5,6 +5,8 @@ import { Client } from '@stomp/stompjs'
 import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
+import ScrollFade from '../components/ScrollFade.vue'
+import { vFitText } from '../lib/fitLabel'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import {
   badgeClass,
@@ -324,17 +326,25 @@ onUnmounted(() => {
         </div>
         <template v-else>
           <div class="filters">
-            <div class="chips">
-              <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">Все турниры</button>
-              <button
-                v-for="tournament in matchChips"
-                :key="tournament.id"
-                class="chip"
-                :class="{ on: chip === tournament.id }"
-                type="button"
-                @click="chip = tournament.id"
-              >{{ tournament.shortName || tournament.name }}</button>
-            </div>
+            <ScrollFade arrows fade="#ffffff">
+              <div class="chips">
+                <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">
+                  <span class="chip-label">Все турниры</span>
+                </button>
+                <button
+                  v-for="tournament in matchChips"
+                  :key="tournament.id"
+                  class="chip"
+                  :class="{ on: chip === tournament.id }"
+                  type="button"
+                  :title="tournament.shortName || tournament.name"
+                  :aria-label="tournament.shortName || tournament.name"
+                  @click="chip = tournament.id"
+                >
+                  <span class="chip-label" v-fit-text="tournament.shortName || tournament.name" :title="tournament.shortName || tournament.name"></span>
+                </button>
+              </div>
+            </ScrollFade>
           </div>
           <p v-if="!upcoming.length && !recent.length" class="block-empty">Матчей пока нет</p>
           <div v-else class="feed-list">
@@ -375,7 +385,8 @@ onUnmounted(() => {
               </RouterLink>
             </div>
           </div>
-          <div v-if="upcoming.length || recent.length" class="feed-cards">
+          <ScrollFade v-if="upcoming.length || recent.length" fade="#ffffff">
+          <div class="feed-cards">
             <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
               <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b class="dim">{{ scoreText(match, 'home') }}</b></div>
@@ -389,6 +400,7 @@ onUnmounted(() => {
               <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
             </RouterLink>
           </div>
+          </ScrollFade>
           <RouterLink class="more" to="/calendar">Все игры →</RouterLink>
         </template>
       </div>
@@ -484,15 +496,21 @@ onUnmounted(() => {
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
       </div>
       <div v-else class="card">
-        <div v-if="scorerGroups.length" class="tabs">
-          <button
-            v-for="group in scorerGroups"
-            :key="group.tournamentId"
-            type="button"
-            :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
-            @click="scorerTab = group.tournamentId"
-          >{{ group.shortName || group.tournamentName }}</button>
-        </div>
+        <ScrollFade v-if="scorerGroups.length" arrows fade="#ffffff" :watch-key="activeScorers?.tournamentId || ''">
+          <div class="tabs">
+            <button
+              v-for="group in scorerGroups"
+              :key="group.tournamentId"
+              type="button"
+              :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
+              :title="group.shortName || group.tournamentName"
+              :aria-label="group.shortName || group.tournamentName"
+              @click="scorerTab = group.tournamentId"
+            >
+              <span class="tab-label" v-fit-text:tab="group.shortName || group.tournamentName" :title="group.shortName || group.tournamentName"></span>
+            </button>
+          </div>
+        </ScrollFade>
         <p v-if="!activeScorers?.scorers.length" class="block-empty">Голов пока нет</p>
         <template v-else>
           <table class="stbl">
@@ -704,15 +722,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .chips {
   gap: 0.45rem;
   padding: 0.15rem 0 0.25rem;
-  scroll-padding-inline: 1.7rem;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 18px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 18px), transparent);
+  scroll-padding-inline: 1.7rem 3.25rem;
 }
-.chips::before,
-.chips::after {
-  content: "";
-  flex: 0 0 1.7rem;
-}
+.chips::before { content: ""; flex: 0 0 1.7rem; }
+.chips::after { content: ""; flex: 0 0 3.25rem; }
+.chip-label, .tab-label { display: inline-block; max-width: 100%; vertical-align: bottom; }
 .chip, .tabs button {
   flex: 0 0 auto; white-space: nowrap; border: 1px solid var(--line); background: #fff; color: var(--navy);
   border-radius: 999px; padding: 0.45rem 0.85rem; font-family: var(--font-display);
@@ -723,15 +737,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   gap: 0;
   border-bottom: 1px solid var(--line);
   padding: 0;
-  scroll-padding-inline: 1rem;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  scroll-padding-inline: 0.75rem;
 }
-.tabs::before,
-.tabs::after {
-  content: "";
-  flex: 0 0 1rem;
-}
+.tabs::before { content: ""; flex: 0 0 1rem; }
+.tabs::after { content: ""; flex: 0 0 3.25rem; }
 .tabs button {
   border: 0;
   border-radius: 0;
@@ -921,13 +930,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
     scrollbar-width: none;
     min-width: 0;
     width: 100%;
-    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 16px), transparent);
-    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 16px), transparent);
   }
   .feed-cards::-webkit-scrollbar { display: none; }
   .mc {
     flex: 0 0 auto;
-    width: calc(100% - 2.75rem);
+    width: calc(100% - 3.25rem);
     box-sizing: border-box;
     scroll-snap-align: start;
     border: 1px solid var(--line);

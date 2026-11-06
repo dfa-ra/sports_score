@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import CalendarMatchLine from '../components/CalendarMatchLine.vue'
+import ScrollFade from '../components/ScrollFade.vue'
+import { vFitText } from '../lib/fitLabel'
 import {
   applyCalendarFilter,
   boardLink,
@@ -343,22 +345,30 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <div class="filters" role="tablist" aria-label="Фильтр матчей">
-      <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
-        <span class="full">Все турниры</span><span class="short">Все</span>
-      </button>
-      <button type="button" :class="{ on: filter.kind === 'favorites' }" @click="pick({ kind: 'favorites' })">
-        <span class="full">★ Избранные</span><span class="short">★ Избр.</span>
-      </button>
-      <button type="button" :class="{ on: filter.kind === 'undated' }" @click="pick({ kind: 'undated' })">Без даты</button>
-      <button
-        v-for="tour in chipTournaments"
-        :key="tour.id"
-        type="button"
-        :class="{ on: tournamentOn(tour.id) }"
-        @click="pick({ kind: 'tournament', tournamentId: tour.id })"
-      >{{ tour.name }}</button>
-    </div>
+    <ScrollFade class="filters-fade" arrows fade="var(--canvas)">
+      <div class="filters" role="tablist" aria-label="Фильтр матчей">
+        <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
+          <span class="full chip-label">Все турниры</span><span class="short chip-label">Все</span>
+        </button>
+        <button type="button" :class="{ on: filter.kind === 'favorites' }" @click="pick({ kind: 'favorites' })">
+          <span class="full chip-label">★ Избранные</span><span class="short chip-label">★ Избр.</span>
+        </button>
+        <button type="button" :class="{ on: filter.kind === 'undated' }" @click="pick({ kind: 'undated' })">
+          <span class="chip-label">Без даты</span>
+        </button>
+        <button
+          v-for="tour in chipTournaments"
+          :key="tour.id"
+          type="button"
+          :class="{ on: tournamentOn(tour.id) }"
+          :title="tour.name"
+          :aria-label="tour.name"
+          @click="pick({ kind: 'tournament', tournamentId: tour.id })"
+        >
+          <span class="chip-label" v-fit-text="tour.name" :title="tour.name"></span>
+        </button>
+      </div>
+    </ScrollFade>
 
     <p v-if="!countsReady && !loading && !error" class="note">Показаны не все матчи</p>
 
@@ -511,30 +521,29 @@ onUnmounted(() => {
   bottom: 4px;
 }
 .day.on .dot { background: var(--navy); }
+.filters-fade {
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  background: rgba(232, 238, 244, 0.94);
+}
 .filters {
   display: flex;
   justify-content: flex-start;
   gap: 0.45rem;
   overflow-x: auto;
-  position: sticky;
-  top: 56px;
-  z-index: 4;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  background: rgba(232, 238, 244, 0.94);
+  background: transparent;
   padding: 0.35rem 0 0.45rem;
-  scroll-padding-inline: 1rem;
+  scroll-padding-inline: 1rem 3.25rem;
   scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 16px), transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 16px), transparent);
 }
-.filters::before,
-.filters::after {
-  content: "";
-  flex: 0 0 1rem;
-}
+.filters::before { content: ""; flex: 0 0 1rem; }
+.filters::after { content: ""; flex: 0 0 3.25rem; }
+.filters .chip-label { display: inline-block; max-width: 100%; vertical-align: bottom; }
 .filters::-webkit-scrollbar { display: none; }
 .filters button {
   flex: 0 0 auto;
