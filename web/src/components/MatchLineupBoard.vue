@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { initials } from '../lib/format'
+import { personInitials } from '../lib/personAvatar'
 import { registeredName } from '../lib/playerTitle'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -50,6 +52,12 @@ function save() {
   })
 }
 
+function face(player: any) {
+  const letters = personInitials(player?.firstName, player?.lastName)
+  if (letters && letters !== 'SL') return letters
+  return initials(registeredName(player))
+}
+
 function rowNote(player: any, onBench: boolean) {
   const position = String(player?.position || '').replace(/\s+/g, ' ').trim()
   const benchLabel = 'запас'
@@ -69,11 +77,22 @@ function rowNote(player: any, onBench: boolean) {
         </RouterLink>
       </h3>
       <p class="muted">
-        {{ side.confirmed ? 'Стартовый состав записан' : 'Состав не подан' }}
+        {{ side.confirmed ? 'Стартовый состав записан' : 'Состав не подтверждён' }}
       </p>
     </header>
 
-    <section>
+    <section v-if="!side.confirmed && !editable">
+      <h4>Заявка</h4>
+      <p v-if="!roster.length" class="muted">В заявке никого нет.</p>
+      <div v-for="p in roster" :key="p.playerId" class="player squad">
+        <span class="face" aria-hidden="true">{{ face(p) }}</span>
+        <RouterLink v-if="p.playerId" class="name" :to="`/players/${p.playerId}`" :title="registeredName(p)">{{ registeredName(p) }}</RouterLink>
+        <span v-else class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
+        <span class="meta">{{ p.jerseyNumber != null ? `#${p.jerseyNumber}` : '' }}</span>
+      </div>
+    </section>
+
+    <section v-else>
       <h4>Основа</h4>
       <p v-if="!side.starters?.length && !editable" class="muted">Стартовый состав не указан.</p>
       <component
@@ -84,6 +103,7 @@ function rowNote(player: any, onBench: boolean) {
         :class="{ starter: !editable || selected.includes(p.playerId), picking: editable }"
       >
         <input v-if="editable" type="checkbox" :checked="selected.includes(p.playerId)" @change="toggle(p.playerId)" />
+        <span class="face" aria-hidden="true">{{ face(p) }}</span>
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
         <RouterLink v-if="!editable && p.playerId" class="name" :to="`/players/${p.playerId}`" :title="registeredName(p)">{{ registeredName(p) }}</RouterLink>
         <span v-else class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
@@ -97,6 +117,7 @@ function rowNote(player: any, onBench: boolean) {
       <h4>Скамейка</h4>
       <p v-if="!side.bench?.length" class="muted">Скамейка пуста.</p>
       <div v-for="p in side.bench" :key="p.playerId" class="player">
+        <span class="face" aria-hidden="true">{{ face(p) }}</span>
         <span class="num">{{ p.jerseyNumber ?? '—' }}</span>
         <RouterLink v-if="p.playerId" class="name" :to="`/players/${p.playerId}`" :title="registeredName(p)">{{ registeredName(p) }}</RouterLink>
         <span v-else class="name" :title="registeredName(p)">{{ registeredName(p) }}</span>
@@ -137,7 +158,7 @@ h4 {
 }
 .player {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) minmax(0, max-content);
+  grid-template-columns: 1.7rem 2.2rem minmax(0, 1fr) minmax(0, max-content);
   column-gap: 0.7rem;
   align-items: center;
   min-height: 2.35rem;
@@ -145,8 +166,22 @@ h4 {
   border-bottom: 1px solid var(--line);
   min-width: 0;
 }
+.player.squad {
+  grid-template-columns: 1.7rem minmax(0, 1fr) auto;
+}
 .player.picking {
-  grid-template-columns: 1.15rem 2.5rem minmax(0, 1fr) minmax(0, max-content);
+  grid-template-columns: 1.15rem 1.7rem 2.5rem minmax(0, 1fr) minmax(0, max-content);
+}
+.face {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--navy);
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 .player input { margin: 0; }
 .player.starter .num { color: var(--ice); }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { advancingRank } from '../lib/matchPresentation'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
@@ -12,14 +13,17 @@ const props = defineProps<{
 const teams = useTeamDirectory()
 
 function rankClass(index: number) {
-  if ((props.markedPlaces ?? []).includes(index + 1)) return 'ice'
+  // A passed list, including an empty one, is the only highlight. The old
+  // 1–2 / 3–4 colours stay only for callers that do not pass places.
+  if (props.markedPlaces) return advancingRank(index, props.markedPlaces) ? 'ice' : ''
   if (index < 2) return 'ice'
   if (index < 4) return 'navy'
   return ''
 }
 
 function advances(index: number) {
-  return (props.markedPlaces ?? []).includes(index + 1)
+  if (!props.markedPlaces) return false
+  return advancingRank(index, props.markedPlaces)
 }
 </script>
 
