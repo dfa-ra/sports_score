@@ -12,6 +12,21 @@ export type FormRow = {
   penaltyAway?: number | null
 }
 
+/**
+ * A slower form response must not paint over a newer one, and must not paint
+ * onto a different match. Null means "leave the letters already on screen".
+ */
+export function keepFormPayload<T>(
+  ticket: number,
+  latest: number,
+  matchId: string,
+  currentMatchId: string,
+  rows: T,
+): T | null {
+  if (ticket !== latest || matchId !== currentMatchId) return null
+  return rows
+}
+
 /** Letters the form endpoint actually returned. Shorter than five stays shorter. */
 export function formMarks(rows: FormRow[], teamId?: string | null): string[] {
   if (!teamId) return []

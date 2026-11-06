@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { cardScoreParts } from '../lib/calendarFeed'
 import { outcomeMark } from '../lib/format'
 import { matchOutcome, penaltyPair, publicScore } from '../lib/match'
 import KickoffWhen from './KickoffWhen.vue'
@@ -19,6 +20,8 @@ const props = defineProps<{
 const fav = useFavorites()
 const teams = useTeamDirectory()
 const outcome = computed(() => matchOutcome(props.match, props.highlightTeamId))
+const scoreParts = computed(() => cardScoreParts(props.match))
+const soon = computed(() => props.match?.status === 'SCHEDULED')
 const shootoutScore = computed(() => (penaltyPair(props.match) ? publicScore(props.match) : ''))
 const isLive = computed(() => props.match.status === 'LIVE' || props.match.status === 'PAUSED')
 const homeLogo = computed(() => teams.logo(props.match.homeTeamId))
@@ -72,10 +75,13 @@ function tapStar() {
       </span>
       <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
       <span v-else class="nums">
-        <strong><ScorePop :value="match.homeScore" /></strong>
-        <strong><ScorePop :value="match.awayScore" /></strong>
+        <strong v-if="scoreParts.dash">{{ scoreParts.home }}</strong>
+        <strong v-else><ScorePop :value="match.homeScore" /></strong>
+        <strong v-if="scoreParts.dash">{{ scoreParts.away }}</strong>
+        <strong v-else><ScorePop :value="match.awayScore" /></strong>
       </span>
-      <span v-if="outcome" class="mark" :class="outcome.toLowerCase()">{{ outcomeMark[outcome] }}</span>
+      <span v-if="soon" class="soon">Скоро</span>
+      <span v-else-if="outcome" class="mark" :class="outcome.toLowerCase()">{{ outcomeMark[outcome] }}</span>
     </RouterLink>
   </div>
 </template>
@@ -157,9 +163,12 @@ function tapStar() {
   font-weight: 500;
   font-size: 1rem;
   min-width: 0;
+  line-height: 1.2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 .side.own b { font-weight: 800; color: var(--navy); }
 .nums {
@@ -189,6 +198,14 @@ function tapStar() {
 .mark.win { background: #1b8a4a; }
 .mark.draw { background: #c47b00; }
 .mark.loss { background: var(--danger); }
+.soon {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--status-soon-ink);
+  white-space: nowrap;
+}
 
 @media (max-width: 720px) {
   .body {

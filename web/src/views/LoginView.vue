@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import PasswordPeek from '../components/PasswordPeek.vue'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
 import { useAuthStore } from '../stores/auth'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
@@ -76,18 +77,12 @@ async function onGoogle(idToken: string) {
           </label>
           <label class="field" :class="{ invalid: fieldErrors.password }">
             Пароль
-            <span class="pass-row">
-              <input
-                v-model="password"
-                :type="showPassword ? 'text' : 'password'"
-                maxlength="100"
-                autocomplete="current-password"
-                @input="clearField('password')"
-              />
-              <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
-                {{ showPassword ? 'Скрыть' : 'Показать' }}
-              </button>
-            </span>
+            <PasswordPeek
+              v-model="password"
+              v-model:visible="showPassword"
+              autocomplete="current-password"
+              @input="clearField('password')"
+            />
             <span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
           </label>
           <RouterLink class="forgot" to="/forgot-password">Забыли пароль?</RouterLink>
@@ -134,8 +129,6 @@ async function onGoogle(idToken: string) {
 }
 .promo ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; }
 .card { border: 0; box-shadow: none; border-radius: 0; }
-.pass-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }
-.peek { min-width: 92px; }
 .forgot { justify-self: start; color: var(--navy); font-size: 0.92rem; }
 @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
 </style>

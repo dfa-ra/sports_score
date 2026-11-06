@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import CalendarMatchLine from '../components/CalendarMatchLine.vue'
 import {
@@ -10,6 +10,8 @@ import {
   calendarStageLabel,
   dayTitle,
   calendarHeroPending,
+  calendarQueryPatch,
+  calendarQueryState,
   dottedDays,
   groupByTournament,
   heroMeta,
@@ -19,6 +21,7 @@ import {
   sortDayMatches,
   type CalendarFilter,
   type CalendarMatch,
+  sameSearchQuery,
   undatedMatches,
   weekdayChip,
   weekKeys,
@@ -32,6 +35,8 @@ import { useTeamDirectory } from '../lib/useTeamDirectory'
 type TourInfo = { id: string; name: string; competitionStage?: string | null }
 
 const route = useRoute()
+const router = useRouter()
+const opened = calendarQueryState(route.query as Record<string, unknown>, ymd(new Date()))
 const teams = useTeamDirectory()
 const fav = useFavorites()
 
@@ -46,8 +51,10 @@ const liveComplete = ref(false)
 const pausedComplete = ref(false)
 const loading = ref(true)
 const error = ref('')
-const anchor = ref(ymd(new Date()))
-const filter = ref<CalendarFilter>({ kind: 'all' })
+const anchor = ref(opened.date)
+const filter = ref<CalendarFilter>(opened.tournamentId
+  ? { kind: 'tournament', tournamentId: opened.tournamentId }
+  : { kind: 'all' })
 let refreshTimer = 0
 let requestId = 0
 
@@ -236,6 +243,23 @@ function pick(next: CalendarFilter) {
   filter.value = next
 }
 
+function syncCalendarQuery() {
+  const next = calendarQueryPatch(route.query as Record<string, unknown>, anchor.value, filter.value)
+  if (sameSearchQuery(next, route.query as Record<string, unknown>)) return
+  void router.replace({ query: next })
+}
+
+function readCalendarQuery() {
+  const next = calendarQueryState(route.query as Record<string, unknown>, anchor.value || ymd(new Date()))
+  if (next.date !== anchor.value) anchor.value = next.date
+  const currentId = filter.value.kind === 'tournament' ? filter.value.tournamentId : ''
+  if (next.tournamentId !== currentId) {
+    filter.value = next.tournamentId
+      ? { kind: 'tournament', tournamentId: next.tournamentId }
+      : { kind: 'all' }
+  }
+}
+
 function shiftWeek(delta: number) {
   const from = selectedDay.value || anchor.value
   anchor.value = shiftYmd(from, delta * 7) || from
@@ -261,8 +285,17 @@ function hint(match: CalendarMatch) {
 }
 
 onMounted(async () => {
+  syncCalendarQuery()
   await load(true)
   armRefresh()
+})
+
+watch([anchor, () => (filter.value.kind === 'tournament' ? filter.value.tournamentId : filter.value.kind)], () => {
+  syncCalendarQuery()
+})
+
+watch(() => `${String(route.query.date || '')}|${String(route.query.tournament || '')}`, () => {
+  readCalendarQuery()
 })
 
 watch(() => route.name, () => {

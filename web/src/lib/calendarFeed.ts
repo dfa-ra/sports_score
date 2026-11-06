@@ -23,6 +23,42 @@ export type CalendarFilter =
   | { kind: 'undated' }
   | { kind: 'tournament'; tournamentId: string }
 
+const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Date and tournament chip live in the query so a reload keeps them. */
+export function calendarQueryState(query: Record<string, unknown>, today: string): { date: string; tournamentId: string } {
+  const raw = String(query.date || '')
+  return {
+    date: DAY_KEY.test(raw) ? raw : today,
+    tournamentId: String(query.tournament || ''),
+  }
+}
+
+export function calendarQueryPatch(
+  current: Record<string, unknown>,
+  date: string,
+  filter: CalendarFilter,
+): Record<string, string> {
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(current)) {
+    if (key === 'date' || key === 'tournament') continue
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  if (DAY_KEY.test(date)) query.date = date
+  if (filter.kind === 'tournament' && filter.tournamentId) query.tournament = filter.tournamentId
+  return query
+}
+
+export function sameSearchQuery(next: Record<string, string>, current: Record<string, unknown>) {
+  const keys = new Set([...Object.keys(next), ...Object.keys(current)])
+  for (const key of keys) {
+    const raw = current[key]
+    const now = Array.isArray(raw) ? String(raw[0] || '') : typeof raw === 'string' ? raw : ''
+    if ((next[key] || '') !== now) return false
+  }
+  return true
+}
+
 /** Moscow calendar day, or empty when the match must not sit on a day. */
 export function calendarDayKey(match?: MatchDateSource | null): string {
   const instant = matchInstant(match)

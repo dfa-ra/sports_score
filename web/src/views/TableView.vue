@@ -33,6 +33,7 @@ const tournament = ref<any>(null)
 const playoff = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
+const bootstrapError = ref('')
 const loadError = ref('')
 const playoffError = ref(false)
 const statsLoading = ref(false)
@@ -118,27 +119,38 @@ onMounted(async () => {
     inkObserver = new ResizeObserver(() => placeInk(true))
     inkObserver.observe(tabBar.value)
   }
-  await teams.load()
-  const [{ data }, games] = await Promise.all([
-    api.get('/tournaments', { params: { size: 50 } }),
-    api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
-  ])
-  tournaments.value = data.content ?? []
-  matches.value = games.data.content ?? []
-  const requested = String(route.query.tournament || '')
-  if (requested && tournaments.value.some((item) => item.id === requested)) {
-    tournamentId.value = requested
-  } else {
-    try {
-      const current = await api.get('/tournaments/current')
-      if (current.data?.id) tournamentId.value = current.data.id
-    } catch {
-      if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-    }
-    if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  }
-  if (!tournamentId.value) await load()
+  await bootstrap()
 })
+
+async function bootstrap() {
+  bootstrapError.value = ''
+  loading.value = true
+  try {
+    await teams.load()
+    const [{ data }, games] = await Promise.all([
+      api.get('/tournaments', { params: { size: 50 } }),
+      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+    ])
+    tournaments.value = data.content ?? []
+    matches.value = games.data.content ?? []
+    const requested = String(route.query.tournament || '')
+    if (requested && tournaments.value.some((item) => item.id === requested)) {
+      tournamentId.value = requested
+    } else {
+      try {
+        const current = await api.get('/tournaments/current')
+        if (current.data?.id) tournamentId.value = current.data.id
+      } catch {
+        if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+      }
+      if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+    }
+    if (!tournamentId.value) await load()
+  } catch {
+    bootstrapError.value = 'Таблица не загрузилась.'
+    loading.value = false
+  }
+}
 
 watch(tournamentId, (id) => {
   const requested = String(route.query.tab || '')
@@ -216,6 +228,11 @@ async function loadStats() {
   } finally {
     if (tournamentId.value === id) statsLoading.value = false
   }
+}
+
+function retryStats() {
+  statsLoadedFor.value = ''
+  void loadStats()
 }
 
 function syncPlayoffTab(id: string, rememberPlayoff: boolean, listAll: boolean) {
@@ -319,8 +336,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       />
     </div>
 
-    <div :key="tab" class="tab-panel">
-    <p v-if="loadError" class="form-error">{{ loadError }}</p>
+    <div v-if="bootstrapError" class="load-fail" role="alert">
+      <strong>{{ bootstrapError }}</strong>
+      <button class="btn secondary" type="button" @click="bootstrap">Повторить</button>
+    </div>
+    <div v-else :key="tab" class="tab-panel">
+    <div v-if="loadError" class="load-fail" role="alert">
+      <strong>{{ loadError }}</strong>
+      <button class="btn secondary" type="button" @click="load()">Повторить</button>
+    </div>
     <div v-if="loading" class="skeleton" />
 
     <template v-else-if="tab === 'table'">
@@ -360,7 +384,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 
     <template v-else-if="tab === 'players'">
       <div class="panel">
-        <PlayerSearch />
+        <PlayerSearch :tournament-id="tournamentId" />
       </div>
     </template>
 
@@ -371,7 +395,10 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <p v-if="topNote(scorers, 'scorers')" class="muted">{{ topNote(scorers, 'scorers') }}</p>
         </div>
         <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
         <EmptyState v-else-if="!scorers.length" title="Голов пока нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
@@ -402,7 +429,10 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
         <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
         <EmptyState v-else-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
@@ -433,7 +463,10 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <p v-if="topNote(assists, 'assists')" class="muted">{{ topNote(assists, 'assists') }}</p>
         </div>
         <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
         <EmptyState v-else-if="!assists.length" title="Ассистов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
@@ -538,7 +571,17 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   width: 4.8rem;
   white-space: nowrap;
   vertical-align: middle;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
+.load-fail {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  padding: 1rem 0.2rem;
+}
+.load-fail strong { color: var(--navy); }
 .stat-table .who {
   vertical-align: middle;
   overflow: hidden;

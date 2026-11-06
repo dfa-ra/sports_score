@@ -40,6 +40,7 @@ import {
   teamCountOf,
   useRoundTabs,
   winnerSide,
+  type BracketPanel,
   type PlayoffRound,
   type PlayoffSlot,
 } from '../lib/playoffGrid'
@@ -213,11 +214,23 @@ function arrivals(roundIndex: number, slot: PlayoffSlot) {
     .filter((line): line is { name: string; detail: string } => !!line)
 }
 
-function nextHint(roundIndex: number) {
-  const next = rounds.value[roundIndex + 1]
-  if (!next) return ''
-  const note = roundNote(slotsOf(next)).text.replace(' · завершён', '')
-  return note ? `Дальше · ${next.title} ${note}` : `Дальше · ${next.title}`
+function nextPreview(panel: BracketPanel) {
+  if (panel.thirdPlace || panel.champion) return null
+  const index = panels.value.findIndex((item) => item.key === panel.key)
+  if (index < 0) return null
+  const next = panels.value.slice(index + 1).find((item) => !item.thirdPlace)
+  if (!next) return null
+  const slots = next.slots.length
+    ? next.slots
+    : [{
+        id: `tbd-${next.key}`,
+        slotIndex: 0,
+        roundTitle: next.title,
+        homeWaitingLabel: 'Состав определится позже',
+        awayWaitingLabel: 'Состав определится позже',
+        matchStatus: 'SCHEDULED',
+      }]
+  return { title: next.title || next.tab, roundIndex: next.roundIndex, slots }
 }
 
 const finalRound = computed(() => rounds.value[rounds.value.length - 1])
@@ -679,7 +692,24 @@ function bronzePairStyle() {
                 </div>
               </div>
             </div>
-            <p v-else-if="!panel.thirdPlace && nextHint(panel.roundIndex)" class="next-hint">{{ nextHint(panel.roundIndex) }}</p>
+            <template v-else v-for="preview in [nextPreview(panel)]" :key="`${panel.key}-next`">
+              <div v-if="preview" class="next-round">
+                <h4>Дальше · {{ preview.title }}</h4>
+                <div class="pair-stack">
+                  <PlayoffPairCard
+                    v-for="slot in preview.slots"
+                    :key="`next-${panel.key}-${slot.id || slot.slotIndex}`"
+                    :slot="viewSlot(slot)"
+                    :previous-title="previousTitle(preview.roundIndex)"
+                    :first-round="false"
+                    :final="false"
+                    :lit="lit"
+                    :can-hover="false"
+                    :logo="logo"
+                  />
+                </div>
+              </div>
+            </template>
           </section>
         </div>
       </div>
@@ -1073,6 +1103,7 @@ function bronzePairStyle() {
 }
 .po-swipe {
   display: flex;
+  align-items: flex-start;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
@@ -1084,6 +1115,7 @@ function bronzePairStyle() {
 .po-swipe::-webkit-scrollbar { display: none; }
 .po-panel {
   flex: 0 0 100%;
+  align-self: flex-start;
   scroll-snap-align: start;
   min-width: 0;
   max-width: 100%;
@@ -1101,10 +1133,15 @@ function bronzePairStyle() {
 }
 .how b { color: var(--ink); }
 .champ-block { margin-top: 0.9rem; }
-.next-hint {
-  margin: 0.9rem 0 0;
-  padding-top: 0.9rem;
+.next-round {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
   border-top: 1px dashed var(--line-strong);
+  display: grid;
+  gap: 0.7rem;
+}
+.next-round h4 {
+  margin: 0;
   color: var(--navy);
   font-size: 0.75rem;
   font-weight: 800;

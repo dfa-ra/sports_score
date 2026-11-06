@@ -34,6 +34,7 @@ const commonLinks = [
   { to: '/calendar', label: 'Игры' },
   { to: '/live', label: 'Live' },
   { to: '/tournaments', label: 'Турниры' },
+  { to: '/teams', label: 'Команды' },
   { to: '/players', label: 'Игроки' },
 ]
 

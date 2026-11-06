@@ -34,7 +34,7 @@ const router = createRouter({
     { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Аналитик', description: 'Матчи аналитика.' } },
     { path: '/analyst/matches/:id', name: 'analyst-match', component: () => import('../views/analyst/AnalystPad.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Пульт аналитика', description: 'Статистика матча.' } },
     { path: '/forbidden', name: 'forbidden', component: () => import('../views/ForbiddenView.vue'), meta: { title: 'Недостаточно прав', description: 'Этот раздел закрыт для вашей роли.' } },
-    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Такой страницы нет', description: 'Страница не найдена.' } },
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Не найдено', description: 'Страница не найдена.' } },
   ],
   scrollBehavior: () => ({ top: 0 }),
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -15,6 +15,7 @@ import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { setPageMeta } from '../lib/pageMeta'
+import NotFoundView from './NotFoundView.vue'
 import { matchInstant } from '../lib/match'
 import { formatMoscowDate } from '../lib/moscowTime'
 import { registeredName } from '../lib/playerTitle'
@@ -28,7 +29,25 @@ const team = ref<any>(null)
 const members = ref<any[]>([])
 const stats = ref<any[]>([])
 const matches = ref<any[]>([])
-const tab = ref<'results' | 'calendar' | 'squad' | 'stats'>('results')
+type TeamTab = 'results' | 'calendar' | 'squad' | 'stats'
+const teamTabs: TeamTab[] = ['results', 'calendar', 'squad', 'stats']
+const tab = computed<TeamTab>(() => {
+  const raw = String(route.query.tab || '')
+  return teamTabs.includes(raw as TeamTab) ? raw as TeamTab : 'results'
+})
+function setTab(next: TeamTab) {
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(route.query)) {
+    if (key === 'tab') continue
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  if (next !== 'results') query.tab = next
+  if (String(route.query.tab || '') === (query.tab || '')) return
+  void router.replace({ query })
+}
+function rowName(id?: string | null) {
+  return names.fullName(id)
+}
 const played = computed(() => matches.value
   .filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED')
   .slice()
@@ -60,6 +79,19 @@ onMounted(load)
 watch(() => route.params.id, () => {
   load()
 })
+watch(() => route.fullPath, () => {
+  const name = team.value?.name
+  if (!name || missing.value) return
+  const id = String(route.params.id || '')
+  void nextTick(() => {
+    if (team.value?.name !== name || String(route.params.id || '') !== id) return
+    setPageMeta({
+      title: name,
+      description: `${name} — состав и матчи Лиги ИТМО.`,
+      path: `/teams/${id}`,
+    })
+  })
+})
 
 async function load() {
   const id = route.params.id
@@ -74,11 +106,14 @@ async function load() {
       api.get(`/teams/${id}/player-stats`),
     ])
     team.value = t.data
-    setPageMeta({
-      title: t.data?.name || 'Команда',
-      description: `${t.data?.name || 'Команда'} — состав и матчи Лиги ИТМО.`,
+    const title = t.data?.name || 'Команда'
+    const publish = () => setPageMeta({
+      title,
+      description: `${title} — состав и матчи Лиги ИТМО.`,
       path: `/teams/${id}`,
     })
+    publish()
+    void nextTick(publish)
     members.value = m.data
     stats.value = squadStats.data ?? []
     matches.value = (games.data.content ?? []).filter((row: any) =>
@@ -203,10 +238,10 @@ async function deleteTeam() {
     </div>
 
     <div class="fs-tabs">
-      <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
-      <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
-      <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
+      <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
+      <button type="button" :class="{ on: tab === 'calendar' }" @click="setTab('calendar')">Календарь</button>
+      <button type="button" :class="{ on: tab === 'squad' }" @click="setTab('squad')">Состав</button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="setTab('stats')">Статистика</button>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
@@ -220,8 +255,8 @@ async function deleteTeam() {
         v-for="m in played"
         :key="m.id"
         :match="m"
-        :home-name="names.fullName(m.homeTeamId)"
-        :away-name="names.fullName(m.awayTeamId)"
+        :home-name="rowName(m.homeTeamId)"
+        :away-name="rowName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
@@ -232,8 +267,8 @@ async function deleteTeam() {
         v-for="m in upcoming"
         :key="m.id"
         :match="m"
-        :home-name="names.fullName(m.homeTeamId)"
-        :away-name="names.fullName(m.awayTeamId)"
+        :home-name="rowName(m.homeTeamId)"
+        :away-name="rowName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
@@ -347,10 +382,11 @@ async function deleteTeam() {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
-  <section v-else-if="missing" class="stack">
-    <h1>Команда не найдена</h1>
+  <NotFoundView v-else-if="missing" heading="Команда не найдена" />
+  <section v-else-if="error" class="stack">
+    <strong>{{ error }}</strong>
+    <button class="btn secondary" type="button" @click="load">Повторить</button>
   </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>

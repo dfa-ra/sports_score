@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
@@ -12,7 +12,8 @@ import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { cardScoreText } from '../lib/calendarFeed'
-import { aboutStage, formMarks, refereeNames, venueLabel } from '../lib/matchPresentation'
+import { aboutStage, formMarks, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import NotFoundView from './NotFoundView.vue'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
@@ -67,7 +68,22 @@ function crestForViewport() {
 const crestSize = ref(crestForViewport())
 const homeStarTap = ref(0)
 const awayStarTap = ref(0)
-const tab = ref<'overview' | 'stats' | 'lineups' | 'protocol'>('overview')
+type MatchTab = 'overview' | 'stats' | 'lineups' | 'protocol'
+const matchTabs: MatchTab[] = ['overview', 'stats', 'lineups', 'protocol']
+const tab = computed<MatchTab>(() => {
+  const raw = String(route.query.tab || '')
+  return matchTabs.includes(raw as MatchTab) ? raw as MatchTab : 'overview'
+})
+function setTab(next: MatchTab) {
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(route.query)) {
+    if (key === 'tab') continue
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  if (next !== 'overview') query.tab = next
+  if (String(route.query.tab || '') === (query.tab || '')) return
+  void router.replace({ query })
+}
 const connected = ref(false)
 const error = ref('')
 const ok = ref('')
@@ -290,11 +306,13 @@ async function load() {
   match.value = m.data
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
-  setPageMeta({
+  const publish = () => setPageMeta({
     title: `${homeName} — ${awayName}`,
     description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
     path: `/matches/${id}`,
   })
+  publish()
+  void nextTick(publish)
   motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
   homeKeeperId.value = m.data.homeGoalkeeper?.playerId || ''
   awayKeeperId.value = m.data.awayGoalkeeper?.playerId || ''
@@ -357,9 +375,14 @@ async function load() {
   }
 }
 
+let formTicket = 0
 async function loadForms(homeTeamId?: string, awayTeamId?: string) {
+  const ticket = ++formTicket
+  const matchId = String(route.params.id || '')
   formError.value = false
   if (!homeTeamId || !awayTeamId) {
+    const empty = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), [] as any[])
+    if (!empty) return
     homeForm.value = []
     awayForm.value = []
     return
@@ -369,9 +392,15 @@ async function loadForms(homeTeamId?: string, awayTeamId?: string) {
       api.get(`/teams/${homeTeamId}/form`, { params: { limit: 5 } }),
       api.get(`/teams/${awayTeamId}/form`, { params: { limit: 5 } }),
     ])
-    homeForm.value = hf.data ?? []
-    awayForm.value = af.data ?? []
+    const homeRows = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), hf.data ?? [])
+    const awayRows = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), af.data ?? [])
+    if (!homeRows || !awayRows) return
+    if (match.value && (match.value.homeTeamId !== homeTeamId || match.value.awayTeamId !== awayTeamId)) return
+    homeForm.value = homeRows
+    awayForm.value = awayRows
   } catch {
+    const failed = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), true)
+    if (!failed) return
     homeForm.value = []
     awayForm.value = []
     formError.value = true
@@ -655,6 +684,21 @@ onMounted(async () => {
   }, 4_000)
 })
 
+watch(() => route.fullPath, () => {
+  if (!match.value || missing.value) return
+  const id = String(route.params.id || '')
+  const homeName = teams.fullName(match.value.homeTeamId, match.value.homeTeamName || 'Команда')
+  const awayName = teams.fullName(match.value.awayTeamId, match.value.awayTeamName || 'Команда')
+  void nextTick(() => {
+    if (!match.value || String(route.params.id || '') !== id) return
+    setPageMeta({
+      title: `${homeName} — ${awayName}`,
+      description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
+      path: `/matches/${id}`,
+    })
+  })
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', applyCrest)
   if (pollTimer) window.clearInterval(pollTimer)
@@ -876,10 +920,10 @@ onUnmounted(() => {
     </AdminOnly>
 
     <div class="match-tabs" role="tablist">
-      <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'"><span class="tab-label">Обзор</span></button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'"><span class="tab-label"><span class="full">Статистика</span><span class="short">Стат.</span></span></button>
-      <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'"><span class="tab-label">Составы</span></button>
-      <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'"><span class="tab-label">Протокол</span></button>
+      <button type="button" :class="{ on: tab === 'overview' }" @click="setTab('overview')"><span class="tab-label">Обзор</span></button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="setTab('stats')"><span class="tab-label"><span class="full">Статистика</span><span class="short">Стат.</span></span></button>
+      <button type="button" :class="{ on: tab === 'lineups' }" @click="setTab('lineups')"><span class="tab-label">Составы</span></button>
+      <button type="button" :class="{ on: tab === 'protocol' }" @click="setTab('protocol')"><span class="tab-label">Протокол</span></button>
     </div>
 
     <div v-if="tab === 'overview'" class="overview">
@@ -1011,9 +1055,7 @@ onUnmounted(() => {
     </div>
 
   </section>
-  <section v-else-if="missing" class="match-state">
-    <h1>Матч не найден</h1>
-  </section>
+  <NotFoundView v-else-if="missing" heading="Матч не найден" />
   <section v-else-if="error" class="match-state">
     <strong>Матч не загрузился</strong>
     <button class="btn secondary" type="button" @click="load">Повторить</button>

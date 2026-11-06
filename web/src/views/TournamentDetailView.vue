@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -17,6 +17,8 @@ import {
   tournamentStatusChip,
 } from '../lib/playoffGrid'
 import { setPageMeta } from '../lib/pageMeta'
+import { registeredName } from '../lib/playerTitle'
+import NotFoundView from './NotFoundView.vue'
 import { publicTournamentDescription } from '../lib/tournamentCopy'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -39,6 +41,8 @@ const names = useTeamDirectory()
 const tournament = ref<any>(null)
 const publicDescription = computed(() => publicTournamentDescription(tournament.value?.description))
 const teams = ref<any[]>([])
+const teamsReady = ref(false)
+const teamsError = ref(false)
 const standings = ref<StandingGroup[]>([])
 const tableDraft = ref<{ id?: string; name: string; teamIds: string[] }[]>([])
 const matches = ref<any[]>([])
@@ -97,6 +101,9 @@ async function load() {
     playoffError.value = false
     missing.value = false
     error.value = ''
+    teams.value = []
+    teamsReady.value = false
+    teamsError.value = false
   }
   let detail: any
   try {
@@ -135,8 +142,11 @@ async function load() {
     tableError.value = ''
     summaryError.value = false
     scorersError.value = false
-    const [teamRes, tableRes, summaryData, boardData, matchPage] = await Promise.all([
-      api.get(`/tournaments/${id}/teams`),
+    const teamTask = api.get(`/tournaments/${id}/teams`).then(
+      (res) => ({ rows: res.data ?? [], failed: false as const }),
+      () => ({ rows: [] as any[], failed: true as const }),
+    )
+    const restTask = Promise.all([
       api.get(`/tournaments/${id}/tables`),
       api.get('/statistics/summary', { params: { tournamentId: id } }).then((res) => res.data).catch(() => null),
       api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } }).then((res) => res.data).catch(() => null),
@@ -144,8 +154,13 @@ async function load() {
         params: { size: 100, page, sort: 'scheduledAt,asc' },
       }).then((res) => res.data), 5),
     ])
+    const teamOutcome = await teamTask
     if (route.params.id !== id) return
-    teams.value = teamRes.data
+    teams.value = teamOutcome.rows
+    teamsError.value = teamOutcome.failed
+    teamsReady.value = true
+    const [tableRes, summaryData, boardData, matchPage] = await restTask
+    if (route.params.id !== id) return
     summary.value = summaryData
     summaryError.value = summaryData == null
     summaryLoading.value = false
@@ -166,7 +181,7 @@ async function load() {
       if (route.params.id === id) tableLoading.value = false
     }
     const approvedIds = new Set(
-      (teamRes.data ?? [])
+      (teamOutcome.rows ?? [])
         .filter((team: { status?: string }) => team.status === 'APPROVED')
         .map((team: { teamId?: string }) => String(team.teamId)),
     )
@@ -181,14 +196,12 @@ async function load() {
     error.value = apiError(e, 'Турнир не загрузился.')
     tableLoading.value = false
     summaryLoading.value = false
+    if (!summary.value) summaryError.value = true
+    teamsReady.value = true
   }
   await playoffTask
   if (route.params.id !== id) return
-  setPageMeta({
-    title: detail?.name || 'Турнир',
-    description: `${detail?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
-    path: `/tournaments/${id}`,
-  })
+  publishTournamentTitle(detail?.name, String(id))
   name.value = detail.name
   description.value = visibleDescription
   status.value = detail.status
@@ -361,7 +374,28 @@ const tab = computed<TourTab | 'pending'>(() => {
 })
 const statusChip = computed(() => tournamentStatusChip(tournament.value?.status))
 const hasRegulations = computed(() => !!String(tournament.value?.regulations || '').trim())
-const teamsCount = computed(() => overview.value?.teamsCount ?? listedTeams.value.length)
+const teamsCount = computed(() => listedTeams.value.length)
+
+function publishTournamentTitle(name?: string | null, id?: string) {
+  const title = (name || '').trim()
+  if (!title) return
+  const path = `/tournaments/${id || route.params.id}`
+  const apply = () => {
+    if ((tournament.value?.name || '').trim() !== title) return
+    setPageMeta({
+      title,
+      description: `${title} — таблица и матчи Лиги ИТМО.`,
+      path,
+    })
+  }
+  apply()
+  void nextTick(apply)
+}
+
+watch(() => [route.fullPath, tournament.value?.name, missing.value] as const, () => {
+  if (missing.value || !tournament.value?.name) return
+  publishTournamentTitle(tournament.value.name, String(route.params.id || ''))
+})
 const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
 const heroFacts = computed(() => {
   const seasonLabel = String(overview.value?.seasonLabel || tournament.value?.seasonLabel || '').trim()
@@ -415,6 +449,25 @@ async function reloadTable() {
     tableError.value = 'Таблица не загрузилась'
   } finally {
     tableLoading.value = false
+  }
+}
+
+async function reloadTeams() {
+  const id = String(route.params.id || '')
+  if (!id) return
+  teamsReady.value = false
+  teamsError.value = false
+  try {
+    const { data } = await api.get(`/tournaments/${id}/teams`)
+    if (String(route.params.id) !== id) return
+    teams.value = data ?? []
+    teamsError.value = false
+  } catch {
+    if (String(route.params.id) !== id) return
+    teams.value = []
+    teamsError.value = true
+  } finally {
+    if (String(route.params.id) === id) teamsReady.value = true
   }
 }
 
@@ -511,9 +564,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 </script>
 
 <template>
-  <section v-if="missing" class="stack">
-    <h1>Турнир не найден</h1>
-  </section>
+  <NotFoundView v-if="missing" heading="Турнир не найден" />
   <section v-else-if="!tournament && error" class="match-state">
     <strong>Турнир не загрузился</strong>
     <button class="btn secondary" type="button" @click="load">Повторить</button>
@@ -574,7 +625,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         Матчи <i v-if="overview">{{ matchesCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'teams'" :class="{ on: tab === 'teams' }" @click="setTab('teams')">
-        Команды <i v-if="overview">{{ teamsCount }}</i>
+        Команды <i v-if="teamsReady && !teamsError">{{ teamsCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'rules'" :class="{ on: tab === 'rules' }" @click="setTab('rules')">Регламент</button>
     </div>
@@ -639,9 +690,9 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <p v-else-if="!scorers.length" class="side-note">Бомбардиров пока нет</p>
           <RouterLink v-for="(row, index) in scorers.slice(0, 8)" :key="row.playerId" class="scorer" :to="`/players/${row.playerId}`">
             <span class="pos">{{ index + 1 }}</span>
-            <PlayerAvatar :src="row.avatarUrl" :name="row.displayName" :first-name="row.firstName" :last-name="row.lastName" :size="28" />
+            <PlayerAvatar :src="row.avatarUrl" :name="registeredName(row)" :first-name="row.firstName" :last-name="row.lastName" :size="28" />
             <span>
-              <b>{{ row.displayName }}</b>
+              <b>{{ registeredName(row) }}</b>
               <small v-if="clubName(row.teamId)">{{ clubName(row.teamId) }}</small>
             </span>
             <strong>{{ row.goals }}</strong>
@@ -651,7 +702,12 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
     <div v-else-if="tab === 'teams'" class="panel stack" role="tabpanel">
       <h2>Команды</h2>
-      <EmptyState v-if="!listedTeams.length" title="Заявок нет" />
+      <div v-if="!teamsReady" class="skeleton" role="status" aria-busy="true" aria-label="Заявки загружаются" />
+      <div v-else-if="teamsError" class="table-state">
+        <strong>Заявки не загрузились</strong>
+        <button class="btn secondary" type="button" @click="reloadTeams">Повторить</button>
+      </div>
+      <EmptyState v-else-if="!listedTeams.length" title="Заявок нет" />
       <div v-for="team in listedTeams" :key="team.id" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />

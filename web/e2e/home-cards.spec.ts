@@ -511,7 +511,7 @@ test('guest burger switches at 1024 and the menu matches on home and a tournamen
   await page.setViewportSize({ width: 1024, height: 900 })
   await expect(page.locator('.menu-button')).toBeHidden()
   await expect(page.locator('nav.primary')).toBeVisible()
-  await expect(page.locator('nav.primary a')).toHaveCount(6)
+  await expect(page.locator('nav.primary a')).toHaveCount(7)
   await expect(page.locator('nav.primary a.on')).toHaveText('Главная')
   await expect(page.locator('.login-pill', { hasText: 'Войти' })).toBeVisible()
 

@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 
 const tournamentId = '00000000-0000-4000-8000-000000000105'
 const longName = 'QA Толян Альфа Северный Кампус Лиги ИТМО'
-const nav = ['Главная', 'Таблица', 'Игры', 'Live', 'Турниры', 'Игроки']
+const nav = ['Главная', 'Таблица', 'Игры', 'Live', 'Турниры', 'Команды', 'Игроки']
 
 const roleItem: Record<string, string | null> = {
   guest: null,
@@ -356,7 +356,7 @@ test('header menus follow the width and the signed-in role', async ({ page }) =>
       if (wide) {
         await expect(page.locator('.menu-button')).toBeHidden()
         await expect(page.locator('nav.primary')).toBeVisible()
-        await expect(page.locator('nav.primary a')).toHaveCount(6)
+        await expect(page.locator('nav.primary a')).toHaveCount(7)
       } else {
         await expect(page.locator('nav.primary')).toBeHidden()
         await expect(page.locator('.menu-button')).toBeVisible()

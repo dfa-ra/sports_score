@@ -37,6 +37,7 @@ import {
 } from '../lib/homeOverview'
 import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
 import { setPageMeta } from '../lib/pageMeta'
+import { registeredName } from '../lib/playerTitle'
 import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
 
@@ -503,8 +504,8 @@ onUnmounted(() => {
                 <td class="rk">{{ index + 1 }}</td>
                 <td>
                   <RouterLink class="pl" :to="`/players/${player.playerId}`">
-                    <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
-                    <b>{{ player.displayName }}</b>
+                    <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
+                    <b>{{ registeredName(player) }}</b>
                   </RouterLink>
                 </td>
                 <td class="tm">{{ player.teamName }}</td>
@@ -517,8 +518,8 @@ onUnmounted(() => {
           <div class="sl-mob">
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
-              <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
-              <div><div class="nm">{{ player.displayName }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
+              <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
             </RouterLink>
           </div>
@@ -543,6 +544,7 @@ onUnmounted(() => {
   background:
     radial-gradient(900px 260px at 92% 0%, rgba(76, 180, 229, 0.22), transparent 70%),
     var(--navy);
+  padding-top: 0.9rem;
   padding-bottom: 1.5rem;
 }
 .block { padding-top: 1.5rem; }
