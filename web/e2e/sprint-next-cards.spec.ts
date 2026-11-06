@@ -170,6 +170,17 @@ const matches = [
     awayTeamName: 'Химики',
   }),
   match({
+    id: 'm-winter',
+    tournamentId: 'winter-1',
+    tournamentName: 'Зимний кубок',
+    status: 'SCHEDULED',
+    scheduledAt: at(dotDay, 19, 0),
+    homeTeamId: 'home-ma',
+    awayTeamId: 'away-h',
+    homeTeamName: 'Математики',
+    awayTeamName: 'Химики',
+  }),
+  match({
     id: 'm-undated',
     tournamentId: liga,
     tournamentName: 'Лига ИТМО',
@@ -279,7 +290,15 @@ const cupFinal = [{
   }],
 }]
 
-async function installApi(page: Page, options?: { matchesFail?: boolean; statsFail?: boolean; tableFail?: boolean; incomplete?: boolean; places?: number[]; delayMatches?: boolean }) {
+async function installApi(page: Page, options?: {
+  matchesFail?: boolean
+  statsFail?: boolean
+  tableFail?: boolean
+  incomplete?: boolean
+  places?: number[]
+  delayMatches?: boolean
+  holdMatches?: { hold: boolean; waiters: Array<() => void> }
+}) {
   const places = options?.places ?? [1, 2]
   await page.route('**/api/v1/**', async (route: Route) => {
     const url = new URL(route.request().url())
@@ -297,6 +316,9 @@ async function installApi(page: Page, options?: { matchesFail?: boolean; statsFa
       return
     }
     if (path.endsWith('/matches') && !path.includes('/tournaments/') && route.request().method() === 'GET') {
+      if (options?.holdMatches?.hold) {
+        await new Promise<void>((resolve) => options.holdMatches!.waiters.push(resolve))
+      }
       if (options?.delayMatches) await new Promise((resolve) => setTimeout(resolve, 1200))
       if (options?.incomplete) {
         const pageNo = Number(url.searchParams.get('page') || 0)
@@ -584,6 +606,31 @@ test('tournament chip keeps only that tournament on the day', async ({ page }) =
   await expect(page.locator('.card-head', { hasText: 'Осенняя лига' })).toHaveCount(0)
   await expect(page.locator('.card-head', { hasText: 'Лига ИТМО' })).toHaveCount(0)
   await expect(saturday.locator('.dot')).toHaveCount(0)
+})
+
+test('an empty tournament or favorites filter does not leave the hero loading', async ({ page }) => {
+  const holdMatches = { hold: false, waiters: [] as Array<() => void> }
+  await installApi(page, { holdMatches })
+  await page.clock.install()
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/calendar')
+  await expect(page.locator('.hero .meta span')).toContainText(/\d+ матч/)
+  await expect(page.locator('.hero')).not.toContainText('Загрузка матчей…')
+  holdMatches.hold = true
+  await page.clock.fastForward(13_000)
+  await expect.poll(() => holdMatches.waiters.length).toBeGreaterThan(0)
+  await page.getByRole('button', { name: /Избр/ }).click()
+  await expect(page.getByText('Избранных пока нет').first()).toBeVisible()
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(page.locator('.hero')).not.toContainText('Загрузка матчей…')
+  await expect(page.locator('.hero .meta span')).toContainText('0 матчей')
+  await page.getByRole('button', { name: 'Зимний кубок' }).click()
+  await expect(page.getByText('Матчей на этот день пока нет')).toBeVisible()
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(page.locator('.hero')).not.toContainText('Загрузка матчей…')
+  await expect(page.locator('.hero .meta span')).toContainText('0 матчей')
+  holdMatches.hold = false
+  for (const release of holdMatches.waiters.splice(0)) release()
 })
 
 test('375 calendar shows the same tournaments and no bottom nav', async ({ page }) => {

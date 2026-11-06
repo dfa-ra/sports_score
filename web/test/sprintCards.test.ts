@@ -4,6 +4,7 @@ import {
   applyCalendarFilter,
   calendarCounts,
   calendarDayKey,
+  calendarHeroPending,
   cardScoreText,
   dottedDays,
   groupByTournament,
@@ -49,6 +50,21 @@ test('live counter ignores paused matches', () => {
   assert.deepEqual(counts, { matches: 3, tournaments: 2, live: 1, paused: 1 })
   assert.equal(heroMeta(counts, true), '3 матча · 2 турнира · 1 в игре · 1 на паузе')
   assert.equal(heroMeta(counts, false), '')
+})
+
+test('an empty filter keeps an honest total and does not look like loading', () => {
+  const rows = [
+    { id: '1', tournamentId: 'liga', status: 'SCHEDULED', scheduledAt: '2026-11-06T15:00:00Z' },
+  ]
+  const favorites = applyCalendarFilter(rows, { kind: 'favorites' }, () => false)
+  const otherTournament = applyCalendarFilter(rows, { kind: 'tournament', tournamentId: 'cup' }, () => false)
+  assert.deepEqual(favorites, [])
+  assert.deepEqual(otherTournament, [])
+  const counts = calendarCounts(favorites)
+  assert.equal(heroMeta(counts, true), '0 матчей · 0 турниров · 0 в игре')
+  assert.equal(calendarHeroPending(false, true), false)
+  assert.equal(calendarHeroPending(true, false), true)
+  assert.equal(calendarHeroPending(false, false), false)
 })
 
 test('week dots follow the filter and ignore the selected day', () => {

@@ -9,6 +9,7 @@ import {
   calendarCounts,
   calendarStageLabel,
   dayTitle,
+  calendarHeroPending,
   dottedDays,
   groupByTournament,
   heroMeta,
@@ -44,7 +45,6 @@ const nullComplete = ref(false)
 const liveComplete = ref(false)
 const pausedComplete = ref(false)
 const loading = ref(true)
-const inflight = ref(false)
 const error = ref('')
 const anchor = ref(ymd(new Date()))
 const filter = ref<CalendarFilter>({ kind: 'all' })
@@ -79,7 +79,7 @@ const modeRows = computed(() => {
 })
 
 const countsReady = computed(() => {
-  if (loading.value || inflight.value) return false
+  if (loading.value) return false
   if (liveOnly.value) return liveComplete.value && pausedComplete.value
   if (filter.value.kind === 'undated') return nullComplete.value
   return weekComplete.value && nullComplete.value
@@ -87,6 +87,7 @@ const countsReady = computed(() => {
 
 const counts = computed(() => calendarCounts(modeRows.value))
 const meta = computed(() => heroMeta(counts.value, countsReady.value))
+const heroPending = computed(() => calendarHeroPending(loading.value, countsReady.value))
 const dots = computed(() => (countsReady.value && filter.value.kind !== 'undated' && !liveOnly.value
   ? dottedDays(filteredWeek.value.concat(filteredNull.value), week.value)
   : []))
@@ -199,29 +200,28 @@ async function loadTournaments() {
   tournaments.value = next
 }
 
-async function load(initial = false) {
-  const id = ++requestId
-  if (initial) loading.value = true
-  inflight.value = true
+function markWindowOpen() {
   weekComplete.value = false
   nullComplete.value = false
   liveComplete.value = false
   pausedComplete.value = false
+}
+
+async function load(initial = false) {
+  const id = ++requestId
+  if (initial) {
+    loading.value = true
+    markWindowOpen()
+  }
   error.value = ''
   try {
     await Promise.all([teams.load(), loadTournaments(), loadWindow(id)])
   } catch {
     if (id !== requestId) return
     error.value = 'Матчи не загрузились'
-    weekComplete.value = false
-    nullComplete.value = false
-    liveComplete.value = false
-    pausedComplete.value = false
+    markWindowOpen()
   } finally {
-    if (id === requestId) {
-      loading.value = false
-      inflight.value = false
-    }
+    if (id === requestId) loading.value = false
   }
 }
 
@@ -272,6 +272,7 @@ watch(() => route.name, () => {
 watch(() => week.value.join('|'), (next, prev) => {
   if (!prev || next === prev) return
   loading.value = true
+  markWindowOpen()
   void load(false)
 })
 
@@ -288,7 +289,7 @@ onUnmounted(() => {
       <p v-if="meta" class="meta">
         <span>{{ meta }}</span>
       </p>
-      <p v-else-if="loading || inflight" class="meta quiet">Загрузка матчей…</p>
+      <p v-else-if="heroPending" class="meta quiet">Загрузка матчей…</p>
       <div v-if="!liveOnly && filter.kind !== 'undated'" class="week">
         <button type="button" class="arrow" aria-label="Предыдущая неделя" @click="shiftWeek(-1)">‹</button>
         <div class="days">
@@ -326,7 +327,7 @@ onUnmounted(() => {
       >{{ tour.name }}</button>
     </div>
 
-    <p v-if="!countsReady && !loading && !inflight && !error" class="note">Показаны не все матчи</p>
+    <p v-if="!countsReady && !loading && !error" class="note">Показаны не все матчи</p>
 
     <div class="layout">
       <div class="main-col">

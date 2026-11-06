@@ -141,6 +141,15 @@ export function heroMeta(counts: { matches: number; tournaments: number; live: n
   return parts.join(' · ')
 }
 
+/**
+ * The loading line matches the list skeleton.
+ * A background refresh (`loading` false) must not bring it back, even when the
+ * settled filter is empty. An incomplete scan is the «not all matches» note, not loading.
+ */
+export function calendarHeroPending(loading: boolean, ready: boolean): boolean {
+  return loading && !ready
+}
+
 export function applyCalendarFilter<T extends {
   id?: string | null
   tournamentId?: string | null
