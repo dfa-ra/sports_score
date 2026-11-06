@@ -110,13 +110,17 @@ function advances(index: number) {
 }
 .points { font-weight: 800; }
 .rank {
-  width: 1.35rem;
-  height: 1.35rem;
-  display: inline-grid;
-  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
-  font-size: 0.7rem;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.72rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
 .rank.ice { background: var(--ice); color: var(--navy); }

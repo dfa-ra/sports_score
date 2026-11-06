@@ -378,12 +378,24 @@ const bronzeBoardStyle = computed(() => ({
 }))
 
 type LinkSeg = { d: string; kind: string; ids: Array<string | null | undefined> }
+type PairPath = { upper: string; lower: string; exit: string }
 const linkPaths = ref<LinkSeg[][]>([])
+const measuredPairs = ref<Record<string, PairPath>>({})
+const measuredFinal = ref('M0 50 H100')
+
+function linkD(roundIndex: number, slotIndex: number, part: keyof PairPath) {
+  const found = measuredPairs.value[`${roundIndex}-${slotIndex}`]
+  if (found) return found[part]
+  if (part === 'upper') return 'M0 25 H50 V50'
+  if (part === 'lower') return 'M0 75 H50 V50'
+  return 'M50 50 H100'
+}
 
 function measureLinks() {
   const board = root.value?.querySelector('.bronze-board') as HTMLElement | null
   if (!board) {
     linkPaths.value = []
+    measurePairGrid()
     return
   }
   const links = [...board.querySelectorAll<HTMLElement>('.b-link')]
@@ -425,6 +437,57 @@ function measureLinks() {
     next.push(segs)
   })
   linkPaths.value = next
+  measurePairGrid()
+}
+
+function yIn(box: DOMRect, el: HTMLElement) {
+  const rect = el.getBoundingClientRect()
+  const y = ((rect.top + rect.height / 2 - box.top) / Math.max(1, box.height)) * 100
+  return Math.max(0, Math.min(100, y))
+}
+
+function measurePairGrid() {
+  const grid = root.value?.querySelector('.po-grid') as HTMLElement | null
+  if (!grid) {
+    if (Object.keys(measuredPairs.value).length) measuredPairs.value = {}
+    return
+  }
+  const next: Record<string, PairPath> = {}
+  const cells = [...grid.querySelectorAll<HTMLElement>('.cellc[data-from-round]')]
+  for (const cell of cells) {
+    const box = cell.getBoundingClientRect()
+    const fromRound = Number(cell.dataset.fromRound)
+    const slotIndex = Number(cell.dataset.slotIndex)
+    if (box.height < 1 || Number.isNaN(fromRound) || Number.isNaN(slotIndex)) continue
+    const fromCards = [...grid.querySelectorAll<HTMLElement>(`.cell[data-round="${fromRound}"] .pc`)]
+    const toCards = [...grid.querySelectorAll<HTMLElement>(`.cell[data-round="${fromRound + 1}"] .pc`)]
+    const upper = fromCards[slotIndex * 2]
+    const lower = fromCards[slotIndex * 2 + 1]
+    const target = toCards[slotIndex]
+    if (!upper || !lower || !target) continue
+    const yTop = yIn(box, upper)
+    const yBottom = yIn(box, lower)
+    const yTarget = yIn(box, target)
+    next[`${fromRound}-${slotIndex}`] = {
+      upper: `M0 ${yTop} H50 V${yTarget}`,
+      lower: `M0 ${yBottom} H50 V${yTarget}`,
+      exit: `M50 ${yTarget} H100`,
+    }
+  }
+  const finalCell = grid.querySelector<HTMLElement>('.cellc.final-link')
+  let finalD = 'M0 50 H100'
+  if (finalCell) {
+    const box = finalCell.getBoundingClientRect()
+    const finalCard = grid.querySelector<HTMLElement>('.pc.final')
+    const champ = grid.querySelector<HTMLElement>('.champ-cell .champ')
+    if (box.height > 1 && finalCard && champ) {
+      const yFrom = yIn(box, finalCard)
+      const yTo = yIn(box, champ)
+      finalD = Math.abs(yFrom - yTo) < 1.5 ? `M0 ${yFrom} H100` : `M0 ${yFrom} H50 V${yTo} H100`
+    }
+  }
+  if (JSON.stringify(measuredPairs.value) !== JSON.stringify(next)) measuredPairs.value = next
+  if (measuredFinal.value !== finalD) measuredFinal.value = finalD
 }
 
 function earlyStyle(roundIndex: number, slotIndex: number, slotCount: number) {
@@ -793,30 +856,32 @@ function bronzePairStyle() {
               v-for="slot in linkSlots(slotsOf(rounds[roundIndex + 1]))"
               :key="`svg-${roundIndex}-${slot.id}`"
               class="cellc"
+              :data-from-round="roundIndex"
+              :data-slot-index="Number(slot.slotIndex ?? 0)"
               :style="connectorCell(roundIndex, Number(slot.slotIndex ?? 0))"
             >
               <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path
                   :class="[connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperKind, { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperId]) }]"
-                  d="M0 25 H50 V50"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'upper')"
                 />
                 <path
                   :class="[connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerKind, { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerId]) }]"
-                  d="M0 75 H50 V50"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'lower')"
                 />
                 <path
                   :class="[exitKind(connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperKind, connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerKind), { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperId, connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerId]) }]"
-                  d="M50 50 H100"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'exit')"
                 />
               </svg>
             </div>
           </template>
 
-          <div v-if="rounds.length > 1" class="cellc" :style="finalLinkStyle">
+          <div v-if="rounds.length > 1" class="cellc final-link" :style="finalLinkStyle">
             <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path
                 :class="[branchKind(finalSlot), { hl: pathLit([champion?.id]) }]"
-                d="M0 50 H100"
+                :d="measuredFinal"
               />
             </svg>
           </div>
@@ -867,6 +932,10 @@ function bronzePairStyle() {
 .po-grid { display: grid; column-gap: 0; min-width: 0; }
 .po-grid > * { min-width: 0; }
 .cell { align-self: center; }
+.cell[data-round="0"] :deep(.pr) {
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+}
 .bronze-board {
   display: grid;
   column-gap: 0;

@@ -876,10 +876,10 @@ onUnmounted(() => {
     </AdminOnly>
 
     <div class="match-tabs" role="tablist">
-      <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'"><span class="full">Статистика</span><span class="short">Стат.</span></button>
-      <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
-      <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
+      <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'"><span class="tab-label">Обзор</span></button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'"><span class="tab-label"><span class="full">Статистика</span><span class="short">Стат.</span></span></button>
+      <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'"><span class="tab-label">Составы</span></button>
+      <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'"><span class="tab-label">Протокол</span></button>
     </div>
 
     <div v-if="tab === 'overview'" class="overview">
@@ -1481,7 +1481,17 @@ h2 a { color: inherit; }
 .pill.finished { background: rgba(255,255,255,0.14); }
 .pill.cancelled { color: rgba(255,255,255,0.65); }
 .pitch-score { margin-top: 0.8rem; align-items: flex-start; }
-.pitch-side { display: grid; justify-items: center; gap: 0.35rem; min-width: 0; flex: 1; }
+.pitch-side {
+  display: grid;
+  grid-template-areas: "star" "who";
+  justify-items: center;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+.pitch-side .fav-star { grid-area: star; }
+.pitch-side .pitch-who { grid-area: who; }
 .pitch-who {
   display: grid;
   justify-items: center;
@@ -1528,16 +1538,27 @@ h2 a { color: inherit; }
 }
 .match-tabs button {
   flex: 1 1 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
   border: 0;
   background: transparent;
   color: var(--muted);
   font-weight: 800;
-  padding: 0.7rem 0.4rem;
-  border-bottom: 3px solid transparent;
+  padding: 0.15rem 0.35rem 0;
   cursor: pointer;
   white-space: nowrap;
 }
-.match-tabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
+.match-tabs .tab-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.05rem 0.42rem;
+  border-bottom: 3px solid transparent;
+  line-height: 1.2;
+}
+.match-tabs button.on { color: var(--navy); }
+.match-tabs button.on .tab-label { border-bottom-color: var(--ice); color: var(--navy); }
 .match-tabs .short { display: none; }
 .overview {
   display: grid;
@@ -1574,11 +1595,19 @@ h2 a { color: inherit; }
 .rail { display: grid; gap: 0.75rem; }
 .form-row, .about dl div {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.45rem;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 0.5rem;
   align-items: center;
   padding: 0.4rem 0;
 }
+.form-row b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.form-row .marks { align-self: center; }
 .about dl { margin: 0; }
 .about dl div { grid-template-columns: 5.5rem minmax(0, 1fr); }
 .about dt { color: var(--muted); font-weight: 700; }
@@ -1602,7 +1631,9 @@ h2 a { color: inherit; }
 .marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
 .fail { display: grid; justify-items: center; gap: 0.5rem; }
 .pad { justify-self: start; margin-top: 0.6rem; }
-.empty-events { padding: 0.6rem 0; }
+.overview > .stack { align-items: start; }
+.card.events { align-self: start; height: auto; }
+.empty-events { margin: 0; padding: 0.4rem 0 0.15rem; }
 @media (max-width: 720px) {
   .overview { grid-template-columns: 1fr; }
   .match-tabs { flex-wrap: wrap; overflow: visible; }

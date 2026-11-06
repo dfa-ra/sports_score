@@ -364,9 +364,12 @@ const hasRegulations = computed(() => !!String(tournament.value?.regulations || 
 const teamsCount = computed(() => overview.value?.teamsCount ?? listedTeams.value.length)
 const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
 const heroFacts = computed(() => {
+  const seasonLabel = String(overview.value?.seasonLabel || tournament.value?.seasonLabel || '').trim()
+  const seasonYear = overview.value?.seasonYear ?? tournament.value?.seasonYear
+  const season = seasonLabel || (seasonYear ? `Сезон ${seasonYear}` : '')
   const format = tournament.value?.format ? (formatLabel[tournament.value.format] || '') : ''
   const dates = tournamentDateSpan(tournament.value?.startDate, tournament.value?.endDate)
-  return [format, dates].filter(Boolean).join(' · ')
+  return [season, format, dates].filter(Boolean).join(' · ')
 })
 const stageLine = computed(() => {
   const stage = overview.value?.stage || playoff.value?.competitionStage || tournament.value?.competitionStage

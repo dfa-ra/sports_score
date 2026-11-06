@@ -395,7 +395,7 @@ const stickyChrome = computed(() => {
   .brand-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .login-pill { white-space: nowrap; flex-shrink: 0; }
   .menu, .menu-button { flex-shrink: 0; margin-left: 0; }
-  .menu { margin-left: 0.5rem; }
+  .menu { margin-left: 0.85rem; }
 }
 @media (max-width: 720px) {
   .profile-button { width: 36px; height: 36px; }

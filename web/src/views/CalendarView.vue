@@ -480,14 +480,27 @@ onUnmounted(() => {
 .day.on .dot { background: var(--navy); }
 .filters {
   display: flex;
-  gap: 0.4rem;
+  justify-content: flex-start;
+  gap: 0.45rem;
   overflow-x: auto;
   position: sticky;
   top: 56px;
   z-index: 4;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   background: rgba(232, 238, 244, 0.94);
-  padding: 0.35rem 0;
+  padding: 0.35rem 0 0.45rem;
+  scroll-padding-inline: 1rem;
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12px, #000 calc(100% - 16px), transparent);
+}
+.filters::before,
+.filters::after {
+  content: "";
+  flex: 0 0 1rem;
 }
 .filters::-webkit-scrollbar { display: none; }
 .filters button {
@@ -499,6 +512,7 @@ onUnmounted(() => {
   padding: 0.42rem 0.8rem;
   font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
 }
 .filters button.on { background: var(--ice); }
 .filters .short { display: none; }
@@ -519,9 +533,9 @@ onUnmounted(() => {
 .card-head {
   display: flex;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.85rem;
   align-items: center;
-  padding: 0.75rem 0.9rem;
+  padding: 0.8rem 1rem;
   color: var(--navy);
 }
 .card-head b { font-size: 0.95rem; }
@@ -566,6 +580,8 @@ onUnmounted(() => {
   .filters .full { display: none; }
   .filters .short { display: inline; }
   .hero { border-radius: 18px; padding: 0.95rem 0.8rem 0.8rem; }
+  .card-head { gap: 1rem; align-items: flex-start; padding: 0.9rem 1rem; }
+  .card-head a { margin-left: 0.25rem; padding-top: 0.15rem; }
   .days { gap: 0.2rem; }
   .day { padding-inline: 0; }
 }

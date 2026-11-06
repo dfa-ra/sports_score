@@ -490,9 +490,19 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
 .tie-note {
-  margin: 0.1rem 0.2rem 0;
+  margin: 0.7rem 0 0.15rem;
+  padding: 0 0.95rem;
   color: var(--muted);
   font-size: 0.78rem;
+  line-height: 1.4;
+}
+@media (max-width: 720px) {
+  .league-tabs button {
+    padding: 0.5rem 0.42rem 0.45rem;
+    letter-spacing: 0.02em;
+    font-size: 0.7rem;
+  }
+  .tie-note { padding-inline: 0.85rem; }
 }
 .sheet {
   background: #fff;
