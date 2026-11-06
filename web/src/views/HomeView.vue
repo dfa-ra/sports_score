@@ -496,7 +496,7 @@ onUnmounted(() => {
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
       </div>
       <div v-else class="card">
-        <ScrollFade v-if="scorerGroups.length" arrows fade="#ffffff" :watch-key="activeScorers?.tournamentId || ''">
+        <ScrollFade v-if="scorerGroups.length" arrows solid fade="#ffffff" :watch-key="activeScorers?.tournamentId || ''">
           <div class="tabs">
             <button
               v-for="group in scorerGroups"

@@ -164,6 +164,41 @@ test.beforeAll(() => {
   mkdirSync(OUT, { recursive: true })
 })
 
+async function assertNoCutAtEdge(page: Page, scroller: string) {
+  const report = await page.locator(scroller).evaluate((bar) => {
+    const host = bar.getBoundingClientRect()
+    const plate = bar.parentElement?.querySelector('.scroll-fade-plate.right')
+    const plateBox = plate instanceof HTMLElement ? plate.getBoundingClientRect() : null
+    const coverLeft = plateBox ? plateBox.left : host.right
+    const paint = plate instanceof HTMLElement ? getComputedStyle(plate).backgroundColor : ''
+    const opaque = /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*1\s*)?\)$/.test(paint)
+      || paint === 'rgb(255, 255, 255)'
+      || paint === 'rgb(232, 238, 244)'
+    const items = [...bar.querySelectorAll('button')].flatMap((button) => {
+      if (!(button instanceof HTMLElement)) return []
+      const box = button.getBoundingClientRect()
+      if (box.width < 1 || box.bottom <= host.top || box.top >= host.bottom) return []
+      const onScreen = box.right > host.left + 1 && box.left < host.right - 1
+      if (!onScreen) return []
+      const crossesCover = box.left < coverLeft - 1 && box.right > coverLeft + 0.5
+      const crossesContainer = box.left < host.right - 1 && box.right > host.right - 1
+      const underPlate = !!plateBox && box.left >= plateBox.left - 1
+      return [{
+        text: (button.innerText || '').replace(/\s+/g, ' ').trim(),
+        stub: (crossesCover || crossesContainer) && !underPlate,
+        left: Math.round(box.left),
+        right: Math.round(box.right),
+        coverLeft: Math.round(coverLeft),
+        hostRight: Math.round(host.right),
+      }]
+    })
+    return { opaque: plateBox ? opaque : true, plate: !!plateBox, items }
+  })
+  if (report.plate) expect(report.opaque).toBe(true)
+  const stubs = report.items.filter((item) => item.stub)
+  expect(stubs, JSON.stringify(report.items)).toEqual([])
+}
+
 test('chip and tab labels are not clipped at 375, 719, and 1440', async ({ page }) => {
   await install(page)
   for (const width of [375, 719, 1440]) {
@@ -202,12 +237,17 @@ test('chip and tab labels are not clipped at 375, 719, and 1440', async ({ page 
       })
     }
     if (width === 375) {
+      await page.locator('.tabs').evaluate((bar) => { bar.scrollLeft = 0 })
+      await assertNoCutAtEdge(page, '.tabs')
       await stamp(page)
       await page.locator('.card', { has: page.getByRole('heading', { name: 'Матчи' }) }).screenshot({
         path: `${OUT}/qa3-home-matches-375.png`,
       })
       await page.locator('.card', { has: page.locator('.tabs') }).screenshot({
         path: `${OUT}/qa3-scorer-tabs-375.png`,
+      })
+      await page.locator('.card', { has: page.locator('.tabs') }).screenshot({
+        path: `${OUT}/qa4-scorer-tabs-375.png`,
       })
     }
     const last = page.locator('.tabs button').last()
@@ -247,7 +287,11 @@ test('chip and tab labels are not clipped at 375, 719, and 1440', async ({ page 
   await page.goto('/calendar')
   await expect(page.getByRole('button', { name: 'Лига ИТМО' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Сетка' }).first()).toBeVisible()
+  await page.locator('.filters').evaluate((bar) => { bar.scrollLeft = 0 })
+  await assertNoCutAtEdge(page, '.filters')
   await assertTextFits(page, '.filters .chip-label')
+  await stamp(page)
+  await page.locator('.filters-fade').screenshot({ path: `${OUT}/qa4-calendar-chip-375.png` })
   const liga = page.locator('.filters .chip-label').filter({ hasText: 'Лига ИТМО' })
   await expect(liga).toHaveAttribute('title', 'Лига ИТМО')
   const whole = await liga.evaluate((node) => {
@@ -261,7 +305,7 @@ test('chip and tab labels are not clipped at 375, 719, and 1440', async ({ page 
       && box.right <= host.right + 1
   })
   expect(whole).toBe(true)
-  await expect(page.locator('.filters-fade .scroll-fade-edge.right')).toBeVisible()
+  await expect(page.locator('.filters-fade .scroll-fade-plate.right, .filters-fade .scroll-fade-edge.right').first()).toBeVisible()
   await stamp(page)
   await page.locator('.filters-fade').screenshot({ path: `${OUT}/qa3-calendar-chip-375.png` })
 })

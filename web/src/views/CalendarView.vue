@@ -345,7 +345,7 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <ScrollFade class="filters-fade" arrows fade="var(--canvas)">
+    <ScrollFade class="filters-fade" arrows solid fade="#e8eef4">
       <div class="filters" role="tablist" aria-label="Фильтр матчей">
         <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
           <span class="full chip-label">Все турниры</span><span class="short chip-label">Все</span>

@@ -6,15 +6,24 @@ const props = withDefaults(defineProps<{
   arrows?: boolean
   fade?: string
   watchKey?: string
+  /** At phone width, hide any chip that the scroller would slice. Wider layouts keep the soft edge. */
+  solid?: boolean
 }>(), {
   arrows: false,
   fade: '#ffffff',
   watchKey: '',
+  solid: false,
 })
 
 const root = ref<HTMLElement | null>(null)
 const left = ref(false)
 const right = ref(false)
+const narrow = ref(false)
+const plateWidth = ref(40)
+
+function phoneWidth() {
+  narrow.value = window.matchMedia('(max-width: 480px)').matches
+}
 
 function row() {
   const child = root.value?.firstElementChild
@@ -58,6 +67,21 @@ function edgeFit() {
 
 let fitting = false
 
+function coverCutChips() {
+  plateWidth.value = 40
+  const node = row()
+  if (!props.solid || !narrow.value || !node) return
+  const host = node.getBoundingClientRect()
+  let plateLeft = host.right - 40
+  for (const button of node.querySelectorAll('button')) {
+    if (!(button instanceof HTMLElement)) continue
+    const box = button.getBoundingClientRect()
+    if (box.width < 1 || box.right <= host.left + 1 || box.left >= host.right - 1) continue
+    if (box.right > plateLeft + 0.5) plateLeft = Math.min(plateLeft, box.left)
+  }
+  plateWidth.value = Math.min(host.width, Math.max(40, host.right - plateLeft))
+}
+
 function update() {
   const node = row()
   if (!node || getComputedStyle(node).display === 'none') {
@@ -70,6 +94,7 @@ function update() {
     try {
       edgeFit()
       revealActive()
+      coverCutChips()
     } finally { fitting = false }
   }
   left.value = node.scrollLeft > 2
@@ -100,10 +125,16 @@ function onScroll() {
   update()
 }
 
+function onResize() {
+  phoneWidth()
+  update()
+}
+
 let observer: ResizeObserver | null = null
 let bound: HTMLElement | null = null
 
 onMounted(() => {
+  phoneWidth()
   bound = row()
   bound?.addEventListener('scroll', onScroll, { passive: true })
   bound?.addEventListener('fit-label', update)
@@ -111,12 +142,14 @@ onMounted(() => {
   revealActive()
   observer = new ResizeObserver(() => update())
   if (bound) observer.observe(bound)
+  window.addEventListener('resize', onResize)
 })
 
 onUnmounted(() => {
   observer?.disconnect()
   bound?.removeEventListener('scroll', onScroll)
   bound?.removeEventListener('fit-label', update)
+  window.removeEventListener('resize', onResize)
 })
 
 watch(() => props.watchKey, () => {
@@ -134,7 +167,12 @@ watch(() => props.watchKey, () => {
       :style="{ background: `linear-gradient(90deg, ${fade} 18%, transparent)` }"
     />
     <span
-      v-if="right"
+      v-if="right && solid && narrow"
+      class="scroll-fade-plate right"
+      :style="{ width: `${plateWidth}px`, background: fade }"
+    />
+    <span
+      v-else-if="right"
       class="scroll-fade-edge right"
       :style="{ background: `linear-gradient(90deg, transparent, ${fade} 82%)` }"
     />
@@ -167,6 +205,14 @@ watch(() => props.watchKey, () => {
 }
 .scroll-fade-edge.left { left: 0; }
 .scroll-fade-edge.right { right: 0; }
+.scroll-fade-plate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 1;
+  pointer-events: none;
+}
 .scroll-fade-arrow {
   position: absolute;
   top: 50%;
