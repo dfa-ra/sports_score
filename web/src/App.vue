@@ -102,7 +102,13 @@ watch(compact, () => {
   closeMenus()
 })
 
+const q2Chrome = computed(() => {
+  const name = String(route.name || '')
+  return name === 'tournaments' || name === 'players' || name === 'login'
+})
+
 const stickyChrome = computed(() => {
+  if (q2Chrome.value) return true
   const name = String(route.name || '')
   if (name === 'calendar' || name === 'live' || name === 'match') return true
   if (name === 'table') return String(route.query.tab || 'table') !== 'playoff'
@@ -114,7 +120,7 @@ const stickyChrome = computed(() => {
 
 <template>
   <div class="shell" :data-mood="mood">
-    <header class="chrome" :class="{ pin: stickyChrome }">
+    <header class="chrome" :class="{ pin: stickyChrome, 'q2-pin': q2Chrome }">
       <div class="nav-bar">
         <div class="container nav-inner">
           <RouterLink class="brand" to="/" :title="SITE_NAME">
@@ -212,6 +218,9 @@ const stickyChrome = computed(() => {
   position: sticky;
   top: 0;
   z-index: 30;
+}
+@media (min-width: 721px) {
+  .chrome.q2-pin .nav-inner { min-height: 64px; }
 }
 .nav-inner {
   display: flex;

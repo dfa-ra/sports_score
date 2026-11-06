@@ -2,6 +2,7 @@
 defineProps<{
   autocomplete: string
   maxlength?: number
+  placeholder?: string
 }>()
 
 const value = defineModel<string>({ required: true })
@@ -16,6 +17,7 @@ const emit = defineEmits<{ input: [] }>()
       :type="visible ? 'text' : 'password'"
       :maxlength="maxlength ?? 100"
       :autocomplete="autocomplete"
+      :placeholder="placeholder"
       @input="emit('input')"
     />
     <button
