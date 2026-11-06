@@ -157,3 +157,77 @@ test('a successful match retry clears the update banner', async ({ page }) => {
   await stamp(page)
   await page.screenshot({ path: `${OUT}/qa5-match-retry-cleared.png` })
 })
+
+const retryFormRow = {
+  id: 'h-new',
+  status: 'FINISHED',
+  homeTeamId: teamId,
+  awayTeamId: otherTeamId,
+  homeScore: 2,
+  awayScore: 0,
+  startedAt: '2026-11-03T12:00:00Z',
+}
+
+test('a successful match retry does not leave the form loading', async ({ page }) => {
+  test.setTimeout(20_000)
+  let matchGets = 0
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/teams') return json(route, { content: [] })
+    if (path === `/api/v1/matches/${matchId}`) {
+      matchGets += 1
+      if (matchGets === 1) return json(route, { message: 'down' }, 500)
+      return json(route, match)
+    }
+    if (path === `/api/v1/matches/${matchId}/events`) return json(route, [])
+    if (path === `/api/v1/matches/${matchId}/referees`) return json(route, [])
+    if (path === `/api/v1/matches/${matchId}/lineups`) return json(route, {})
+    if (path.endsWith('/form')) return json(route, [retryFormRow])
+    return json(route, {})
+  })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto(`/matches/${matchId}`)
+  await expect(page.getByText('Матч не загрузился')).toBeVisible()
+  await page.getByRole('button', { name: 'Повторить' }).click()
+  await expect(page.getByRole('link', { name: 'QA Толян Альфа' })).toBeVisible()
+  const card = page.locator('.rail .card', { hasText: 'последние 5' })
+  await expect(card.locator('.marks i')).toHaveText(['В', 'П'])
+  await expect(card.getByText('Загрузка…')).toHaveCount(0)
+})
+
+test('the form loads when a failed retry is overtaken by the live match', async ({ page }) => {
+  test.setTimeout(20_000)
+  let matchGets = 0
+  let releaseRetry = () => {}
+  const retryGate = new Promise<void>((resolve) => { releaseRetry = resolve })
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/teams') return json(route, { content: [] })
+    if (path === `/api/v1/matches/${matchId}`) {
+      matchGets += 1
+      if (matchGets === 1) return json(route, { message: 'down' }, 500)
+      if (matchGets === 2) {
+        await retryGate
+        return json(route, { message: 'down' }, 500)
+      }
+      return json(route, match)
+    }
+    if (path === `/api/v1/matches/${matchId}/events`) return json(route, [])
+    if (path === `/api/v1/matches/${matchId}/referees`) return json(route, [])
+    if (path === `/api/v1/matches/${matchId}/lineups`) return json(route, {})
+    if (path.endsWith('/form')) return json(route, [retryFormRow])
+    return json(route, {})
+  })
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto(`/matches/${matchId}`)
+  const retry = page.getByRole('button', { name: 'Повторить' })
+  await expect(page.getByText('Матч не загрузился')).toBeVisible()
+  await expect(retry).toBeVisible()
+  await retry.click()
+  await expect.poll(() => matchGets, { timeout: 8_000 }).toBeGreaterThanOrEqual(3)
+  releaseRetry()
+  await expect(page.getByRole('link', { name: 'QA Толян Альфа' })).toBeVisible()
+  const card = page.locator('.rail .card', { hasText: 'последние 5' })
+  await expect(card.locator('.marks i')).toHaveText(['В', 'П'])
+  await expect(card.getByText('Загрузка…')).toHaveCount(0)
+})

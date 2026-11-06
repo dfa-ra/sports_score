@@ -311,6 +311,8 @@ async function load() {
   if (ticket !== pageTicket || String(route.params.id || '') !== id) return
   match.value = m.data
   error.value = ''
+  await loadForms(m.data.homeTeamId, m.data.awayTeamId)
+  if (ticket !== pageTicket) return
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
   const publish = () => setPageMeta({
@@ -343,7 +345,6 @@ async function load() {
       awayRoster.value = []
     }
   }
-  await loadForms(m.data.homeTeamId, m.data.awayTeamId)
   if (ticket !== pageTicket) return
   try {
     const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
@@ -387,28 +388,36 @@ async function load() {
 }
 
 let formTicket = 0
+let formPending = false
 async function loadForms(homeTeamId?: string, awayTeamId?: string) {
   const ticket = ++formTicket
+  formPending = true
   const matchId = String(route.params.id || '')
   const stillThisMatch = () => ticket === formTicket && matchId === String(route.params.id || '')
-  if (!homeTeamId || !awayTeamId) {
-    const empty = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), [] as any[])
-    if (!empty) return
-    homeForm.value = []
-    awayForm.value = []
-    formError.value = false
-    formReady.value = true
-    return
-  }
   try {
+    if (!homeTeamId || !awayTeamId) {
+      if (!stillThisMatch()) return
+      homeForm.value = []
+      awayForm.value = []
+      formError.value = false
+      formReady.value = true
+      return
+    }
     const [hf, af] = await Promise.all([
       api.get(`/teams/${homeTeamId}/form`, { params: { limit: 5 } }),
       api.get(`/teams/${awayTeamId}/form`, { params: { limit: 5 } }),
     ])
     const homeRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), hf.data)
     const awayRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), af.data)
-    if (homeRaw == null || awayRaw == null || !stillThisMatch()) return
-    if (match.value && (String(match.value.homeTeamId) !== String(homeTeamId) || String(match.value.awayTeamId) !== String(awayTeamId))) return
+    if (!stillThisMatch()) return
+    if (homeRaw == null || awayRaw == null) {
+      formError.value = true
+      return
+    }
+    if (match.value && (String(match.value.homeTeamId) !== String(homeTeamId) || String(match.value.awayTeamId) !== String(awayTeamId))) {
+      formError.value = true
+      return
+    }
     const home = classifyFormPayload(homeRaw, homeTeamId, matchId)
     const away = classifyFormPayload(awayRaw, awayTeamId, matchId)
     if (!stillThisMatch()) return
@@ -423,6 +432,8 @@ async function loadForms(homeTeamId?: string, awayTeamId?: string) {
   } catch {
     if (!stillThisMatch()) return
     formError.value = true
+  } finally {
+    if (ticket === formTicket) formPending = false
   }
 }
 
@@ -451,7 +462,9 @@ async function refreshLive() {
     api.get(`/matches/${id}/events`),
   ])
   if (String(route.params.id || '') !== id) return
+  const needsForm = !formReady.value && !formError.value && !formPending
   match.value = { ...match.value, ...m.data }
+  if (needsForm) void loadForms(match.value?.homeTeamId, match.value?.awayTeamId)
   const next = e.data ?? []
   if (eventSignature(next) !== eventSignature(events.value)) {
     events.value = next
