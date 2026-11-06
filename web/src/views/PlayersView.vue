@@ -54,8 +54,9 @@ const mode = ref<'goals' | 'assists'>('goals')
 const limit = ref(10)
 const loading = ref(true)
 const error = ref('')
+const SEARCH_PAGE_SIZE = 10
 const hits = ref<Hit[]>([])
-const searchLimit = ref(10)
+const searchPage = ref(0)
 const searchTotal = ref(0)
 const searchState = ref<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle')
 let boardTicket = 0
@@ -175,58 +176,79 @@ async function pool<T>(list: T[], limitSize: number, job: (item: T) => Promise<v
   await Promise.all(Array.from({ length: width }, () => worker()))
 }
 
+function hitsFrom(content: Person[], kept: Map<string, Hit>): Hit[] {
+  const board = new Map<string, Person>()
+  for (const row of [...scorers.value, ...assists.value]) {
+    if (row.playerId) board.set(row.playerId, row)
+  }
+  const seen = new Set<string>()
+  const next: Hit[] = []
+  for (const person of content) {
+    const id = String(person.id || person.playerId || '')
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    const prior = board.get(id)
+    const remembered = kept.get(id)
+    const extra = prior
+      ? knownHit(prior)
+      : { team: remembered?.team || '', logo: remembered?.logo || '', goals: remembered?.goals ?? null }
+    next.push({
+      id,
+      name: nameOf(person),
+      firstName: person.firstName,
+      lastName: person.lastName,
+      avatarUrl: person.avatarUrl,
+      team: extra.team,
+      logo: extra.logo,
+      goals: extra.goals,
+    })
+  }
+  return next
+}
+
 async function search(more = false) {
   const q = query.value.trim()
   if (q.length < 2) {
     searchState.value = 'idle'
     hits.value = []
     searchTotal.value = 0
+    searchPage.value = 0
     return
   }
+  const page = more ? searchPage.value + 1 : 0
   const mine = ++searchTicket
   if (!more) searchState.value = 'loading'
   try {
-    const { data } = await api.get('/players', { params: { q, size: searchLimit.value, sort: 'lastName,asc' } })
+    const { data } = await api.get('/players', {
+      params: { q, size: SEARCH_PAGE_SIZE, page, sort: 'lastName,asc' },
+    })
     if (mine !== searchTicket || query.value.trim() !== q) return
     const content = pageContent(data) as Person[]
     const reported = Number((data as { totalElements?: unknown } | null)?.totalElements)
-    searchTotal.value = Number.isFinite(reported) ? reported : content.length
-    const board = new Map<string, Person>()
-    for (const row of [...scorers.value, ...assists.value]) {
-      if (row.playerId) board.set(row.playerId, row)
-    }
     const kept = new Map(hits.value.map((hit) => [hit.id, hit]))
-    const next: Hit[] = content.map((person) => {
-      const id = String(person.id || person.playerId || '')
-      const prior = board.get(id)
-      const remembered = kept.get(id)
-      const extra = prior
-        ? knownHit(prior)
-        : { team: remembered?.team || '', logo: remembered?.logo || '', goals: remembered?.goals ?? null }
-      return {
-        id,
-        name: nameOf(person),
-        firstName: person.firstName,
-        lastName: person.lastName,
-        avatarUrl: person.avatarUrl,
-        team: extra.team,
-        logo: extra.logo,
-        goals: extra.goals,
-      }
-    }).filter((hit) => hit.id)
-    hits.value = next
-    searchState.value = next.length ? 'ready' : 'empty'
+    const incoming = hitsFrom(content, kept)
+    if (more) {
+      const seen = new Set(hits.value.map((hit) => hit.id))
+      hits.value = [...hits.value, ...incoming.filter((hit) => !seen.has(hit.id))]
+    } else {
+      hits.value = incoming
+    }
+    searchPage.value = page
+    if (Number.isFinite(reported)) searchTotal.value = reported
+    else if (!more) searchTotal.value = hits.value.length
+    searchState.value = hits.value.length ? 'ready' : 'empty'
     void enrich(hits.value, mine, q)
   } catch {
     if (mine !== searchTicket || query.value.trim() !== q) return
+    if (more) return
     hits.value = []
     searchTotal.value = 0
+    searchPage.value = 0
     searchState.value = 'error'
   }
 }
 
 function showMoreSearch() {
-  searchLimit.value += 10
   void search(true)
 }
 
@@ -237,11 +259,11 @@ function scheduleSearch() {
     searchTicket += 1
     hits.value = []
     searchTotal.value = 0
-    searchLimit.value = 10
+    searchPage.value = 0
     searchState.value = 'idle'
     return
   }
-  searchLimit.value = 10
+  searchPage.value = 0
   searchState.value = 'loading'
   searchTimer = window.setTimeout(() => { void search() }, 200)
 }

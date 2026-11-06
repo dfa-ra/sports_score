@@ -380,7 +380,7 @@ test('players board, search highlight, and phone column', async ({ page }) => {
 })
 
 test('player search count uses totalElements and show more loads the next page', async ({ page }) => {
-  const sizes: number[] = []
+  const calls: { page: number; size: number }[] = []
   const people = [
     ...Array.from({ length: 15 }, (_, index) => ({
       id: `a${index}`,
@@ -395,11 +395,14 @@ test('player search count uses totalElements and show more loads the next page',
     const path = url.pathname
     if (path === '/api/v1/auth/me' || path === '/api/v1/auth/refresh') return json(route, { message: 'no' }, 401)
     if (path === '/api/v1/players') {
-      const size = Number(url.searchParams.get('size') || '10')
-      sizes.push(size)
+      const requested = Number(url.searchParams.get('size') || '10')
+      const size = Math.min(12, requested)
+      const pageNumber = Number(url.searchParams.get('page') || '0')
+      calls.push({ page: pageNumber, size: requested })
       const sorted = [...people].sort((a, b) => a.lastName.localeCompare(b.lastName, 'ru'))
+      const start = pageNumber * size
       return json(route, {
-        content: sorted.slice(0, size),
+        content: sorted.slice(start, start + size),
         totalElements: people.length,
         totalPages: Math.ceil(people.length / size),
       })
@@ -416,20 +419,21 @@ test('player search count uses totalElements and show more loads the next page',
   await expect(page.getByText('Капитанов Толян')).toHaveCount(0)
   await expect(page.getByText('Свободный Толян')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Показать ещё' })).toBeVisible()
-  await shot(page, 'q2-players-search-more-1440')
-
-  await page.setViewportSize({ width: 375, height: 812 })
-  await noHorizontalScroll(page)
-  await shot(page, 'q2-players-search-more-375')
 
   await page.getByRole('button', { name: 'Показать ещё' }).click()
   await expect(page.getByText('Найдено · 17')).toBeVisible()
   await expect(page.locator('.hit')).toHaveCount(17)
+  const names = await page.locator('.hit').evaluateAll((nodes) => nodes.map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim()))
+  expect(new Set(names).size).toBe(17)
   await expect(page.getByText('Капитанов Толян')).toBeVisible()
   await expect(page.getByText('Свободный Толян')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Показать ещё' })).toHaveCount(0)
-  expect(sizes[0]).toBe(10)
-  expect(sizes.at(-1)).toBe(20)
+  expect(calls.map((call) => `${call.page}:${call.size}`)).toEqual(['0:10', '1:10'])
+  await shot(page, 'q2-players-search-all-1440')
+
+  await page.setViewportSize({ width: 375, height: 812 })
+  await noHorizontalScroll(page)
+  await shot(page, 'q2-players-search-all-375')
 })
 
 test('login copy, field errors, and the phone plate', async ({ page }) => {
