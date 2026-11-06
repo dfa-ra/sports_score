@@ -418,7 +418,7 @@ test('home chips, tabs, pause chip and header gap stay intact', async ({ page })
 
 test('match stars, empty events and header gap', async ({ page }) => {
   await install(page)
-  for (const width of [1440, 375]) {
+  for (const width of [1440, 720, 375]) {
     await page.setViewportSize({ width, height: width === 375 ? 900 : 1000 })
     await page.goto('/matches/next-1')
     await expect(page.getByText('Событий пока нет')).toBeVisible()
@@ -461,14 +461,16 @@ test('match stars, empty events and header gap', async ({ page }) => {
       })
       expect(headerGap).toBeGreaterThanOrEqual(18)
     }
-    await stamp(page)
-    await page.screenshot({ path: `${OUT}/redesign-match-${width === 1440 ? '1440' : '375'}.png`, fullPage: true })
+    if (width === 1440 || width === 375) {
+      await stamp(page)
+      await page.screenshot({ path: `${OUT}/redesign-match-${width}.png`, fullPage: true })
+    }
   }
 })
 
 test('calendar chips stay inside the scroller', async ({ page }) => {
   await install(page)
-  for (const width of [1440, 375]) {
+  for (const width of [1440, 720, 375]) {
     await page.setViewportSize({ width, height: width === 375 ? 1000 : 900 })
     await page.goto('/calendar')
     await expect(page.getByRole('button', { name: 'Лига ИТМО' })).toBeVisible()
@@ -489,8 +491,10 @@ test('calendar chips stay inside the scroller', async ({ page }) => {
     expect(align.filtersLeft).toBeGreaterThanOrEqual(align.heroLeft - 1)
     expect(align.firstLeft).toBeGreaterThanOrEqual(align.heroLeft - 1)
     await noPageScroll(page)
-    await stamp(page)
-    await page.screenshot({ path: `${OUT}/redesign-calendar-${width === 1440 ? '1440' : '375'}.png`, fullPage: true })
+    if (width === 1440 || width === 375) {
+      await stamp(page)
+      await page.screenshot({ path: `${OUT}/redesign-calendar-${width}.png`, fullPage: true })
+    }
   }
 })
 
@@ -524,6 +528,12 @@ test('playoff connectors meet card centers and the phone header stays static', a
   await noPageScroll(page)
   await stamp(page)
   await page.screenshot({ path: `${OUT}/redesign-playoff-1440.png`, fullPage: true })
+
+  await page.setViewportSize({ width: 720, height: 900 })
+  await page.goto('/tournaments/liga?tab=playoff')
+  await expect(page.getByText('1/8 финала').first()).toBeVisible()
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+  await noPageScroll(page)
 
   await page.setViewportSize({ width: 375, height: 900 })
   await page.goto('/tournaments/liga?tab=playoff')
@@ -572,6 +582,13 @@ test('table tabs, footnote and place numbers', async ({ page }) => {
   await noPageScroll(page)
   await stamp(page)
   await page.screenshot({ path: `${OUT}/redesign-table-375.png`, fullPage: true })
+
+  await page.setViewportSize({ width: 720, height: 1000 })
+  await page.goto('/table?tournament=liga')
+  await expect(page.getByRole('button', { name: 'Игроки' })).toBeVisible()
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'sticky')
+  await labelsFitScroller(page, '.league-tabs')
+  await noPageScroll(page)
 
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('/table?tournament=liga')
