@@ -764,7 +764,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .stbl td.tm { width: 11rem; }
 .stbl .tm { color: var(--muted); font-weight: 600; }
 .stbl td:nth-child(2) { overflow: hidden; }
-.stbl .g { font-weight: 800; font-size: 1.125rem; color: var(--navy); }
+.stbl td.num.g {
+  margin: 0;
+  width: 5.5rem;
+  padding: 0.6rem 0.8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 1.125rem;
+  color: var(--navy);
+}
 .pl { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
 .pl b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl b, .srow .nm { color: var(--ink); font-weight: 700; }

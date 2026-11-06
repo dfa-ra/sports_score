@@ -389,15 +389,39 @@ test('home fixture matches the approved blocks on desktop and phone', async ({ p
         }
         const headers = [...table.querySelectorAll('th.num')]
         const cells = [...table.querySelectorAll('tbody tr:first-child td.num')]
-        return headers.map((header, index) => ({
-          header: inkRight(header),
-          cell: inkRight(cells[index]),
-          width: header.getBoundingClientRect().width,
-        }))
+        const box = (el: Element) => {
+          const style = getComputedStyle(el)
+          return {
+            right: inkRight(el),
+            width: el.getBoundingClientRect().width,
+            tabular: style.fontVariantNumeric,
+            margin: style.margin,
+            padding: style.padding,
+            align: style.textAlign,
+          }
+        }
+        return {
+          columns: headers.map((header, index) => ({ header: box(header), cell: box(cells[index]) })),
+          player: getComputedStyle(table.querySelector('tbody td:nth-child(2)')!).textAlign,
+          team: getComputedStyle(table.querySelector('tbody td.tm')!).textAlign,
+        }
       })
-      const widths = edges.map((edge) => edge.width)
+      const widths = edges.columns.flatMap((column) => [column.header.width, column.cell.width])
       expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1)
-      for (const edge of edges) expect(Math.abs(edge.header - edge.cell)).toBeLessThanOrEqual(2)
+      for (const column of edges.columns) {
+        expect(Math.abs(column.header.right - column.cell.right)).toBeLessThanOrEqual(2)
+        expect(column.header.tabular).toBe('tabular-nums')
+        expect(column.cell.tabular).toBe('tabular-nums')
+        expect(column.header.align).toBe('right')
+        expect(column.cell.align).toBe('right')
+      }
+      const goals = edges.columns[2].cell
+      const assists = edges.columns[1].cell
+      expect(goals.margin).toBe('0px')
+      expect(goals.padding).toBe(assists.padding)
+      expect(goals.width).toBe(assists.width)
+      expect(edges.player).toBe('start')
+      expect(edges.team).toBe('start')
       await page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Бомбардиры по турнирам' }) })
         .screenshot({ path: `${OUT}/home-scorers-desktop-aligned.png` })
     }
