@@ -39,6 +39,12 @@ const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
 
+const advancingPlaces = computed(() => {
+  const raw = playoff.value?.advancingPlaces
+  if (!Array.isArray(raw)) return []
+  return raw.map((place: unknown) => Number(place)).filter((place) => Number.isFinite(place))
+})
+
 const hasPlayoff = computed(() => {
   const picked = tournaments.value.find((item) => item.id === tournamentId.value)
   if (picked?.competitionStage === 'PLAYOFF') return true
@@ -321,7 +327,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <div v-else class="sheet-stack">
         <div v-for="(table, i) in standings" :key="table.id || i" class="sheet">
           <h2 v-if="table.name" class="group-title">{{ table.name }}</h2>
-          <StandingTable :rows="table.rows" />
+          <StandingTable :rows="table.rows" :marked-places="advancingPlaces" />
         </div>
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
       </div>

@@ -101,11 +101,19 @@ watch(compact, () => {
   closeMenus()
 })
 
+const stickyChrome = computed(() => {
+  const name = String(route.name || '')
+  if (name === 'calendar' || name === 'live' || name === 'match') return true
+  if (name === 'table') return String(route.query.tab || 'table') !== 'playoff'
+  if (name === 'tournament') return String(route.query.tab || '') === 'table'
+  return false
+})
+
 </script>
 
 <template>
   <div class="shell" :data-mood="mood">
-    <header class="chrome">
+    <header class="chrome" :class="{ pin: stickyChrome }">
       <div class="nav-bar">
         <div class="container nav-inner">
           <RouterLink class="brand" to="/" :title="SITE_NAME">
@@ -198,12 +206,11 @@ watch(compact, () => {
 <style scoped>
 .shell { min-height: 100vh; min-width: 0; display: grid; grid-template-rows: auto 1fr auto; }
 .shell > * { min-width: 0; }
-.chrome {
+.chrome { background: var(--navy); color: #fff; }
+.chrome.pin {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: var(--navy);
-  color: #fff;
 }
 .nav-inner {
   display: flex;

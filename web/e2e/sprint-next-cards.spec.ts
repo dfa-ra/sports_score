@@ -1,7 +1,29 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 
-const today = '2026-11-05'
+function moscowToday() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Moscow',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+function plusDays(ymd: string, days: number) {
+  const [year, month, day] = ymd.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day + days))
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(date.getUTCDate()).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${mm}-${dd}`
+}
+
+const today = moscowToday()
+const mondayOffset = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7
+const weekMonday = plusDays(today, -mondayOffset)
+const emptyDay = mondayOffset === 0 ? plusDays(weekMonday, 1) : weekMonday
+const dotDay = mondayOffset === 6 ? plusDays(weekMonday, 5) : plusDays(weekMonday, 6)
+const dayNumber = (ymd: string) => String(Number(ymd.slice(8)))
 const cup = 'cup-1'
 const liga = 'liga-1'
 const autumn = 'autumn-1'
@@ -141,7 +163,7 @@ const matches = [
     tournamentId: autumn,
     tournamentName: 'Осенняя лига',
     status: 'SCHEDULED',
-    scheduledAt: at('2026-11-07', 15, 0),
+    scheduledAt: at(dotDay, 15, 0),
     homeTeamId: 'home-ma',
     awayTeamId: 'away-h',
     homeTeamName: 'Математики',
@@ -240,7 +262,24 @@ function detail(id: string) {
   return matches.find((row) => row.id === id) || matches[2]
 }
 
-async function installApi(page: Page, options?: { matchesFail?: boolean; statsFail?: boolean; tableFail?: boolean; incomplete?: boolean; places?: number[] }) {
+const cupFinal = [{
+  round: 1,
+  title: 'Финал',
+  slots: [{
+    id: 'slot-final',
+    round: 1,
+    slotIndex: 0,
+    homeTeamId: 'home-j',
+    homeTeamName: 'Журналистика',
+    awayTeamId: 'away-b',
+    awayTeamName: 'Биофак',
+    matchStatus: 'SCHEDULED',
+    scheduledAt: at(today, 16, 0),
+    venue: 'Зал ИТМО',
+  }],
+}]
+
+async function installApi(page: Page, options?: { matchesFail?: boolean; statsFail?: boolean; tableFail?: boolean; incomplete?: boolean; places?: number[]; delayMatches?: boolean }) {
   const places = options?.places ?? [1, 2]
   await page.route('**/api/v1/**', async (route: Route) => {
     const url = new URL(route.request().url())
@@ -258,6 +297,7 @@ async function installApi(page: Page, options?: { matchesFail?: boolean; statsFa
       return
     }
     if (path.endsWith('/matches') && !path.includes('/tournaments/') && route.request().method() === 'GET') {
+      if (options?.delayMatches) await new Promise((resolve) => setTimeout(resolve, 1200))
       if (options?.incomplete) {
         const pageNo = Number(url.searchParams.get('page') || 0)
         await route.fulfill({
@@ -334,11 +374,12 @@ async function installApi(page: Page, options?: { matchesFail?: boolean; statsFa
       return
     }
     if (path.includes('/tournaments/') && path.endsWith('/overview')) {
+      const cupGrid = path.includes(`/${cup}/`)
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
         matchesCount: 99,
-        teamsCount: 12,
-        format: 'GROUPS_PLAYOFF',
-        stage: 'GROUPS',
+        teamsCount: cupGrid ? 2 : 12,
+        format: cupGrid ? 'CUP' : 'GROUPS_PLAYOFF',
+        stage: cupGrid ? 'PLAYOFF' : 'GROUPS',
         seasonYear: 2026,
         startDate: '2026-10-03',
         endDate: '2027-02-28',
@@ -355,7 +396,39 @@ async function installApi(page: Page, options?: { matchesFail?: boolean; statsFa
       return
     }
     if (path.includes('/tournaments/') && path.endsWith('/playoff')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ competitionStage: 'GROUPS', advancingPlaces: places, rounds: [] }) })
+      const cupGrid = path.includes(`/${cup}/`)
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        competitionStage: cupGrid ? 'PLAYOFF' : 'GROUPS',
+        advancingPlaces: places,
+        rounds: cupGrid ? cupFinal : [],
+      }) })
+      return
+    }
+    if (path.endsWith('/home/overview')) {
+      const asHome = (row: Record<string, unknown>) => ({
+        ...row,
+        tournamentShortName: row.tournamentName,
+        scheduledAt: row.scheduledAt || at(today, 18, 0),
+      })
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        live: matches.filter((row) => row.status === 'LIVE').map(asHome),
+        upcoming: matches.filter((row) => row.status === 'SCHEDULED' && row.scheduledAt).map(asHome),
+        recent: matches.filter((row) => row.status === 'FINISHED').map(asHome),
+        next: asHome(matches.find((row) => row.id === 'm-soon')!),
+        tournaments: tournaments.map((item) => ({
+          id: item.id,
+          name: item.name,
+          shortName: item.name,
+          status: item.status,
+          format: item.format,
+          competitionStage: item.competitionStage,
+          teamsCount: item.id === liga ? 9 : 2,
+          startDate: item.startDate,
+          endDate: item.endDate,
+        })),
+        scorersByTournament: [],
+        summary: { matchesPlayed: 36, goals: 140, goalsPerMatch: 3.9, teams: 11, players: 80 },
+      }) })
       return
     }
     if (path.includes('/tournaments/') && path.endsWith('/teams')) {
@@ -450,10 +523,10 @@ test('empty day and local favorites stay separate from the full list', async ({ 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/calendar')
   await expect(page.getByText('Осенняя лига').first()).toBeVisible()
-  await page.locator('.day', { hasText: '2' }).click()
+  await page.locator('.day').filter({ has: page.locator('b', { hasText: new RegExp(`^${dayNumber(emptyDay)}$`) }) }).click()
   await expect(page.getByText('Матчей на этот день пока нет')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Перейти' })).toBeVisible()
-  await page.locator('.day', { hasText: '5' }).click()
+  await page.locator('.day').filter({ has: page.locator('b', { hasText: new RegExp(`^${dayNumber(today)}$`) }) }).click()
   await page.locator('.line', { hasText: 'Журналистика' }).locator('.star').click()
   await page.getByRole('button', { name: /Избранн/ }).click()
   await expect(page.locator('.line', { hasText: 'Журналистика' })).toBeVisible()
@@ -466,7 +539,7 @@ test('tournament chip keeps only that tournament on the day', async ({ page }) =
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/calendar')
   await expect(page.getByText('Осенняя лига').first()).toBeVisible()
-  const saturday = page.locator('.day', { hasText: '7' })
+  const saturday = page.locator('.day').filter({ has: page.locator('b', { hasText: new RegExp(`^${dayNumber(dotDay)}$`) }) })
   await expect(saturday.locator('.dot')).toHaveCount(1)
   await page.getByRole('button', { name: 'Студ. кубок' }).click()
   await expect(page.locator('.card-head', { hasText: 'Студ. кубок' })).toBeVisible()
@@ -577,6 +650,81 @@ test('375 table shows both groups without horizontal scroll', async ({ page }) =
   expect(scroll).toBe(true)
 })
 
+test('calendar shows the loading line before the match list arrives', async ({ page }) => {
+  await installApi(page, { delayMatches: true })
+  await page.goto('/calendar')
+  await expect(page.getByText('Загрузка матчей…').first()).toBeVisible()
+  await expect(page.locator('.meta span')).toHaveCount(0)
+  await expect(page.getByText('Осенняя лига').first()).toBeVisible()
+  await expect(page.getByText(/в игре/)).toBeVisible()
+})
+
+test('live page counts only live matches and still lists a pause', async ({ page }) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/live')
+  await expect(page.getByRole('heading', { name: 'Сейчас' })).toBeVisible()
+  await expect(page.getByText('Игры · Live')).toBeVisible()
+  await expect(page.getByText(/1 в игре/)).toBeVisible()
+  await expect(page.getByText(/1 на паузе/)).toBeVisible()
+  await expect(page.locator('.line', { hasText: 'Журналистика' })).toBeVisible()
+  await expect(page.locator('.line', { hasText: 'Медики' })).toContainText('Пауза')
+  await expect(page.locator('.week')).toHaveCount(0)
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'sticky')
+})
+
+test('table hub highlights only declared places', async ({ page }) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/table?tournament=liga-1')
+  await expect(page.getByText('Группа A')).toBeVisible()
+  await expect(page.getByText('Группа B')).toBeVisible()
+  await expect(page.locator('.rank.ice')).toHaveCount(4)
+  await expect(page.locator('.rank.navy')).toHaveCount(0)
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'sticky')
+})
+
+test('table hub with an empty place list has no zone colours', async ({ page }) => {
+  mkdirSync(outDir, { recursive: true })
+  await installApi(page, { places: [] })
+  for (const [file, width, height] of [
+    ['table-hub-1440-empty-places.png', 1440, 1100],
+    ['table-hub-375-empty-places.png', 375, 1400],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    await page.goto('/table?tournament=liga-1')
+    await expect(page.getByText('Химики').first()).toBeVisible()
+    await expect(page.locator('.rank.ice, .rank.navy')).toHaveCount(0)
+    await stamp(page)
+    await page.screenshot({ path: `${outDir}/${file}`, fullPage: true })
+  }
+})
+
+test('home and the playoff grid keep a static header', async ({ page }) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+  await page.goto('/tournaments/cup-1')
+  await expect(page.getByText('Финал').first()).toBeVisible()
+  await expect(page.getByText('Журналистика').first()).toBeVisible()
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+  await page.goto('/table?tournament=cup-1&tab=playoff')
+  await expect(page.getByText('Финал').first()).toBeVisible()
+  await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+})
+
+test('375 table hub shows both groups without horizontal scroll', async ({ page }) => {
+  await installApi(page)
+  await page.setViewportSize({ width: 375, height: 900 })
+  await page.goto('/table?tournament=liga-1')
+  await expect(page.getByText('Группа A')).toBeVisible()
+  await expect(page.getByText('Группа B')).toBeVisible()
+  await expect(page.locator('.rank.navy')).toHaveCount(0)
+  const scroll = await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)
+  expect(scroll).toBe(true)
+})
+
 test('incomplete calendar does not invent a total', async ({ page }) => {
   await installApi(page, { incomplete: true })
   await page.goto('/calendar')
@@ -613,6 +761,26 @@ test('fixture screenshots of calendar, match and table', async ({ page }) => {
     }],
     ['table-375-cards.png', '/tournaments/liga-1?tab=table', 375, 1600, async () => {
       await expect(page.getByText('Группа B')).toBeVisible()
+    }],
+    ['table-hub-1440-places.png', '/table?tournament=liga-1', 1440, 1200, async () => {
+      await expect(page.locator('.rank.ice')).toHaveCount(4)
+    }],
+    ['table-hub-375-places.png', '/table?tournament=liga-1', 375, 1400, async () => {
+      await expect(page.getByText('Группа B')).toBeVisible()
+    }],
+    ['home-1440-header.png', '/', 1440, 1100, async () => {
+      await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+    }],
+    ['home-375-header.png', '/', 375, 1200, async () => {
+      await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+    }],
+    ['playoff-1440-header.png', '/tournaments/cup-1', 1440, 1100, async () => {
+      await expect(page.getByText('Финал').first()).toBeVisible()
+      await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
+    }],
+    ['playoff-375-header.png', '/tournaments/cup-1', 375, 1200, async () => {
+      await expect(page.getByText('Финал').first()).toBeVisible()
+      await expect(page.locator('.chrome')).toHaveCSS('position', 'static')
     }],
   ]
   for (const [file, url, width, height, ready] of shots) {
