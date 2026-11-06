@@ -495,7 +495,7 @@ onUnmounted(() => {
         <template v-else>
           <table class="stbl">
             <thead>
-              <tr><th></th><th>Игрок</th><th>Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
             </thead>
             <tbody>
               <tr v-for="(player, index) in activeScorers.scorers" :key="player.playerId">
@@ -748,14 +748,25 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
 .irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
-.stbl { width: 100%; border-collapse: collapse; }
+.stbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
 .stbl td { padding: 0.6rem 0.8rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
-.stbl .num { text-align: right; }
-.stbl .rk, .srow .rk { width: 40px; text-align: center; font-weight: 800; color: var(--muted); }
+.stbl th.num,
+.stbl td.num {
+  width: 5.5rem;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.stbl .rk { width: 2.75rem; text-align: center; font-weight: 800; color: var(--muted); }
+.srow .rk { text-align: center; font-weight: 800; color: var(--muted); }
+.stbl th.tm,
+.stbl td.tm { width: 11rem; }
 .stbl .tm { color: var(--muted); font-weight: 600; }
+.stbl td:nth-child(2) { overflow: hidden; }
 .stbl .g { font-weight: 800; font-size: 1.125rem; color: var(--navy); }
-.pl { display: flex; align-items: center; gap: 0.7rem; }
+.pl { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.pl b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl b, .srow .nm { color: var(--ink); font-weight: 700; }
 .sl-mob { display: none; }
 .srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 1rem; border-top: 1px solid var(--line); }

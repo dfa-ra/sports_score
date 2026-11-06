@@ -380,6 +380,27 @@ test('home fixture matches the approved blocks on desktop and phone', async ({ p
     await expect(page.getByRole('link', { name: 'Календарь игр' })).toBeVisible()
     await expect(page.getByText('Опционально')).toHaveCount(0)
     await expect(page.getByText('Тур 6')).toHaveCount(0)
+    if (width === 1440) {
+      const edges = await page.locator('.stbl').evaluate((table) => {
+        const inkRight = (el: Element) => {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          return range.getBoundingClientRect().right
+        }
+        const headers = [...table.querySelectorAll('th.num')]
+        const cells = [...table.querySelectorAll('tbody tr:first-child td.num')]
+        return headers.map((header, index) => ({
+          header: inkRight(header),
+          cell: inkRight(cells[index]),
+          width: header.getBoundingClientRect().width,
+        }))
+      })
+      const widths = edges.map((edge) => edge.width)
+      expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(1)
+      for (const edge of edges) expect(Math.abs(edge.header - edge.cell)).toBeLessThanOrEqual(2)
+      await page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Бомбардиры по турнирам' }) })
+        .screenshot({ path: `${OUT}/home-scorers-desktop-aligned.png` })
+    }
     if (width === 375) await noOverflow(page)
     await page.screenshot({ path: `${OUT}/home-a-${width === 1440 ? 'desktop' : 'mobile'}-fixture.png`, fullPage: true })
   }
