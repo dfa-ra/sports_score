@@ -52,26 +52,35 @@ export function myTeamMode(canManage: boolean) {
   return canManage ? 'Вы капитан' : 'Вы игрок · просмотр'
 }
 
-/**
- * Match-order score. An unplayed match stays a dash, including a stored 0:0.
- * A finished 0:0 stays visible. Penalties are a separate clause; they do not
- * change a regulation draw into a win.
- */
-export function calendarScore(match: {
+type CalendarMatchScore = {
   status?: string | null
   homeScore?: number | null
   awayScore?: number | null
   penaltyHome?: number | null
   penaltyAway?: number | null
-}) {
+}
+
+/**
+ * Regulation score and, when the match was drawn on penalties, the shootout
+ * clause. An unplayed match stays a dash, including a stored 0:0. A finished
+ * 0:0 stays visible. Penalties do not change a regulation draw into a win.
+ */
+export function calendarScoreParts(match: CalendarMatchScore) {
   const dash = unplayedCardScore(match.status)
-  if (dash) return dash
+  if (dash) return { score: dash, penalty: null as string | null }
   const home = Number(match.homeScore ?? 0)
   const away = Number(match.awayScore ?? 0)
-  const base = `${home} : ${away}`
+  const score = `${home} : ${away}`
   const pens = penaltyPair(match)
-  if (!pens) return base
-  return `${base} · пен. ${pens.home} : ${pens.away}`
+  if (!pens) return { score, penalty: null as string | null }
+  return { score, penalty: `пен. ${pens.home} : ${pens.away}` }
+}
+
+/** One line for surfaces that still print the shootout beside the score. */
+export function calendarScore(match: CalendarMatchScore) {
+  const parts = calendarScoreParts(match)
+  if (!parts.penalty) return parts.score
+  return `${parts.score} · ${parts.penalty}`
 }
 
 /** A second click on the confirmed answer, or any click while one is in flight, does not send. */

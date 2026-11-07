@@ -14,7 +14,7 @@ import { myTeamStub, showsMyTeamRoster } from '../lib/myTeamAccess'
 import { matchListWhen } from '../lib/format'
 import { DATE_PENDING } from '../lib/match'
 import {
-  calendarScore,
+  calendarScoreParts,
   collectPages,
   myTeamMode,
   shouldSendRsvp,
@@ -439,7 +439,10 @@ async function confirmRemove() {
               {{ matchTitle(match) }}
               <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" :third-place="!!match.thirdPlace" />
             </span>
-            <span class="score">{{ calendarScore(match) }}</span>
+            <span class="score">
+              <span class="main">{{ calendarScoreParts(match).score }}</span>
+              <small v-if="calendarScoreParts(match).penalty" class="pens">{{ calendarScoreParts(match).penalty }}</small>
+            </span>
           </RouterLink>
         </section>
       </div>
@@ -561,7 +564,22 @@ async function confirmRemove() {
   text-decoration: none;
 }
 .opponent { min-width: 0; display: flex; flex-wrap: wrap; gap: 0.35rem 0.55rem; align-items: center; overflow-wrap: break-word; font-weight: 800; }
-.score { white-space: nowrap; font-weight: 800; }
+.calendar .score {
+  display: grid;
+  justify-items: end;
+  gap: 0.05rem;
+  white-space: nowrap;
+  font-weight: 800;
+  text-align: right;
+  line-height: 1.15;
+}
+.calendar .score .main { font-size: 1rem; font-weight: 800; }
+.calendar .score .pens {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
 .block-error { display: grid; justify-items: start; gap: 0.65rem; }
 .block-error p { margin: 0; color: var(--navy); font-weight: 800; }
 .skeleton { display: grid; gap: 0.5rem; }

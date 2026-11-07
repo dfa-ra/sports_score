@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   calendarScore,
+  calendarScoreParts,
   collectPages,
   myTeamMode,
   playerStatRows,
@@ -38,13 +39,16 @@ test('team record uses the statistics payload and stays blank when it is missing
 test('calendar score keeps an unplayed dash, a finished 0:0, and penalties beside a draw', () => {
   assert.equal(calendarScore({ status: 'SCHEDULED', homeScore: 0, awayScore: 0 }), '– : –')
   assert.equal(calendarScore({ status: 'FINISHED', homeScore: 0, awayScore: 0 }), '0 : 0')
-  assert.equal(calendarScore({
+  const shootout = {
     status: 'FINISHED',
     homeScore: 1,
     awayScore: 1,
     penaltyHome: 5,
     penaltyAway: 4,
-  }), '1 : 1 · пен. 5 : 4')
+  }
+  assert.equal(calendarScore(shootout), '1 : 1 · пен. 5 : 4')
+  assert.deepEqual(calendarScoreParts(shootout), { score: '1 : 1', penalty: 'пен. 5 : 4' })
+  assert.deepEqual(calendarScoreParts({ status: 'FINISHED', homeScore: 0, awayScore: 0 }), { score: '0 : 0', penalty: null })
 })
 
 test('RSVP does not send a repeat of the confirmed answer or a click while one is in flight', () => {

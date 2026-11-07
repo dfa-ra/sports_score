@@ -142,6 +142,27 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true })
 }
 
+async function expectPenaltyUnderScore(page: Page) {
+  const row = page.locator('.cal', { hasText: 'пен. 4 : 3' })
+  const main = row.locator('.score .main')
+  const pens = row.locator('.score .pens')
+  await expect(main).toHaveText('1 : 1')
+  await expect(pens).toHaveText('пен. 4 : 3')
+  const metrics = await row.evaluate((node) => {
+    const score = node.querySelector('.score .main') as HTMLElement
+    const caption = node.querySelector('.score .pens') as HTMLElement
+    const scoreBox = score.getBoundingClientRect()
+    const captionBox = caption.getBoundingClientRect()
+    return {
+      stacked: captionBox.top >= scoreBox.bottom - 1,
+      scoreSize: Number.parseFloat(getComputedStyle(score).fontSize),
+      captionSize: Number.parseFloat(getComputedStyle(caption).fontSize),
+    }
+  })
+  expect(metrics.stacked).toBe(true)
+  expect(metrics.captionSize).toBeLessThan(metrics.scoreSize)
+}
+
 async function noHorizontalScroll(page: Page) {
   const metrics = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -349,7 +370,8 @@ test('captain manages the team and a player only reads it', async ({ page }) => 
   await expect(page.locator('.cal')).toHaveCount(6)
   await expect(page.locator('.cal .when', { hasText: 'Дата уточняется' })).toBeVisible()
   await expect(page.getByText('0 : 0')).toBeVisible()
-  await expect(page.getByText('1 : 1 · пен. 4 : 3')).toBeVisible()
+  await expectPenaltyUnderScore(page)
+  await page.locator('.cal', { hasText: 'пен. 4 : 3' }).screenshot({ path: `${OUT}/q2r-my-team-penalty-1440.png` })
   await expect(page.locator('.cal .score', { hasText: '– : –' }).first()).toBeVisible()
   expect(pages).toContain(0)
   const card = await page.locator('[data-section="card"]').boundingBox()
@@ -365,6 +387,8 @@ test('captain manages the team and a player only reads it', async ({ page }) => 
       .map((item) => item.name),
   )
   expect(order).toEqual(['match', 'roster', 'card', 'calendar'])
+  await expectPenaltyUnderScore(page)
+  await page.locator('.cal', { hasText: 'пен. 4 : 3' }).screenshot({ path: `${OUT}/q2r-my-team-penalty-375.png` })
   await noHorizontalScroll(page)
   await shot(page, 'q2r-my-team-captain-375')
   for (const width of [719, 1000]) {
