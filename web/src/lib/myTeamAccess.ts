@@ -1,9 +1,9 @@
 export type RosterRole = 'PLAYER' | 'CAPTAIN'
 
 export const myTeamStub = {
-  title: 'Страница для игроков и капитанов',
-  homeTo: '/',
-  homeLabel: 'Главная',
+  title: 'Недостаточно прав',
+  homeTo: '/profile',
+  homeLabel: 'К профилю',
 } as const
 
 /**

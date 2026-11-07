@@ -13,6 +13,7 @@ const props = defineProps<{
 const query = ref('')
 const players = ref<any[]>([])
 const pending = ref(false)
+const failed = ref(false)
 const open = ref(false)
 let timer: number | undefined
 
@@ -26,14 +27,20 @@ async function search() {
     players.value = []
     open.value = false
     pending.value = false
+    failed.value = false
     return
   }
   pending.value = true
+  failed.value = false
   try {
     const { data } = await api.get('/players', { params: { q, size: 8, sort: 'lastName,asc' } })
     const skip = new Set(props.excludeIds ?? [])
     players.value = (data.content ?? []).filter((player: any) => !skip.has(player.id))
     open.value = true
+  } catch {
+    players.value = []
+    open.value = false
+    failed.value = true
   } finally {
     pending.value = false
   }
@@ -74,6 +81,7 @@ watch(() => (props.excludeIds ?? []).join(','), () => {
       @focus="open = players.length > 0"
     />
     <p v-if="pending" class="muted">Ищем…</p>
+    <p v-else-if="failed" class="form-error">Не удалось выполнить поиск.</p>
     <div v-else-if="open && query.trim().length >= 2" class="hints">
       <p v-if="!players.length" class="muted">{{ emptyText || 'Никого не нашли' }}</p>
       <button
