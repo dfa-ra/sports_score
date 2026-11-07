@@ -36,6 +36,7 @@ const error = ref('')
 const ok = ref('')
 const fieldError = ref<Record<string, string>>({})
 const editing = ref(false)
+const dialogRoot = ref<HTMLElement | null>(null)
 const avatarUrl = ref('')
 const playerId = ref('')
 const card = ref<any>(null)
@@ -47,7 +48,90 @@ const tab = ref<'games' | 'stats'>('games')
 let profileTicket = 0
 let cardTicket = 0
 let matchTicket = 0
-let onEscape: ((event: KeyboardEvent) => void) | null = null
+let opener: HTMLElement | null = null
+
+const FOCUSABLE = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
+
+function focusableControls(root: HTMLElement) {
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => {
+    if (el.getAttribute('aria-hidden') === 'true') return false
+    const style = window.getComputedStyle(el)
+    return style.display !== 'none' && style.visibility !== 'hidden'
+  })
+}
+
+function focusDialogField() {
+  const root = dialogRoot.value
+  if (!root) return
+  const field = root.querySelector<HTMLElement>('input:not([type="file"]), select, textarea')
+  const fallback = focusableControls(root)[0] || root
+  const target = field && !field.hasAttribute('disabled') ? field : fallback
+  target.focus()
+}
+
+function onDialogTab(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !editing.value) return
+  const root = dialogRoot.value
+  if (!root) return
+  const items = focusableControls(root)
+  if (!items.length) {
+    event.preventDefault()
+    root.focus()
+    return
+  }
+  const active = document.activeElement
+  const index = active instanceof HTMLElement ? items.indexOf(active) : -1
+  if (event.shiftKey) {
+    if (index <= 0) {
+      event.preventDefault()
+      items[items.length - 1].focus()
+    }
+    return
+  }
+  if (index < 0 || index === items.length - 1) {
+    event.preventDefault()
+    items[0].focus()
+  }
+}
+
+function onDialogEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') editing.value = false
+}
+
+function bindDialogKeys() {
+  window.addEventListener('keydown', onDialogEscape)
+  document.addEventListener('keydown', onDialogTab, true)
+}
+
+function unbindDialogKeys() {
+  window.removeEventListener('keydown', onDialogEscape)
+  document.removeEventListener('keydown', onDialogTab, true)
+}
+
+function backgroundRoot() {
+  return document.getElementById('app')
+}
+
+function lockBackground() {
+  const root = backgroundRoot()
+  if (!root) return
+  root.setAttribute('inert', '')
+  root.setAttribute('aria-hidden', 'true')
+}
+
+function releaseBackground() {
+  const root = backgroundRoot()
+  if (!root) return
+  root.removeAttribute('inert')
+  root.removeAttribute('aria-hidden')
+}
 
 const approvedRoles = computed(() => {
   const from = (auth.user?.roles ?? [])
@@ -114,6 +198,8 @@ function hasJersey(value: unknown) {
 }
 
 function openForm() {
+  const active = document.activeElement
+  opener = active instanceof HTMLElement ? active : null
   error.value = ''
   ok.value = ''
   fieldError.value = {}
@@ -238,17 +324,22 @@ onMounted(() => {
 })
 
 watch(editing, (open) => {
-  if (onEscape) window.removeEventListener('keydown', onEscape)
-  onEscape = null
-  if (!open) return
-  onEscape = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') editing.value = false
+  unbindDialogKeys()
+  if (!open) {
+    releaseBackground()
+    const back = opener
+    opener = null
+    if (back?.isConnected) back.focus()
+    return
   }
-  window.addEventListener('keydown', onEscape)
-})
+  bindDialogKeys()
+  focusDialogField()
+  lockBackground()
+}, { flush: 'post' })
 
 onUnmounted(() => {
-  if (onEscape) window.removeEventListener('keydown', onEscape)
+  unbindDialogKeys()
+  releaseBackground()
 })
 
 async function submit() {
@@ -459,7 +550,14 @@ async function logout() {
 
     <Teleport to="body">
       <div v-if="editing" class="overlay" @click.self="editing = false">
-        <div class="sheet-form" role="dialog" aria-modal="true" aria-labelledby="profile-form-title">
+        <div
+          ref="dialogRoot"
+          class="sheet-form"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-form-title"
+          tabindex="-1"
+        >
           <div class="dialog-head">
             <h2 id="profile-form-title">{{ isPlayer ? 'Изменить анкету' : 'Стать игроком' }}</h2>
             <button class="btn secondary" type="button" @click="editing = false">Закрыть</button>

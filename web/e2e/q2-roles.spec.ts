@@ -469,3 +469,92 @@ test('missing team and a role without access stay different from a load error', 
   await expect(page.getByRole('button', { name: 'Буду' })).toHaveCount(0)
   await noHorizontalScroll(page)
 })
+
+test('profile editor keeps keyboard focus inside the dialog', async ({ page }) => {
+  await signIn(page, ['PLAYER'])
+  await page.route('**/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/auth/me') return json(route, user(['PLAYER']))
+    if (path === '/api/v1/players/me') return json(route, profile)
+    if (path === '/api/v1/players/p1/card') {
+      return json(route, {
+        ...profile,
+        team: { id: 'ft', name: 'Физтех', shortName: 'ФТ', logoUrl: '', captain: false },
+        captainTeams: [],
+        statistics: { appearances: 6, goals: 3, assists: 1, yellowCards: 0, redCards: 0 },
+        matchHistory: history,
+      })
+    }
+    if (path === '/api/v1/teams') return json(route, { content: [team] })
+    if (path === '/api/v1/matches') return json(route, { content: [] })
+    return json(route, { content: [] })
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/profile')
+  const edit = page.getByRole('button', { name: 'Редактировать' })
+  const teamLink = page.getByRole('link', { name: 'Моя команда' })
+  await expect(edit).toBeVisible()
+  await expect(teamLink).toBeVisible()
+  await edit.click()
+
+  const dialog = page.getByRole('dialog')
+  const close = dialog.getByRole('button', { name: 'Закрыть' })
+  const cancel = dialog.getByRole('button', { name: 'Отмена' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog).toHaveAttribute('aria-modal', 'true')
+  await expect(dialog.getByLabel('Имя')).toBeFocused()
+  await shot(page, 'q2r-profile-editor-open')
+
+  async function expectInside() {
+    const state = await page.evaluate(() => {
+      const active = document.activeElement
+      const dialogEl = document.querySelector('[role="dialog"]')
+      const team = document.querySelector('a[href="/my-team"]')
+      const inside = !!active && !!dialogEl && dialogEl.contains(active)
+      const onTeam = !!active && !!team && (active === team || team.contains(active))
+      return { inside, onTeam }
+    })
+    expect(state.inside).toBe(true)
+    expect(state.onTeam).toBe(false)
+  }
+
+  for (let step = 0; step < 24; step += 1) {
+    await page.keyboard.press('Tab')
+    await expectInside()
+  }
+
+  await close.focus()
+  await page.keyboard.press('Shift+Tab')
+  await expect(cancel).toBeFocused()
+  await expectInside()
+  await page.keyboard.press('Tab')
+  await expect(close).toBeFocused()
+  await expectInside()
+
+  for (let step = 0; step < 24; step += 1) {
+    await page.keyboard.press('Shift+Tab')
+    await expectInside()
+  }
+
+  await cancel.click()
+  await expect(dialog).toHaveCount(0)
+  await expect(edit).toBeFocused()
+
+  await edit.click()
+  await expect(dialog.getByLabel('Имя')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(edit).toBeFocused()
+
+  await edit.click()
+  await expect(dialog.getByLabel('Имя')).toBeFocused()
+  await page.locator('.overlay').click({ position: { x: 8, y: 8 } })
+  await expect(dialog).toHaveCount(0)
+  await expect(edit).toBeFocused()
+
+  await expect(page.locator('#app')).not.toHaveAttribute('aria-hidden', 'true')
+  await expect.poll(() => page.locator('#app').evaluate((node) => node.hasAttribute('inert'))).toBe(false)
+  await teamLink.focus()
+  await expect(teamLink).toBeFocused()
+})
