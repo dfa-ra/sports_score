@@ -5,6 +5,8 @@ import { Client } from '@stomp/stompjs'
 import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
+import ScrollFade from '../components/ScrollFade.vue'
+import { vFitText } from '../lib/fitLabel'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import {
   badgeClass,
@@ -35,7 +37,9 @@ import {
   type HomeOverview,
   type HomeTournament,
 } from '../lib/homeOverview'
+import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
 import { setPageMeta } from '../lib/pageMeta'
+import { registeredName } from '../lib/playerTitle'
 import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
 
@@ -59,7 +63,7 @@ const nextMatch = computed(() => {
 })
 const runningTournamentCap = 4
 const liveRows = computed(() => overview.value.live.map((match) => withLiveMinute(match, nowMs.value)))
-const livePreview = computed(() => liveRows.value.slice(0, 3))
+const livePreview = computed(() => heroLivePreview(liveRows.value))
 const tournaments = computed(() => overview.value.tournaments)
 const orderedTournaments = computed(() => orderRunningTournaments(tournaments.value, overview.value.live))
 const visibleTournaments = computed(() => orderedTournaments.value.slice(0, runningTournamentCap))
@@ -249,9 +253,9 @@ onUnmounted(() => {
           </div>
           <div v-if="plainHero && livePreview.length" class="livebar">
             <span class="st live on-dark">Live сейчас</span>
-            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="badge paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -282,9 +286,9 @@ onUnmounted(() => {
           </div>
           <div v-if="livePreview.length" class="livebar">
             <span class="st live on-dark">Live сейчас</span>
-            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :to="`/matches/${match.id}`">
+            <RouterLink v-for="match in livePreview" :key="match.id" class="lv" :class="{ paused: match.status === 'PAUSED' }" :to="`/matches/${match.id}`">
               <b>{{ match.homeTeamName }} {{ match.homeScore }}:{{ match.awayScore }} {{ match.awayTeamName }}</b>
-              <span>{{ match.tournamentShortName || match.tournamentName }} · {{ match.minute == null ? 'Live' : `${match.minute}′` }}</span>
+              <span>{{ match.tournamentShortName || match.tournamentName }} · <span v-if="match.status === 'PAUSED'" class="badge paused">{{ heroLiveTail(match) }}</span><template v-else>{{ heroLiveTail(match) }}</template></span>
             </RouterLink>
             <RouterLink v-if="liveRows.length > 3" class="all-live" to="/live">Все live →</RouterLink>
           </div>
@@ -322,17 +326,25 @@ onUnmounted(() => {
         </div>
         <template v-else>
           <div class="filters">
-            <div class="chips">
-              <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">Все турниры</button>
-              <button
-                v-for="tournament in matchChips"
-                :key="tournament.id"
-                class="chip"
-                :class="{ on: chip === tournament.id }"
-                type="button"
-                @click="chip = tournament.id"
-              >{{ tournament.shortName || tournament.name }}</button>
-            </div>
+            <ScrollFade arrows fade="#ffffff">
+              <div class="chips">
+                <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">
+                  <span class="chip-label">Все турниры</span>
+                </button>
+                <button
+                  v-for="tournament in matchChips"
+                  :key="tournament.id"
+                  class="chip"
+                  :class="{ on: chip === tournament.id }"
+                  type="button"
+                  :title="tournament.shortName || tournament.name"
+                  :aria-label="tournament.shortName || tournament.name"
+                  @click="chip = tournament.id"
+                >
+                  <span class="chip-label" v-fit-text="tournament.shortName || tournament.name" :title="tournament.shortName || tournament.name"></span>
+                </button>
+              </div>
+            </ScrollFade>
           </div>
           <p v-if="!upcoming.length && !recent.length" class="block-empty">Матчей пока нет</p>
           <div v-else class="feed-list">
@@ -373,7 +385,8 @@ onUnmounted(() => {
               </RouterLink>
             </div>
           </div>
-          <div v-if="upcoming.length || recent.length" class="feed-cards">
+          <ScrollFade v-if="upcoming.length || recent.length" fade="#ffffff">
+          <div class="feed-cards">
             <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
               <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b class="dim">{{ scoreText(match, 'home') }}</b></div>
@@ -387,6 +400,7 @@ onUnmounted(() => {
               <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
             </RouterLink>
           </div>
+          </ScrollFade>
           <RouterLink class="more" to="/calendar">Все игры →</RouterLink>
         </template>
       </div>
@@ -482,28 +496,34 @@ onUnmounted(() => {
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
       </div>
       <div v-else class="card">
-        <div v-if="scorerGroups.length" class="tabs">
-          <button
-            v-for="group in scorerGroups"
-            :key="group.tournamentId"
-            type="button"
-            :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
-            @click="scorerTab = group.tournamentId"
-          >{{ group.shortName || group.tournamentName }}</button>
-        </div>
+        <ScrollFade v-if="scorerGroups.length" arrows solid fade="#ffffff" :watch-key="activeScorers?.tournamentId || ''">
+          <div class="tabs">
+            <button
+              v-for="group in scorerGroups"
+              :key="group.tournamentId"
+              type="button"
+              :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
+              :title="group.shortName || group.tournamentName"
+              :aria-label="group.shortName || group.tournamentName"
+              @click="scorerTab = group.tournamentId"
+            >
+              <span class="tab-label" v-fit-text:tab="group.shortName || group.tournamentName" :title="group.shortName || group.tournamentName"></span>
+            </button>
+          </div>
+        </ScrollFade>
         <p v-if="!activeScorers?.scorers.length" class="block-empty">Голов пока нет</p>
         <template v-else>
           <table class="stbl">
             <thead>
-              <tr><th></th><th>Игрок</th><th>Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
             </thead>
             <tbody>
               <tr v-for="(player, index) in activeScorers.scorers" :key="player.playerId">
                 <td class="rk">{{ index + 1 }}</td>
                 <td>
                   <RouterLink class="pl" :to="`/players/${player.playerId}`">
-                    <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
-                    <b>{{ player.displayName }}</b>
+                    <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
+                    <b>{{ registeredName(player) }}</b>
                   </RouterLink>
                 </td>
                 <td class="tm">{{ player.teamName }}</td>
@@ -516,8 +536,8 @@ onUnmounted(() => {
           <div class="sl-mob">
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
-              <HomeAvatar :src="player.avatarUrl" :name="player.displayName" :first-name="player.firstName" :last-name="player.lastName" />
-              <div><div class="nm">{{ player.displayName }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
+              <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
             </RouterLink>
           </div>
@@ -542,6 +562,7 @@ onUnmounted(() => {
   background:
     radial-gradient(900px 260px at 92% 0%, rgba(76, 180, 229, 0.22), transparent 70%),
     var(--navy);
+  padding-top: 0.9rem;
   padding-bottom: 1.5rem;
 }
 .block { padding-top: 1.5rem; }
@@ -586,8 +607,17 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .side { gap: 0.3rem; }
 }
 .x { flex: 0 0 auto; color: var(--ice); font-weight: 800; font-size: 1em; letter-spacing: 0.1em; line-height: 1; }
-.meta, .acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
-.meta { margin-bottom: 1.2rem; }
+.acts { display: flex; gap: 0.7rem; align-items: center; flex-wrap: wrap; }
+.meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 0.55rem;
+  margin-bottom: 1.2rem;
+  min-width: 0;
+}
+.meta .tb { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.meta .stage { grid-column: 2; justify-self: center; text-align: center; }
 .stage { font-size: 0.75rem; font-weight: 600; color: rgba(255, 255, 255, 0.7); letter-spacing: 0.03em; }
 .hv-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -609,19 +639,59 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   position: relative;
 }
 .lv {
-  display: flex; justify-content: space-between; gap: 0.5rem; color: #fff;
-  padding: 0.6rem 0.8rem; background: rgba(255, 255, 255, 0.06); border-radius: 14px;
+  display: flex; justify-content: space-between; gap: 0.4rem 0.7rem; color: #fff;
+  padding: 0.8rem 0.95rem 1.05rem; background: rgba(255, 255, 255, 0.06); border-radius: 14px;
   font-size: 0.9375rem; align-items: center; flex-wrap: wrap; text-decoration: none;
   border-left: 3px solid var(--status-live);
   background-image: linear-gradient(90deg, rgba(227, 107, 91, 0.07), transparent 60%);
 }
+.lv b { line-height: 1.35; min-width: 0; }
+.lv.paused {
+  border-left-color: rgba(255, 255, 255, 0.35);
+  background-image: none;
+}
 .lv span, .all-live { font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); font-weight: 600; }
 .all-live { justify-self: end; text-decoration: none; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
-.stats { padding: 0.9rem 1.4rem 1.2rem; }
-.sgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
-.stat { border-left: 3px solid var(--ice); padding-left: 0.8rem; min-width: 0; }
-.stat b { display: block; font-size: 2rem; line-height: 1.1; color: var(--ink); font-weight: 800; }
-.stat span { font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
+.stats { padding: 0.9rem 0.4rem 1.2rem; }
+.sgrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  align-items: stretch;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  min-width: 0;
+  padding: 0.1rem 0.55rem 0.15rem;
+  border-left: 2px solid var(--ice);
+}
+.stat:first-child { border-left-color: transparent; }
+.stat b {
+  display: block;
+  width: 100%;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: var(--ink);
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stat > span {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.4em;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
 .ls { display: none; }
 .card { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .card-head {
@@ -638,18 +708,48 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 .more-link::after { content: " →"; }
 .more { display: block; text-align: center; padding: 0.9rem; border-top: 1px solid var(--line); }
-.filters { padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); }
-.chips, .tabs { display: flex; gap: 0.4rem; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.filters { padding: 0.65rem 0 0.75rem; border-bottom: 1px solid var(--line); min-width: 0; }
+.chips, .tabs {
+  display: flex;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .chips::-webkit-scrollbar, .tabs::-webkit-scrollbar { display: none; }
+.chips {
+  gap: 0.45rem;
+  padding: 0.15rem 0 0.25rem;
+  scroll-padding-inline: 1.7rem 3.25rem;
+}
+.chips::before { content: ""; flex: 0 0 1.7rem; }
+.chips::after { content: ""; flex: 0 0 3.25rem; }
+.chip-label, .tab-label { display: inline-block; max-width: 100%; vertical-align: bottom; }
 .chip, .tabs button {
-  flex: 0 0 auto; border: 1px solid var(--line); background: #fff; color: var(--navy);
+  flex: 0 0 auto; white-space: nowrap; border: 1px solid var(--line); background: #fff; color: var(--navy);
   border-radius: 999px; padding: 0.45rem 0.85rem; font-family: var(--font-display);
   font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; cursor: pointer;
 }
 .chip.on { background: var(--ice); border-color: var(--ice); }
-.tabs { border-bottom: 1px solid var(--line); gap: 0; }
-.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--muted); padding: 0.75rem 1rem; background: transparent; }
-.tabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
+.tabs {
+  gap: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0;
+  scroll-padding-inline: 0.75rem;
+}
+.tabs::before { content: ""; flex: 0 0 1rem; }
+.tabs::after { content: ""; flex: 0 0 3.25rem; }
+.tabs button {
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  padding: 0.75rem 0.9rem 0.65rem;
+  background: transparent;
+  box-shadow: inset 0 -3px 0 transparent;
+}
+.tabs button.on { color: var(--navy); box-shadow: inset 0 -3px 0 var(--ice); }
 .feed-list { display: grid; grid-template-columns: 1fr 1fr; }
 .feed-col + .feed-col { border-left: 1px solid var(--line); }
 .feed-cards { display: none; }
@@ -706,6 +806,23 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .st.ok { background: var(--status-ok-soft); color: var(--status-ok); }
 .st.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
 .st.live { background: var(--status-live-soft); color: var(--status-live-ink); }
+.st.paused {
+  background: var(--status-done-soft);
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.lv .badge.paused {
+  background: var(--status-warn-soft);
+  color: var(--status-warn-ink);
+  border-color: transparent;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
 .st.live::before {
   content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--status-live);
   box-shadow: 0 0 0 0 rgba(227, 107, 91, 0.6); animation: hv-pulse 1.6s infinite;
@@ -714,8 +831,9 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 @keyframes hv-pulse { 70% { box-shadow: 0 0 0 7px rgba(227, 107, 91, 0); } 100% { box-shadow: 0 0 0 0 rgba(227, 107, 91, 0); } }
 .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: stretch; }
 .tcard { display: flex; flex-direction: column; }
-.tc-head { padding: 1.1rem 1.2rem 1rem; display: grid; gap: 0.7rem; }
+.tc-head { padding: 1.35rem 1.2rem 1rem; display: grid; gap: 0.7rem; }
 .tc-top { display: flex; justify-content: space-between; gap: 0.6rem; align-items: flex-start; }
+.tc-top .st { margin-top: 0.15rem; }
 .tc-top h3 { font-size: 1.0625rem; margin-top: 0.45rem; line-height: 1.25; }
 .tc-meta { display: flex; gap: 0.4rem 1rem; flex-wrap: wrap; font-size: 0.8125rem; font-weight: 600; }
 .tc-meta span + span::before { content: "·"; margin-right: 1rem; color: var(--line-strong); }
@@ -748,14 +866,39 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
 .irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
-.stbl { width: 100%; border-collapse: collapse; }
+.stbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
 .stbl td { padding: 0.6rem 0.8rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
-.stbl .num { text-align: right; }
-.stbl .rk, .srow .rk { width: 40px; text-align: center; font-weight: 800; color: var(--muted); }
+.stbl th.num,
+.stbl td.num {
+  width: 5.5rem;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.stbl .rk { width: 2.75rem; text-align: center; font-weight: 800; color: var(--muted); }
+.srow .rk { text-align: center; font-weight: 800; color: var(--muted); }
+.stbl th.tm,
+.stbl td.tm { width: 11rem; }
 .stbl .tm { color: var(--muted); font-weight: 600; }
-.stbl .g { font-weight: 800; font-size: 1.125rem; color: var(--navy); }
-.pl { display: flex; align-items: center; gap: 0.7rem; }
+.stbl td:nth-child(2) { overflow: hidden; }
+.stbl th.num:last-child,
+.stbl td.num.g {
+  margin: 0;
+  width: 5.5rem;
+  padding: 0.6rem 0.8rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stbl td.num.g {
+  font-weight: 800;
+  font-size: 1.125rem;
+  color: var(--navy);
+}
+.pl { display: flex; align-items: center; gap: 0.7rem; min-width: 0; }
+.pl b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl b, .srow .nm { color: var(--ink); font-weight: 700; }
 .sl-mob { display: none; }
 .srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 1rem; border-top: 1px solid var(--line); }
@@ -773,13 +916,33 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; font-size: 1em; }
   .wm { width: 220px; right: -50px; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 44px; height: 44px; }
   .feed-list { display: none; }
-  .feed-cards { display: flex; gap: 0.75rem; overflow-x: auto; padding: 1rem; scroll-snap-type: x mandatory; scrollbar-width: none; min-width: 0; width: 100%; }
+  .feed-cards {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    box-sizing: border-box;
+    padding: 0.9rem 1rem 1.15rem;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1rem;
+    scrollbar-width: none;
+    min-width: 0;
+    width: 100%;
+  }
   .feed-cards::-webkit-scrollbar { display: none; }
   .mc {
-    flex: 0 0 244px; scroll-snap-align: start; border: 1px solid var(--line); border-radius: 14px;
-    padding: 0.8rem; display: grid; gap: 0.5rem; background: #fff;
+    flex: 0 0 auto;
+    width: calc(100% - 3.25rem);
+    box-sizing: border-box;
+    scroll-snap-align: start;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.85rem 0.85rem 1rem;
+    display: grid;
+    gap: 0.5rem;
+    background: #fff;
   }
   .mc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
   .mc-t b { font-size: 1.125rem; margin-left: auto; }
@@ -793,13 +956,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .irow .stc { justify-content: flex-start; }
   .tb { white-space: normal; }
   .tc-meta span + span::before { display: none; }
-  .stats { padding: 0.8rem 0.6rem 1rem; }
-  .sgrid { gap: 0.35rem; }
-  .stat { border-left-width: 2px; padding-left: 0.35rem; }
+  .stats { padding: 0.8rem 0.35rem 1rem; }
+  .stat { padding-inline: 0.28rem; }
   .stat b { font-size: 1.25rem; line-height: 1.15; }
-  .stat span { font-size: 0.6875rem; line-height: 1.2; }
-  .lf { display: none; }
-  .ls { display: inline; }
+  .stat > span { font-size: 0.6875rem; line-height: 1.2; min-height: 2.2em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.35rem 0.55rem; }
+  .meta .stage { flex: 1 0 100%; text-align: center; }
   .stbl { display: none; }
   .sl-mob { display: block; }
   .hero-card.has-live, .hero-card:has(.livebar) { min-height: 446px; }
@@ -815,8 +977,14 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
   .side { gap: 0.4rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.35rem 0.55rem; }
+  .meta .stage { flex: 1 0 100%; text-align: center; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; }
   .irow .sc .line { white-space: nowrap; }
+}
+@media (max-width: 960px) {
+  .lf { display: none; }
+  .ls { display: inline; }
 }
 @media (max-width: 960px) {
   .tgrid { grid-template-columns: 1fr; }

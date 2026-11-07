@@ -14,7 +14,9 @@ const teams = useTeamDirectory()
 const nameMax = 150
 const name = ref('')
 const shortName = ref('')
+const dirty = ref(false)
 const pending = ref(false)
+const nameError = ref('')
 const error = ref('')
 const ok = ref('')
 const logoInput = ref<HTMLInputElement | null>(null)
@@ -31,24 +33,31 @@ function saveError(e: any) {
 }
 
 watch(
-  () => props.team,
-  (team) => {
-    name.value = team?.name || ''
-    shortName.value = team?.shortName || ''
+  () => [props.team?.id, props.team?.name, props.team?.shortName] as const,
+  () => {
+    if (dirty.value || pending.value) return
+    name.value = props.team?.name || ''
+    shortName.value = props.team?.shortName || ''
   },
   { immediate: true },
 )
 
+function markDirty() {
+  dirty.value = true
+  ok.value = ''
+}
+
 async function save() {
   error.value = ''
+  nameError.value = ''
   ok.value = ''
   const trimmed = name.value.trim()
   if (!trimmed) {
-    error.value = 'Укажите название команды.'
+    nameError.value = 'Укажите название команды.'
     return
   }
   if (trimmed.length > nameMax) {
-    error.value = 'Название не длиннее 150 символов.'
+    nameError.value = 'Название не длиннее 150 символов.'
     return
   }
   pending.value = true
@@ -57,11 +66,17 @@ async function save() {
       name: trimmed,
       shortName: shortName.value || undefined,
     })
-    ok.value = 'Карточка обновлена.'
+    dirty.value = false
+    name.value = trimmed
+    ok.value = 'Карточка сохранена'
     await teams.load(true)
     emit('saved')
   } catch (e: any) {
-    error.value = saveError(e)
+    const field = saveError(e)
+    const details = e?.response?.data?.details
+    const named = Array.isArray(details) && details.some((item) => item?.field === 'name' && item?.message)
+    if (named) nameError.value = field
+    else error.value = 'Не удалось сохранить. Повторите ещё раз'
   } finally {
     pending.value = false
   }
@@ -122,20 +137,21 @@ async function onLogo(event: Event) {
           :disabled="pending"
           @change="onLogo"
         />
-        <span class="field-hint">PNG или JPG. Сохраняется сразу.</span>
+        <span class="field-hint">PNG или JPG. Логотип сохраняется сразу.</span>
       </div>
     </div>
     <form class="stack" novalidate @submit.prevent="save">
       <label class="field">Название
-        <input v-model="name" :maxlength="nameMax" />
+        <input v-model="name" :maxlength="nameMax" :aria-invalid="!!nameError" @input="markDirty" />
         <span class="field-hint">{{ name.length }}/{{ nameMax }}</span>
+        <span v-if="nameError" class="field-error">{{ nameError }}</span>
       </label>
       <label class="field">Короткое имя
-        <input v-model="shortName" maxlength="32" placeholder="ЛП" />
+        <input v-model="shortName" maxlength="32" placeholder="ЛП" @input="markDirty" />
       </label>
       <p v-if="error" class="form-error">{{ error }}</p>
       <p v-if="ok" class="form-ok">{{ ok }}</p>
-      <button class="btn secondary" type="submit" :disabled="pending">
+      <button class="btn" type="submit" :disabled="pending">
         {{ pending ? 'Сохраняем…' : 'Сохранить карточку' }}
       </button>
     </form>

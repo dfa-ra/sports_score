@@ -41,9 +41,13 @@ export function penaltyPair(match: {
   return { home: match.penaltyHome, away: match.penaltyAway }
 }
 
-/** Unstarted card. A live, paused, or finished match keeps the real score. */
+/**
+ * Score the public card is allowed to print.
+ * SCHEDULED and CANCELLED stay a dash even when the API sends int 0.
+ * LIVE, PAUSED and FINISHED keep the real numbers, including 0:0.
+ */
 export function unplayedCardScore(status?: string | null): string | null {
-  if (status === 'SCHEDULED') return '– : –'
+  if (status === 'SCHEDULED' || status === 'CANCELLED') return '– : –'
   return null
 }
 

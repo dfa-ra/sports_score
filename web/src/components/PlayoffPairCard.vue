@@ -270,28 +270,43 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
 .pf {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.4rem 0.7rem;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  padding: 0.45rem 0.75rem;
   background: #f6f9fc;
   border-top: 1px solid var(--line);
   font-size: 0.75rem;
   color: var(--muted);
   font-weight: 600;
-  min-height: 32px;
+  min-height: 2.15rem;
+  line-height: 1.2;
+}
+.pf > span {
+  display: inline-flex;
+  align-items: center;
+  height: 1.35rem;
+  box-sizing: border-box;
+  line-height: 1;
+}
+.pf > span:last-child {
+  margin-left: auto;
+  white-space: nowrap;
 }
 .st {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   border-radius: 999px;
-  padding: 0.05rem 0.5rem;
+  padding: 0 0.5rem;
   font-size: 0.75rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
-  line-height: 1.5;
+  line-height: 1;
+  height: 1.35rem;
+  min-height: 1.35rem;
+  box-sizing: border-box;
 }
 .st.live { background: rgba(227, 107, 91, 0.14); color: #b4402f; }
 .st.live::before {

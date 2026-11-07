@@ -1,6 +1,15 @@
-export const LOGIN_EMAIL_REQUIRED = 'Введите e-mail'
-export const LOGIN_EMAIL_FORMAT = 'Неверный формат e-mail'
+export const LOGIN_EMAIL_REQUIRED = 'Введите email'
+export const LOGIN_EMAIL_FORMAT = 'Введите email полностью'
 export const LOGIN_PASSWORD_REQUIRED = 'Введите пароль'
+export const LOGIN_PAIR_INVALID = 'Неверный email или пароль'
+export const LOGIN_NETWORK = 'Не удалось войти. Повторите позже'
+
+/** A missing response or a 5xx is a network failure. Any other status is a rejected pair. */
+export function loginSubmitFailure(error: { response?: { status?: number } | null } | null | undefined): 'pair' | 'network' {
+  const status = error?.response?.status
+  if (status == null || status >= 500) return 'network'
+  return 'pair'
+}
 
 export type LoginFieldErrors = {
   email?: string

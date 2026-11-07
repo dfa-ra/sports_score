@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs'
 
 const tournamentId = '00000000-0000-4000-8000-000000000105'
 const longName = 'QA Толян Альфа Северный Кампус Лиги ИТМО'
-const nav = ['Главная', 'Таблица', 'Игры', 'Live', 'Турниры', 'Игроки']
+const nav = ['Главная', 'Таблица', 'Игры', 'Live', 'Турниры', 'Команды', 'Игроки']
 
 const roleItem: Record<string, string | null> = {
   guest: null,
@@ -230,7 +230,7 @@ test('16-team full grid wraps 1/8 names and keeps placeholder circles inside the
   await mockApi(page, null)
   await page.setViewportSize({ width: 1180, height: 900 })
   await page.goto(`/tournaments/${tournamentId}?tab=playoff`)
-  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Сетка плей-офф' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '1/8 финала' }).first()).toBeVisible()
   await expect(page.getByRole('tablist', { name: 'Раунды' })).toBeVisible()
   await expect(page.locator('.po-grid')).toHaveCount(0)
@@ -356,7 +356,7 @@ test('header menus follow the width and the signed-in role', async ({ page }) =>
       if (wide) {
         await expect(page.locator('.menu-button')).toBeHidden()
         await expect(page.locator('nav.primary')).toBeVisible()
-        await expect(page.locator('nav.primary a')).toHaveCount(6)
+        await expect(page.locator('nav.primary a')).toHaveCount(7)
       } else {
         await expect(page.locator('nav.primary')).toBeHidden()
         await expect(page.locator('.menu-button')).toBeVisible()

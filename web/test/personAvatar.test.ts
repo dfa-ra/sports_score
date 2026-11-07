@@ -11,9 +11,9 @@ test('initials come from the first letters of the name', () => {
   assert.equal(initials(null), 'SL')
 })
 
-test('person avatar letters are the given name then the surname', () => {
-  assert.equal(personInitials('Максим', 'Волков'), 'МВ')
-  assert.equal(personInitials(' максим ', ' волков '), 'МВ')
+test('person avatar letters follow the registered name: surname, then given name', () => {
+  assert.equal(personInitials('Максим', 'Волков'), 'ВМ')
+  assert.equal(personInitials(' максим ', ' волков '), 'ВМ')
   assert.equal(personInitials('Максим', null), 'М')
   assert.equal(personInitials(null, 'Волков'), 'В')
   assert.equal(personInitials('', '  '), 'SL')

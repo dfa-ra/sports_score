@@ -1,338 +1,630 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
-import { useTeamDirectory } from '../lib/useTeamDirectory'
+import CalendarMatchLine from '../components/CalendarMatchLine.vue'
+import ScrollFade from '../components/ScrollFade.vue'
+import { vFitText } from '../lib/fitLabel'
+import {
+  applyCalendarFilter,
+  boardLink,
+  calendarCounts,
+  calendarStageLabel,
+  dayTitle,
+  calendarHeroPending,
+  calendarQueryPatch,
+  calendarQueryState,
+  dottedDays,
+  groupByTournament,
+  heroMeta,
+  isFavoriteMatch,
+  matchesOnDay,
+  rowClock,
+  sortDayMatches,
+  type CalendarFilter,
+  type CalendarMatch,
+  sameSearchQuery,
+  undatedMatches,
+  weekdayChip,
+  weekKeys,
+} from '../lib/calendarFeed'
+import { ymd } from '../lib/match'
+import { shiftYmd } from '../lib/moscowTime'
+import { collectPaged, DEFAULT_PAGE_CAP, nullKickoffScanStep, type PageBody } from '../lib/pagedList'
 import { useFavorites } from '../stores/favorites'
-import { moscowWeekdayShort, shiftYmd } from '../lib/moscowTime'
-import { matchInstant, ymd } from '../lib/match'
-import EmptyState from '../components/EmptyState.vue'
-import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
-import MatchRow from '../components/MatchRow.vue'
+import { useTeamDirectory } from '../lib/useTeamDirectory'
 
-const PAST_DAYS = 21
-const PAGE_SIZE = 100
+type TourInfo = { id: string; name: string; competitionStage?: string | null }
 
 const route = useRoute()
-const items = ref<any[]>([])
-const tournaments = ref<Record<string, string>>({})
-const error = ref('')
-const loading = ref(true)
-const mineOnly = ref(false)
+const router = useRouter()
+const opened = calendarQueryState(route.query as Record<string, unknown>, ymd(new Date()))
 const teams = useTeamDirectory()
 const fav = useFavorites()
-const stripEl = ref<HTMLElement | null>(null)
+
+const weekRows = ref<CalendarMatch[]>([])
+const nullRows = ref<CalendarMatch[]>([])
+const liveRows = ref<CalendarMatch[]>([])
+const pausedRows = ref<CalendarMatch[]>([])
+const tournaments = ref<Record<string, TourInfo>>({})
+const weekComplete = ref(false)
+const nullComplete = ref(false)
+const liveComplete = ref(false)
+const pausedComplete = ref(false)
+const loading = ref(true)
+const error = ref('')
+const anchor = ref(opened.date)
+const filter = ref<CalendarFilter>(opened.tournamentId
+  ? { kind: 'tournament', tournamentId: opened.tournamentId }
+  : { kind: 'all' })
 let refreshTimer = 0
-let alignedStrip = false
+let requestId = 0
 
 const liveOnly = computed(() => route.name === 'live')
-
 const todayKey = computed(() => ymd(new Date()))
-const day = ref(todayKey.value)
+const week = computed(() => weekKeys(anchor.value))
+const selectedDay = computed(() => (week.value.includes(anchor.value) ? anchor.value : week.value[0] || anchor.value))
 
-function oldestKey(batch: any[]) {
-  let oldest = ''
-  for (const match of batch) {
-    const key = ymd(match.scheduledAt)
-    if (!key) continue
-    if (!oldest || key < oldest) oldest = key
-  }
-  return oldest
+function favorite(match: CalendarMatch) {
+  return isFavoriteMatch(match, fav.hasMatch, fav.hasTeam)
 }
 
-async function loadMatches() {
-  const fromKey = shiftYmd(ymd(new Date()), -PAST_DAYS)
-  const collected: any[] = []
-  for (let page = 0; page < 30; page += 1) {
-    const { data } = await api.get('/matches', {
-      params: { size: PAGE_SIZE, page, sort: 'scheduledAt,desc' },
-    })
-    const batch = data.content ?? []
-    collected.push(...batch)
-    const oldest = oldestKey(batch)
-    const last = batch.length < PAGE_SIZE || page + 1 >= Number(data.totalPages ?? page + 1)
-    if (last || (oldest && oldest < fromKey)) break
-  }
-  items.value = collected
-}
+const filteredWeek = computed(() => applyCalendarFilter(weekRows.value, filter.value.kind === 'undated' ? { kind: 'all' } : filter.value, favorite))
+const filteredNull = computed(() => applyCalendarFilter(nullRows.value, filter.value.kind === 'undated' ? { kind: 'all' } : filter.value, favorite))
+const filteredLive = computed(() => applyCalendarFilter(liveRows.value, filter.value.kind === 'undated' ? { kind: 'all' } : filter.value, favorite))
 
-onMounted(async () => {
-  try {
-    await teams.load()
-    const [, t] = await Promise.all([
-      loadMatches(),
-      api.get('/tournaments', { params: { size: 50 } }),
-    ])
-    const names: Record<string, string> = {}
-    for (const item of t.data.content ?? []) names[item.id] = item.name
-    tournaments.value = names
-  } catch (e: any) {
-    error.value = e.response?.data?.message || 'Календарь не загрузился.'
-  } finally {
-    loading.value = false
-    armRefresh()
+const modeRows = computed(() => {
+  if (liveOnly.value) {
+    const rows = applyCalendarFilter(
+      [...liveRows.value, ...pausedRows.value],
+      filter.value.kind === 'undated' ? { kind: 'all' } : filter.value,
+      favorite,
+    )
+    if (filter.value.kind === 'undated') return undatedMatches(rows)
+    return sortDayMatches(rows)
   }
+  if (filter.value.kind === 'undated') return undatedMatches(filteredNull.value)
+  return matchesOnDay(filteredWeek.value, filteredNull.value, selectedDay.value)
 })
+
+const countsReady = computed(() => {
+  if (loading.value) return false
+  if (liveOnly.value) return liveComplete.value && pausedComplete.value
+  if (filter.value.kind === 'undated') return nullComplete.value
+  return weekComplete.value && nullComplete.value
+})
+
+const counts = computed(() => calendarCounts(modeRows.value))
+const meta = computed(() => heroMeta(counts.value, countsReady.value))
+const heroPending = computed(() => calendarHeroPending(loading.value, countsReady.value))
+const dots = computed(() => (countsReady.value && filter.value.kind !== 'undated' && !liveOnly.value
+  ? dottedDays(filteredWeek.value.concat(filteredNull.value), week.value)
+  : []))
+
+const groups = computed(() => groupByTournament(modeRows.value))
+const chipTournaments = computed(() => {
+  const ids = new Set<string>()
+  for (const match of [...weekRows.value, ...nullRows.value, ...liveRows.value, ...pausedRows.value]) {
+    if (match.tournamentId) ids.add(match.tournamentId)
+  }
+  return [...ids].map((id) => tournaments.value[id] || { id, name: matchName(id) }).sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+})
+
+const eyebrow = computed(() => {
+  if (liveOnly.value) return 'Игры · Live'
+  if (filter.value.kind === 'undated') return 'Игры · Без даты'
+  if (selectedDay.value === todayKey.value) return 'Игры · Сегодня'
+  return 'Игры'
+})
+
+const title = computed(() => {
+  if (liveOnly.value) return 'Сейчас'
+  if (filter.value.kind === 'undated') return 'Дата уточняется'
+  return dayTitle(selectedDay.value)
+})
+
+const showLiveSide = computed(() => !liveOnly.value && filter.value.kind !== 'undated')
+const favoriteSide = computed(() => {
+  const pool = liveOnly.value
+    ? [...liveRows.value, ...pausedRows.value]
+    : [...weekRows.value, ...nullRows.value]
+  return sortDayMatches(pool.filter(favorite)).slice(0, 6)
+})
+
+function matchName(id: string) {
+  return tournaments.value[id]?.name || weekRows.value.find((row) => row.tournamentId === id)?.tournamentName
+    || nullRows.value.find((row) => row.tournamentId === id)?.tournamentName
+    || 'Турнир'
+}
+
+function stageOf(groupId: string, match: CalendarMatch) {
+  return calendarStageLabel(match, tournaments.value[groupId])
+}
+
+function linkOf(groupId: string, match: CalendarMatch) {
+  const stage = String(match.stageLabel || '').trim()
+  const playoff = !!stage || tournaments.value[groupId]?.competitionStage === 'PLAYOFF'
+  return boardLink(playoff)
+}
+
+function homeName(match: CalendarMatch) {
+  return teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')
+}
+function awayName(match: CalendarMatch) {
+  return teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')
+}
+
+async function loadPage(params: Record<string, string | number>) {
+  const { data } = await api.get<PageBody<CalendarMatch>>('/matches', { params })
+  return data
+}
+
+async function loadWindow(id: number) {
+  const currentWeek = week.value
+  const from = currentWeek[0]
+  const to = currentWeek[currentWeek.length - 1]
+  if (!from || !to) return
+  const [weekResult, nullResult, liveResult, pausedResult] = await Promise.all([
+    collectPaged((page) => loadPage({
+      from,
+      to,
+      size: 100,
+      page,
+      sort: 'scheduledAt,asc',
+    }), DEFAULT_PAGE_CAP),
+    loadNullKickoffs(),
+    collectPaged((page) => loadPage({ status: 'LIVE', size: 100, page, sort: 'scheduledAt,desc' }), DEFAULT_PAGE_CAP),
+    collectPaged((page) => loadPage({ status: 'PAUSED', size: 100, page, sort: 'scheduledAt,desc' }), DEFAULT_PAGE_CAP),
+  ])
+  if (id !== requestId) return
+  weekRows.value = weekResult.rows
+  weekComplete.value = weekResult.complete
+  nullRows.value = nullResult.rows
+  nullComplete.value = nullResult.complete
+  liveRows.value = liveResult.rows
+  liveComplete.value = liveResult.complete
+  pausedRows.value = pausedResult.rows
+  pausedComplete.value = pausedResult.complete
+}
+
+async function loadNullKickoffs() {
+  const rows: CalendarMatch[] = []
+  for (let page = 0; page < DEFAULT_PAGE_CAP; page += 1) {
+    const body = await loadPage({ size: 100, page, sort: 'scheduledAt,desc' })
+    const batch = body?.content ?? []
+    rows.push(...batch)
+    const step = nullKickoffScanStep({ page, cap: DEFAULT_PAGE_CAP, body, batch })
+    if (step === 'done-complete') return { rows, complete: true }
+    if (step === 'done-incomplete') return { rows, complete: false }
+  }
+  return { rows, complete: false }
+}
+
+async function loadTournaments() {
+  const { data } = await api.get('/tournaments', { params: { size: 50 } })
+  const next: Record<string, TourInfo> = {}
+  for (const item of data.content ?? []) {
+    next[item.id] = { id: item.id, name: item.name, competitionStage: item.competitionStage }
+  }
+  tournaments.value = next
+}
+
+function markWindowOpen() {
+  weekComplete.value = false
+  nullComplete.value = false
+  liveComplete.value = false
+  pausedComplete.value = false
+}
+
+async function load(initial = false) {
+  const id = ++requestId
+  if (initial) {
+    loading.value = true
+    markWindowOpen()
+  }
+  error.value = ''
+  try {
+    await Promise.all([teams.load(), loadTournaments(), loadWindow(id)])
+  } catch {
+    if (id !== requestId) return
+    error.value = 'Матчи не загрузились'
+    markWindowOpen()
+  } finally {
+    if (id === requestId) loading.value = false
+  }
+}
 
 function armRefresh() {
   if (refreshTimer) window.clearInterval(refreshTimer)
-  const delay = route.name === 'live' ? 4_000 : 12_000
   refreshTimer = window.setInterval(() => {
-    loadMatches().catch((reason: unknown) => {
-      const message = (reason as { response?: { data?: { message?: string } } })?.response?.data?.message
-      if (!items.value.length) error.value = message || 'Календарь не обновился.'
-    })
-  }, delay)
+    void load(false)
+  }, liveOnly.value ? 4_000 : 12_000)
 }
+
+function pick(next: CalendarFilter) {
+  filter.value = next
+}
+
+function syncCalendarQuery() {
+  const next = calendarQueryPatch(route.query as Record<string, unknown>, anchor.value, filter.value)
+  if (sameSearchQuery(next, route.query as Record<string, unknown>)) return
+  void router.replace({ query: next })
+}
+
+function readCalendarQuery() {
+  const next = calendarQueryState(route.query as Record<string, unknown>, anchor.value || ymd(new Date()))
+  if (next.date !== anchor.value) anchor.value = next.date
+  const currentId = filter.value.kind === 'tournament' ? filter.value.tournamentId : ''
+  if (next.tournamentId !== currentId) {
+    filter.value = next.tournamentId
+      ? { kind: 'tournament', tournamentId: next.tournamentId }
+      : { kind: 'all' }
+  }
+}
+
+function shiftWeek(delta: number) {
+  const from = selectedDay.value || anchor.value
+  anchor.value = shiftYmd(from, delta * 7) || from
+}
+
+function jumpNearest() {
+  const keys = week.value
+  const future = keys.find((key) => key > selectedDay.value && dots.value.includes(key))
+  const past = [...keys].reverse().find((key) => key < selectedDay.value && dots.value.includes(key))
+  if (future || past) {
+    anchor.value = (future || past) as string
+    return
+  }
+  shiftWeek(1)
+}
+
+function tournamentOn(id: string) {
+  return filter.value.kind === 'tournament' && filter.value.tournamentId === id
+}
+
+function hint(match: CalendarMatch) {
+  return rowClock(match)
+}
+
+onMounted(async () => {
+  syncCalendarQuery()
+  await load(true)
+  armRefresh()
+})
+
+watch([anchor, () => (filter.value.kind === 'tournament' ? filter.value.tournamentId : filter.value.kind)], () => {
+  syncCalendarQuery()
+})
+
+watch(() => `${String(route.query.date || '')}|${String(route.query.tournament || '')}`, () => {
+  readCalendarQuery()
+})
 
 watch(() => route.name, () => {
   if (!loading.value) armRefresh()
 })
 
+watch(() => week.value.join('|'), (next, prev) => {
+  if (!prev || next === prev) return
+  loading.value = true
+  markWindowOpen()
+  void load(false)
+})
+
 onUnmounted(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
-})
-
-function alignStrip() {
-  const root = stripEl.value
-  if (!root) return
-  const selected = root.querySelector<HTMLElement>('button.on')
-  if (!selected) return
-  const left = selected.offsetLeft - (root.clientWidth - selected.clientWidth) / 2
-  root.scrollLeft = Math.max(0, left)
-}
-
-watch(loading, (isLoading) => {
-  if (isLoading || alignedStrip || liveOnly.value) return
-  alignedStrip = true
-  nextTick(alignStrip)
-})
-
-function pad(n: number) {
-  return String(n).padStart(2, '0')
-}
-
-function weekday(key: string) {
-  return moscowWeekdayShort(key)
-}
-
-function windowStartKey() {
-  return shiftYmd(ymd(new Date()), -PAST_DAYS)
-}
-
-function inWindow(match: any) {
-  const key = ymd(matchInstant(match))
-  const floor = windowStartKey()
-  return !!key && !!floor && key >= floor
-}
-
-function preferredDay(keys: string[], today: string, current: string) {
-  if (keys.includes(current)) return current
-  if (keys.includes(today)) return today
-  const upcoming = keys.find((key) => key >= today)
-  if (upcoming) return upcoming
-  return keys[keys.length - 1] || today
-}
-
-function selectDay(key: string) {
-  if (!matchDates.value.includes(key)) return
-  day.value = key
-  nextTick(alignStrip)
-}
-
-const calendarMatches = computed(() => {
-  const rows = items.value.filter(inWindow)
-  return mineOnly.value ? rows.filter(isMine) : rows
-})
-
-const matchDates = computed(() => {
-  const keys = new Set<string>()
-  for (const match of calendarMatches.value) {
-    const key = ymd(matchInstant(match))
-    if (key) keys.add(key)
-  }
-  return [...keys].sort()
-})
-
-watch(matchDates, (keys) => {
-  const next = preferredDay(keys, todayKey.value, day.value)
-  if (next !== day.value) day.value = next
-  if (!liveOnly.value) nextTick(alignStrip)
-})
-
-const strip = computed(() => {
-  const current = todayKey.value
-  return matchDates.value.map((key) => {
-    const [, monthText, dateText] = key.split('-')
-    const month = Number(monthText)
-    const date = Number(dateText)
-    return {
-      key,
-      label: key === current
-        ? `Сегодня ${pad(date)}.${pad(month)}.`
-        : `${weekday(key)} ${pad(date)}.${pad(month)}.`,
-    }
-  })
-})
-
-function isMine(match: any) {
-  return fav.hasMatch(match.id) || fav.hasTeam(match.homeTeamId) || fav.hasTeam(match.awayTeamId)
-}
-
-const visible = computed(() => {
-  if (liveOnly.value) {
-    const rows = items.value.filter((m) => m.status === 'LIVE' || m.status === 'PAUSED')
-    return mineOnly.value ? rows.filter(isMine) : rows
-  }
-  return calendarMatches.value
-    .filter((m) => ymd(matchInstant(m)) === day.value)
-    .slice()
-    .sort((a, b) => String(matchInstant(a) || '').localeCompare(String(matchInstant(b) || '')))
-})
-
-const grouped = computed(() => {
-  const map = new Map<string, any[]>()
-  for (const match of visible.value) {
-    const key = match.tournamentId || 'none'
-    const list = map.get(key) ?? []
-    list.push(match)
-    map.set(key, list)
-  }
-  return [...map.entries()].map(([id, matches]) => ({
-    id,
-    name: tournaments.value[id] || 'Турнир',
-    matches,
-  }))
 })
 </script>
 
 <template>
-  <section class="stack page">
-    <div v-if="liveOnly" class="live-head">
-      <h1>Live</h1>
-      <MatchGoalAlerts />
-    </div>
-    <div class="calendar-bar">
-      <button
-        type="button"
-        class="fav-toggle"
-        :class="{ on: mineOnly }"
-        :aria-pressed="mineOnly"
-        @click="mineOnly = !mineOnly"
-      >Избранные</button>
-      <div v-if="!liveOnly" ref="stripEl" class="date-strip">
-        <button
-          v-for="item in strip"
-          :key="item.key"
-          type="button"
-          :class="{ on: day === item.key }"
-          @click="selectDay(item.key)"
-        >{{ item.label }}</button>
-      </div>
-    </div>
-    <p v-if="error" class="form-error">{{ error }}</p>
-    <div v-if="loading" class="skeleton" />
-    <EmptyState
-      v-else-if="!visible.length"
-      :title="mineOnly ? 'В избранном таких матчей нет' : liveOnly ? 'Сейчас никто не играет' : matchDates.length ? 'В этот день матчей нет' : 'Матчей нет'"
-    />
-    <div v-else class="sheet">
-      <section v-for="group in grouped" :key="group.id">
-        <div class="league-head">
-          <div>
-            <RouterLink v-if="group.id !== 'none'" :to="`/tournaments/${group.id}`">{{ group.name }}</RouterLink>
-            <template v-else>{{ group.name }}</template>
-          </div>
+  <section class="calendar">
+    <header class="hero">
+      <p class="eyebrow">{{ eyebrow }}</p>
+      <h1>{{ title }}</h1>
+      <p v-if="meta" class="meta">
+        <span>{{ meta }}</span>
+      </p>
+      <p v-else-if="heroPending" class="meta quiet">Загрузка матчей…</p>
+      <div v-if="!liveOnly && filter.kind !== 'undated'" class="week">
+        <button type="button" class="arrow" aria-label="Предыдущая неделя" @click="shiftWeek(-1)">‹</button>
+        <div class="days">
+          <button
+            v-for="key in week"
+            :key="key"
+            type="button"
+            class="day"
+            :class="{ on: key === selectedDay }"
+            @click="anchor = key"
+          >
+            <span>{{ weekdayChip(key).weekday }}</span>
+            <b>{{ weekdayChip(key).date }}</b>
+            <i v-if="dots.includes(key)" class="dot" aria-hidden="true"></i>
+          </button>
         </div>
-        <MatchRow
-          v-for="m in group.matches"
-          :key="m.id"
-          :match="m"
-          :home-name="teams.fullName(m.homeTeamId)"
-          :away-name="teams.fullName(m.awayTeamId)"
-        />
-        <RouterLink
-          v-if="!liveOnly"
-          class="sheet-link"
-          :to="group.id !== 'none' ? { path: '/table', query: { tournament: group.id } } : '/table'"
-        >К таблице ›</RouterLink>
-      </section>
+        <button type="button" class="arrow" aria-label="Следующая неделя" @click="shiftWeek(1)">›</button>
+      </div>
+    </header>
+
+    <ScrollFade class="filters-fade" arrows solid fade="#e8eef4">
+      <div class="filters" role="tablist" aria-label="Фильтр матчей">
+        <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
+          <span class="full chip-label">Все турниры</span><span class="short chip-label">Все</span>
+        </button>
+        <button type="button" :class="{ on: filter.kind === 'favorites' }" @click="pick({ kind: 'favorites' })">
+          <span class="full chip-label">★ Избранные</span><span class="short chip-label">★ Избр.</span>
+        </button>
+        <button type="button" :class="{ on: filter.kind === 'undated' }" @click="pick({ kind: 'undated' })">
+          <span class="chip-label">Без даты</span>
+        </button>
+        <button
+          v-for="tour in chipTournaments"
+          :key="tour.id"
+          type="button"
+          :class="{ on: tournamentOn(tour.id) }"
+          :title="tour.name"
+          :aria-label="tour.name"
+          @click="pick({ kind: 'tournament', tournamentId: tour.id })"
+        >
+          <span class="chip-label" v-fit-text="tour.name" :title="tour.name"></span>
+        </button>
+      </div>
+    </ScrollFade>
+
+    <p v-if="!countsReady && !loading && !error" class="note">Показаны не все матчи</p>
+
+    <div class="layout">
+      <div class="main-col">
+        <div v-if="loading" class="card skeleton" role="status" aria-label="Загрузка матчей">
+          <p>Загрузка матчей…</p>
+          <span></span><span></span><span></span>
+        </div>
+        <div v-else-if="error && !groups.length" class="card state">
+          <strong>Матчи не загрузились</strong>
+          <button class="btn secondary" type="button" @click="load(true)">Повторить</button>
+        </div>
+        <div v-else-if="!groups.length" class="card state">
+          <strong v-if="filter.kind === 'favorites'">Избранных пока нет</strong>
+          <strong v-else-if="filter.kind === 'undated'">Матчей без даты нет</strong>
+          <strong v-else-if="liveOnly">Сейчас никто не играет</strong>
+          <strong v-else>Матчей на этот день пока нет</strong>
+          <button v-if="filter.kind === 'all' && !liveOnly" class="btn secondary" type="button" @click="jumpNearest">Перейти</button>
+        </div>
+        <template v-else>
+          <article v-if="filter.kind === 'undated'" class="card">
+            <header class="card-head">
+              <b>Дата уточняется</b>
+            </header>
+            <CalendarMatchLine
+              v-for="match in groups.flatMap((group) => group.matches)"
+              :key="match.id"
+              :match="match"
+              :kicker="matchName(match.tournamentId || '')"
+              :home-name="homeName(match)"
+              :away-name="awayName(match)"
+              :home-logo="teams.logo(match.homeTeamId)"
+              :away-logo="teams.logo(match.awayTeamId)"
+            />
+          </article>
+          <article v-for="group in groups" v-else :key="group.id" class="card">
+            <header class="card-head">
+              <div>
+                <b>{{ matchName(group.id) }}</b>
+                <span>{{ stageOf(group.id, group.matches[0]) }}</span>
+              </div>
+              <RouterLink
+                v-if="group.id !== 'none'"
+                :to="{ path: `/tournaments/${group.id}`, query: { tab: linkOf(group.id, group.matches[0]).tab } }"
+              >{{ linkOf(group.id, group.matches[0]).label }} →</RouterLink>
+            </header>
+            <CalendarMatchLine
+              v-for="match in group.matches"
+              :key="match.id"
+              :match="match"
+              :home-name="homeName(match)"
+              :away-name="awayName(match)"
+              :home-logo="teams.logo(match.homeTeamId)"
+              :away-logo="teams.logo(match.awayTeamId)"
+            />
+          </article>
+        </template>
+
+        <aside class="fav-mobile card">
+          <header class="card-head"><b>★ Избранные</b></header>
+          <p v-if="!favoriteSide.length" class="empty">Избранных пока нет</p>
+          <RouterLink v-for="match in favoriteSide" :key="`m-${match.id}`" class="mini" :to="`/matches/${match.id}`">
+            <b>{{ homeName(match) }}</b>
+            <span>{{ match.tournamentName || matchName(match.tournamentId || '') }}</span>
+          </RouterLink>
+        </aside>
+      </div>
+
+      <aside class="side">
+        <section v-if="showLiveSide" class="card">
+          <header class="card-head">
+            <b>Live сейчас</b>
+            <i v-if="liveComplete">{{ filteredLive.length }}</i>
+          </header>
+          <p v-if="!filteredLive.length" class="empty">Сейчас никто не играет</p>
+          <RouterLink v-for="match in filteredLive" :key="match.id" class="mini" :to="`/matches/${match.id}`">
+            <b>{{ homeName(match) }}</b>
+            <span>{{ awayName(match) }}</span>
+            <strong>{{ match.homeScore }} : {{ match.awayScore }}</strong>
+          </RouterLink>
+          <p v-if="!liveComplete && !loading" class="empty">Показаны не все матчи</p>
+        </section>
+        <section class="card fav-desk">
+          <header class="card-head"><b>★ Избранные</b></header>
+          <p v-if="!favoriteSide.length" class="empty">Избранных пока нет</p>
+          <RouterLink v-for="match in favoriteSide" :key="match.id" class="mini" :to="`/matches/${match.id}`">
+            <b>{{ homeName(match) }}</b>
+            <span>{{ awayName(match) }} · {{ hint(match) }}</span>
+          </RouterLink>
+        </section>
+      </aside>
     </div>
   </section>
 </template>
 
 <style scoped>
-.page {
-  gap: 0;
-  min-width: 0;
-  max-width: 100%;
+.calendar { display: grid; gap: 0.9rem; min-width: 0; }
+.hero {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 22px;
+  padding: 1.15rem 1.2rem 1rem;
 }
-.calendar-bar {
-  display: flex;
-  align-items: stretch;
-  flex-wrap: nowrap;
-  gap: 0.35rem;
-  margin: 0.35rem -0.2rem 0.15rem;
-  min-width: 0;
-  max-width: 100%;
-}
-.fav-toggle {
-  flex: 0 0 auto;
-  align-self: center;
-  margin-left: 0.2rem;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--muted);
+.eyebrow {
+  margin: 0;
+  color: var(--ice);
+  font-size: 0.75rem;
   font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  white-space: nowrap;
-  padding: 0.42rem 0.75rem;
-  border-radius: 999px;
+}
+.hero h1 {
+  color: #fff;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  margin: 0.2rem 0 0.35rem;
+  text-transform: none;
+}
+.meta { margin: 0; color: rgba(255,255,255,0.82); font-weight: 650; }
+.meta.quiet { color: rgba(255,255,255,0.62); }
+.week { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.9rem; }
+.days { display: flex; gap: 0.35rem; flex: 1; min-width: 0; justify-content: space-between; }
+.day, .arrow {
+  border: 0;
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  border-radius: 14px;
   cursor: pointer;
 }
-.fav-toggle.on {
-  color: var(--navy);
-  background: var(--ice);
-  border-color: transparent;
-}
-.calendar-bar .date-strip {
+.arrow { width: 32px; height: 48px; flex: 0 0 auto; font-size: 1.2rem; }
+.day {
   flex: 1 1 0;
-  width: 0;
   min-width: 0;
-  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.05rem;
+  padding: 0.35rem 0.1rem 0.45rem;
+  position: relative;
 }
-@media (max-width: 720px) {
-  .calendar-bar {
-    margin-inline: 0;
-    gap: 0.25rem;
-  }
-  .fav-toggle {
-    margin-left: 0;
-    padding: 0.38rem 0.55rem;
-  }
-  .league-head {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
+.day span { font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255,255,255,0.7); }
+.day b { font-size: 1rem; }
+.day.on { background: var(--ice); color: var(--navy); }
+.day.on span { color: var(--navy); }
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ice);
+  position: absolute;
+  bottom: 4px;
 }
-.live-head {
+.day.on .dot { background: var(--navy); }
+.filters-fade {
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  background: rgba(232, 238, 244, 0.94);
+}
+.filters {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.65rem;
-  flex-wrap: wrap;
-  padding: 0.35rem 0 0.15rem;
-}
-.live-head h1 { font-size: 1.35rem; }
-.sheet {
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  overflow: hidden;
-  margin-top: 0.45rem;
-  min-width: 0;
+  justify-content: flex-start;
+  gap: 0.45rem;
+  overflow-x: auto;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: transparent;
+  padding: 0.35rem 0 0.45rem;
+  scroll-padding-inline: 1rem 3.25rem;
+  scrollbar-width: none;
+}
+.filters::before { content: ""; flex: 0 0 1rem; }
+.filters::after { content: ""; flex: 0 0 3.25rem; }
+.filters .chip-label { display: inline-block; max-width: 100%; vertical-align: bottom; }
+.filters::-webkit-scrollbar { display: none; }
+.filters button {
+  flex: 0 0 auto;
+  border: 0;
+  background: #fff;
+  color: var(--navy);
+  border-radius: 999px;
+  padding: 0.42rem 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filters button.on { background: var(--ice); }
+.filters .short { display: none; }
+.note { margin: 0; color: var(--muted); font-weight: 700; }
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 0.9rem;
+  align-items: start;
+}
+.main-col, .side { display: grid; gap: 0.75rem; min-width: 0; }
+.card {
+  background: #fff;
+  border-radius: 18px;
+  overflow: hidden;
+  min-width: 0;
+}
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  color: var(--navy);
+}
+.card-head b { font-size: 0.95rem; }
+.card-head span { display: block; color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.card-head a { color: var(--navy); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.card-head i {
+  font-style: normal;
+  background: var(--status-live-soft);
+  color: var(--status-live-ink);
+  border-radius: 999px;
+  min-width: 1.4rem;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+}
+.state, .skeleton { padding: 1.4rem 1rem; display: grid; justify-items: center; gap: 0.7rem; text-align: center; }
+.skeleton span {
+  display: block;
+  width: 100%;
+  height: 2.4rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e8eef5 25%, #f7f9fb 50%, #e8eef5 75%);
+  background-size: 200% 100%;
+}
+.empty { margin: 0; padding: 0 0.9rem 0.9rem; color: var(--muted); }
+.mini {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.1rem 0.5rem;
+  padding: 0.45rem 0.9rem 0.55rem;
+  color: inherit;
+  text-decoration: none;
+  border-top: 1px solid var(--line);
+}
+.mini b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini span { grid-column: 1 / -1; color: var(--muted); font-size: 0.75rem; }
+.fav-mobile { display: none; }
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
+  .side { display: none; }
+  .fav-mobile { display: block; }
+  .filters .full { display: none; }
+  .filters .short { display: inline; }
+  .hero { border-radius: 18px; padding: 0.95rem 0.8rem 0.8rem; }
+  .card-head { gap: 1rem; align-items: flex-start; padding: 0.9rem 1rem; }
+  .card-head a { margin-left: 0.25rem; padding-top: 0.15rem; }
+  .days { gap: 0.2rem; }
+  .day { padding-inline: 0; }
 }
 </style>

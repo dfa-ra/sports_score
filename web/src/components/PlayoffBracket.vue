@@ -40,6 +40,7 @@ import {
   teamCountOf,
   useRoundTabs,
   winnerSide,
+  type BracketPanel,
   type PlayoffRound,
   type PlayoffSlot,
 } from '../lib/playoffGrid'
@@ -213,11 +214,23 @@ function arrivals(roundIndex: number, slot: PlayoffSlot) {
     .filter((line): line is { name: string; detail: string } => !!line)
 }
 
-function nextHint(roundIndex: number) {
-  const next = rounds.value[roundIndex + 1]
-  if (!next) return ''
-  const note = roundNote(slotsOf(next)).text.replace(' · завершён', '')
-  return note ? `Дальше · ${next.title} ${note}` : `Дальше · ${next.title}`
+function nextPreview(panel: BracketPanel) {
+  if (panel.thirdPlace || panel.champion) return null
+  const index = panels.value.findIndex((item) => item.key === panel.key)
+  if (index < 0) return null
+  const next = panels.value.slice(index + 1).find((item) => !item.thirdPlace)
+  if (!next) return null
+  const slots = next.slots.length
+    ? next.slots
+    : [{
+        id: `tbd-${next.key}`,
+        slotIndex: 0,
+        roundTitle: next.title,
+        homeWaitingLabel: 'Состав определится позже',
+        awayWaitingLabel: 'Состав определится позже',
+        matchStatus: 'SCHEDULED',
+      }]
+  return { title: next.title || next.tab, roundIndex: next.roundIndex, slots }
 }
 
 const finalRound = computed(() => rounds.value[rounds.value.length - 1])
@@ -378,12 +391,24 @@ const bronzeBoardStyle = computed(() => ({
 }))
 
 type LinkSeg = { d: string; kind: string; ids: Array<string | null | undefined> }
+type PairPath = { upper: string; lower: string; exit: string }
 const linkPaths = ref<LinkSeg[][]>([])
+const measuredPairs = ref<Record<string, PairPath>>({})
+const measuredFinal = ref('M0 50 H100')
+
+function linkD(roundIndex: number, slotIndex: number, part: keyof PairPath) {
+  const found = measuredPairs.value[`${roundIndex}-${slotIndex}`]
+  if (found) return found[part]
+  if (part === 'upper') return 'M0 25 H50 V50'
+  if (part === 'lower') return 'M0 75 H50 V50'
+  return 'M50 50 H100'
+}
 
 function measureLinks() {
   const board = root.value?.querySelector('.bronze-board') as HTMLElement | null
   if (!board) {
     linkPaths.value = []
+    measurePairGrid()
     return
   }
   const links = [...board.querySelectorAll<HTMLElement>('.b-link')]
@@ -425,6 +450,57 @@ function measureLinks() {
     next.push(segs)
   })
   linkPaths.value = next
+  measurePairGrid()
+}
+
+function yIn(box: DOMRect, el: HTMLElement) {
+  const rect = el.getBoundingClientRect()
+  const y = ((rect.top + rect.height / 2 - box.top) / Math.max(1, box.height)) * 100
+  return Math.max(0, Math.min(100, y))
+}
+
+function measurePairGrid() {
+  const grid = root.value?.querySelector('.po-grid') as HTMLElement | null
+  if (!grid) {
+    if (Object.keys(measuredPairs.value).length) measuredPairs.value = {}
+    return
+  }
+  const next: Record<string, PairPath> = {}
+  const cells = [...grid.querySelectorAll<HTMLElement>('.cellc[data-from-round]')]
+  for (const cell of cells) {
+    const box = cell.getBoundingClientRect()
+    const fromRound = Number(cell.dataset.fromRound)
+    const slotIndex = Number(cell.dataset.slotIndex)
+    if (box.height < 1 || Number.isNaN(fromRound) || Number.isNaN(slotIndex)) continue
+    const fromCards = [...grid.querySelectorAll<HTMLElement>(`.cell[data-round="${fromRound}"] .pc`)]
+    const toCards = [...grid.querySelectorAll<HTMLElement>(`.cell[data-round="${fromRound + 1}"] .pc`)]
+    const upper = fromCards[slotIndex * 2]
+    const lower = fromCards[slotIndex * 2 + 1]
+    const target = toCards[slotIndex]
+    if (!upper || !lower || !target) continue
+    const yTop = yIn(box, upper)
+    const yBottom = yIn(box, lower)
+    const yTarget = yIn(box, target)
+    next[`${fromRound}-${slotIndex}`] = {
+      upper: `M0 ${yTop} H50 V${yTarget}`,
+      lower: `M0 ${yBottom} H50 V${yTarget}`,
+      exit: `M50 ${yTarget} H100`,
+    }
+  }
+  const finalCell = grid.querySelector<HTMLElement>('.cellc.final-link')
+  let finalD = 'M0 50 H100'
+  if (finalCell) {
+    const box = finalCell.getBoundingClientRect()
+    const finalCard = grid.querySelector<HTMLElement>('.pc.final')
+    const champ = grid.querySelector<HTMLElement>('.champ-cell .champ')
+    if (box.height > 1 && finalCard && champ) {
+      const yFrom = yIn(box, finalCard)
+      const yTo = yIn(box, champ)
+      finalD = Math.abs(yFrom - yTo) < 1.5 ? `M0 ${yFrom} H100` : `M0 ${yFrom} H50 V${yTo} H100`
+    }
+  }
+  if (JSON.stringify(measuredPairs.value) !== JSON.stringify(next)) measuredPairs.value = next
+  if (measuredFinal.value !== finalD) measuredFinal.value = finalD
 }
 
 function earlyStyle(roundIndex: number, slotIndex: number, slotCount: number) {
@@ -466,8 +542,9 @@ function bronzePairStyle() {
 <template>
   <div ref="root" class="po">
     <div class="po-card">
-      <div v-if="!tabMode && !loading && !error && !empty" class="po-card-h">
-        <p class="po-hint">
+      <div class="po-card-h">
+        <h2>Сетка плей-офф</h2>
+        <p v-if="!tabMode && !loading && !error && !empty" class="po-hint">
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>
@@ -496,7 +573,7 @@ function bronzePairStyle() {
       <div v-else-if="empty" class="msg">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h5v5H3zM3 14h5v5H3zM16 9.5h5v5h-5zM8 7.5h4v9M12 12h4" /></svg>
         <b>Сетка ещё не сформирована</b>
-        <p>Сетка появится после групп</p>
+        <p>Плей-офф начнётся после группового этапа. Следите за таблицей.</p>
         <button class="po-action" type="button" @click="emit('show-table')">К таблице</button>
       </div>
 
@@ -615,7 +692,24 @@ function bronzePairStyle() {
                 </div>
               </div>
             </div>
-            <p v-else-if="!panel.thirdPlace && nextHint(panel.roundIndex)" class="next-hint">{{ nextHint(panel.roundIndex) }}</p>
+            <template v-else v-for="preview in [nextPreview(panel)]" :key="`${panel.key}-next`">
+              <div v-if="preview" class="next-round">
+                <h4>Дальше · {{ preview.title }}</h4>
+                <div class="pair-stack">
+                  <PlayoffPairCard
+                    v-for="slot in preview.slots"
+                    :key="`next-${panel.key}-${slot.id || slot.slotIndex}`"
+                    :slot="viewSlot(slot)"
+                    :previous-title="previousTitle(preview.roundIndex)"
+                    :first-round="false"
+                    :final="false"
+                    :lit="lit"
+                    :can-hover="false"
+                    :logo="logo"
+                  />
+                </div>
+              </div>
+            </template>
           </section>
         </div>
       </div>
@@ -792,30 +886,32 @@ function bronzePairStyle() {
               v-for="slot in linkSlots(slotsOf(rounds[roundIndex + 1]))"
               :key="`svg-${roundIndex}-${slot.id}`"
               class="cellc"
+              :data-from-round="roundIndex"
+              :data-slot-index="Number(slot.slotIndex ?? 0)"
               :style="connectorCell(roundIndex, Number(slot.slotIndex ?? 0))"
             >
               <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path
                   :class="[connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperKind, { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperId]) }]"
-                  d="M0 25 H50 V50"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'upper')"
                 />
                 <path
                   :class="[connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerKind, { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerId]) }]"
-                  d="M0 75 H50 V50"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'lower')"
                 />
                 <path
                   :class="[exitKind(connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperKind, connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerKind), { hl: pathLit([connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).upperId, connectorTeams(roundIndex, Number(slot.slotIndex ?? 0)).lowerId]) }]"
-                  d="M50 50 H100"
+                  :d="linkD(roundIndex, Number(slot.slotIndex ?? 0), 'exit')"
                 />
               </svg>
             </div>
           </template>
 
-          <div v-if="rounds.length > 1" class="cellc" :style="finalLinkStyle">
+          <div v-if="rounds.length > 1" class="cellc final-link" :style="finalLinkStyle">
             <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path
                 :class="[branchKind(finalSlot), { hl: pathLit([champion?.id]) }]"
-                d="M0 50 H100"
+                :d="measuredFinal"
               />
             </svg>
           </div>
@@ -858,6 +954,7 @@ function bronzePairStyle() {
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
+.po-card-h h2 { font-size: 1.0625rem; margin: 0; color: var(--navy); }
 .po-hint { margin: 0; font-size: 0.8125rem; color: var(--muted); font-weight: 600; }
 .po-board { min-width: 0; max-width: 100%; overflow-x: auto; }
 .po-board.stack { overflow-x: visible; }
@@ -865,6 +962,10 @@ function bronzePairStyle() {
 .po-grid { display: grid; column-gap: 0; min-width: 0; }
 .po-grid > * { min-width: 0; }
 .cell { align-self: center; }
+.cell[data-round="0"] :deep(.pr) {
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+}
 .bronze-board {
   display: grid;
   column-gap: 0;
@@ -1002,6 +1103,7 @@ function bronzePairStyle() {
 }
 .po-swipe {
   display: flex;
+  align-items: flex-start;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   overscroll-behavior-x: contain;
@@ -1013,6 +1115,7 @@ function bronzePairStyle() {
 .po-swipe::-webkit-scrollbar { display: none; }
 .po-panel {
   flex: 0 0 100%;
+  align-self: flex-start;
   scroll-snap-align: start;
   min-width: 0;
   max-width: 100%;
@@ -1030,10 +1133,15 @@ function bronzePairStyle() {
 }
 .how b { color: var(--ink); }
 .champ-block { margin-top: 0.9rem; }
-.next-hint {
-  margin: 0.9rem 0 0;
-  padding-top: 0.9rem;
+.next-round {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
   border-top: 1px dashed var(--line-strong);
+  display: grid;
+  gap: 0.7rem;
+}
+.next-round h4 {
+  margin: 0;
   color: var(--navy);
   font-size: 0.75rem;
   font-weight: 800;

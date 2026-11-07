@@ -132,14 +132,15 @@ export function isLiveStatus(status?: string | null) {
 
 /**
  * Minimum width of the public grid. The numbers are the min tracks in `gridColumns`:
- * a 16-team board is four 150px rounds, four 22px links and a 168px champion.
+ * a 16-team board is a 220px opening round, three 150px rounds, four 22px links and a 168px champion.
  */
 export function gridMinWidth(roundCount: number, compact: boolean) {
   if (roundCount <= 1) return 238 + 160
   const col = compact ? 150 : 238
+  const first = compact ? 220 : col
   const link = compact ? 22 : 30
   const champion = compact ? 168 : 160
-  return roundCount * col + roundCount * link + champion
+  return first + (roundCount - 1) * col + roundCount * link + champion
 }
 
 /**
@@ -371,10 +372,12 @@ export function gridColumns(roundCount: number, compact: boolean, squeeze: boole
   // Stacking uses one fluid column so the board stays inside the viewport.
   if (roundCount <= 1) return stack ? 'minmax(0, 1fr)' : 'minmax(0, 238px) minmax(160px, 1fr)'
   // 16-team tracks prefer 214px but can shrink so the champion column stays readable inside the 1120px page.
+  // The opening round (1/8 on a 16-team board) gets a wider track so names are not crushed.
   const col = compact ? 'minmax(150px, 214px)' : squeeze ? 'minmax(190px, 238px)' : '238px'
+  const first = compact ? 'minmax(220px, 268px)' : col
   const link = compact ? '22px' : squeeze ? '24px' : '30px'
   const parts: string[] = []
-  for (let i = 0; i < roundCount; i += 1) parts.push(col, link)
+  for (let i = 0; i < roundCount; i += 1) parts.push(i === 0 ? first : col, link)
   parts.push(compact ? 'minmax(168px, 1fr)' : 'minmax(0, 1fr)')
   return parts.join(' ')
 }

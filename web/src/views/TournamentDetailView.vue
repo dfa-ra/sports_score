@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { apiError } from '../lib/errors'
 import { APPROVE_BUTTON_LABEL, entryActionError, showApproveButton } from '../lib/tournamentEntryActions'
-import { isTournamentOpenForApply, matchListWhen, tournamentDatesError } from '../lib/format'
-import { matchStateLabel, publicScore } from '../lib/match'
+import { formatLabel, isTournamentOpenForApply, matchListWhen, tournamentDatesError } from '../lib/format'
+import { cardScoreText, rowClock } from '../lib/calendarFeed'
+import { goalsPerMatchLabel } from '../lib/homeOverview'
+import { matchInstant, matchStateLabel } from '../lib/match'
+import { collectPaged } from '../lib/pagedList'
 import {
-  overviewMeta,
   roundsHaveLive,
+  tournamentDateSpan,
   tournamentHasPlayoff,
   tournamentStatusChip,
 } from '../lib/playoffGrid'
 import { setPageMeta } from '../lib/pageMeta'
+import { registeredName } from '../lib/playerTitle'
+import NotFoundView from './NotFoundView.vue'
 import { publicTournamentDescription } from '../lib/tournamentCopy'
 import AdminOnly from '../components/AdminOnly.vue'
 import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
@@ -21,7 +26,8 @@ import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PlayoffAdmin from '../components/PlayoffAdmin.vue'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
-import StandingGroups from '../components/StandingGroups.vue'
+import CardsStandings from '../components/CardsStandings.vue'
+import PlayerAvatar from '../components/PlayerAvatar.vue'
 import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import TeamCrest from '../components/TeamCrest.vue'
@@ -35,9 +41,19 @@ const names = useTeamDirectory()
 const tournament = ref<any>(null)
 const publicDescription = computed(() => publicTournamentDescription(tournament.value?.description))
 const teams = ref<any[]>([])
+const teamsReady = ref(false)
+const teamsError = ref(false)
 const standings = ref<StandingGroup[]>([])
 const tableDraft = ref<{ id?: string; name: string; teamIds: string[] }[]>([])
 const matches = ref<any[]>([])
+const matchesComplete = ref(true)
+const summary = ref<{ matchesPlayed?: number; goals?: number; goalsPerMatch?: number | string | null } | null>(null)
+const summaryError = ref(false)
+const summaryLoading = ref(true)
+const tableError = ref('')
+const tableLoading = ref(true)
+const scorers = ref<any[]>([])
+const scorersError = ref(false)
 const playoff = ref<any>(null)
 const overview = ref<any>(null)
 const playoffLoading = ref(false)
@@ -85,6 +101,9 @@ async function load() {
     playoffError.value = false
     missing.value = false
     error.value = ''
+    teams.value = []
+    teamsReady.value = false
+    teamsError.value = false
   }
   let detail: any
   try {
@@ -118,17 +137,51 @@ async function load() {
   tournament.value = detail
   const playoffTask = loadPlayoff(String(id))
   try {
-    const [teamRes, standingRes, matchRes, tableRes] = await Promise.all([
-      api.get(`/tournaments/${id}/teams`),
-      api.get(`/tournaments/${id}/standings`),
-      api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
+    tableLoading.value = true
+    summaryLoading.value = true
+    tableError.value = ''
+    summaryError.value = false
+    scorersError.value = false
+    const teamTask = api.get(`/tournaments/${id}/teams`).then(
+      (res) => ({ rows: res.data ?? [], failed: false as const }),
+      () => ({ rows: [] as any[], failed: true as const }),
+    )
+    const restTask = Promise.all([
       api.get(`/tournaments/${id}/tables`),
+      api.get('/statistics/summary', { params: { tournamentId: id } }).then((res) => res.data).catch(() => null),
+      api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } }).then((res) => res.data).catch(() => null),
+      collectPaged((page) => api.get(`/tournaments/${id}/matches`, {
+        params: { size: 100, page, sort: 'scheduledAt,asc' },
+      }).then((res) => res.data), 5),
     ])
+    const teamOutcome = await teamTask
     if (route.params.id !== id) return
-    teams.value = teamRes.data
-    standings.value = parseStandings(standingRes.data)
+    teams.value = teamOutcome.rows
+    teamsError.value = teamOutcome.failed
+    teamsReady.value = true
+    const [tableRes, summaryData, boardData, matchPage] = await restTask
+    if (route.params.id !== id) return
+    summary.value = summaryData
+    summaryError.value = summaryData == null
+    summaryLoading.value = false
+    scorers.value = boardData?.scorers ?? []
+    scorersError.value = boardData == null
+    matches.value = matchPage.rows
+    matchesComplete.value = matchPage.complete
+    try {
+      const standingRes = await api.get(`/tournaments/${id}/standings`)
+      if (route.params.id !== id) return
+      standings.value = parseStandings(standingRes.data)
+      tableError.value = ''
+    } catch {
+      if (route.params.id !== id) return
+      standings.value = []
+      tableError.value = 'Таблица не загрузилась'
+    } finally {
+      if (route.params.id === id) tableLoading.value = false
+    }
     const approvedIds = new Set(
-      (teamRes.data ?? [])
+      (teamOutcome.rows ?? [])
         .filter((team: { status?: string }) => team.status === 'APPROVED')
         .map((team: { teamId?: string }) => String(team.teamId)),
     )
@@ -137,19 +190,18 @@ async function load() {
       name: row.name,
       teamIds: (row.teamIds ?? []).map(String).filter((id: string) => approvedIds.has(id)),
     }))
-    matches.value = matchRes.data.content ?? []
     error.value = ''
   } catch (e: any) {
     if (route.params.id !== id) return
     error.value = apiError(e, 'Турнир не загрузился.')
+    tableLoading.value = false
+    summaryLoading.value = false
+    if (!summary.value) summaryError.value = true
+    teamsReady.value = true
   }
   await playoffTask
   if (route.params.id !== id) return
-  setPageMeta({
-    title: detail?.name || 'Турнир',
-    description: `${detail?.name || 'Турнир'} — таблица и матчи Лиги ИТМО.`,
-    path: `/tournaments/${id}`,
-  })
+  publishTournamentTitle(detail?.name, String(id))
   name.value = detail.name
   description.value = visibleDescription
   status.value = detail.status
@@ -322,17 +374,118 @@ const tab = computed<TourTab | 'pending'>(() => {
 })
 const statusChip = computed(() => tournamentStatusChip(tournament.value?.status))
 const hasRegulations = computed(() => !!String(tournament.value?.regulations || '').trim())
-const teamsCount = computed(() => overview.value?.teamsCount ?? listedTeams.value.length)
+const teamsCount = computed(() => listedTeams.value.length)
+
+function publishTournamentTitle(name?: string | null, id?: string) {
+  const title = (name || '').trim()
+  if (!title) return
+  const path = `/tournaments/${id || route.params.id}`
+  const apply = () => {
+    if ((tournament.value?.name || '').trim() !== title) return
+    setPageMeta({
+      title,
+      description: `${title} — таблица и матчи Лиги ИТМО.`,
+      path,
+    })
+  }
+  apply()
+  void nextTick(apply)
+}
+
+watch(() => [route.fullPath, tournament.value?.name, missing.value] as const, () => {
+  if (missing.value || !tournament.value?.name) return
+  publishTournamentTitle(tournament.value.name, String(route.params.id || ''))
+})
 const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
+const heroFacts = computed(() => {
+  const seasonLabel = String(overview.value?.seasonLabel || tournament.value?.seasonLabel || '').trim()
+  const seasonYear = overview.value?.seasonYear ?? tournament.value?.seasonYear
+  const season = seasonLabel || (seasonYear ? `Сезон ${seasonYear}` : '')
+  const format = tournament.value?.format ? (formatLabel[tournament.value.format] || '') : ''
+  const dates = tournamentDateSpan(tournament.value?.startDate, tournament.value?.endDate)
+  return [season, format, dates].filter(Boolean).join(' · ')
+})
+const stageLine = computed(() => {
+  const stage = overview.value?.stage || playoff.value?.competitionStage || tournament.value?.competitionStage
+  if (stage === 'PLAYOFF') return 'Плей-офф'
+  if (stage === 'GROUPS') return 'Групповой этап'
+  return ''
+})
+const perMatchLabel = computed(() => {
+  const raw = summary.value?.goalsPerMatch
+  const value = typeof raw === 'number' ? raw : Number(raw)
+  if (!Number.isFinite(value)) return ''
+  return goalsPerMatchLabel(value)
+})
+const advancingPlaces = computed(() => Array.isArray(playoff.value?.advancingPlaces) ? playoff.value.advancingPlaces as number[] : [])
+const upcoming = computed(() => matches.value
+  .filter((match) => match.status === 'SCHEDULED' || match.status === 'LIVE' || match.status === 'PAUSED')
+  .slice()
+  .sort((a, b) => {
+    const left = matchInstant(a)
+    const right = matchInstant(b)
+    if (!left && !right) return 0
+    if (!left) return 1
+    if (!right) return -1
+    return String(left).localeCompare(String(right))
+  })
+  .slice(0, 6))
+function clubName(teamId?: string | null) {
+  if (!teamId) return ''
+  return names.teams.value[teamId]?.name || ''
+}
 const playoffLive = computed(() => roundsHaveLive(playoff.value?.rounds) || overview.value?.playoffLive === true)
-const metaParts = computed(() => overviewMeta({
-  seasonYear: overview.value?.seasonYear ?? tournament.value?.seasonYear,
-  format: overview.value?.format ?? tournament.value?.format,
-  teamsCount: overview.value ? overview.value.teamsCount : (teams.value.length ? listedTeams.value.length : null),
-  startDate: overview.value?.startDate ?? tournament.value?.startDate,
-  endDate: overview.value?.endDate ?? tournament.value?.endDate,
-  stage: overview.value?.stage ?? playoff.value?.competitionStage ?? tournament.value?.competitionStage,
-}))
+
+async function reloadTable() {
+  const id = String(tournament.value?.id || route.params.id || '')
+  if (!id) return
+  tableLoading.value = true
+  tableError.value = ''
+  try {
+    const standingRes = await api.get(`/tournaments/${id}/standings`)
+    if (String(route.params.id) !== id) return
+    standings.value = parseStandings(standingRes.data)
+  } catch {
+    tableError.value = 'Таблица не загрузилась'
+  } finally {
+    tableLoading.value = false
+  }
+}
+
+async function reloadTeams() {
+  const id = String(route.params.id || '')
+  if (!id) return
+  teamsReady.value = false
+  teamsError.value = false
+  try {
+    const { data } = await api.get(`/tournaments/${id}/teams`)
+    if (String(route.params.id) !== id) return
+    teams.value = data ?? []
+    teamsError.value = false
+  } catch {
+    if (String(route.params.id) !== id) return
+    teams.value = []
+    teamsError.value = true
+  } finally {
+    if (String(route.params.id) === id) teamsReady.value = true
+  }
+}
+
+async function reloadSummary() {
+  const id = String(tournament.value?.id || route.params.id || '')
+  if (!id) return
+  summaryLoading.value = true
+  summaryError.value = false
+  try {
+    const { data } = await api.get('/statistics/summary', { params: { tournamentId: id } })
+    if (String(route.params.id) !== id) return
+    summary.value = data
+  } catch {
+    summaryError.value = true
+  } finally {
+    summaryLoading.value = false
+  }
+}
 
 function setTab(next: TourTab) {
   router.replace({ query: { ...route.query, tab: next } })
@@ -370,16 +523,23 @@ async function refreshAfterScheduleSave() {
   const request = ++publishedRequest
   void loadPlayoff(id, true)
   try {
-    const [teamRes, standingRes, matchRes, overviewRes] = await Promise.all([
+    const [teamRes, standingRes, matchPage, overviewRes, summaryData] = await Promise.all([
       api.get(`/tournaments/${id}/teams`),
       api.get(`/tournaments/${id}/standings`),
-      api.get(`/tournaments/${id}/matches`, { params: { size: 50 } }),
+      collectPaged((page) => api.get(`/tournaments/${id}/matches`, {
+        params: { size: 100, page, sort: 'scheduledAt,asc' },
+      }).then((res) => res.data), 5),
       api.get(`/tournaments/${id}/overview`).catch(() => ({ data: null })),
+      api.get('/statistics/summary', { params: { tournamentId: id } }).then((res) => res.data).catch(() => null),
     ])
     if (request !== publishedRequest || String(route.params.id) !== id) return
     teams.value = teamRes.data ?? []
     standings.value = parseStandings(standingRes.data)
-    matches.value = matchRes.data.content ?? []
+    matches.value = matchPage.rows
+    matchesComplete.value = matchPage.complete
+    summary.value = summaryData
+    summaryError.value = summaryData == null
+    summaryLoading.value = false
     if (overviewRes.data) overview.value = overviewRes.data
   } catch {
     // The bracket card already shows the saved kickoff. Leave the other tabs as they were.
@@ -404,32 +564,45 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 </script>
 
 <template>
-  <section v-if="missing" class="stack">
-    <h1>Турнир не найден</h1>
+  <NotFoundView v-if="missing" heading="Турнир не найден" />
+  <section v-else-if="!tournament && error" class="match-state">
+    <strong>Турнир не загрузился</strong>
+    <button class="btn secondary" type="button" @click="load">Повторить</button>
   </section>
-  <p v-else-if="!tournament && error" class="form-error">{{ error }}</p>
   <section v-else class="stack tour">
-    <nav class="crumbs" aria-label="Навигация">
-      <RouterLink to="/tournaments">Турниры</RouterLink>
-      <span aria-hidden="true"> › </span>
-      <span v-if="tournament">{{ tournament.name }}</span>
-      <span v-else class="crumb-skel" aria-hidden="true"></span>
-    </nav>
-    <div class="th">
-      <div v-if="tournament">
-        <span v-if="statusChip" class="tour-st" :class="statusChip.kind">{{ statusChip.text }}</span>
+    <header class="tour-hero">
+      <div v-if="tournament" class="tour-copy">
+        <RouterLink to="/tournaments">‹ Турниры</RouterLink>
         <h1>{{ tournament.name }}</h1>
-        <p v-if="metaParts.length" class="meta">
-          <span v-for="part in metaParts" :key="part">{{ part }}</span>
+        <p class="tour-line">
+          <span v-if="statusChip" class="tour-st" :class="statusChip.kind">{{ statusChip.text }}</span>
+          <span v-if="heroFacts">{{ heroFacts }}</span>
         </p>
-        <p v-if="publicDescription" class="lede">{{ publicDescription }}</p>
+        <p v-if="stageLine" class="stage">{{ stageLine }}</p>
       </div>
       <div v-else class="title-pending" role="status" aria-busy="true" aria-label="Заголовок загружается">
         <span class="chip-skel"></span>
         <span class="title-skel"></span>
         <span class="meta-skel"></span>
       </div>
-    </div>
+      <div v-if="tournament" class="figures">
+        <template v-if="summaryLoading">
+          <span class="fig-skel"></span>
+          <span class="fig-skel"></span>
+          <span class="fig-skel"></span>
+        </template>
+        <div v-else-if="summaryError" class="fig-error">
+          <p>Цифры не загрузились</p>
+          <button class="btn secondary" type="button" @click="reloadSummary">Повторить</button>
+        </div>
+        <template v-else>
+          <div><b>{{ summary?.matchesPlayed ?? 0 }}</b><span><span class="lf">Сыграно матчей</span><span class="ls">Сыграно</span></span></div>
+          <div><b>{{ summary?.goals ?? 0 }}</b><span>Голы</span></div>
+          <div><b>{{ perMatchLabel }}</b><span><span class="lf">Голов за матч</span><span class="ls">Г/матч</span></span></div>
+        </template>
+      </div>
+    </header>
+    <p v-if="publicDescription" class="lede">{{ publicDescription }}</p>
 
     <div v-if="showApply" class="panel stack">
       <h2>Заявить команду</h2>
@@ -441,6 +614,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </RouterLink>
     </div>
 
+    <div class="tab-card">
     <div class="ttabs" role="tablist" aria-label="Разделы турнира">
       <button v-if="showGrid || tab === 'pending'" type="button" role="tab" :aria-selected="tab === 'playoff'" :class="{ on: tab === 'playoff' }" @click="tab !== 'pending' && setTab('playoff')">
         Сетка
@@ -451,9 +625,10 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         Матчи <i v-if="overview">{{ matchesCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'teams'" :class="{ on: tab === 'teams' }" @click="setTab('teams')">
-        Команды <i v-if="overview">{{ teamsCount }}</i>
+        Команды <i v-if="teamsReady && !teamsError">{{ teamsCount }}</i>
       </button>
       <button type="button" role="tab" :aria-selected="tab === 'rules'" :class="{ on: tab === 'rules' }" @click="setTab('rules')">Регламент</button>
+    </div>
     </div>
 
     <div v-if="tab === 'pending' || !tournament" class="panel tour-skel" role="status" aria-busy="true" aria-label="Турнир загружается">
@@ -470,14 +645,69 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <p class="rules-body">{{ tournament.regulations }}</p>
       </template>
     </div>
-    <div v-else-if="tab === 'table'" class="panel" role="tabpanel">
-      <h2>{{ standings.length > 1 ? 'Таблицы' : 'Таблица' }}</h2>
-      <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Результатов пока нет" />
-      <StandingGroups v-else :tables="standings" :marked-places="playoff?.advancingPlaces ?? []" />
+    <div v-else-if="tab === 'table'" class="table-layout" role="tabpanel">
+      <div class="table-main card-block">
+        <div v-if="tableLoading" class="table-skel" role="status" aria-busy="true">Таблица загружается…</div>
+        <div v-else-if="tableError" class="table-state">
+          <strong>Таблица не загрузилась</strong>
+          <button class="btn secondary" type="button" @click="reloadTable">Повторить</button>
+        </div>
+        <div v-else-if="!standingGroupsHaveRows(standings)" class="table-state">
+          <strong>Таблица пустая</strong>
+          <p>Нет утверждённых команд или сыгранных матчей.</p>
+        </div>
+        <template v-else>
+          <CardsStandings :tables="standings" :places="advancingPlaces" />
+          <p v-if="advancingPlaces.length" class="legend"><i class="ice"></i> Выходят в плей-офф</p>
+          <p class="legend keys">И — игры, В — победы, Н — ничьи, П — поражения, О — очки</p>
+        </template>
+      </div>
+      <aside class="table-side">
+        <section class="card-block">
+          <header>
+            <b>Ближайшие</b>
+            <button type="button" @click="setTab('matches')">Все →</button>
+          </header>
+          <p v-if="!matchesComplete" class="side-note">Показаны не все матчи</p>
+          <p v-if="!upcoming.length" class="side-note">Ближайших матчей нет</p>
+          <RouterLink v-for="match in upcoming" :key="match.id" class="soon" :to="`/matches/${match.id}`">
+            <span>
+              <b>{{ rowClock(match) }}</b>
+              <small>{{ match.homeTeamName || names.fullName(match.homeTeamId, 'Команда') }} — {{ match.awayTeamName || names.fullName(match.awayTeamId, 'Команда') }}</small>
+            </span>
+            <em>{{ cardScoreText(match) }}</em>
+          </RouterLink>
+        </section>
+        <section class="card-block">
+          <header>
+            <b>Бомбардиры</b>
+            <RouterLink :to="{ path: '/table', query: { tournament: tournament.id, tab: 'scorers' } }">Все →</RouterLink>
+          </header>
+          <div v-if="scorersError" class="table-state">
+            <strong>Бомбардиры не загрузились</strong>
+            <button class="btn secondary" type="button" @click="load">Повторить</button>
+          </div>
+          <p v-else-if="!scorers.length" class="side-note">Бомбардиров пока нет</p>
+          <RouterLink v-for="(row, index) in scorers.slice(0, 8)" :key="row.playerId" class="scorer" :to="`/players/${row.playerId}`">
+            <span class="pos">{{ index + 1 }}</span>
+            <PlayerAvatar :src="row.avatarUrl" :name="registeredName(row)" :first-name="row.firstName" :last-name="row.lastName" :size="28" />
+            <span>
+              <b>{{ registeredName(row) }}</b>
+              <small v-if="clubName(row.teamId)">{{ clubName(row.teamId) }}</small>
+            </span>
+            <strong>{{ row.goals }}</strong>
+          </RouterLink>
+        </section>
+      </aside>
     </div>
     <div v-else-if="tab === 'teams'" class="panel stack" role="tabpanel">
       <h2>Команды</h2>
-      <EmptyState v-if="!listedTeams.length" title="Заявок нет" />
+      <div v-if="!teamsReady" class="skeleton" role="status" aria-busy="true" aria-label="Заявки загружаются" />
+      <div v-else-if="teamsError" class="table-state">
+        <strong>Заявки не загрузились</strong>
+        <button class="btn secondary" type="button" @click="reloadTeams">Повторить</button>
+      </div>
+      <EmptyState v-else-if="!listedTeams.length" title="Заявок нет" />
       <div v-for="team in listedTeams" :key="team.id" class="row">
         <RouterLink class="club" :to="`/teams/${team.teamId}`">
           <TeamCrest :src="names.logo(team.teamId)" :name="team.teamName" :size="22" />
@@ -488,13 +718,14 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
     <div v-else-if="tab === 'matches'" class="panel stack" role="tabpanel">
       <h2>Матчи</h2>
+      <p v-if="!matchesComplete" class="side-note">Показаны не все матчи</p>
       <EmptyState v-if="!matches.length" title="Матчей нет" />
       <RouterLink v-for="m in matches" :key="m.id" class="row match-row" :to="`/matches/${m.id}`">
         <span class="match-side">
           <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="22" />
           <span>{{ m.homeTeamName || names.fullName(m.homeTeamId) }}</span>
         </span>
-        <span class="match-score">{{ publicScore(m) }}</span>
+        <span class="match-score">{{ cardScoreText(m) }}</span>
         <span class="match-side away">
           <span>{{ m.awayTeamName || names.fullName(m.awayTeamId) }}</span>
           <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
@@ -650,6 +881,52 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 
 <style scoped>
 .tour { min-width: 0; max-width: 100%; }
+.tour-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+  background: var(--ink);
+  color: #fff;
+  border-radius: 22px;
+  padding: 1.1rem 1.2rem 1.15rem;
+}
+.tour-copy { min-width: 0; }
+.tour-copy a { color: var(--ice); font-weight: 800; text-decoration: none; }
+.tour-hero h1 { color: #fff; font-size: clamp(1.45rem, 3vw, 2.1rem); margin: 0.25rem 0 0.45rem; text-transform: none; }
+.tour-line { display: flex; flex-wrap: wrap; gap: 0.45rem 0.7rem; align-items: center; margin: 0; color: rgba(255,255,255,0.82); }
+.stage { margin: 0.45rem 0 0; color: #fff; font-weight: 800; }
+.figures { display: flex; gap: 1.1rem; align-items: flex-end; }
+.figures b { display: block; color: #fff; font-size: 1.8rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.figures span { color: rgba(255,255,255,0.7); font-size: 0.75rem; font-weight: 700; }
+.figures .ls { display: none; }
+.fig-skel { width: 4.2rem; height: 2.6rem; border-radius: 10px; background: rgba(255,255,255,0.12); }
+.fig-error { display: grid; gap: 0.4rem; justify-items: end; color: #fff; }
+.tab-card { background: #fff; border-radius: 18px; padding: 0.2rem 0.6rem 0; min-width: 0; max-width: 100%; }
+.table-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 0.85rem; align-items: start; min-width: 0; }
+.card-block { background: #fff; border-radius: 18px; padding: 0.85rem 0.9rem 1rem; min-width: 0; overflow: hidden; }
+.table-side { display: grid; gap: 0.75rem; }
+.card-block header { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; color: var(--navy); }
+.card-block header button, .card-block header a { border: 0; background: transparent; color: var(--navy); font-weight: 800; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.table-state { display: grid; justify-items: center; gap: 0.55rem; text-align: center; padding: 1rem 0; }
+.table-skel { color: var(--muted); padding: 1rem 0; }
+.legend { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.8rem; margin: 0.7rem 0 0; }
+.legend i.ice { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--ice); }
+.soon, .scorer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; padding: 0.45rem 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
+.soon b, .scorer b { display: block; color: var(--navy); }
+.soon small, .scorer small { color: var(--muted); }
+.soon em { font-style: normal; font-weight: 800; color: var(--navy); }
+.scorer { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.scorer .pos { color: var(--muted); font-weight: 800; }
+.side-note { color: var(--muted); margin: 0.35rem 0; }
+.match-state { display: grid; justify-items: center; gap: 0.6rem; padding: 1.2rem; background: #fff; border-radius: 18px; }
+@media (max-width: 720px) {
+  .tour-hero { flex-direction: column; align-items: stretch; border-radius: 18px; }
+  .figures { justify-content: space-between; }
+  .figures .lf { display: none; }
+  .figures .ls { display: inline; }
+  .table-layout { grid-template-columns: 1fr; }
+}
 .tour > * { min-width: 0; }
 .crumbs { font-size: 0.8125rem; font-weight: 700; color: var(--muted); display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
 .crumbs a { color: var(--muted); }
@@ -811,10 +1088,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .ttabs button { padding: 0.75rem 0.8rem; }
   .meta { gap: 0.15rem 1rem; }
   .meta span + span::before { display: none; }
-  .ttabs {
-    -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent);
-    mask-image: linear-gradient(90deg, #000 82%, transparent);
-  }
+  .ttabs { flex-wrap: wrap; overflow: visible; }
   .row.match-row {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
