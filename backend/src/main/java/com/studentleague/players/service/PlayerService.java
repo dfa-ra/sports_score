@@ -11,6 +11,7 @@ import com.studentleague.matches.repository.MatchEventRepository;
 import com.studentleague.matches.repository.MatchLineupPlayerRepository;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.matches.scoring.OwnGoals;
+import com.studentleague.players.RegisteredNameQuery;
 import com.studentleague.players.dto.PlayerCardResponse;
 import com.studentleague.players.dto.PlayerProfileRequest;
 import com.studentleague.players.dto.PlayerProfileResponse;
@@ -135,13 +136,13 @@ public class PlayerService {
     }
 
     @Transactional(readOnly = true)
-    public Page<PlayerProfileResponse> list(String query, UUID teamId, Pageable pageable) {
+    public Page<PlayerProfileResponse> list(String query, UUID teamId, UUID tournamentId, Pageable pageable) {
         Pageable limited = PageRequest.of(
                 Math.max(pageable.getPageNumber(), 0),
                 Math.min(Math.max(pageable.getPageSize(), 1), 12),
                 pageable.getSort().isSorted() ? pageable.getSort() : Sort.by("lastName")
         );
-        String q = query == null ? "" : query.trim();
+        String q = RegisteredNameQuery.collapse(query);
         if (q.length() < 2 && teamId == null) {
             return new PageImpl<>(List.of(), limited, 0);
         }
@@ -151,23 +152,22 @@ public class PlayerService {
                     .toList();
             List<PlayerProfile> profiles = playerProfileRepository.findAllById(memberIds);
             if (q.length() >= 2) {
-                String needle = q.toLowerCase();
                 profiles = profiles.stream()
-                        .filter(profile -> contains(profile.getFirstName(), needle)
-                                || contains(profile.getLastName(), needle))
+                        .filter(profile -> RegisteredNameQuery.matches(profile.getFirstName(), profile.getLastName(), q))
                         .toList();
+            }
+            if (tournamentId != null) {
+                var allowed = playerProfileRepository.findAll(RegisteredNameQuery.inTournament(tournamentId)).stream()
+                        .map(PlayerProfile::getId)
+                        .collect(Collectors.toSet());
+                profiles = profiles.stream().filter(profile -> allowed.contains(profile.getId())).toList();
             }
             int from = Math.min(limited.getPageNumber() * limited.getPageSize(), profiles.size());
             int to = Math.min(from + limited.getPageSize(), profiles.size());
             return new PageImpl<>(toResponses(profiles.subList(from, to)), limited, profiles.size());
         }
-        Page<PlayerProfile> page = playerProfileRepository
-                .findByLastNameContainingIgnoreCaseOrFirstNameContainingIgnoreCase(q, q, limited);
+        Page<PlayerProfile> page = playerProfileRepository.findAll(RegisteredNameQuery.matching(q, tournamentId), limited);
         return new PageImpl<>(toResponses(page.getContent()), limited, page.getTotalElements());
-    }
-
-    private static boolean contains(String value, String query) {
-        return value != null && value.toLowerCase().contains(query);
     }
 
     @Transactional(readOnly = true)

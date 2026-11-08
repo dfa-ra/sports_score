@@ -13,8 +13,25 @@ export function boardParams(tournamentId: string | null, limit: number) {
   return params
 }
 
+/** Trim and collapse inner whitespace. Case stays as typed; the server folds it. */
+export function playerSearchQuery(raw: string) {
+  return raw.replace(/\s+/g, ' ').trim()
+}
+
+/** One `q`, fixed page size, next page is page+1. Tournament is sent only when a chip is on. */
+export function playerSearchParams(query: string, page: number, tournamentId?: string | null, size = 10) {
+  const params: Record<string, string | number> = {
+    q: playerSearchQuery(query),
+    page: Math.max(0, page),
+    size,
+    sort: 'lastName,asc',
+  }
+  if (tournamentId) params.tournamentId = tournamentId
+  return params
+}
+
 export function highlightParts(name: string, query: string) {
-  const needle = query.trim()
+  const needle = playerSearchQuery(query)
   if (!needle) return [{ text: name, hit: false }]
   const lower = name.toLocaleLowerCase('ru')
   const probe = needle.toLocaleLowerCase('ru')

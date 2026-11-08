@@ -20,6 +20,7 @@ function player(
   goals: number,
   assists: number,
   teamId: string,
+  avatarUrl: string | null = null,
 ) {
   return {
     playerId: id,
@@ -31,7 +32,7 @@ function player(
     appearances: 10,
     teamId,
     teamLogoUrl: '',
-    avatarUrl: null,
+    avatarUrl,
   }
 }
 
@@ -39,21 +40,21 @@ function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
-async function stamp(page: Page) {
-  await page.evaluate(() => {
+async function stamp(page: Page, label = 'Тестовый стенд · фикстура, не прод') {
+  await page.evaluate((text) => {
     document.getElementById('fixture-stamp')?.remove()
     const note = document.createElement('div')
     note.id = 'fixture-stamp'
-    note.textContent = 'Тестовый стенд · фикстура, не прод'
+    note.textContent = text
     note.style.cssText = 'margin:12px 8px 4px;display:inline-block;background:#fff;color:#00205b;border-radius:8px;padding:4px 8px;font:700 12px/1.2 sans-serif;box-shadow:0 2px 8px rgba(0,32,91,.15);'
     document.body.appendChild(note)
-  })
+  }, label)
 }
 
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, label?: string) {
   mkdirSync(OUT, { recursive: true })
   await page.evaluate(() => document.fonts.ready)
-  await stamp(page)
+  await stamp(page, label)
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true })
 }
 
@@ -84,6 +85,7 @@ async function metricFacts(page: Page) {
       value: (value.textContent || '').trim(),
       label: (label.textContent || '').trim(),
       gap: labelBox.top - valueBox.bottom,
+      gapCss: getComputedStyle(metric).gap,
       valueSize: getComputedStyle(value).fontSize,
       labelSize: getComputedStyle(label).fontSize,
       nameSize: getComputedStyle(name).fontSize,
@@ -197,13 +199,17 @@ test('players leader metric stack keeps word forms at 1, 2, 5 and 100', async ({
 
   for (const width of [375, 719, 1000, 1440]) {
     await page.setViewportSize({ width, height: width < 800 ? 812 : 900 })
+    if (width === 1440) {
+      expect(await page.evaluate(() => window.innerWidth)).toBe(1440)
+      expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1)
+    }
     const facts = await metricFacts(page)
     expect(facts, `viewport ${width}`).toHaveLength(2)
     for (const fact of facts) {
       expect(fact, `viewport ${width}`).not.toBeNull()
       if (!fact) continue
-      expect(fact.gap, `${fact.title} gap at ${width}`).toBeGreaterThan(3)
-      expect(fact.gap, `${fact.title} gap at ${width}`).toBeLessThan(5.5)
+      expect(fact.gapCss, `${fact.title} gap css at ${width}`).toBe('4px')
+      expect(Math.abs(fact.gap - 4), `${fact.title} gap at ${width}`).toBeLessThan(0.6)
       expect(fact.valueSize).toBe('38px')
       expect(fact.labelSize).toBe('12px')
       expect(fact.nameSize).toBe('16px')
@@ -281,4 +287,52 @@ test('players leader metric stack keeps word forms at 1, 2, 5 and 100', async ({
   await expect(page.getByLabel('Поиск игрока')).toBeVisible()
   await expect(page.locator('.leader-metric')).toHaveCount(0)
   await expect(page.getByText('Бомбардир')).toHaveCount(0)
+})
+
+test('leader card at 1440 keeps a 4px gap, a wrapped name, and the given photo', async ({ page }) => {
+  const photo = 'https://fixture.invalid/orlov.jpg'
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKElEQVR4nO3NMQ0AAAgDsElDKlKngoOkSf8ms7cEAoFAIBAIBALBl6DKSoAut3OBigAAAABJRU5ErkJggg==', 'base64')
+  await page.route('**/orlov.jpg', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: png }))
+  await page.route('**/api/v1/**', async (route) => {
+    const url = new URL(route.request().url())
+    const path = url.pathname
+    if (path === '/api/v1/auth/me' || path === '/api/v1/auth/refresh') return json(route, { message: 'no' }, 401)
+    if (path === '/api/v1/statistics/board') {
+      return json(route, {
+        scorers: [player('p1', 'Александр Константинович Владимирович', 'Орлов-Воскресенский-Преображенский', 12, 1, 'ft', photo)],
+        assists: [player('p2', 'Мария Александровна', 'Белова-Преображенская', 1, 5, 'pu', photo)],
+      })
+    }
+    if (path === '/api/v1/tournaments') {
+      return json(route, { content: [{ id: 'liga', name: 'Лига ИТМО', status: 'ACTIVE' }], totalPages: 1 })
+    }
+    if (path === '/api/v1/teams') {
+      return json(route, {
+        content: [
+          { id: 'ft', name: 'Факультет программной инженерии и компьютерной техники', logoUrl: '' },
+          { id: 'pu', name: 'Сборная института международного развития и экономики', logoUrl: '' },
+        ],
+        totalPages: 1,
+      })
+    }
+    return json(route, { content: [] })
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/players')
+  expect(await page.evaluate(() => window.innerWidth)).toBe(1440)
+  expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1)
+  const photoImg = page.locator('.leader').nth(0).locator('img')
+  await expect(photoImg).toHaveAttribute('src', photo)
+  const facts = await metricFacts(page)
+  expect(facts).toHaveLength(2)
+  for (const fact of facts) {
+    expect(fact).not.toBeNull()
+    if (!fact) continue
+    expect(fact.gapCss).toBe('4px')
+    expect(Math.abs(fact.gap - 4)).toBeLessThan(0.6)
+    expect(fact.nameLines).toBeGreaterThan(1)
+    expect(fact.clipped).toBe(false)
+  }
+  await shot(page, 'q2-players-metric-photo-1440', 'Тестовый стенд · фикстура, не live')
 })

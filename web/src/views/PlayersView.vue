@@ -13,6 +13,8 @@ import {
   goalsAside,
   goalsFromCard,
   highlightParts,
+  playerSearchParams,
+  playerSearchQuery,
   teamFromCard,
   unitWord,
 } from '../lib/q2Players'
@@ -149,7 +151,7 @@ async function enrich(list: Hit[], mine: number, q: string) {
     if (hit.goals != null && hit.team) return
     try {
       const { data } = await api.get(`/players/${hit.id}/card`)
-      if (mine !== searchTicket || query.value.trim() !== q) return
+      if (mine !== searchTicket || playerSearchQuery(query.value) !== q) return
       const goals = goalsFromCard(data)
       const team = teamFromCard(data)
       hit.goals = goals
@@ -207,7 +209,8 @@ function hitsFrom(content: Person[], kept: Map<string, Hit>): Hit[] {
 }
 
 async function search(more = false) {
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
+  const pinned = chipId.value
   if (q.length < 2) {
     searchState.value = 'idle'
     hits.value = []
@@ -220,9 +223,9 @@ async function search(more = false) {
   if (!more) searchState.value = 'loading'
   try {
     const { data } = await api.get('/players', {
-      params: { q, size: SEARCH_PAGE_SIZE, page, sort: 'lastName,asc' },
+      params: playerSearchParams(q, page, pinned, SEARCH_PAGE_SIZE),
     })
-    if (mine !== searchTicket || query.value.trim() !== q) return
+    if (mine !== searchTicket || playerSearchQuery(query.value) !== q || chipId.value !== pinned) return
     const content = pageContent(data) as Person[]
     const reported = Number((data as { totalElements?: unknown } | null)?.totalElements)
     const kept = new Map(hits.value.map((hit) => [hit.id, hit]))
@@ -239,7 +242,7 @@ async function search(more = false) {
     searchState.value = hits.value.length ? 'ready' : 'empty'
     void enrich(hits.value, mine, q)
   } catch {
-    if (mine !== searchTicket || query.value.trim() !== q) return
+    if (mine !== searchTicket || playerSearchQuery(query.value) !== q || chipId.value !== pinned) return
     if (more) return
     hits.value = []
     searchTotal.value = 0
@@ -254,7 +257,7 @@ function showMoreSearch() {
 
 function scheduleSearch() {
   if (searchTimer) window.clearTimeout(searchTimer)
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
   if (q.length < 2) {
     searchTicket += 1
     hits.value = []

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { boardParams, goalsAside, goalsFromCard, highlightParts, teamFromCard } from '../src/lib/q2Players.ts'
+import { boardParams, goalsAside, goalsFromCard, highlightParts, playerSearchParams, playerSearchQuery, teamFromCard } from '../src/lib/q2Players.ts'
 import {
   appliedLine,
   assembleTour,
@@ -134,6 +134,23 @@ test('the all-tournaments board omits tournamentId and search highlights the typ
   const parts = highlightParts('Орлов Илья', 'орл')
   assert.deepEqual(parts.filter((part) => part.hit).map((part) => part.text), ['Орл'])
   assert.equal(parts.map((part) => part.text).join(''), 'Орлов Илья')
+  const full = highlightParts('Орлов Илья', '  ОРЛОВ   илья ')
+  assert.equal(full.filter((part) => part.hit).map((part) => part.text).join(''), 'Орлов Илья')
+  assert.equal(playerSearchQuery('  Орлов   Илья  '), 'Орлов Илья')
+  assert.equal(playerSearchQuery('  игроков    толян '), 'игроков толян')
+  assert.deepEqual(playerSearchParams('  Орлов   Илья ', 0, null), {
+    q: 'Орлов Илья',
+    page: 0,
+    size: 10,
+    sort: 'lastName,asc',
+  })
+  assert.deepEqual(playerSearchParams('Толян', 1, 'liga'), {
+    q: 'Толян',
+    page: 1,
+    size: 10,
+    sort: 'lastName,asc',
+    tournamentId: 'liga',
+  })
   assert.equal(goalsAside(null), '–')
   assert.equal(goalsAside(1), '1 гол')
   assert.equal(goalsAside(2), '2 гола')

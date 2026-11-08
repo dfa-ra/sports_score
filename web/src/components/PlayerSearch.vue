@@ -3,6 +3,7 @@ import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { registeredName } from '../lib/playerTitle'
+import { playerSearchQuery } from '../lib/q2Players'
 import PlayerAvatar from './PlayerAvatar.vue'
 
 const props = defineProps<{ tournamentId?: string }>()
@@ -61,7 +62,8 @@ async function loadLeaders() {
 }
 
 async function search() {
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
+  const pinned = props.tournamentId
   if (q.length < 2) {
     items.value = []
     searched.value = false
@@ -72,23 +74,25 @@ async function search() {
   pending.value = true
   searchError.value = ''
   try {
-    const { data } = await api.get('/players', { params: { q, size: 8, sort: 'lastName,asc' } })
-    if (query.value.trim() !== q) return
+    const params: Record<string, string | number> = { q, size: 8, sort: 'lastName,asc' }
+    if (pinned) params.tournamentId = pinned
+    const { data } = await api.get('/players', { params })
+    if (playerSearchQuery(query.value) !== q || props.tournamentId !== pinned) return
     items.value = data.content ?? []
     searched.value = true
   } catch {
-    if (query.value.trim() !== q) return
+    if (playerSearchQuery(query.value) !== q || props.tournamentId !== pinned) return
     items.value = []
     searched.value = true
     searchError.value = 'Поиск не выполнился.'
   } finally {
-    if (query.value.trim() === q) pending.value = false
+    if (playerSearchQuery(query.value) === q && props.tournamentId === pinned) pending.value = false
   }
 }
 
 function schedule() {
   if (timer) window.clearTimeout(timer)
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
   if (q.length < 2) {
     items.value = []
     searched.value = false
@@ -101,7 +105,10 @@ function schedule() {
   timer = window.setTimeout(() => { void search() }, 250)
 }
 
-watch(() => props.tournamentId, () => { void loadLeaders() }, { immediate: true })
+watch(() => props.tournamentId, () => {
+  void loadLeaders()
+  if (playerSearchQuery(query.value).length >= 2) void search()
+}, { immediate: true })
 onUnmounted(() => {
   if (timer) window.clearTimeout(timer)
 })
