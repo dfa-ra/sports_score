@@ -361,7 +361,7 @@ onMounted(() => {
                 <span class="club-name">{{ teamName(scorer.teamId) }}</span>
               </span>
             </span>
-            <span class="score"><b>{{ scorer.goals ?? 0 }}</b><small>{{ unitWord(scorer.goals || 0, 'goals') }}</small></span>
+            <span class="leader-metric"><b>{{ scorer.goals ?? 0 }}</b><small>{{ unitWord(scorer.goals || 0, 'goals') }}</small></span>
           </div>
         </article>
         <article class="leader">
@@ -375,7 +375,7 @@ onMounted(() => {
                 <span class="club-name">{{ teamName(assist.teamId) }}</span>
               </span>
             </span>
-            <span class="score"><b>{{ assist.assists ?? 0 }}</b><small>{{ unitWord(assist.assists || 0, 'assists') }}</small></span>
+            <span class="leader-metric"><b>{{ assist.assists ?? 0 }}</b><small>{{ unitWord(assist.assists || 0, 'assists') }}</small></span>
           </div>
         </article>
       </div>
@@ -506,11 +506,13 @@ onMounted(() => {
   cursor: pointer;
 }
 .chip.on { background: #4cb4e5; color: #04203f; border-color: transparent; }
-.leaders { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.leaders { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: start; }
 .leader, .sheet { background: #fff; border-radius: 16px; min-width: 0; }
-.leader { padding: 0.75rem 0.85rem; }
-.leader p { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: #8b97a8; }
+.leader { padding: 20px; border-radius: 18px; }
+.leader p { margin: 0 0 8px; font-size: 12px; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; color: #8b97a8; }
 .leader-row, .hit { display: flex; align-items: center; gap: 0.55rem; }
+.leader-row { align-items: center; min-width: 0; }
+.leader-row :deep(.player-avatar) { flex: 0 0 auto; }
 .who, .name-team {
   min-width: 0;
   display: flex;
@@ -518,7 +520,14 @@ onMounted(() => {
   gap: 0.35rem;
   flex: 1;
 }
+.leader-row .name-team {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 2px;
+}
 .player-name, .who a { font-weight: 700; color: var(--navy); line-height: 1.2; min-width: 0; overflow-wrap: break-word; }
+.leader-row .who a { display: block; max-width: 100%; font-size: 16px; line-height: 1.2; white-space: normal; }
 .club {
   display: inline-flex;
   align-items: center;
@@ -529,13 +538,53 @@ onMounted(() => {
   font-size: 0.75rem;
   line-height: 1.2;
 }
+.leader-row .club {
+  display: flex;
+  align-items: flex-start;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.leader-row .club :deep(.team-crest) { flex: 0 0 auto; }
 .club :deep(.team-crest),
 .club-name { line-height: 1.2; }
 .club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.score { text-align: right; }
-.score b { display: block; font-family: var(--font-display); font-size: 1.45rem; line-height: 1; color: var(--navy); }
-.score small { color: #8b97a8; font-size: 0.68rem; }
-.card { min-height: 92px; display: block; }
+.leader-row .club-name {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: break-word;
+}
+.leader-metric {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  gap: 4px;
+  min-width: 72px;
+  margin-left: auto;
+  text-align: center;
+}
+.leader-metric b,
+.leader-metric small {
+  display: block;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+  line-height: 1;
+}
+.leader-metric b {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy);
+}
+.leader-metric small { color: #8b97a8; font-size: 12px; font-weight: 600; }
+.leaders .card { min-height: 116px; border-radius: 18px; display: block; }
 .sheet { overflow: hidden; }
 .board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.75rem 0.85rem 0.3rem; }
 .board-head h2 { margin: 0; font-size: 1rem; letter-spacing: 0.04em; }
