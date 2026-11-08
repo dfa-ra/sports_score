@@ -131,16 +131,15 @@ export function isLiveStatus(status?: string | null) {
 }
 
 /**
- * Minimum width of the public grid. The numbers are the min tracks in `gridColumns`:
- * a 16-team board is a 220px opening round, three 150px rounds, four 22px links and a 168px champion.
+ * Minimum width of the public grid. The champion is a card above the tree,
+ * so a 16-team board is a 220px opening round, three 150px rounds and three 22px links.
  */
 export function gridMinWidth(roundCount: number, compact: boolean) {
-  if (roundCount <= 1) return 238 + 160
+  if (roundCount <= 1) return 238
   const col = compact ? 150 : 238
   const first = compact ? 220 : col
   const link = compact ? 22 : 30
-  const champion = compact ? 168 : 160
-  return first + (roundCount - 1) * col + roundCount * link + champion
+  return first + (roundCount - 1) * col + (roundCount - 1) * link
 }
 
 /**
@@ -345,6 +344,41 @@ export function roundNote(slots: PlayoffSlot[]): { live: boolean; text: string }
   return { live: false, text: span }
 }
 
+export type ChampionCard = {
+  teamId: string
+  teamName: string
+  matchId: string | null
+  score: string
+  penalties: string | null
+}
+
+/**
+ * Champion only when the final is finished and a side is ahead on the score or on penalties.
+ * A draw without penalties, a live match, and a missing team are not a champion.
+ * Scores stay as returned. Null scores are not turned into 0.
+ */
+export function championCard(slot?: PlayoffSlot | null): ChampionCard | null {
+  if (!slot) return null
+  const side = winnerSide(slot)
+  const teamId = advancedTeamId(slot)
+  if (!side || !teamId) return null
+  if (slot.homeScore == null || slot.awayScore == null) return null
+  const teamName = (side === 'home' ? slot.homeTeamName : slot.awayTeamName) || ''
+  const name = teamName.replace(/\s+/g, ' ').trim()
+  if (!name) return null
+  const drawn = slot.homeScore === slot.awayScore
+  const pens = drawn && slot.penaltyHome != null && slot.penaltyAway != null
+    ? `пен. ${slot.penaltyHome} : ${slot.penaltyAway}`
+    : null
+  return {
+    teamId,
+    teamName: name,
+    matchId: slot.matchId || null,
+    score: `${slot.homeScore} : ${slot.awayScore}`,
+    penalties: pens,
+  }
+}
+
 export function championWhen(slot?: PlayoffSlot | null) {
   const parts = moscowParts(slotInstant(slot))
   if (!parts) return ''
@@ -368,17 +402,17 @@ export function arrivalLine(feeder: PlayoffSlot | undefined, sourceTitle?: strin
 }
 
 export function gridColumns(roundCount: number, compact: boolean, squeeze: boolean, stack = false) {
-  // Side by side, 238px + a 160px champion is about 398px and scrolls a 375px phone.
-  // Stacking uses one fluid column so the board stays inside the viewport.
-  if (roundCount <= 1) return stack ? 'minmax(0, 1fr)' : 'minmax(0, 238px) minmax(160px, 1fr)'
-  // 16-team tracks prefer 214px but can shrink so the champion column stays readable inside the 1120px page.
-  // The opening round (1/8 on a 16-team board) gets a wider track so names are not crushed.
+  // A lone final is one column. The phone uses a fluid track so it stays inside the viewport.
+  if (roundCount <= 1) return stack ? 'minmax(0, 1fr)' : 'minmax(0, 238px)'
+  // 16-team tracks prefer 214px and can shrink inside the page. The opening round stays wider.
   const col = compact ? 'minmax(150px, 214px)' : squeeze ? 'minmax(190px, 238px)' : '238px'
   const first = compact ? 'minmax(220px, 268px)' : col
   const link = compact ? '22px' : squeeze ? '24px' : '30px'
   const parts: string[] = []
-  for (let i = 0; i < roundCount; i += 1) parts.push(i === 0 ? first : col, link)
-  parts.push(compact ? 'minmax(168px, 1fr)' : 'minmax(0, 1fr)')
+  for (let i = 0; i < roundCount; i += 1) {
+    if (i > 0) parts.push(link)
+    parts.push(i === 0 ? first : col)
+  }
   return parts.join(' ')
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import PlayoffPairCard from './PlayoffPairCard.vue'
 import TeamCrest from './TeamCrest.vue'
@@ -13,7 +14,6 @@ import {
   bracketPanels,
   branchKind,
   bronzeBoardColumns,
-  bronzeChampionCell,
   bronzeEarlyCell,
   bronzeFinalCell,
   bronzeLinkCell,
@@ -21,9 +21,7 @@ import {
   bronzeRoundColumn,
   bronzeSemiCell,
   bronzeThirdRow,
-  championCell,
-  championHeaderCell,
-  championWhen,
+  championCard,
   connectorCell,
   defaultPanelIndex,
   gridColumns,
@@ -39,7 +37,6 @@ import {
   stackChampion,
   teamCountOf,
   useRoundTabs,
-  winnerSide,
   type BracketPanel,
   type PlayoffRound,
   type PlayoffSlot,
@@ -52,6 +49,8 @@ const props = defineProps<{
   editable?: boolean
   loading?: boolean
   error?: boolean
+  /** Tournament name and season already loaded by the page. The playoff payload has neither. */
+  meta?: string
 }>()
 const emit = defineEmits<{ saved: []; retry: []; 'show-table': [] }>()
 
@@ -91,7 +90,7 @@ const firstSlots = computed(() => Math.max(1, slotsOf(rounds.value[0]).length))
 const hasBronze = computed(() => rounds.value.some((round) => thirdPlaceSlots(slotsOf(round)).length > 0))
 const gridStyle = computed(() => ({
   gridTemplateColumns: gridColumns(rounds.value.length, compact.value, squeeze.value, stack.value),
-  gridTemplateRows: stack.value ? 'auto auto auto auto' : gridRows(firstSlots.value, compact.value),
+  gridTemplateRows: gridRows(firstSlots.value, compact.value),
 }))
 const showSwitcher = computed(() => tabMode.value && panels.value.length > 1)
 
@@ -236,14 +235,8 @@ function nextPreview(panel: BracketPanel) {
 const finalRound = computed(() => rounds.value[rounds.value.length - 1])
 const finalSlot = computed(() => linkSlots(slotsOf(finalRound.value))[0])
 const extraFinalSlots = computed(() => thirdPlaceSlots(slotsOf(finalRound.value)))
-const champion = computed(() => {
-  const slot = finalSlot.value
-  const side = slot ? winnerSide(slot) : null
-  const id = advancedTeamId(slot)
-  if (!slot || !side || !id) return null
-  const name = side === 'home' ? slot.homeTeamName : slot.awayTeamName
-  return { id, name: name || 'Команда' }
-})
+const champion = computed(() => championCard(finalSlot.value))
+const championMeta = computed(() => (props.meta || '').replace(/\s+/g, ' ').trim())
 
 function connectorTeams(roundIndex: number, slotIndex: number) {
   const sources = slotsOf(rounds.value[roundIndex])
@@ -377,12 +370,6 @@ async function save(slot: PlayoffSlot) {
   }
 }
 
-const champHeaderStyle = computed(() => championHeaderCell(rounds.value.length, stack.value))
-const champStyle = computed(() => championCell(rounds.value.length, firstSlots.value, stack.value))
-const finalLinkStyle = computed(() => ({
-  gridColumn: String(rounds.value.length * 2),
-  gridRow: `2 / span ${firstSlots.value}`,
-}))
 const semiRoundIndex = computed(() => Math.max(0, rounds.value.length - 2))
 const bronzeRows = computed(() => bronzeMatchRows(firstSlots.value, linkSlots(slotsOf(rounds.value[semiRoundIndex.value])).length || 2))
 const bronzeBoardStyle = computed(() => ({
@@ -394,7 +381,6 @@ type LinkSeg = { d: string; kind: string; ids: Array<string | null | undefined> 
 type PairPath = { upper: string; lower: string; exit: string }
 const linkPaths = ref<LinkSeg[][]>([])
 const measuredPairs = ref<Record<string, PairPath>>({})
-const measuredFinal = ref('M0 50 H100')
 
 function linkD(roundIndex: number, slotIndex: number, part: keyof PairPath) {
   const found = measuredPairs.value[`${roundIndex}-${slotIndex}`]
@@ -487,20 +473,7 @@ function measurePairGrid() {
       exit: `M50 ${yTarget} H100`,
     }
   }
-  const finalCell = grid.querySelector<HTMLElement>('.cellc.final-link')
-  let finalD = 'M0 50 H100'
-  if (finalCell) {
-    const box = finalCell.getBoundingClientRect()
-    const finalCard = grid.querySelector<HTMLElement>('.pc.final')
-    const champ = grid.querySelector<HTMLElement>('.champ-cell .champ')
-    if (box.height > 1 && finalCard && champ) {
-      const yFrom = yIn(box, finalCard)
-      const yTo = yIn(box, champ)
-      finalD = Math.abs(yFrom - yTo) < 1.5 ? `M0 ${yFrom} H100` : `M0 ${yFrom} H50 V${yTo} H100`
-    }
-  }
   if (JSON.stringify(measuredPairs.value) !== JSON.stringify(next)) measuredPairs.value = next
-  if (measuredFinal.value !== finalD) measuredFinal.value = finalD
 }
 
 function earlyStyle(roundIndex: number, slotIndex: number, slotCount: number) {
@@ -524,13 +497,6 @@ function finalPairStyle() {
   }
 }
 
-function championPairStyle() {
-  return {
-    gridColumn: bronzeRoundColumn(rounds.value.length - 1),
-    ...bronzeChampionCell(bronzeRows.value),
-  }
-}
-
 function bronzePairStyle() {
   return {
     gridColumn: bronzeRoundColumn(semiRoundIndex.value),
@@ -548,6 +514,25 @@ function bronzePairStyle() {
           Время московское (МСК) · наведите на команду — подсветится её путь · клик по карточке открывает матч
         </p>
       </div>
+
+      <section v-if="champion" class="champion" data-champion>
+        <RouterLink class="champion-team" :to="`/teams/${champion.teamId}`">
+          <TeamCrest :src="logo(champion.teamId)" :name="champion.teamName" :size="52" />
+          <span class="champion-copy">
+            <span class="champion-kicker">Чемпион</span>
+            <span class="champion-name">{{ champion.teamName }}</span>
+            <span v-if="championMeta" class="champion-meta">{{ championMeta }}</span>
+          </span>
+        </RouterLink>
+        <component
+          :is="champion.matchId ? RouterLink : 'div'"
+          class="champion-result"
+          :to="champion.matchId ? `/matches/${champion.matchId}` : undefined"
+        >
+          <span class="champion-score">{{ champion.score }}</span>
+          <span v-if="champion.penalties" class="champion-pens">{{ champion.penalties }}</span>
+        </component>
+      </section>
 
       <div v-if="loading" class="po-state" role="status" aria-busy="true" aria-label="Сетка загружается">
         <div v-if="viewport <= 720" class="seg sk-seg" aria-hidden="true"><span></span><span></span><span></span></div>
@@ -679,20 +664,7 @@ function bronzePairStyle() {
                 </ul>
               </div>
             </div>
-            <div v-if="panel.champion" class="champ-block">
-              <div v-if="champion" class="champ won">
-                <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
-                <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
-              </div>
-              <div v-else class="champ">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8" /></svg>
-                <div>
-                  <b>Чемпион</b>
-                  <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
-                </div>
-              </div>
-            </div>
-            <template v-else v-for="preview in [nextPreview(panel)]" :key="`${panel.key}-next`">
+            <template v-for="preview in [nextPreview(panel)]" :key="`${panel.key}-next`">
               <div v-if="preview" class="next-round">
                 <h4>Дальше · {{ preview.title }}</h4>
                 <div class="pair-stack">
@@ -812,19 +784,6 @@ function bronzePairStyle() {
                   @blur="clearLight"
                 />
               </div>
-              <div class="b-champ" :data-round="roundIndex" :style="championPairStyle()">
-                <div v-if="champion" class="champ won">
-                  <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
-                  <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
-                </div>
-                <div v-else class="champ">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8" /></svg>
-                  <div>
-                    <b>Чемпион</b>
-                    <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
-                  </div>
-                </div>
-              </div>
             </template>
           </template>
 
@@ -855,7 +814,6 @@ function bronzePairStyle() {
             <small v-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text">{{ roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).text }}</small>
             <span v-else-if="roundNote(columnSlots(slotsOf(round), roundIndex === rounds.length - 1)).live" class="st live">идёт</span>
           </h3>
-          <h3 class="rh" :style="champHeaderStyle">Чемпион</h3>
 
           <template v-for="(round, roundIndex) in rounds" :key="`c-${round.round ?? roundIndex}`">
             <div
@@ -907,28 +865,6 @@ function bronzePairStyle() {
             </div>
           </template>
 
-          <div v-if="rounds.length > 1" class="cellc final-link" :style="finalLinkStyle">
-            <svg class="cn" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <path
-                :class="[branchKind(finalSlot), { hl: pathLit([champion?.id]) }]"
-                :d="measuredFinal"
-              />
-            </svg>
-          </div>
-
-          <div class="cell champ-cell" :style="champStyle">
-            <div v-if="champion" class="champ won">
-              <TeamCrest :src="logo(champion.id)" :name="champion.name" :size="30" />
-              <div><b>{{ champion.name }}</b><span>Чемпион</span></div>
-            </div>
-            <div v-else class="champ">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3M12 14v4M8 20h8" /></svg>
-              <div>
-                <b>Чемпион</b>
-                <span>{{ championWhen(finalSlot) ? `определится ${championWhen(finalSlot)}` : 'определится позже' }}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       <p v-if="saveError" class="form-error">{{ saveError }}</p>
@@ -972,11 +908,75 @@ function bronzePairStyle() {
   row-gap: 0.45rem;
   align-items: stretch;
 }
-.b-slot, .b-champ { align-self: center; min-width: 0; }
+.b-slot { align-self: center; min-width: 0; }
 .b-link { align-self: stretch; min-width: 0; min-height: 0; }
 .b-link .cn { width: 100%; height: 100%; }
 .cellc { align-self: stretch; padding: 0; }
-.champ-cell { align-self: center; display: grid; gap: 0.7rem; }
+.champion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  min-height: 116px;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(0, 32, 91, 0.08);
+  border-radius: 22px;
+  background: #f7fbfe;
+  min-width: 0;
+}
+.champion-team {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1 1 auto;
+  color: inherit;
+  text-decoration: none;
+}
+.champion-copy { display: grid; gap: 2px; min-width: 0; }
+.champion-kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8b97a8;
+}
+.champion-name {
+  color: #001433;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+.champion-meta {
+  color: #5c6d82;
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.champion-result {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  flex: 0 0 auto;
+  color: #001433;
+  text-align: right;
+  text-decoration: none;
+}
+.champion-score {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.champion-pens {
+  color: #5c6d82;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
 .rh {
   display: flex;
   align-items: center;
@@ -1021,42 +1021,6 @@ function bronzePairStyle() {
 .cn path.on { stroke: var(--ice); }
 .cn path.pend { stroke-dasharray: 4 4; stroke: #b9c8d8; }
 .cn path.hl { stroke: var(--navy); stroke-width: 3; }
-.champ {
-  border: 1.5px dashed rgba(0, 32, 91, 0.35);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.6);
-  padding: 0.8rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 0.875rem;
-  min-width: 0;
-}
-.champ svg {
-  width: 30px;
-  height: 30px;
-  stroke: var(--navy);
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  flex: 0 0 auto;
-}
-.champ b {
-  display: block;
-  color: var(--ink);
-  font-size: 0.9375rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.champ span { font-size: 0.8125rem; font-weight: 600; }
-.champ.won {
-  border: 2px solid var(--navy);
-  background: #fff;
-  color: var(--ink);
-}
 .po-board.compact :deep(.pr) {
   height: auto;
   min-height: 34px;
@@ -1132,7 +1096,6 @@ function bronzePairStyle() {
   font-weight: 600;
 }
 .how b { color: var(--ink); }
-.champ-block { margin-top: 0.9rem; }
 .next-round {
   margin-top: 0.9rem;
   padding-top: 0.85rem;
@@ -1167,6 +1130,20 @@ function bronzePairStyle() {
 .msg.err svg { stroke: var(--danger); }
 .msg b { font-size: 1.0625rem; color: var(--navy); }
 .msg p { margin: 0; font-size: 0.875rem; color: var(--muted); font-weight: 600; max-width: 30ch; }
+@media (max-width: 719px) {
+  .champion {
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 156px;
+    padding: 14px 16px;
+  }
+  .champion-result {
+    justify-items: start;
+    text-align: left;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0, 32, 91, 0.08);
+  }
+}
 .po-action {
   margin-top: 0.4rem;
   padding: 0.6rem 1.2rem;

@@ -397,6 +397,13 @@ watch(() => [route.fullPath, tournament.value?.name, missing.value] as const, ()
   publishTournamentTitle(tournament.value.name, String(route.params.id || ''))
 })
 const matchesCount = computed(() => overview.value?.matchesCount ?? matches.value.length)
+const championMeta = computed(() => {
+  const name = String(tournament.value?.name || overview.value?.name || '').trim()
+  const seasonLabel = String(overview.value?.seasonLabel || tournament.value?.seasonLabel || '').trim()
+  const year = overview.value?.seasonYear ?? tournament.value?.seasonYear
+  const season = seasonLabel || (typeof year === 'number' && year > 0 ? `Сезон ${year}` : '')
+  return [name, season].filter(Boolean).join(' · ')
+})
 const heroFacts = computed(() => {
   const seasonLabel = String(overview.value?.seasonLabel || tournament.value?.seasonLabel || '').trim()
   const seasonYear = overview.value?.seasonYear ?? tournament.value?.seasonYear
@@ -742,6 +749,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       role="tabpanel"
       :tournament-id="tournament.id"
       :rounds="playoff?.rounds ?? []"
+      :meta="championMeta"
       :loading="playoffLoading"
       :error="playoffError"
       :editable="auth.canManageLeague && playoff?.competitionStage === 'PLAYOFF'"

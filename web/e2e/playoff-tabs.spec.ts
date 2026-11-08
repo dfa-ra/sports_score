@@ -116,7 +116,7 @@ async function expectRoundTabs(page: Page, teams: number) {
 async function expectFullGrid(page: Page, teams: number) {
   await expect(rounds(page)).toHaveCount(0)
   const headers = page.locator('.po-grid h3.rh')
-  const expected = [...roundTitles[teams], 'Чемпион']
+  const expected = [...roundTitles[teams]]
   await expect(headers).toHaveCount(expected.length)
   for (let index = 0; index < expected.length; index += 1) {
     await expect(headers.nth(index)).toContainText(expected[index])

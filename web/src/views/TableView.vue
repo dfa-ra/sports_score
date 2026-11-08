@@ -52,6 +52,15 @@ const hasPlayoff = computed(() => {
   return (playoff.value?.rounds?.length ?? 0) > 0
 })
 
+const championMeta = computed(() => {
+  const current = tournament.value
+  if (!current) return ''
+  const name = String(current.name || '').trim()
+  const seasonLabel = String(current.seasonLabel || '').trim()
+  const year = current.seasonYear
+  const season = seasonLabel || (typeof year === 'number' && year > 0 ? `Сезон ${year}` : '')
+  return [name, season].filter(Boolean).join(' · ')
+})
 const headingName = computed(() => {
   const picked = tournaments.value.find((item) => item.id === tournamentId.value)
   if (picked?.name) return picked.name
@@ -362,6 +371,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <PlayoffBracket
         :tournament-id="tournamentId"
         :rounds="playoff?.rounds ?? []"
+        :meta="championMeta"
         :loading="false"
         :error="playoffError"
         @retry="load()"

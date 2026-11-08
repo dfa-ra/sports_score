@@ -3,6 +3,7 @@ import test from 'node:test'
 import { matchCardStage, protocolStage } from '../src/lib/playoffLabel.ts'
 import {
   arrivalLine,
+  championCard,
   bracketIsEmpty,
   bracketPanels,
   bronzeBoardColumns,
@@ -46,10 +47,10 @@ test('round tabs follow team count and width', () => {
   assert.equal(useRoundTabs(16, 1180), true)
   assert.equal(useRoundTabs(16, 1181), false)
   assert.equal(useRoundTabs(16, 1440), false)
-  const fiveColumns = gridMinWidth(4, true)
-  assert.equal(fiveColumns, 220 + 3 * 150 + 4 * 22 + 168)
-  assert.equal(useRoundTabs(16, 1440, fiveColumns - 1), true)
-  assert.equal(useRoundTabs(16, 1440, fiveColumns), false)
+  const boardWidth = gridMinWidth(4, true)
+  assert.equal(boardWidth, 220 + 3 * 150 + 3 * 22)
+  assert.equal(useRoundTabs(16, 1440, boardWidth - 1), true)
+  assert.equal(useRoundTabs(16, 1440, boardWidth), false)
   assert.equal(useRoundTabs(16, 1440, 0), false)
   assert.equal(useRoundTabs(8, 900, 400), false)
   assert.equal(useRoundTabs(4, 1000, 200), false)
@@ -81,7 +82,8 @@ test('a two-team final stacks the champion under the match on a phone', () => {
   assert.equal(stackChampion(2, 375), false)
   assert.equal(stackChampion(4, 375), false)
   assert.equal(gridColumns(1, false, false, true), 'minmax(0, 1fr)')
-  assert.equal(gridColumns(1, false, false, false), 'minmax(0, 238px) minmax(160px, 1fr)')
+  assert.equal(gridColumns(1, false, false, false), 'minmax(0, 238px)')
+  assert.equal(gridColumns(3, false, false).endsWith('1fr'), false)
   assert.equal(gridColumns(3, true, false).includes('214px'), true)
   assert.deepEqual(championHeaderCell(1, true), { gridColumn: '1', gridRow: '3' })
   assert.deepEqual(championCell(1, 1, true), { gridColumn: '1', gridRow: '4' })
@@ -217,4 +219,44 @@ test('third-place slot is not a final column or a bracket link', () => {
     { title: '1/2 финала', slots: [{}] },
     { title: 'Финал', slots: [{ kind: 'MAIN' }] },
   ]).map((panel) => panel.tab), ['1/2', 'Финал'])
+})
+
+test('champion card uses only a decided final and keeps every slot', () => {
+  const rounds = [
+    { title: '1/2 финала', slots: [{ id: 's1', slotIndex: 0 }, { id: 's2', slotIndex: 1 }] },
+    {
+      title: 'Финал',
+      slots: [{
+        id: 'final',
+        slotIndex: 0,
+        matchId: 'match-final',
+        matchStatus: 'FINISHED',
+        homeTeamId: 'home',
+        homeTeamName: '  Факультет   журналистики  ',
+        awayTeamId: 'away',
+        awayTeamName: 'Экономика',
+        homeScore: 0,
+        awayScore: 0,
+        penaltyHome: 5,
+        penaltyAway: 3,
+      }],
+    },
+  ]
+  const slots = rounds.reduce((sum, round) => sum + (round.slots?.length ?? 0), 0)
+  assert.equal(slots, 3)
+  assert.equal(bracketPanels(rounds).length, 2)
+  assert.deepEqual(championCard(rounds[1].slots[0]), {
+    teamId: 'home',
+    teamName: 'Факультет журналистики',
+    matchId: 'match-final',
+    score: '0 : 0',
+    penalties: 'пен. 5 : 3',
+  })
+  assert.equal(championCard({ matchStatus: 'FINISHED', homeScore: 1, awayScore: 0, homeTeamId: 'a', homeTeamName: 'Альфа', awayTeamId: 'b', awayTeamName: 'Бета' })?.score, '1 : 0')
+  assert.equal(championCard({ matchStatus: 'FINISHED', homeScore: 1, awayScore: 0, homeTeamId: 'a', homeTeamName: 'Альфа', awayTeamId: 'b', awayTeamName: 'Бета' })?.penalties, null)
+  assert.equal(championCard({ matchStatus: 'FINISHED', homeScore: 1, awayScore: 1, homeTeamId: 'a', awayTeamId: 'b', homeTeamName: 'Альфа', awayTeamName: 'Бета' }), null)
+  assert.equal(championCard({ matchStatus: 'SCHEDULED', homeScore: 0, awayScore: 0, homeTeamId: 'a', awayTeamId: 'b', homeTeamName: 'Альфа', awayTeamName: 'Бета' }), null)
+  assert.equal(championCard({ matchStatus: 'LIVE', homeScore: 1, awayScore: 0, homeTeamId: 'a', awayTeamId: 'b', homeTeamName: 'Альфа', awayTeamName: 'Бета' }), null)
+  assert.equal(championCard({ matchStatus: 'FINISHED', homeScore: 2, awayScore: 1, homeTeamId: 'a', awayTeamName: 'Бета' }), null)
+  assert.equal(slots, 3)
 })
