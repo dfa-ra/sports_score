@@ -899,7 +899,6 @@ onUnmounted(() => {
               @click="action('next-period')"
             >Следующий тайм</button>
           </div>
-          <p class="hint">Доступные действия зависят от статуса</p>
           <p v-if="expired && live" class="form-ok">Время тайма вышло.</p>
           <p v-if="flowMessage" class="form-ok">{{ flowMessage }}</p>
           <p v-if="flowError" class="form-error">{{ flowError }}</p>
@@ -967,7 +966,7 @@ onUnmounted(() => {
         <aside class="side">
           <section class="panel block">
             <h2>Вратари</h2>
-            <p class="hint">Нажмите, кто стоял в воротах. Другой выбор заменяет первый. Если никого не нажать, останется вратарь из состава.</p>
+            <p class="hint">Выберите вратаря каждой команды</p>
             <div class="keeper">
               <h3>{{ homeLabel }}</h3>
               <p v-if="!keeperChoices(match.homeTeamId).length" class="hint">В составе никого.</p>
