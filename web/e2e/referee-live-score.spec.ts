@@ -248,7 +248,7 @@ test('referee pad applies its own goal and void without a reload', async ({ page
     page.goto(`/referee/matches/${matchId}`),
   ])
   await expect(page.locator('.scoreboard .score')).toHaveText('0 : 0')
-  await expect(viewer.locator('.board .score')).toHaveText(/0\s*-\s*0/)
+  await expect(viewer.locator('.pitch-score .nums b')).toHaveText('0 : 0')
   await socketReady
 
   const sheet = page.getByRole('dialog')
@@ -256,7 +256,7 @@ test('referee pad applies its own goal and void without a reload', async ({ page
   await sheet.getByRole('button', { name: 'Север' }).click()
   await sheet.getByRole('button', { name: '#9 Иванов Иван' }).click()
   await sheet.getByRole('button', { name: 'Без передачи' }).click()
-  await expect(page.getByRole('button', { name: 'Гол', exact: true })).toBeDisabled()
+  await expect(page.locator('button.goal')).toBeDisabled()
   expect(counts.goals).toBe(1)
   gates.goal.resolve()
 
@@ -264,8 +264,8 @@ test('referee pad applies its own goal and void without a reload', async ({ page
   await expect(page.locator('.proto').filter({ hasText: 'Гол' })).toBeVisible()
   await expect(page.locator('.proto').filter({ hasText: 'Иванов' })).toBeVisible()
   expect(counts.goals).toBe(1)
-  await expect(viewer.locator('.board .score')).toHaveText(/1\s*-\s*0/)
-  await expect(viewer.locator('.sheet')).toContainText('Иванов')
+  await expect(viewer.locator('.pitch-score .nums b')).toHaveText('1 : 0')
+  await expect(viewer.locator('.events')).toContainText('Иванов')
 
   page.on('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Убрать' }).click()
@@ -277,7 +277,7 @@ test('referee pad applies its own goal and void without a reload', async ({ page
   await expect(page.getByRole('button', { name: 'Убрать' })).toHaveCount(0)
   await expect(page.locator('.proto.voided')).toContainText('Гол')
   expect(counts.voids).toBe(1)
-  await expect(viewer.locator('.board .score')).toHaveText(/0\s*-\s*0/)
-  await expect(viewer.locator('.sheet')).not.toContainText('Иванов')
-  await expect(viewer.locator('.empty-line')).toHaveText('Событий пока нет')
+  await expect(viewer.locator('.pitch-score .nums b')).toHaveText('0 : 0')
+  await expect(viewer.locator('.events')).not.toContainText('Иванов')
+  await expect(viewer.locator('.empty-events')).toHaveText('Событий пока нет')
 })

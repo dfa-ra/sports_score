@@ -2,53 +2,136 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
-import KickoffWhen from '../../components/KickoffWhen.vue'
-import { useTeamDirectory } from '../../lib/useTeamDirectory'
-import EmptyState from '../../components/EmptyState.vue'
 import MatchStageNote from '../../components/MatchStageNote.vue'
-import StatusBadge from '../../components/StatusBadge.vue'
-import { refereeBoardScore } from '../../lib/match'
+import { refereeListGroups, refereeListScore, refereeListWhen, refereePenaltyCaption } from '../../lib/refereePad'
+import { useTeamDirectory } from '../../lib/useTeamDirectory'
 
 const matches = ref<any[]>([])
 const teams = useTeamDirectory()
+const loading = ref(true)
+const error = ref(false)
+const groups = computed(() => refereeListGroups(matches.value))
 
-const ordered = computed(() =>
-  [...matches.value].sort((a, b) => {
-    const rank = (status: string) => (status === 'LIVE' || status === 'PAUSED' ? 0 : status === 'SCHEDULED' ? 1 : 2)
-    const byStatus = rank(a.status) - rank(b.status)
-    if (byStatus !== 0) return byStatus
-    return String(a.scheduledAt || '').localeCompare(String(b.scheduledAt || ''))
-  }),
-)
+function teamName(id?: string | null, fallback?: string | null) {
+  const known = id ? teams.fullName(id, '') : ''
+  if (known && known !== 'Команда') return known
+  return fallback || known || 'Команда'
+}
 
-onMounted(async () => {
-  await teams.load()
-  const { data } = await api.get('/referee/matches')
-  matches.value = data
-})
+async function load() {
+  error.value = false
+  try {
+    await teams.load()
+    const { data } = await api.get('/referee/matches')
+    matches.value = Array.isArray(data) ? data : []
+  } catch {
+    error.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
 </script>
 
 <template>
-  <section class="stack">
-    <div class="page-title">
-      <p class="eyebrow">Пульт</p>
-      <h1>Выберите матч</h1>
+  <section class="referee">
+    <header class="hero">
+      <h1>Пульт судьи</h1>
+      <p>Выберите матч для ведения протокола</p>
+    </header>
+
+    <div v-if="loading && !matches.length" class="sheet boot" role="status" aria-busy="true" aria-label="Загрузка матчей">
+      <span class="skeleton bar"></span>
+      <span class="skeleton bar short"></span>
     </div>
-    <EmptyState v-if="!ordered.length" title="Нет назначений" />
-    <div v-else class="grid cards">
-      <RouterLink v-for="m in ordered" :key="m.id" class="panel card-link" :to="`/referee/matches/${m.id}`">
-        <MatchStageNote :match="m" />
-        <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
-        <div class="versus">{{ teams.fullName(m.homeTeamId) }} — {{ teams.fullName(m.awayTeamId) }}</div>
-        <div class="score">{{ refereeBoardScore(m) }}</div>
-        <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" :minute="m.minute" align="start" />
-      </RouterLink>
+    <div v-else-if="error && !matches.length" class="sheet state">
+      <strong>Не удалось загрузить матчи</strong>
+      <p>Уже показанные матчи сохраняются при повторе</p>
+      <button class="btn" type="button" @click="load">Повторить</button>
+    </div>
+    <div v-else-if="!groups.length" class="sheet state">
+      <strong>Нет назначенных матчей</strong>
+      <p>Новые назначения появятся здесь</p>
+    </div>
+    <div v-else class="sheet">
+      <p v-if="error" class="retry">
+        Не удалось загрузить матчи
+        <button class="btn" type="button" @click="load">Повторить</button>
+      </p>
+      <section v-for="group in groups" :key="group.id" class="group">
+        <h2>{{ group.title }}</h2>
+        <RouterLink
+          v-for="match in group.rows"
+          :key="match.id"
+          class="row"
+          :to="`/referee/matches/${match.id}`"
+        >
+          <span class="who">
+            <strong>{{ teamName(match.homeTeamId, match.homeTeamName) }} – {{ teamName(match.awayTeamId, match.awayTeamName) }}</strong>
+            <MatchStageNote :match="match" />
+            <small>{{ refereeListWhen(match) }}</small>
+            <small v-if="refereePenaltyCaption(match)" class="pens">{{ refereePenaltyCaption(match) }}</small>
+          </span>
+          <span class="score">{{ refereeListScore(match) }}</span>
+        </RouterLink>
+      </section>
     </div>
   </section>
 </template>
 
 <style scoped>
-.card-link { display: grid; gap: 0.45rem; }
-.versus { font-weight: 750; color: var(--text-strong); }
-.score { font-weight: 800; color: var(--navy); font-size: 1.2rem; }
+.referee { min-width: 0; max-width: 100%; display: grid; gap: 16px; }
+.hero {
+  background: #001433;
+  color: #fff;
+  border-radius: 22px;
+  padding: 1.15rem 1.2rem 1.2rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.hero h1 { margin: 0; color: #fff; font-size: clamp(1.6rem, 4vw, 2rem); }
+.hero p { margin: 0; color: #d5e6f5; }
+.sheet {
+  background: #fff;
+  border-radius: 22px;
+  min-width: 0;
+  padding: 0.35rem 0 0.6rem;
+}
+.boot { display: grid; gap: 0.7rem; padding: 1rem; }
+.bar { display: block; height: 16px; border-radius: 8px; }
+.bar.short { width: 58%; }
+.state { display: grid; justify-items: start; gap: 0.45rem; padding: 1.1rem 1rem 1.2rem; }
+.state strong { color: #001433; font-size: 1.05rem; }
+.group h2 {
+  margin: 0;
+  padding: 0.85rem 1rem 0.2rem;
+  color: #8b97a8;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid rgba(0, 32, 91, 0.08);
+  color: inherit;
+  text-decoration: none;
+  min-height: 44px;
+}
+.row:hover { text-decoration: none; background: #f7fbfe; }
+.who { display: grid; gap: 0.15rem; min-width: 0; }
+.who strong { color: #001433; font-size: 1rem; overflow-wrap: anywhere; }
+.who small { color: #5c6d82; overflow-wrap: anywhere; }
+.score {
+  color: #001433;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pens { color: #5c6d82; }
+.retry { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0; padding: 0.8rem 1rem 0; }
+.referee :focus-visible { outline: 2px solid #4cb4e5; outline-offset: 2px; }
 </style>

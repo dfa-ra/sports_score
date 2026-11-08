@@ -159,7 +159,7 @@ onMounted(() => {
           <option v-for="person in bothOptions" :key="person.id" :value="person.id">{{ title(person) }}</option>
         </select>
       </label>
-      <button class="btn assign-btn" type="submit" :disabled="pending || !bothId">Назначить</button>
+      <button class="btn assign-btn" type="submit" :disabled="pending || !bothId || (directoryReady && !analysts.length && !bothId)">Назначить</button>
     </form>
 
     <template v-else>
@@ -185,7 +185,7 @@ onMounted(() => {
       </form>
     </template>
 
-    <p v-if="directoryReady && !analysts.length" class="muted">Сначала поставьте кому-то роль аналитика в админке.</p>
+    <p v-if="directoryReady && !analysts.length" class="muted">Нет доступных аналитиков</p>
     <button
       v-if="assignment?.mode"
       class="btn secondary assign-btn"

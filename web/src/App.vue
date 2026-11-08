@@ -102,6 +102,12 @@ watch(compact, () => {
   closeMenus()
 })
 
+const pageFrame = computed(() => {
+  if (route.path === '/') return 'home-bleed'
+  if (route.path === '/referee' || route.path.startsWith('/referee/')) return 'referee-frame rise'
+  return 'container rise'
+})
+
 const q2Chrome = computed(() => {
   const name = String(route.name || '')
   return name === 'tournaments' || name === 'players' || name === 'login'
@@ -197,7 +203,7 @@ const stickyChrome = computed(() => {
       </div>
     </header>
     <main class="main" :class="{ flush: route.path === '/' }">
-      <div :class="route.path === '/' ? 'home-bleed' : 'container rise'">
+      <div :class="pageFrame">
         <RouterView />
       </div>
     </main>
@@ -368,6 +374,17 @@ const stickyChrome = computed(() => {
   color: #fff;
   font-weight: 800;
   box-shadow: inset 4px 0 0 #4cb4e5;
+}
+.referee-frame {
+  width: min(1260px, calc(100% - 48px));
+  margin: 0 auto;
+  min-width: 0;
+}
+@media (min-width: 1440px) {
+  .referee-frame { width: min(1260px, calc(100% - 180px)); }
+}
+@media (max-width: 719px) {
+  .referee-frame { width: min(1260px, calc(100% - 28px)); }
 }
 .main { padding: 1.4rem 0 2.4rem; }
 .main.flush { padding: 0 0 2.4rem; }
