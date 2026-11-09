@@ -444,7 +444,7 @@ const stickyChrome = computed(() => {
   .referee-frame { width: min(1260px, calc(100% - 28px)); }
 }
 .main { padding: var(--main-pad-top) 0 var(--main-pad-bottom); }
-.main.flush { padding: 0 0 var(--main-pad-bottom); }
+.main.flush { padding: 0 0 var(--main-pad-bottom); min-height: 100vh; }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
 .foot-inner {
   display: flex;
