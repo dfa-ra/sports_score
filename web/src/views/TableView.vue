@@ -605,7 +605,6 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 @media (max-width: 720px) {
   .stat-table .num { width: 4.15rem; }
 }
-.pass-col { text-transform: none; }
 .pass-wide { display: none; }
 @media (min-width: 721px) {
   .pass-short { display: none; }

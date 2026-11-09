@@ -71,7 +71,7 @@ export const roleLabel: Record<string, string> = {
 
 export const eventLabel: Record<string, string> = {
   GOAL: 'Гол',
-  ASSIST: 'Голевая',
+  ASSIST: 'Передача',
   YELLOW_CARD: 'Жёлтая',
   RED_CARD: 'Красная',
   SUBSTITUTION: 'Замена',

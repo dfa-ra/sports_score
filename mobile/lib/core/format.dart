@@ -206,7 +206,7 @@ String recentGameLine({
 const eventLabels = {
   'GOAL': 'Гол',
   'OWN_GOAL': 'Автогол',
-  'ASSIST': 'Голевая',
+  'ASSIST': 'Передача',
   'YELLOW_CARD': 'Жёлтая',
   'RED_CARD': 'Красная',
   'SUBSTITUTION': 'Замена',

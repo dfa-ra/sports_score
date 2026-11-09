@@ -303,9 +303,9 @@ test('table passes tab keeps the designer copy and the existing column width', a
         transform: getComputedStyle(el).textTransform,
       }
     })
-    expect(facts.text).toBe(width === 375 ? 'Пер.' : 'Передачи')
+    expect(facts.text).toBe(width === 375 ? 'ПЕР.' : 'ПЕРЕДАЧИ')
     expect(facts.clipped).toBe(false)
-    expect(facts.transform).toBe('none')
+    expect(facts.transform).toBe('uppercase')
     const px = Number.parseFloat(facts.width)
     expect(Math.abs(px - (width === 375 ? 66.4 : 76.8))).toBeLessThan(0.2)
   }
