@@ -1,0 +1,74 @@
+name: Flyway V46 check
+
+on:
+  push:
+    branches:
+      - cursor/prod-backup-v0265-206b
+    paths:
+      - .github/workflows/flyway-v46-check.yml
+      - scripts/flyway_v46_check.sh
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Read Flyway V46
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SSH secrets
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+        run: |
+          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_USER}" ] || { [ -z "${SSH_KEY}" ] && [ -z "${SSH_KEY_BASE64}" ]; }; then
+            echo "PROD SSH secrets are empty — check cannot run."
+            exit 1
+          fi
+          echo "PROD SSH secrets are present."
+
+      - name: Prepare SSH key
+        env:
+          DEV_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          DEV_SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY="$HOME/.ssh/stand_deploy"
+          python3 deploy/normalize_ssh_key.py "$KEY"
+          ssh-keygen -y -P "" -f "$KEY" >/dev/null
+          echo "Private key accepted."
+          ssh-keygen -lf "$KEY"
+
+      - name: Trust stand host
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT || '22' }}
+        run: |
+          if [ -n "${SSH_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${SSH_KNOWN_HOSTS}" | sed 's/\r$//' > ~/.ssh/known_hosts
+          else
+            echo "SSH_KNOWN_HOSTS is empty — falling back to ssh-keyscan (TOFU)."
+            ssh-keyscan -p "${SSH_PORT}" -T 10 "${SSH_HOST}" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Read Flyway history
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT || '22' }}
+        run: |
+          KEY="$HOME/.ssh/stand_deploy"
+          REMOTE="${SSH_USER}@${SSH_HOST}"
+          SSH=(ssh -i "$KEY" -p "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes -o TCPKeepAlive=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          SCP=(scp -i "$KEY" -P "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes -o TCPKeepAlive=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          "${SCP[@]}" scripts/flyway_v46_check.sh "${REMOTE}:/tmp/flyway_v46_check.sh"
+          "${SSH[@]}" "${REMOTE}" "chmod 700 /tmp/flyway_v46_check.sh && bash /tmp/flyway_v46_check.sh; rc=\$?; rm -f /tmp/flyway_v46_check.sh; exit \$rc"
