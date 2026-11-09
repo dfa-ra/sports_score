@@ -148,22 +148,6 @@ function cardMatches(tournament: HomeTournament) {
   return runningCardMatches(tournament, liveRows.value)
 }
 
-function matchSlot(tournament: HomeTournament, index: number) {
-  return cardMatches(tournament)[index] ?? null
-}
-
-function missingSlotLabel(tournament: HomeTournament, index: number) {
-  const matches = cardMatches(tournament)
-  if (matches[index]) return ''
-  if (tournament.status === 'REGISTRATION') {
-    return index === 0 ? 'Матчи появятся после старта турнира' : registrationEmpty(tournament)
-  }
-  if (!matches.length) return index === 0 ? 'Матчей пока нет' : 'Ближайший матч не назначен'
-  const only = matches[0]
-  if (only?.status === 'FINISHED' || only?.status === 'CANCELLED') return 'Ближайший матч не назначен'
-  return 'Прошедшего матча нет'
-}
-
 function statsLink(tournamentId?: string, full = false) {
   return { path: '/table', query: tableRouteQuery({ tournamentId, tab: 'scorers', listAll: full }) }
 }
@@ -487,7 +471,7 @@ onUnmounted(() => {
             <div class="a"><span class="crest sk-crest"></span><span class="n">Юристы</span></div>
             <div class="stc"><span class="st done">Завершён</span></div>
           </div>
-          <div class="irow slim">
+          <div class="irow">
             <div class="mtime"><b>12 дек</b><span>17:00</span></div>
             <div class="h"><span class="n">Физтех</span><span class="crest sk-crest"></span></div>
             <div class="sc dim"><span class="line"><span>–</span><span class="sep">:</span><span>–</span></span></div>
@@ -496,7 +480,6 @@ onUnmounted(() => {
           </div>
         </article>
       </div>
-      <div v-if="!loaded" class="hv-btn dark running-more" aria-hidden="true">Все турниры</div>
       <div v-else-if="failed" class="card block-error" role="alert">
         <p>Турниры не загрузились</p>
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
@@ -535,39 +518,29 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="tc-label">{{ tournament.status === 'REGISTRATION' ? 'Матчи' : 'Последний и ближайший матчи' }}</div>
-          <template v-for="(match, index) in [matchSlot(tournament, 0), matchSlot(tournament, 1)]" :key="`${tournament.id}-${index}`">
-            <RouterLink v-if="match" class="irow" :class="{ slim: index === 1 }" :to="`/matches/${match.id}`">
-              <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
-              <div class="h"><span class="n">{{ match.homeTeamName }}</span><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
-              <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
-                <span class="line">
-                  <span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span>
-                  <small v-if="index === 1 && match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
-                </span>
-                <small v-if="index === 0 && match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
-                <small v-else-if="index === 0" class="pen-hold" aria-hidden="true">пен. 0:0</small>
-              </div>
-              <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
-              <div class="stc"><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
-            </RouterLink>
-            <div v-else class="irow miss" :class="{ slim: index === 1 }">
-              <template v-if="index === 0">
-                <div class="mtime" aria-hidden="true"><b>5 дек</b><span>17:00</span></div>
-                <div class="h" aria-hidden="true"><span class="n">Команда</span><span class="crest sk-crest"></span></div>
-                <div class="sc" aria-hidden="true"><span class="line"><span>1</span><span class="sep">:</span><span>0</span></span><small class="pen-hold">пен. 0:0</small></div>
-                <div class="a" aria-hidden="true"><span class="crest sk-crest"></span><span class="n">Команда</span></div>
-                <div class="stc" aria-hidden="true"><span class="st done">Завершён</span></div>
-              </template>
-              <template v-else>
-                <div class="mtime" aria-hidden="true"><b>12 дек</b><span>17:00</span></div>
-                <div class="h" aria-hidden="true"><span class="n">Физтех</span><span class="crest sk-crest"></span></div>
-                <div class="sc" aria-hidden="true"><span class="line"><span>–</span><span class="sep">:</span><span>–</span></span></div>
-                <div class="a" aria-hidden="true"><span class="crest sk-crest"></span><span class="n">Юристы</span></div>
-                <div class="stc" aria-hidden="true"><span class="st soon">Скоро</span></div>
-              </template>
-              <p class="miss-label">{{ missingSlotLabel(tournament, index) }}</p>
+          <div v-if="!cardMatches(tournament).length" class="empty-note">
+            <template v-if="tournament.status === 'REGISTRATION'">
+              Матчи появятся после старта турнира.<br />
+              <span>{{ registrationEmpty(tournament) }}</span>
+            </template>
+            <template v-else>Матчей пока нет</template>
+          </div>
+          <RouterLink
+            v-for="match in cardMatches(tournament)"
+            :key="match.id"
+            class="irow"
+            :to="`/matches/${match.id}`"
+          >
+            <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
+            <div class="h"><span class="n">{{ match.homeTeamName }}</span><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
+            <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
+              <span class="line"><span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span></span>
+              <small v-if="match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
+              <small v-else-if="match.status === 'FINISHED'" class="pen-hold" aria-hidden="true">пен. 0:0</small>
             </div>
-          </template>
+            <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+            <div class="stc"><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
+          </RouterLink>
         </article>
       </div>
       <RouterLink
@@ -898,7 +871,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   hyphens: manual;
   font-size: clamp(0.95rem, 28cqi, 1em);
   line-height: 1.25;
-  min-height: 0;
+  min-height: calc(2 * 1.25em);
 }
 .mscore { display: grid; gap: 0.35rem; text-align: right; font-weight: 800; color: var(--ink); font-size: 1.125rem; }
 .mscore b { height: 28px; line-height: 28px; }
@@ -955,9 +928,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   font-size: 1.0625rem;
   margin-top: 0.45rem;
   line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .tcard .tb {
   max-width: 100%;
@@ -984,9 +959,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .lead div span {
   font-size: 0.8125rem;
   font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .crest.plus, .plus {
   width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
@@ -1011,36 +988,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
 .irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
-.irow.slim {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  min-height: 2.25rem;
-  padding: 0.3rem 1.2rem;
-}
-.irow.slim .h,
-.irow.slim .a { flex: 1 1 0; min-width: 0; }
-.irow.slim .mtime,
-.irow.slim .sc,
-.irow.slim .stc { flex: 0 0 auto; }
-.irow.slim .sc { flex-direction: row; gap: 0.35rem; }
-.irow.slim .n { min-height: calc(2 * 1.25em); }
-.irow.miss { position: relative; }
-.irow.miss > :not(.miss-label) { visibility: hidden; }
-.irow.miss .miss-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0;
-  padding: 0 1.2rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-align: center;
-}
-.irow.slim.miss { justify-content: center; }
 .stbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
 .stbl tbody tr { height: 56px; }
@@ -1160,6 +1107,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .irow .stc { justify-content: flex-start; }
   .tb { white-space: normal; }
   .tcard .tb { white-space: nowrap; }
+  .tc-top h3 { min-height: calc(2 * 1.25 * 1.0625rem); }
+  .lead div span { min-height: calc(2 * 1.3 * 0.8125rem); }
   .tc-meta span + span::before { display: none; }
   .stats { padding: 0.8rem 0.35rem 1rem; }
   .stat { padding-inline: 0.28rem; }
@@ -1193,12 +1142,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @container home (max-width: 960px) {
   .tgrid { grid-template-columns: 1fr; }
-}
-@media (max-width: 360px) {
-  .irow .n { font-size: 0.8125rem; }
-}
-@container home (max-width: 360px) {
-  .irow .n { font-size: 0.8125rem; }
 }
 @media (max-width: 480px) {
   .vs { gap: 0.35rem; }
