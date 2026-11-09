@@ -66,6 +66,22 @@ function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
 }
 
+const catalogExtra: Record<string, Record<string, unknown>> = {
+  liga: { teamsCount: 12, stage: 'GROUPS', progress: 0.4, roundTitle: 'Групповой этап · тур 2 из 5', liveCount: 0 },
+  cup: { teamsCount: 8, stage: 'PLAYOFF', progress: 0.25, roundTitle: '1/4 финала', liveCount: 1 },
+  autumn: { teamsCount: 6, stage: 'GROUPS', progress: 0.5, roundTitle: null, liveCount: 0 },
+  signup: { teamsCount: 3, stage: 'GROUPS', progress: null, roundTitle: null, liveCount: 0 },
+  'old-cup': { teamsCount: 4, stage: 'PLAYOFF', progress: null, roundTitle: 'Финал', liveCount: 0, winnerName: 'Журналистика', winnerTeamId: 'zh' },
+  'old-rr': { teamsCount: 4, stage: 'GROUPS', progress: null, roundTitle: null, liveCount: 0, winnerName: 'Физтех', winnerTeamId: 'ft' },
+  'open-final': { teamsCount: 4, stage: 'PLAYOFF', progress: null, roundTitle: 'Финал', liveCount: 0, winnerName: '', winnerTeamId: '' },
+}
+
+function catalogOf(source: typeof tours) {
+  return source
+    .filter((item) => item.status === 'ACTIVE' || item.status === 'REGISTRATION' || item.status === 'FINISHED')
+    .map((item) => ({ ...item, ...(catalogExtra[item.id] || { teamsCount: 0, liveCount: 0 }) }))
+}
+
 function finalSlot(status: string, home: string, away: string, homeScore: number | null, awayScore: number | null) {
   return {
     title: 'Финал',
@@ -122,6 +138,13 @@ test('tournaments hybrid keeps hero totals, registration copy, and real winners'
     const url = new URL(route.request().url())
     const path = url.pathname
     if (path === '/api/v1/auth/me' || path === '/api/v1/auth/refresh') return json(route, { message: 'no' }, 401)
+    if (path === '/api/v1/tournaments/catalog') {
+      if (listMode === 'hold') await hold
+      if (listMode === 'fail') return json(route, { message: 'down' }, 500)
+      if (listMode === 'empty') return json(route, [])
+      const source = listMode === 'active' ? tours.filter((item) => item.status === 'ACTIVE') : tours
+      return json(route, catalogOf(source))
+    }
     if (path === '/api/v1/tournaments') {
       if (listMode === 'hold') await hold
       if (listMode === 'fail') return json(route, { message: 'down' }, 500)

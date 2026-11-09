@@ -6,12 +6,25 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface TournamentTeamRepository extends JpaRepository<TournamentTeam, UUID> {
     List<TournamentTeam> findByTournamentId(UUID tournamentId);
+    List<TournamentTeam> findByTournamentIdIn(Collection<UUID> tournamentIds);
+
+    @Query("""
+            select entry.tournamentId, count(entry)
+            from TournamentTeam entry
+            where entry.tournamentId in :ids and entry.status <> :status
+            group by entry.tournamentId
+            """)
+    List<Object[]> countByTournamentIdInAndStatusNot(
+            @Param("ids") Collection<UUID> ids,
+            @Param("status") TournamentTeamStatus status
+    );
     long countByTournamentIdAndStatusNot(UUID tournamentId, TournamentTeamStatus status);
     Optional<TournamentTeam> findByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);
     boolean existsByTournamentIdAndTeamId(UUID tournamentId, UUID teamId);

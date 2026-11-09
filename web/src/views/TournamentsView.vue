@@ -12,18 +12,12 @@ import { setPageMeta } from '../lib/pageMeta'
 import {
   assembleTour,
   compareTours,
-  countLive,
   filterRows,
   groupRows,
   heroCounts,
   isPublicStatus,
-  matchProgress,
   pageContent,
-  playoffChampion,
-  playoffStageTitle,
   safeRoundTitle,
-  tableChampion,
-  wantsPlayoff,
   type TourDraft,
   type TourExtra,
   type TourFilter,
@@ -58,127 +52,33 @@ function asDraft(row: unknown): TourDraft | null {
   return item
 }
 
-async function readPages(path: string, params: Record<string, unknown>, size: number) {
-  const rows: unknown[] = []
-  let page = 0
-  for (;;) {
-    const { data } = await api.get(path, { params: { ...params, page, size } })
-    const content = pageContent(data)
-    rows.push(...content)
-    const pages = Number((data as { totalPages?: number } | null)?.totalPages || 0)
-    page += 1
-    if (!content.length || content.length < size || (pages > 0 && page >= pages) || page > 40) break
-  }
-  return rows
-}
-
-async function pool<T>(list: T[], limit: number, job: (item: T) => Promise<void>) {
-  let cursor = 0
-  async function worker() {
-    for (;;) {
-      const index = cursor
-      cursor += 1
-      if (index >= list.length) return
-      await job(list[index])
-    }
-  }
-  const width = Math.min(limit, list.length)
-  if (!width) return
-  await Promise.all(Array.from({ length: width }, () => worker()))
-}
-
 async function load() {
   const mine = ++ticket
   loading.value = true
   error.value = ''
   try {
-    const [catalog, homeResult, liveResult] = await Promise.all([
-      readPages('/tournaments', {}, 50),
-      api.get('/home/overview').then((res) => res.data).catch(() => null),
-      readPages('/matches', { status: 'LIVE' }, 100).then(
-        (rows) => ({ known: true, counts: countLive(rows as { status?: string; tournamentId?: string }[]) }),
-        () => ({ known: false, counts: new Map<string, number>() }),
-      ),
+    const [catalog] = await Promise.all([
+      api.get('/tournaments/catalog'),
+      teams.load().catch(() => undefined),
     ])
     if (mine !== ticket) return
-    const homeById = new Map<string, {
-      teamsCount?: number
-      progress?: number | null
-      playoffRoundTitle?: string | null
-      competitionStage?: string | null
-    }>()
-    const homeRows = pageContent(homeResult?.tournaments ? { content: homeResult.tournaments } : homeResult)
-    for (const row of Array.isArray(homeResult?.tournaments) ? homeResult.tournaments : homeRows) {
-      if (row && typeof row === 'object' && (row as { id?: string }).id) {
-        homeById.set((row as { id: string }).id, row as {
-          teamsCount?: number
-          progress?: number | null
-          playoffRoundTitle?: string | null
-          competitionStage?: string | null
+    const rows = Array.isArray(catalog.data) ? catalog.data : pageContent(catalog.data)
+    items.value = rows
+      .map((row) => {
+        const draft = asDraft(row)
+        if (!draft) return null
+        const extra = row as TourExtra & { liveCount?: number | null }
+        return assembleTour(draft, {
+          teamsCount: typeof extra.teamsCount === 'number' ? extra.teamsCount : null,
+          stage: extra.stage || draft.competitionStage || null,
+          progress: draft.status === 'ACTIVE' && typeof extra.progress === 'number' ? extra.progress : null,
+          roundTitle: safeRoundTitle(extra.roundTitle),
+          liveCount: typeof extra.liveCount === 'number' ? extra.liveCount : 0,
+          liveKnown: true,
+          winnerName: extra.winnerName,
+          winnerTeamId: extra.winnerTeamId,
         })
-      }
-    }
-    const drafts = catalog.map(asDraft).filter((row): row is TourDraft => !!row)
-    const extras = new Map<string, TourExtra>()
-    for (const draft of drafts) {
-      const home = homeById.get(draft.id)
-      extras.set(draft.id, {
-        teamsCount: typeof home?.teamsCount === 'number' ? home.teamsCount : null,
-        stage: home?.competitionStage || draft.competitionStage || null,
-        progress: draft.status === 'ACTIVE' && typeof home?.progress === 'number' ? home.progress : null,
-        roundTitle: safeRoundTitle(home?.playoffRoundTitle),
-        liveCount: liveResult.known ? (liveResult.counts.get(draft.id) || 0) : null,
-        liveKnown: liveResult.known,
       })
-    }
-    await teams.load().catch(() => undefined)
-    await pool(drafts, 4, async (draft) => {
-      const extra = extras.get(draft.id)
-      if (!extra) return
-      try {
-        const { data } = await api.get(`/tournaments/${draft.id}/overview`)
-        if (typeof data?.teamsCount === 'number') extra.teamsCount = data.teamsCount
-        if (data?.stage) extra.stage = data.stage
-      } catch {
-        /* A missing overview omits the team count. The row still renders. */
-      }
-      const stage = extra.stage || draft.competitionStage
-      const playoff = wantsPlayoff(draft.format, stage)
-      if (draft.status === 'ACTIVE' && extra.progress == null) {
-        try {
-          const matches = await readPages('/matches', { tournamentId: draft.id }, 100)
-          extra.progress = matchProgress(matches as { status?: string; bracketRound?: number | null }[], playoff)
-        } catch {
-          extra.progress = null
-        }
-      }
-      if ((draft.status === 'ACTIVE' && playoff) || (draft.status === 'FINISHED' && (playoff || draft.format === 'GROUPS_PLAYOFF'))) {
-        try {
-          const { data } = await api.get(`/tournaments/${draft.id}/playoff`)
-          const title = playoffStageTitle(data)
-          if (title) extra.roundTitle = title
-          if (draft.status === 'FINISHED') {
-            const winner = playoffChampion(data)
-            extra.winnerName = winner?.name || ''
-            extra.winnerTeamId = winner?.teamId || ''
-          }
-        } catch {
-          extra.winnerName = ''
-        }
-      } else if (draft.status === 'FINISHED' && draft.format === 'ROUND_ROBIN') {
-        try {
-          const { data } = await api.get(`/tournaments/${draft.id}/standings`)
-          const winner = tableChampion(data)
-          extra.winnerName = winner?.name || ''
-          extra.winnerTeamId = winner?.teamId || ''
-        } catch {
-          extra.winnerName = ''
-        }
-      }
-    })
-    if (mine !== ticket) return
-    items.value = drafts
-      .map((draft) => assembleTour(draft, extras.get(draft.id) || { liveKnown: liveResult.known }))
       .filter((row): row is TourRow => !!row)
       .sort(compareTours)
   } catch {
