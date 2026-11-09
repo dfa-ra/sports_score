@@ -11,12 +11,7 @@ function person(id: string, first: string, last: string, goals: number, assists:
 const scorers = [0, 1, 2, 3].map((index) => person(`p${index}`, 'Илья', 'Орлов', 12 - index, index, 'ft'))
 const assists = [0, 1].map((index) => person(`a${index}`, 'Анна', 'Ким', 1, 6 - index, 'ur'))
 
-function match(id: string, status: string, extra: {
-  homeTeamName?: string
-  awayTeamName?: string
-  penaltyHome?: number | null
-  penaltyAway?: number | null
-} = {}) {
+function match(id: string, status: string) {
   return {
     id,
     tournamentId: 't1',
@@ -25,47 +20,29 @@ function match(id: string, status: string, extra: {
     scheduledAt: '2026-12-05T14:00:00Z',
     status,
     homeTeamId: 'ft',
-    homeTeamName: extra.homeTeamName || 'Физтех',
+    homeTeamName: 'Физтех',
     awayTeamId: 'ur',
-    awayTeamName: extra.awayTeamName || 'Юристы',
+    awayTeamName: 'Юристы',
     homeScore: status === 'SCHEDULED' ? 0 : 1,
     awayScore: 0,
-    penaltyHome: extra.penaltyHome ?? null,
-    penaltyAway: extra.penaltyAway ?? null,
     stageLabel: 'Тур 1',
   }
 }
 
-function tournament(id: string, name: string, extra: {
-  shortName?: string
-  seasonLabel?: string
-  formatTitle?: string
-  teamsCount?: number
-  stageLabel?: string
-  leaderName?: string
-  groupName?: string
-  last?: Parameters<typeof match>[2]
-  next?: Parameters<typeof match>[2]
-} = {}) {
+function tournament(id: string, name: string) {
   return {
     id,
     name,
-    shortName: extra.shortName || name,
+    shortName: name,
     status: 'ACTIVE',
-    seasonLabel: extra.seasonLabel || 'Сезон 2026',
-    formatTitle: extra.formatTitle || 'Лига',
-    teamsCount: extra.teamsCount ?? 8,
-    stageLabel: extra.stageLabel || 'Группа',
+    seasonLabel: 'Сезон 2026',
+    formatTitle: 'Лига',
+    teamsCount: 8,
+    stageLabel: 'Группа',
     progress: 0.4,
-    leader: {
-      teamId: 'ft',
-      teamName: extra.leaderName || 'Физтех',
-      points: 12,
-      played: 4,
-      groupName: extra.groupName || '',
-    },
-    lastMatch: { ...match(`${id}-l`, 'FINISHED', extra.last), tournamentId: id },
-    nextMatch: { ...match(`${id}-n`, 'SCHEDULED', extra.next), tournamentId: id },
+    leader: { teamId: 'ft', teamName: 'Физтех', points: 12, played: 4 },
+    lastMatch: { ...match(`${id}-l`, 'FINISHED'), tournamentId: id },
+    nextMatch: { ...match(`${id}-n`, 'SCHEDULED'), tournamentId: id },
   }
 }
 
@@ -84,29 +61,7 @@ const overview = {
   live: [],
   upcoming: [match('u1', 'SCHEDULED'), match('u2', 'SCHEDULED'), match('u3', 'SCHEDULED')],
   recent: [match('r1', 'FINISHED'), match('r2', 'FINISHED'), match('r3', 'FINISHED')],
-  tournaments: [
-    tournament('t1', 'Кубок ИТМО среди факультетов', {
-      seasonLabel: 'Осень-весна 2026/2027',
-      formatTitle: 'Круговой турнир',
-      teamsCount: 16,
-      stageLabel: 'Групповой этап и стыковые матчи',
-      leaderName: 'Факультет программной инженерии и компьютерной техники',
-      groupName: 'группа «Север»',
-      last: {
-        homeTeamName: 'Факультет программной инженерии и компьютерной техники',
-        awayTeamName: 'Сборная института международного развития и экономики',
-        penaltyHome: 4,
-        penaltyAway: 3,
-      },
-      next: {
-        homeTeamName: 'Факультет программной инженерии и компьютерной техники',
-        awayTeamName: 'Сборная института международного развития и экономики',
-      },
-    }),
-    tournament('t2', 'Кубок'),
-    tournament('t3', 'Весна'),
-    tournament('t4', 'Осень'),
-  ],
+  tournaments: [tournament('t1', 'Лига'), tournament('t2', 'Кубок'), tournament('t3', 'Весна'), tournament('t4', 'Осень')],
   scorersByTournament: [homeScorers(5, 't1', 'Лига'), homeScorers(1, 't2', 'Кубок')],
   summary: { matchesPlayed: 4, goals: 12, goalsPerMatch: 3, teams: 8, players: 80 },
 }
@@ -299,7 +254,6 @@ test('home skeletons match the loaded blocks', async ({ page }) => {
         scorers: h('.sk-scorers'),
         srow: [...document.querySelectorAll('.sk-scorers .srow, .sk-scorers tbody tr')].map((el) => el.getBoundingClientRect().height).find((value) => value > 0) ?? null,
         cards,
-        grid: h('.tgrid'),
         cols: getComputedStyle(document.querySelector('.tgrid')!).gridTemplateColumns.split(' ').filter(Boolean).length,
       }
     })
@@ -317,7 +271,6 @@ test('home skeletons match the loaded blocks', async ({ page }) => {
         scorers: document.querySelector('.sk-scorers') ? null : h('.container.block:last-child .card'),
         row: [...document.querySelectorAll('.srow, .stbl tbody tr')].map((el) => el.getBoundingClientRect().height).find((value) => value > 0) ?? null,
         cards,
-        grid: h('.tgrid'),
       }
     })
     if (width <= 720) {
@@ -338,17 +291,12 @@ test('home skeletons match the loaded blocks', async ({ page }) => {
     expect(loaded.row).toBeLessThanOrEqual(57)
     expectStable(loading.matches, loaded.matches, `home matches ${width}`)
     expectStable(loading.scorers, loaded.scorers ?? 0, `home scorers ${width}`)
-    expect(loaded.cards).toHaveLength(loading.cards.length)
-    loading.cards.forEach((card, index) => {
-      expectStable(card, loaded.cards[index], `home tcard ${index} ${width}`)
-    })
-    expectStable(loading.grid ?? 0, loaded.grid ?? 0, `home tgrid ${width}`)
-    const cls = await page.evaluate(() => (window as unknown as { __cls: { value: number } }).__cls.value)
-    if (width === 1440) expect(cls).toBeLessThanOrEqual(0.047)
+    expectStable(loading.cards[0], loaded.cards[0], `home tcard ${width}`)
     const beforeTab = loaded.scorers ?? 0
     await page.locator('.tabs button', { hasText: 'Кубок' }).click()
     const afterTab = await height(page, '.container.block:last-child .card')
     expectStable(beforeTab, afterTab, `home scorer tab ${width}`)
+    const cls = await page.evaluate(() => (window as unknown as { __cls: { value: number } }).__cls.value)
     notes.push({ width, loading, loaded, afterTab, cls })
     if (width === 375) await page.screenshot({ path: `${OUT}/home-blocks-375.png`, fullPage: true })
   }

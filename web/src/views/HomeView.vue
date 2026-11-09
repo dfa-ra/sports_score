@@ -467,7 +467,7 @@ onUnmounted(() => {
           <div class="irow">
             <div class="mtime"><b>5 дек</b><span>17:00</span></div>
             <div class="h"><span class="n">Физтех</span><span class="crest sk-crest"></span></div>
-            <div class="sc"><span class="line"><span>1</span><span class="sep">:</span><span>0</span></span><small>пен. 4:3</small></div>
+            <div class="sc"><span class="line"><span>1</span><span class="sep">:</span><span>0</span></span></div>
             <div class="a"><span class="crest sk-crest"></span><span class="n">Юристы</span></div>
             <div class="stc"><span class="st done">Завершён</span></div>
           </div>
@@ -536,7 +536,6 @@ onUnmounted(() => {
             <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
               <span class="line"><span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span></span>
               <small v-if="match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
-              <small v-else-if="match.status === 'FINISHED'" class="pen-hold" aria-hidden="true">пен. 0:0</small>
             </div>
             <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
             <div class="stc"><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
@@ -862,6 +861,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   line-clamp: 2;
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
   overflow: hidden;
   white-space: normal;
@@ -871,7 +871,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   hyphens: manual;
   font-size: clamp(0.95rem, 28cqi, 1em);
   line-height: 1.25;
-  min-height: calc(2 * 1.25em);
 }
 .mscore { display: grid; gap: 0.35rem; text-align: right; font-weight: 800; color: var(--ink); font-size: 1.125rem; }
 .mscore b { height: 28px; line-height: 28px; }
@@ -922,49 +921,17 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .tcard { display: flex; flex-direction: column; }
 .tc-head { padding: 1.35rem 1.2rem 1rem; display: grid; gap: 0.7rem; }
 .tc-top { display: flex; justify-content: space-between; gap: 0.6rem; align-items: flex-start; }
-.tc-top > div { min-width: 0; }
-.tc-top .st { margin-top: 0.15rem; flex: 0 0 auto; }
-.tc-top h3 {
-  font-size: 1.0625rem;
-  margin-top: 0.45rem;
-  line-height: 1.25;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-.tcard .tb {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tc-meta { display: flex; gap: 0.4rem 1rem; flex-wrap: nowrap; min-width: 0; font-size: 0.8125rem; font-weight: 600; }
-.tc-meta span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-top .st { margin-top: 0.15rem; }
+.tc-top h3 { font-size: 1.0625rem; margin-top: 0.45rem; line-height: 1.25; }
+.tc-meta { display: flex; gap: 0.4rem 1rem; flex-wrap: wrap; font-size: 0.8125rem; font-weight: 600; }
 .tc-meta span + span::before { content: "·"; margin-right: 1rem; color: var(--line-strong); }
 .tc-prog { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--muted); font-weight: 600; flex-wrap: wrap; }
-.tc-prog > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog { height: 6px; border-radius: 99px; background: var(--bg-wash); overflow: hidden; }
 .prog i { display: block; height: 100%; border-radius: 99px; background: var(--ice); }
 .lead { display: flex; align-items: center; gap: 0.7rem; background: #f4f8fb; border: 1px solid var(--line); border-radius: 14px; padding: 0.55rem 0.8rem; }
-.lead div { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
-.lead b {
-  color: var(--ink);
-  font-size: 0.9375rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.lead div span {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
+.lead div { display: flex; flex-direction: column; line-height: 1.3; }
+.lead b { color: var(--ink); font-size: 0.9375rem; }
+.lead div span { font-size: 0.8125rem; font-weight: 600; }
 .crest.plus, .plus {
   width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   background: var(--bg-wash); color: var(--navy); font-weight: 800; box-shadow: inset 0 0 0 1px var(--line-strong);
@@ -983,8 +950,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .h, .irow .a { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; color: var(--ink); min-width: 0; container-type: inline-size; }
 .irow .h { grid-area: h; justify-content: flex-end; text-align: right; }
 .irow .a { grid-area: a; }
-.irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
-.irow .sc .pen-hold { visibility: hidden; }
+.irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
 .irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
@@ -1106,9 +1072,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .irow .sc .line { white-space: nowrap; }
   .irow .stc { justify-content: flex-start; }
   .tb { white-space: normal; }
-  .tcard .tb { white-space: nowrap; }
-  .tc-top h3 { min-height: calc(2 * 1.25 * 1.0625rem); }
-  .lead div span { min-height: calc(2 * 1.3 * 0.8125rem); }
   .tc-meta span + span::before { display: none; }
   .stats { padding: 0.8rem 0.35rem 1rem; }
   .stat { padding-inline: 0.28rem; }
