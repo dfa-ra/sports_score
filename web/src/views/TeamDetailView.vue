@@ -105,7 +105,7 @@ async function load() {
     const [t, m, games, squadStats] = await Promise.all([
       api.get(`/teams/${id}`),
       api.get(`/teams/${id}/members`),
-      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+      api.get('/matches', { params: { teamId: id, size: 100, sort: 'scheduledAt,desc' } }),
       api.get(`/teams/${id}/player-stats`),
     ])
     team.value = t.data
@@ -119,9 +119,7 @@ async function load() {
     void nextTick(publish)
     members.value = m.data
     stats.value = squadStats.data ?? []
-    matches.value = (games.data.content ?? []).filter((row: any) =>
-      row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
-    )
+    matches.value = games.data.content ?? []
     if (auth.isAuthenticated) {
       try {
         const { data } = await api.get('/players/me')

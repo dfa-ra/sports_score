@@ -184,17 +184,26 @@ public class MatchService {
 
     @Transactional(readOnly = true)
     public Page<MatchResponse> list(UUID tournamentId, MatchStatus status, Pageable pageable) {
-        return list(tournamentId, status, null, null, pageable);
+        return list(tournamentId, status, null, null, null, pageable);
     }
 
     /**
      * Same list as before. {@code from} and {@code to} additionally bound {@code scheduledAt}
      * (inclusive). Sort is unchanged: an unknown sort property still fails the same way.
+     * {@code teamId} keeps a match when that team is home or away. Omitting it leaves the
+     * previous filters and the public list unchanged.
      */
     @Transactional(readOnly = true)
-    public Page<MatchResponse> list(UUID tournamentId, MatchStatus status, Instant from, Instant to, Pageable pageable) {
+    public Page<MatchResponse> list(
+            UUID tournamentId,
+            MatchStatus status,
+            Instant from,
+            Instant to,
+            UUID teamId,
+            Pageable pageable
+    ) {
         abandonedLiveMatchService.closeIdle(Instant.now());
-        if (from == null && to == null) {
+        if (from == null && to == null && teamId == null) {
             Page<Match> page;
             if (tournamentId != null && status != null) {
                 page = matchRepository.findByTournamentIdAndStatus(tournamentId, status, pageable);
@@ -214,6 +223,12 @@ public class MatchService {
             }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (teamId != null) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("homeTeamId"), teamId),
+                        cb.equal(root.get("awayTeamId"), teamId)
+                ));
             }
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("scheduledAt"), from));

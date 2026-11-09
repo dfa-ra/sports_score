@@ -310,19 +310,17 @@ async function load() {
   missing.value = false
   if (!match.value) loading.value = true
   try {
-  await teams.load()
-  if (ticket !== pageTicket) return
+  const directory = teams.load()
   const [m, e, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/referees`),
     api.get(`/matches/${id}/lineups`),
+    directory,
   ])
   if (ticket !== pageTicket || String(route.params.id || '') !== id) return
   match.value = m.data
   error.value = ''
-  await loadForms(m.data.homeTeamId, m.data.awayTeamId)
-  if (ticket !== pageTicket) return
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
   const publish = () => setPageMeta({
@@ -342,36 +340,39 @@ async function load() {
   if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
   homeRoster.value = []
   awayRoster.value = []
-  if (auth.canManageLeague) {
-    try {
-      const [homeMembers, awayMembers] = await Promise.all([
-        api.get(`/teams/${m.data.homeTeamId}/members`),
-        api.get(`/teams/${m.data.awayTeamId}/members`),
-      ])
-      homeRoster.value = homeMembers.data ?? []
-      awayRoster.value = awayMembers.data ?? []
-    } catch {
-      homeRoster.value = []
-      awayRoster.value = []
-    }
-  }
+  const forms = loadForms(m.data.homeTeamId, m.data.awayTeamId)
+  const tournamentReq = api.get(`/tournaments/${m.data.tournamentId}`)
+    .then((res) => res.data)
+    .catch(() => null)
+  const membersReq = auth.canManageLeague
+    ? Promise.all([
+      api.get(`/teams/${m.data.homeTeamId}/members`),
+      api.get(`/teams/${m.data.awayTeamId}/members`),
+    ]).then(([homeMembers, awayMembers]) => ({
+      home: homeMembers.data ?? [],
+      away: awayMembers.data ?? [],
+    })).catch(() => ({ home: [] as any[], away: [] as any[] }))
+    : Promise.resolve(null)
+  const meReq = auth.isAuthenticated
+    ? api.get('/players/me').then((res) => res.data).catch(() => null)
+    : Promise.resolve(undefined)
+  const refereesReq = auth.canManageLeague ? loadAllReferees() : Promise.resolve(null)
+  const [tournamentData, members, meData, refereeUsers] = await Promise.all([
+    tournamentReq,
+    membersReq,
+    meReq,
+    refereesReq,
+    forms,
+  ])
   if (ticket !== pageTicket) return
-  try {
-    const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
-    tournament.value = data
-  } catch {
-    tournament.value = null
+  tournament.value = tournamentData
+  if (members) {
+    homeRoster.value = members.home
+    awayRoster.value = members.away
   }
-  if (auth.isAuthenticated) {
-    try {
-      const { data } = await api.get('/players/me')
-      me.value = data
-    } catch {
-      me.value = null
-    }
-  }
-  if (auth.canManageLeague) {
-    users.value = await loadAllReferees()
+  if (meData !== undefined) me.value = meData
+  if (refereeUsers) {
+    users.value = refereeUsers
     const stillListed = users.value.some((user) => user.id === refereeId.value)
     if (!refereeId.value || !stillListed) {
       const assignedId = referees.value.find((row) =>
@@ -380,7 +381,6 @@ async function load() {
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
   }
-  if (ticket !== pageTicket) return
   error.value = ''
   } catch (e: any) {
     if (ticket !== pageTicket) return

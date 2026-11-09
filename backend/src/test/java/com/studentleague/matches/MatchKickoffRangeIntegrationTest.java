@@ -95,6 +95,78 @@ class MatchKickoffRangeIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.totalElements").value(4));
     }
 
+    @Test
+    void teamIdKeepsHomeOrAwayAndOmittingItListsTheTournament() throws Exception {
+        String stamp = String.valueOf(System.nanoTime());
+        String adminToken = createAdminAndLogin("team-admin-" + stamp + "@example.com", "Str0ngPass!");
+        String captainEmail = "team-cap-" + stamp + "@example.com";
+        String captainToken = registerAndLogin(captainEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(captainToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Nina","lastName":"Home"}
+                                """))
+                .andExpect(status().isOk());
+        String teamA = createTeam(adminToken, "Filter Home " + stamp, playerId(captainToken));
+        captainToken = reLogin(captainEmail, "Str0ngPass!");
+
+        String otherEmail = "team-other-" + stamp + "@example.com";
+        String otherToken = registerAndLogin(otherEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(otherToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Gleb","lastName":"Away"}
+                                """))
+                .andExpect(status().isOk());
+        String teamB = createTeam(adminToken, "Filter Away " + stamp, playerId(otherToken));
+
+        String thirdEmail = "team-third-" + stamp + "@example.com";
+        String thirdToken = registerAndLogin(thirdEmail, "Str0ngPass!");
+        mockMvc.perform(put("/api/v1/players/me")
+                        .header("Authorization", auth(thirdToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Oleg","lastName":"Third"}
+                                """))
+                .andExpect(status().isOk());
+        String teamC = createTeam(adminToken, "Filter Third " + stamp, playerId(thirdToken));
+
+        String tournamentId = createTournament(adminToken, sportId(adminToken));
+        registerAndApprove(adminToken, captainToken, tournamentId, teamA);
+        registerAndApprove(adminToken, otherToken, tournamentId, teamB);
+        registerAndApprove(adminToken, thirdToken, tournamentId, teamC);
+
+        String home = createMatch(adminToken, tournamentId, teamA, teamB, "2099-07-01T09:00:00Z");
+        String away = createMatch(adminToken, tournamentId, teamB, teamA, "2099-07-02T09:00:00Z");
+        String other = createMatch(adminToken, tournamentId, teamC, teamB, "2099-07-03T09:00:00Z");
+
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("teamId", teamA)
+                        .param("tournamentId", tournamentId)
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(home)).isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(away)).isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(other)).isEmpty());
+
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("teamId", teamA)
+                        .param("status", "FINISHED")
+                        .param("tournamentId", tournamentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("tournamentId", tournamentId)
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(other)).isNotEmpty());
+    }
+
     private String createMatch(String adminToken, String tournamentId, String homeId, String awayId, String kickoff) throws Exception {
         MvcResult created = mockMvc.perform(post("/api/v1/matches")
                         .header("Authorization", auth(adminToken))

@@ -89,6 +89,7 @@ public class MatchController {
             @RequestParam(required = false) MatchStatus status,
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
+            @RequestParam(required = false) UUID teamId,
             @PageableDefault(size = 20, sort = "scheduledAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         return PageResponse.from(matchService.list(
@@ -96,6 +97,7 @@ public class MatchController {
                 status,
                 KickoffRange.start(from),
                 KickoffRange.end(to),
+                teamId,
                 pageable
         ));
     }

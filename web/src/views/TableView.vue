@@ -40,6 +40,7 @@ const playoffError = ref(false)
 const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
+let hydratedId = ''
 
 const advancingPlaces = computed(() => {
   const raw = playoff.value?.advancingPlaces
@@ -136,30 +137,95 @@ onMounted(async () => {
 async function bootstrap() {
   bootstrapError.value = ''
   loading.value = true
+  const requested = String(route.query.tournament || '')
   try {
-    await teams.load()
-    const [{ data }, games] = await Promise.all([
+    const directory = teams.load().catch(() => undefined)
+    const currentReq = requested
+      ? Promise.resolve(null)
+      : api.get('/tournaments/current').then((res) => res.data).catch(() => null)
+    const bundleReq = requested ? loadTournamentBundle(requested) : Promise.resolve(null)
+    const [{ data }, games, current, bundle] = await Promise.all([
       api.get('/tournaments', { params: { size: 50 } }),
       api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+      currentReq,
+      bundleReq,
+      directory,
     ])
     tournaments.value = data.content ?? []
     matches.value = games.data.content ?? []
-    const requested = String(route.query.tournament || '')
-    if (requested && tournaments.value.some((item) => item.id === requested)) {
-      tournamentId.value = requested
-    } else {
-      try {
-        const current = await api.get('/tournaments/current')
-        if (current.data?.id) tournamentId.value = current.data.id
-      } catch {
-        if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-      }
-      if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
+    const known = (id: string) => tournaments.value.some((item) => item.id === id)
+    let nextId = ''
+    if (requested && known(requested)) nextId = requested
+    else if (current?.id && known(current.id)) nextId = current.id
+    else if (tournaments.value[0]) nextId = tournaments.value[0].id
+    const ready = Boolean(nextId && bundle && nextId === requested && !bundle.failed)
+    if (ready && bundle) {
+      applyBundle(nextId, bundle)
+      hydratedId = nextId
     }
-    if (!tournamentId.value) await load()
+    if (!nextId) {
+      await load()
+      return
+    }
+    if (tournamentId.value === nextId) {
+      if (hydratedId === nextId) {
+        hydratedId = ''
+        loading.value = false
+        syncPlayoffTab(nextId, false, fullList.value)
+      } else {
+        await load()
+      }
+      return
+    }
+    tournamentId.value = nextId
   } catch {
     bootstrapError.value = 'Таблица не загрузилась.'
     loading.value = false
+  }
+}
+
+function applyBundle(id: string, bundle: TournamentBundle) {
+  tournament.value = bundle.tournament
+  playoff.value = bundle.playoff
+  playoffError.value = bundle.playoffFailed
+  standings.value = parseStandings(bundle.standings)
+  if (bundle.board) {
+    scorers.value = bundle.board.scorers ?? []
+    assists.value = bundle.board.assists ?? []
+    keepers.value = bundle.board.goalkeepers ?? []
+    statsLoadedFor.value = id
+  }
+  const name = bundle.tournament?.name || 'Таблица'
+  setPageMeta({
+    title: name,
+    description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам',
+    path: '/table',
+  })
+}
+
+type TournamentBundle = {
+  failed: boolean
+  tournament: any
+  standings: unknown
+  playoff: any
+  playoffFailed: boolean
+  board: { scorers?: any[]; assists?: any[]; goalkeepers?: any[] } | null
+}
+
+async function loadTournamentBundle(id: string): Promise<TournamentBundle> {
+  const [tournamentRes, standingsRes, playoffRes, boardRes] = await Promise.all([
+    api.get(`/tournaments/${id}`).then((res) => ({ ok: true as const, data: res.data })).catch(() => ({ ok: false as const, data: null })),
+    api.get(`/tournaments/${id}/standings`).then((res) => ({ ok: true as const, data: res.data })).catch(() => ({ ok: false as const, data: null })),
+    api.get(`/tournaments/${id}/playoff`).then((res) => ({ data: res.data, failed: false })).catch(() => ({ data: null, failed: true })),
+    api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } }).then((res) => res.data).catch(() => null),
+  ])
+  return {
+    failed: !tournamentRes.ok || !standingsRes.ok,
+    tournament: tournamentRes.data,
+    standings: standingsRes.data,
+    playoff: playoffRes.data,
+    playoffFailed: playoffRes.failed,
+    board: boardRes,
   }
 }
 
@@ -178,6 +244,12 @@ watch(tournamentId, (id) => {
           listAll,
         }),
       })
+    }
+    if (hydratedId && hydratedId === id) {
+      hydratedId = ''
+      loading.value = false
+      syncPlayoffTab(id, rememberPlayoff, listAll)
+      return
     }
     await load({ rememberPlayoff, listAll })
   })()
