@@ -978,16 +978,17 @@ onUnmounted(() => {
                 <span>{{ blockScore(block.score) }}</span>
               </div>
               <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
+                <em class="min">{{ shownMinute(ev) != null ? `${shownMinute(ev)}'` : '' }}</em>
                 <div class="who">
                   <b>
                     <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
                     <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
                   </b>
-                  <span v-if="isOwnGoal(ev)">Автогол</span>
-                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
-                  <span v-if="ev.scoreline" class="run">{{ blockScore(ev.scoreline) }}</span>
+                  <span v-if="isOwnGoal(ev)" class="assist">Автогол</span>
+                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && registeredName(ev, 'secondary')" class="assist">→ {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
                 </div>
-                <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
+                <span class="run">{{ ev.scoreline ? blockScore(ev.scoreline) : '' }}</span>
               </div>
             </section>
             <div class="total"><span>Итог</span><b>{{ heroScore }}</b></div>
@@ -1657,10 +1658,55 @@ h2 a { color: inherit; }
 }
 .card header b, .half span, .total span { color: var(--navy); }
 .half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
-.ev { display: flex; justify-content: space-between; gap: 0.6rem; }
-.ev .who { display: grid; justify-items: end; text-align: right; min-width: 0; }
-.ev.away .who { justify-items: start; text-align: left; }
+.card.events .ev {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.12rem 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 2.6rem auto; }
+.card.events .ev .who {
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  gap: 0.05rem;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+}
+.card.events .ev.home .who { justify-items: start; text-align: left; }
+.card.events .ev.away .who { order: 1; justify-items: end; text-align: right; }
+.card.events .ev.away .min { order: 2; text-align: right; }
+.card.events .ev.away .run { order: 3; }
+.card.events .ev .min {
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card.events .ev b {
+  display: block;
+  min-width: 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.card.events .ev b a { overflow-wrap: anywhere; }
+.card.events .assist {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
 .ev b a { color: inherit; text-decoration: none; }
+.card.events .run {
+  justify-self: end;
+  align-self: center;
+  margin: 0;
+  white-space: nowrap;
+}
 .run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
 .total {
   margin-top: 0.35rem;
@@ -1708,8 +1754,8 @@ h2 a { color: inherit; }
 .marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
 .fail { display: grid; justify-items: center; gap: 0.5rem; }
 .pad { justify-self: start; margin-top: 0.6rem; }
-.overview > .stack { align-items: start; }
-.card.events { align-self: start; height: auto; }
+.overview > .stack { align-items: start; min-width: 0; }
+.card.events { align-self: start; height: auto; min-width: 0; max-width: 100%; overflow-x: clip; }
 .empty-events { margin: 0; padding: 0.4rem 0 0.15rem; }
 @media (max-width: 720px) {
   .overview { grid-template-columns: 1fr; }
