@@ -51,36 +51,6 @@ if [[ "${COMPOSE_PROJECT}" == *prod* ]]; then
 fi
 
 mkdir -p "${RELEASE_DIR}"
-
-# Dev only: keep the web dist and backend that are about to be replaced.
-# Prod releases use the separate read-only backup and must not be copied here.
-if [[ "${COMPOSE_PROJECT}" == *dev* && "${COMPOSE_PROJECT}" != *prod* ]]; then
-  if TZ=Europe/Moscow date +%Y%m%d-%H%M%S >/dev/null 2>&1; then
-    BACKUP_STAMP="$(TZ=Europe/Moscow date +%Y%m%d-%H%M%S)"
-  else
-    BACKUP_STAMP="$(date +%Y%m%d-%H%M%S)"
-  fi
-  BACKUP_DIR="${DEPLOY_ROOT}/backups/dev-${BACKUP_STAMP}"
-  case "${BACKUP_DIR}" in
-    /media | /media/*)
-      echo "refusing to write a backup under /media" >&2
-      exit 1
-      ;;
-  esac
-  mkdir -p "${BACKUP_DIR}"
-  chmod 700 "${BACKUP_DIR}"
-  if [[ -d "${RELEASE_DIR}/web" ]]; then
-    tar -C "${RELEASE_DIR}/web" -czf "${BACKUP_DIR}/web-dist.tar.gz" .
-  fi
-  if [[ -f "${RELEASE_DIR}/backend.jar" ]]; then
-    cp -a "${RELEASE_DIR}/backend.jar" "${BACKUP_DIR}/backend.jar"
-  fi
-  if [[ -f "${RELEASE_DIR}/VERSION" ]]; then
-    cp -a "${RELEASE_DIR}/VERSION" "${BACKUP_DIR}/VERSION"
-  fi
-  echo "BACKED_UP=${BACKUP_DIR}"
-fi
-
 rm -rf "${RELEASE_DIR}/web"
 rm -f "${RELEASE_DIR}/backend.jar" "${RELEASE_DIR}/web.tar.gz"
 

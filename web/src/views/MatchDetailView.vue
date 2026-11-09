@@ -7,8 +7,7 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, isOwnGoal, labelOf, periodLabel, playerTag, statusLabel } from '../lib/format'
-import { eventMark } from '../lib/eventMark'
-import { registeredName, type PersonFields } from '../lib/playerTitle'
+import { registeredName } from '../lib/playerTitle'
 import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
@@ -22,9 +21,7 @@ import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
 import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
-import EventMark from '../components/EventMark.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
-import MatchCardTally from '../components/MatchCardTally.vue'
 import SquadPlayerSelect from '../components/SquadPlayerSelect.vue'
 import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
@@ -461,14 +458,6 @@ function blockScore(value?: string | null) {
   const parts = String(value).split('-')
   if (parts.length !== 2) return value
   return `${parts[0]} : ${parts[1]}`
-}
-
-function markOf(ev: Parameters<typeof eventMark>[0]) {
-  return eventMark(ev)
-}
-
-function namedEvent(ev: PersonFields & { playerId?: string | null; playerJersey?: number | null }) {
-  return !!(ev.playerId || playerTag(registeredName(ev), ev.playerJersey))
 }
 
 function eventSignature(list: any[]) {
@@ -1000,17 +989,16 @@ onUnmounted(() => {
               </div>
               <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
                 <em class="min">{{ shownMinute(ev) != null ? `${shownMinute(ev)}'` : '' }}</em>
+                <i class="mark" :class="ev.eventType.toLowerCase()" />
                 <div class="who">
                   <b>
-                    <EventMark :event="ev" />
-                    <span class="nm">
-                      <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || markOf(ev).label }}</RouterLink>
-                      <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || markOf(ev).label }}</template>
-                    </span>
+                    <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
+                    <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
                   </b>
-                  <span v-if="namedEvent(ev)" class="kind">{{ markOf(ev).label }}</span>
-                  <span v-if="!isOwnGoal(ev) && ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
-                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && registeredName(ev, 'secondary')" class="assist">→ {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-if="isOwnGoal(ev)" class="assist">Автогол</span>
+                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-else-if="(ev.eventType === 'YELLOW_CARD' || ev.eventType === 'RED_CARD') && playerTag(registeredName(ev), ev.playerJersey)" class="assist">{{ labelOf(eventLabel, ev.eventType) }}</span>
+                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && (playerTag(registeredName(ev), ev.playerJersey) || registeredName(ev, 'secondary'))" class="assist">{{ labelOf(eventLabel, ev.eventType) }}<template v-if="registeredName(ev, 'secondary')"> → {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template></span>
                 </div>
                 <span class="run">{{ ev.scoreline ? blockScore(ev.scoreline) : '' }}</span>
               </div>
@@ -1060,8 +1048,7 @@ onUnmounted(() => {
       </aside>
     </div>
 
-    <div v-else-if="tab === 'stats'" class="stack">
-      <MatchCardTally class="panel" :events="events" :home-team-id="match.homeTeamId" />
+    <div v-else-if="tab === 'stats'">
       <MatchAnalystStats :match-id="String(match.id)" />
     </div>
 
@@ -1086,14 +1073,14 @@ onUnmounted(() => {
 
     <div v-else-if="tab === 'protocol'" class="panel">
       <h2>Протокол</h2>
-      <MatchCardTally :events="timeline" :home-team-id="match.homeTeamId" />
       <p v-if="shootoutScore" class="shootout-line">{{ shootoutScore }}</p>
       <p v-if="!timeline.length" class="muted">Событий пока нет</p>
       <ul class="timeline">
         <li v-for="ev in timeline" :key="ev.id" :class="[protocolSide(ev), { 'goal-enter': freshGoal(ev) }]">
           <span v-if="shownMinute(ev) != null" class="t">{{ shownMinute(ev) }}'</span>
           <div>
-            <strong class="proto-type"><EventMark :event="ev" />{{ markOf(ev).label }}</strong>
+            <strong>{{ labelOf(eventLabel, ev.eventType) }}</strong>
+            <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
             <p class="muted">
               <template v-if="ev.playerId || playerTag(registeredName(ev), ev.playerJersey)">
                 <RouterLink v-if="ev.playerId" class="player-link" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || 'Игрок' }}</RouterLink>
@@ -1481,11 +1468,6 @@ h2 a { color: inherit; }
 .timeline li.away > div { text-align: right; }
 .when-label { white-space: nowrap; }
 .player-link { color: var(--navy); font-weight: 800; }
-.proto-type {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
 .t { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 0.85rem; padding-top: 0.15rem; }
 @media (max-width: 719px) {
   .board {
@@ -1690,26 +1672,24 @@ h2 a { color: inherit; }
 .half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
 .card.events .ev {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.6rem 14px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.12rem 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0.05rem;
   width: 100%;
   min-width: 0;
 }
-.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 2.6rem auto; }
-.card.events .ev .who {
-  display: grid;
-  align-items: start;
-  justify-items: start;
-  gap: 0.05rem;
-  width: auto;
-  min-width: 0;
-  text-align: left;
-}
-.card.events .ev.home .who { justify-items: start; text-align: left; }
-.card.events .ev.away .who { order: 1; justify-items: end; text-align: right; }
-.card.events .ev.away .min { order: 2; text-align: right; }
-.card.events .ev.away .run { order: 3; }
+.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 14px 2.6rem auto; }
+.card.events .min { grid-column: 1; grid-row: 1; }
+.card.events .mark { grid-column: 2; grid-row: 1; justify-self: center; }
+.card.events .ev b { grid-column: 3; grid-row: 1; }
+.card.events .assist { grid-column: 3; grid-row: 2; }
+.card.events .run { grid-column: 4; grid-row: 1; }
+.card.events .ev.away b,
+.card.events .ev.away .assist { grid-column: 1; text-align: right; }
+.card.events .ev.away .min { grid-column: 3; text-align: right; }
+.card.events .ev .who { display: contents; text-align: left; }
+.card.events .ev.away .who { text-align: right; }
 .card.events .ev .min {
   font-style: normal;
   color: var(--muted);
@@ -1717,25 +1697,12 @@ h2 a { color: inherit; }
   white-space: nowrap;
 }
 .card.events .ev b {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: block;
   min-width: 0;
   font-weight: 800;
-}
-.card.events .ev.away b { flex-direction: row-reverse; text-align: right; }
-.card.events .ev b .nm {
-  flex: 1;
-  min-width: 0;
   overflow-wrap: anywhere;
 }
 .card.events .ev b a { overflow-wrap: anywhere; }
-.card.events .kind {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.25;
-}
 .card.events .assist {
   color: var(--muted);
   font-size: 12px;
@@ -1746,8 +1713,8 @@ h2 a { color: inherit; }
 .ev b a { color: inherit; text-decoration: none; }
 .card.events .run {
   justify-self: end;
-  align-self: start;
-  margin: 2px 0 0;
+  align-self: center;
+  margin: 0;
   white-space: nowrap;
 }
 .run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
@@ -1933,16 +1900,7 @@ h2 a { color: inherit; }
     align-items: center;
   }
   .card.events .ev .who { max-width: 100%; }
-  .card.events .ev b {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    max-width: 100%;
-    font-size: 13px;
-    line-height: 16px;
-    font-weight: 800;
-  }
-  .card.events .ev b .nm,
+  .card.events .ev b,
   .card.events .ev b a {
     display: block;
     max-width: 100%;
@@ -1953,7 +1911,6 @@ h2 a { color: inherit; }
     overflow-wrap: anywhere;
   }
   .card.events .ev .min { font-size: 12px; font-weight: 600; }
-  .card.events .kind,
   .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
   .card.events .run { font-size: 13px; font-weight: 800; }
   .total { height: 40px; margin-top: 4px; border-radius: 10px; padding: 0 10px; background: #eef5fc; }

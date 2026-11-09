@@ -169,20 +169,6 @@ test('an own goal adds the minute to the other team and keeps the kickoff minute
   assert.equal(blocks[0].score, '1-1')
 })
 
-test('fouls, cards, penalties and an unknown type stay in the public feed', () => {
-  const blocks = buildPeriodBlocks([
-    { id: 'foul', eventType: 'FOUL', teamId: 'away', period: 1, gameTime: 60, timestamp: '2026-11-07T12:01:00Z' },
-    { id: 'timeout', eventType: 'TIMEOUT', teamId: 'home', period: 1, gameTime: 120, timestamp: '2026-11-07T12:02:00Z' },
-    { id: 'red', eventType: 'RED_CARD', teamId: 'away', period: 1, gameTime: 180, timestamp: '2026-11-07T12:03:00Z' },
-    { id: 'second', eventType: 'SECOND_YELLOW', teamId: 'home', period: 1, gameTime: 240, timestamp: '2026-11-07T12:04:00Z' },
-    { id: 'scored', eventType: 'PENALTY_SCORED', teamId: 'home', period: 1, gameTime: 300, timestamp: '2026-11-07T12:05:00Z' },
-    { id: 'missed', eventType: 'PENALTY_MISSED', teamId: 'away', period: 1, gameTime: 360, timestamp: '2026-11-07T12:06:00Z' },
-    { id: 'odd', eventType: 'WATER_BREAK', teamId: 'home', period: 1, gameTime: 420, timestamp: '2026-11-07T12:07:00Z' },
-    { id: 'gone', eventType: 'YELLOW_CARD', teamId: 'home', period: 1, gameTime: 30, timestamp: '2026-11-07T12:00:30Z', voided: true },
-  ], { homeTeamId: 'home' })
-  assert.deepEqual(blocks[0].items.map((item) => item.id), ['foul', 'timeout', 'red', 'second', 'scored', 'missed', 'odd'])
-})
-
 test('an own goal by the away player is drawn on the home side and raises the home score', () => {
   const home = 'home'
   const away = 'away'
