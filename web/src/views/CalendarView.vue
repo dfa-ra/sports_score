@@ -4,7 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import CalendarMatchLine from '../components/CalendarMatchLine.vue'
 import ScrollFade from '../components/ScrollFade.vue'
-import { vFitText } from '../lib/fitLabel'
+import { distinctLabels } from '../lib/shortLabel'
 import {
   applyCalendarFilter,
   boardLink,
@@ -108,6 +108,10 @@ const chipTournaments = computed(() => {
     if (match.tournamentId) ids.add(match.tournamentId)
   }
   return [...ids].map((id) => tournaments.value[id] || { id, name: matchName(id) }).sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+})
+const chipLabels = computed(() => {
+  const labels = distinctLabels(chipTournaments.value.map((tour) => tour.name))
+  return new Map(chipTournaments.value.map((tour, index) => [tour.id, labels[index]]))
 })
 
 const showToday = computed(() => !liveOnly.value && filter.value.kind !== 'undated' && selectedDay.value === todayKey.value)
@@ -375,7 +379,7 @@ onUnmounted(() => {
           :aria-label="tour.name"
           @click="pick({ kind: 'tournament', tournamentId: tour.id })"
         >
-          <span class="chip-label" v-fit-text="tour.name" :title="tour.name"></span>
+          <span class="chip-label" :title="tour.name">{{ chipLabels.get(tour.id) }}</span>
         </button>
       </div>
     </ScrollFade>

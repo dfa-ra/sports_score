@@ -6,8 +6,8 @@ import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
 import ScrollFade from '../components/ScrollFade.vue'
-import { vFitText } from '../lib/fitLabel'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
+import { distinctLabels } from '../lib/shortLabel'
 import {
   badgeClass,
   badgeIndex,
@@ -69,11 +69,19 @@ const tournaments = computed(() => overview.value.tournaments)
 const orderedTournaments = computed(() => orderRunningTournaments(tournaments.value, overview.value.live))
 const visibleTournaments = computed(() => orderedTournaments.value.slice(0, runningTournamentCap))
 const matchChips = computed(() => matchTournamentChips(tournaments.value))
+const chipLabels = computed(() => {
+  const labels = distinctLabels(matchChips.value.map((tournament) => tournament.name || tournament.shortName || ''))
+  return new Map(matchChips.value.map((tournament, index) => [tournament.id, labels[index]]))
+})
 const offseason = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length === 0)
 const plainHero = computed(() => loaded.value && !failed.value && !nextMatch.value && tournaments.value.length > 0)
 const showStats = computed(() => !failed.value && (!loaded.value || !!overview.value.summary))
 const showTournaments = computed(() => !loaded.value || failed.value || tournaments.value.length > 0)
 const scorerGroups = computed(() => overview.value.scorersByTournament)
+const scorerLabels = computed(() => {
+  const labels = distinctLabels(scorerGroups.value.map((group) => group.tournamentName || group.shortName || ''))
+  return new Map(scorerGroups.value.map((group, index) => [group.tournamentId, labels[index]]))
+})
 const liveKey = computed(() => overview.value.live.slice(0, 5).map((match) => match.id).join(','))
 const upcoming = computed(() => feedUpcoming(overview.value, chip.value, nextMatch.value?.id))
 const recent = computed(() => feedRecent(overview.value, chip.value))
@@ -342,7 +350,7 @@ onUnmounted(() => {
                   :aria-label="tournament.shortName || tournament.name"
                   @click="chip = tournament.id"
                 >
-                  <span class="chip-label" v-fit-text="tournament.shortName || tournament.name" :title="tournament.shortName || tournament.name"></span>
+                  <span class="chip-label" :title="tournament.name || tournament.shortName">{{ chipLabels.get(tournament.id) }}</span>
                 </button>
               </div>
             </ScrollFade>
@@ -504,11 +512,11 @@ onUnmounted(() => {
               :key="group.tournamentId"
               type="button"
               :class="{ on: activeScorers?.tournamentId === group.tournamentId }"
-              :title="group.shortName || group.tournamentName"
-              :aria-label="group.shortName || group.tournamentName"
+              :title="group.tournamentName || group.shortName"
+              :aria-label="group.tournamentName || group.shortName"
               @click="scorerTab = group.tournamentId"
             >
-              <span class="tab-label" v-fit-text:tab="group.shortName || group.tournamentName" :title="group.shortName || group.tournamentName"></span>
+              <span class="tab-label">{{ scorerLabels.get(group.tournamentId) }}</span>
             </button>
           </div>
         </ScrollFade>

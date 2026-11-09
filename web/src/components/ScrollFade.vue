@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { fitEdgeLabel, fitLabel, fitLabelOwnsResize, scheduleFrame } from '../lib/fitLabel'
 
 const props = withDefaults(defineProps<{
   arrows?: boolean
@@ -30,76 +29,60 @@ function row() {
   return child instanceof HTMLElement ? child : null
 }
 
-function edgeFit() {
-  const node = row()
-  if (!node || getComputedStyle(node).display === 'none') return
-  const labels = [...node.querySelectorAll<HTMLElement>('[data-fit="tab"]')]
-  for (const label of labels) fitLabel(label)
-  const gutter = 46
-  const host = node.getBoundingClientRect()
-  for (const label of labels) {
-    const button = label.parentElement
-    if (!(button instanceof HTMLElement) || button.classList.contains('on')) continue
-    const box = button.getBoundingClientRect()
-    if (box.left < host.left + gutter || box.right <= host.right - gutter) continue
-    const limit = host.right - gutter - box.left
-    if (limit < 64) break
-    if (!fitEdgeLabel(label, limit)) fitLabel(label)
-    break
-  }
+let alive = true
+let frame = 0
+
+function assign<T>(state: { value: T }, next: T) {
+  if (!Object.is(state.value, next)) state.value = next
 }
 
-let fitting = false
-let alive = true
-
 function coverCutChips() {
-  plateWidth.value = 40
   const node = row()
-  if (!props.solid || !narrow.value || !node) return
-  const host = node.getBoundingClientRect()
-  let plateLeft = host.right - 40
-  for (const button of node.querySelectorAll('button')) {
-    if (!(button instanceof HTMLElement)) continue
-    const box = button.getBoundingClientRect()
-    if (box.width < 1 || box.right <= host.left + 1 || box.left >= host.right - 1) continue
-    if (box.right > plateLeft + 0.5) plateLeft = Math.min(plateLeft, box.left)
+  let next = 40
+  if (props.solid && narrow.value && node) {
+    const host = node.getBoundingClientRect()
+    let plateLeft = host.right - 40
+    for (const button of node.querySelectorAll('button')) {
+      if (!(button instanceof HTMLElement)) continue
+      const box = button.getBoundingClientRect()
+      if (box.width < 1 || box.right <= host.left + 1 || box.left >= host.right - 1) continue
+      if (box.right > plateLeft + 0.5) plateLeft = Math.min(plateLeft, box.left)
+    }
+    next = Math.min(host.width, Math.max(40, host.right - plateLeft))
   }
-  plateWidth.value = Math.min(host.width, Math.max(40, host.right - plateLeft))
+  assign(plateWidth, next)
 }
 
 function fadeFlags() {
   const node = row()
   if (!node || getComputedStyle(node).display === 'none') {
-    left.value = false
-    right.value = false
+    assign(left, false)
+    assign(right, false)
     return
   }
   coverCutChips()
-  left.value = node.scrollLeft > 2
-  right.value = node.scrollLeft + node.clientWidth < node.scrollWidth - 2
+  assign(left, node.scrollLeft > 2)
+  assign(right, node.scrollLeft + node.clientWidth < node.scrollWidth - 2)
 }
 
 function fullUpdate() {
   if (!alive) return
   const node = row()
   if (!node || getComputedStyle(node).display === 'none') {
-    left.value = false
-    right.value = false
+    assign(left, false)
+    assign(right, false)
     return
   }
-  if (!fitting) {
-    fitting = true
-    try {
-      edgeFit()
-      revealActive()
-      coverCutChips()
-    } finally { fitting = false }
-  }
+  revealActive()
   fadeFlags()
 }
 
 function scheduleFull() {
-  scheduleFrame(fullUpdate)
+  if (frame) return
+  frame = requestAnimationFrame(() => {
+    frame = 0
+    fullUpdate()
+  })
 }
 
 function revealActive() {
@@ -138,13 +121,9 @@ onMounted(() => {
   phoneWidth()
   bound = row()
   bound?.addEventListener('scroll', onScroll, { passive: true })
-  bound?.addEventListener('fit-label', onScroll)
   fullUpdate()
   revealActive()
-  observer = new ResizeObserver(() => {
-    if (fitLabelOwnsResize()) return
-    scheduleFull()
-  })
+  observer = new ResizeObserver(() => scheduleFull())
   if (bound) observer.observe(bound)
   window.addEventListener('resize', onResize)
   void document.fonts?.ready.then(() => scheduleFull())
@@ -152,9 +131,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   alive = false
+  if (frame) cancelAnimationFrame(frame)
   observer?.disconnect()
   bound?.removeEventListener('scroll', onScroll)
-  bound?.removeEventListener('fit-label', onScroll)
   window.removeEventListener('resize', onResize)
 })
 

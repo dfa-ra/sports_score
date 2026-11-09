@@ -115,7 +115,7 @@ for (const width of [375, 320]) {
       const host = node.getBoundingClientRect()
       const box = active?.getBoundingClientRect()
       return {
-        height: node.clientHeight,
+        height: node.getBoundingClientRect().height,
         scrolls: node.scrollWidth > node.clientWidth + 1,
         topSpread: Math.max(...tops) - Math.min(...tops),
         labels,
@@ -123,11 +123,10 @@ for (const width of [375, 320]) {
         fade: node.parentElement?.classList.contains('show-right') || false,
       }
     })
-    expect(row.height).toBeLessThanOrEqual(48)
+    expect(row.height).toBe(44)
     expect(row.scrolls).toBe(true)
     expect(row.topSpread).toBeLessThan(2)
-    expect(row.labels.some((label) => label.includes('…'))).toBe(true)
-    expect(row.labels.every((label) => label.length > 0)).toBe(true)
+    expect(row.labels).toEqual(Array.from({ length: 9 }, (_, index) => `инженерии ${index + 1}`))
     expect(row.activeInside).toBe(true)
     expect(row.fade).toBe(true)
 
