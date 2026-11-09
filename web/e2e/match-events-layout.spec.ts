@@ -181,6 +181,13 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
           minute: minute.textContent?.trim() || '',
           scorer: scorer.textContent?.trim() || '',
           assist: assist?.textContent?.trim() || '',
+          markClass: (row.querySelector('.mark') as HTMLElement | null)?.className || '',
+          markBox: (() => {
+            const icon = row.querySelector('.mark') as HTMLElement | null
+            if (!icon) return { w: 0, h: 0, top: 0, bottom: 0, left: 0, right: 0 }
+            const box = icon.getBoundingClientRect()
+            return { w: box.width, h: box.height, top: box.top, bottom: box.bottom, left: box.left, right: box.right }
+          })(),
           assistSize: assistStyle?.fontSize || '',
           score: score.textContent?.trim() || '',
           scorerTop: scorerBox.top,
@@ -222,12 +229,19 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
       if (width > 720) expect(row.scorerHeight).toBeGreaterThan(row.scorerLine * 1.4)
       else expect(row.scorerOverflow).toBe(false)
       expect(row.rowWidth).toBeLessThanOrEqual(width)
+      const markMid = (row.markBox.top + row.markBox.bottom) / 2
+      expect(row.markBox.w).toBeGreaterThanOrEqual(13)
+      expect(row.markBox.h).toBeGreaterThanOrEqual(13)
+      expect(markMid).toBeGreaterThanOrEqual(row.scorerTop - 1)
+      expect(markMid).toBeLessThanOrEqual(row.scorerBottom + 1)
       if (row.home) {
         expect(row.textAlign).toBe('left')
-        expect(row.minuteRight).toBeLessThanOrEqual(row.scorerLeft + 1)
+        expect(row.minuteRight).toBeLessThanOrEqual(row.markBox.left + 1)
+        expect(row.markBox.right).toBeLessThanOrEqual(row.scorerLeft + 1)
       } else {
         expect(row.textAlign).toBe('right')
-        expect(row.minuteLeft).toBeGreaterThanOrEqual(row.scorerLeft)
+        expect(row.scorerRight).toBeLessThanOrEqual(row.markBox.left + 1)
+        expect(row.markBox.right).toBeLessThanOrEqual(row.minuteLeft + 1)
         expect(row.scoreLeft).toBeGreaterThanOrEqual(row.minuteRight - 1)
       }
       if (row.assist) {
@@ -251,12 +265,19 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
     expect(awayGoal.assist.includes('#')).toBe(false)
     expect(cardRow.minute).toBe("30'")
     expect(cardRow.score).toBe('')
-    expect(cardRow.assist).toBe('')
+    expect(cardRow.assist).toBe('Жёлтая')
+    expect(cardRow.markClass).toContain('yellow_card')
     expect(cardRow.scorer).toContain(cardPlayer)
-    expect(sub.assist).toBe(`→ #19 ${subIn}`)
+    expect(goal.markClass).toContain('goal')
+    expect(sub.markClass).toContain('substitution')
+    expect(sub.assist).toBe(`Замена → #19 ${subIn}`)
     expect(sub.scorer).toContain(subOut)
     scoreInset.push(facts.rows[0].inset)
     await card.screenshot({ path: shot })
   }
   expect(Math.abs(scoreInset[0] - scoreInset[1])).toBeLessThanOrEqual(1)
+  await page.getByRole('button', { name: 'Протокол' }).click()
+  const protocolCard = page.locator('.timeline li', { hasText: cardPlayer })
+  await expect(protocolCard.locator('strong')).toHaveText('Жёлтая')
+  await expect(protocolCard).toContainText(cardPlayer)
 })

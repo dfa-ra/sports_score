@@ -989,6 +989,7 @@ onUnmounted(() => {
               </div>
               <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
                 <em class="min">{{ shownMinute(ev) != null ? `${shownMinute(ev)}'` : '' }}</em>
+                <i class="mark" :class="ev.eventType.toLowerCase()" />
                 <div class="who">
                   <b>
                     <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
@@ -996,7 +997,8 @@ onUnmounted(() => {
                   </b>
                   <span v-if="isOwnGoal(ev)" class="assist">Автогол</span>
                   <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
-                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && registeredName(ev, 'secondary')" class="assist">→ {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-else-if="(ev.eventType === 'YELLOW_CARD' || ev.eventType === 'RED_CARD') && playerTag(registeredName(ev), ev.playerJersey)" class="assist">{{ labelOf(eventLabel, ev.eventType) }}</span>
+                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && (playerTag(registeredName(ev), ev.playerJersey) || registeredName(ev, 'secondary'))" class="assist">{{ labelOf(eventLabel, ev.eventType) }}<template v-if="registeredName(ev, 'secondary')"> → {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template></span>
                 </div>
                 <span class="run">{{ ev.scoreline ? blockScore(ev.scoreline) : '' }}</span>
               </div>
@@ -1670,26 +1672,24 @@ h2 a { color: inherit; }
 .half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
 .card.events .ev {
   display: grid;
-  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  grid-template-columns: 2.6rem 14px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.12rem 0.5rem;
+  column-gap: 0.5rem;
+  row-gap: 0.05rem;
   width: 100%;
   min-width: 0;
 }
-.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 2.6rem auto; }
-.card.events .ev .who {
-  display: grid;
-  align-items: start;
-  justify-items: start;
-  gap: 0.05rem;
-  width: auto;
-  min-width: 0;
-  text-align: left;
-}
-.card.events .ev.home .who { justify-items: start; text-align: left; }
-.card.events .ev.away .who { order: 1; justify-items: end; text-align: right; }
-.card.events .ev.away .min { order: 2; text-align: right; }
-.card.events .ev.away .run { order: 3; }
+.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 14px 2.6rem auto; }
+.card.events .min { grid-column: 1; grid-row: 1; }
+.card.events .mark { grid-column: 2; grid-row: 1; justify-self: center; }
+.card.events .ev b { grid-column: 3; grid-row: 1; }
+.card.events .assist { grid-column: 3; grid-row: 2; }
+.card.events .run { grid-column: 4; grid-row: 1; }
+.card.events .ev.away b,
+.card.events .ev.away .assist { grid-column: 1; text-align: right; }
+.card.events .ev.away .min { grid-column: 3; text-align: right; }
+.card.events .ev .who { display: contents; text-align: left; }
+.card.events .ev.away .who { text-align: right; }
 .card.events .ev .min {
   font-style: normal;
   color: var(--muted);
