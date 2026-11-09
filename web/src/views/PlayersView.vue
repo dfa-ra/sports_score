@@ -531,6 +531,7 @@ onMounted(() => {
   gap: 0.35rem;
   flex: 1;
 }
+.name-team { align-items: last baseline; }
 .leader-row .name-team {
   flex-direction: column;
   align-items: stretch;
@@ -542,7 +543,7 @@ onMounted(() => {
 .club {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 4px;
   margin: 0;
   min-width: 0;
   color: #6d7b8c;
@@ -550,7 +551,7 @@ onMounted(() => {
   line-height: 1.2;
 }
 .leader-row .club {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   width: 100%;
   max-width: 100%;
@@ -563,9 +564,10 @@ onMounted(() => {
   line-height: 1;
 }
 .club :deep(.team-crest--fallback) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
 }
 .club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 .leader-row .club-name {
@@ -815,7 +817,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .stat-m, .stat-side { display: none; }
   .line .stat-main { font-size: 15px; font-weight: 800; }
   .row-who { gap: 8px; min-width: 0; }
-  .line .name-team { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+  .line .name-team { display: inline-flex; flex-direction: row; align-items: last baseline; gap: 6px; min-width: 0; max-width: 100%; }
   .line .player-name {
     max-width: 132px;
     font-size: 14px;

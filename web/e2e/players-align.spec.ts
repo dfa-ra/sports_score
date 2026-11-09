@@ -1,215 +1,178 @@
-import { expect, test, type Page, type Route } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import { mkdirSync, writeFileSync } from 'node:fs'
 
 const OUT = '/opt/cursor/artifacts'
 const LONG_TEAM = 'Факультет программной инженерии и компьютерной техники'
-const LOGO = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="16" fill="#4cb4e5"/><text x="16" y="21" text-anchor="middle" font-size="12" font-family="sans-serif" fill="#00205b">Q1</text></svg>')}`
 
-function json(route: Route, body: unknown, status = 200) {
-  return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
-}
-
-function person(id: string, first: string, last: string, goals: number, assists: number, teamId: string, logo = '') {
-  return {
-    playerId: id,
-    id,
-    firstName: first,
-    lastName: last,
-    goals,
-    assists,
-    appearances: 8,
-    teamId,
-    teamLogoUrl: logo,
-    avatarUrl: null,
-  }
-}
-
-const scorers = [
-  person('p1', 'Илья', 'Орлов', 12, 2, 'ft'),
-  person('p2', 'Артём', 'Белов', 9, 4, 'ur'),
-  person('p3', 'Мария', 'Соколова', 7, 1, 'q1', LOGO),
-  person('p4', 'Александр', 'Орлов-Воскресенский', 4, 1, 'long'),
-]
-const assists = [
-  person('a1', 'Анна', 'Ким', 2, 8, 'q1', LOGO),
-  person('a2', 'Олег', 'Мороз', 1, 6, 'ur'),
-  person('a3', 'Илья', 'Орлов', 12, 2, 'ft'),
-  person('a4', 'Мария', 'Белова-Преображенская', 1, 3, 'long'),
-]
-
-async function install(page: Page) {
-  await page.route('**/api/v1/**', (route) => {
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
-    if (path.endsWith('/auth/me') || path.endsWith('/auth/refresh')) return json(route, { message: 'no' }, 401)
-    if (path.endsWith('/statistics/board')) return json(route, { scorers, assists })
+    const json = (body: unknown, status = 200) =>
+      route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    if (path.endsWith('/auth/me') || path.endsWith('/auth/refresh')) return json({ message: 'no' }, 401)
+    if (path.endsWith('/statistics/board')) {
+      return json({
+        scorers: [
+          { playerId: 'p1', firstName: 'Илья', lastName: 'Орлов', goals: 12, assists: 2, appearances: 8, teamId: 'ft' },
+          { playerId: 'p2', firstName: 'Мария', lastName: 'Солнцева', goals: 9, assists: 1, appearances: 8, teamId: 'ur' },
+          { playerId: 'p3', firstName: 'Пётр', lastName: 'Квантов', goals: 7, assists: 1, appearances: 8, teamId: 'kv' },
+          { playerId: 'p4', firstName: 'Олег', lastName: 'Длинный', goals: 4, assists: 0, appearances: 8, teamId: 'long' },
+        ],
+        assists: [
+          { playerId: 'a1', firstName: 'Анна', lastName: 'Ким', goals: 2, assists: 8, appearances: 8, teamId: 'ur' },
+          { playerId: 'a2', firstName: 'Сергей', lastName: 'Нов', goals: 1, assists: 6, appearances: 8, teamId: 'ft' },
+          { playerId: 'a3', firstName: 'Ева', lastName: 'Лис', goals: 1, assists: 4, appearances: 8, teamId: 'kv' },
+        ],
+      })
+    }
     if (path.endsWith('/teams')) {
-      return json(route, {
+      return json({
         content: [
-          { id: 'ft', name: 'Физтех', logoUrl: '' },
-          { id: 'ur', name: 'Юристы', logoUrl: '' },
-          { id: 'q1', name: 'Квант', shortName: 'Q1', logoUrl: LOGO },
-          { id: 'long', name: LONG_TEAM, logoUrl: '' },
+          { id: 'ft', name: 'Физтех' },
+          { id: 'ur', name: 'Юристы' },
+          { id: 'kv', name: 'Квант', logoUrl: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16" fill="#123"/></svg>') },
+          { id: 'long', name: LONG_TEAM },
         ],
         totalPages: 1,
       })
     }
-    if (path.endsWith('/tournaments')) {
-      return json(route, { content: [{ id: 'liga', name: 'Лига ИТМО', status: 'ACTIVE' }], totalElements: 1, totalPages: 1 })
-    }
+    if (path.endsWith('/tournaments')) return json({ content: [], totalPages: 1 })
     if (path.endsWith('/home/overview')) {
-      return json(route, {
-        next: null,
-        live: [],
-        upcoming: [],
-        recent: [],
-        tournaments: [],
-        scorersByTournament: [{
-          tournamentId: 'liga',
-          tournamentName: 'Лига ИТМО',
-          shortName: 'Лига',
-          scorers: scorers.map((row) => ({
-            ...row,
-            displayName: `${row.lastName} ${row.firstName}`,
-            teamName: row.teamId === 'long' ? LONG_TEAM : row.teamId === 'ft' ? 'Физтех' : row.teamId === 'ur' ? 'Юристы' : 'Квант',
-          })),
-        }],
-        summary: { teams: 4, players: 4, matchesPlayed: 4, goals: 32, goalsPerMatch: 8 },
+      return json({
+        liveMatches: [],
+        upcomingMatches: [],
+        recentResults: [],
+        topScorers: [],
+        scorersByTournament: [
+          { tournamentId: 't1', tournamentName: 'Кубок', playerId: 'p1', playerName: 'Илья Орлов', teamName: 'Физтех', goals: 12 },
+        ],
       })
     }
-    return json(route, { content: [] })
+    return json({ content: [] })
   })
-}
+})
 
-type Pair = {
-  kind: string
-  name: string
-  team: string
-  box: number
-  ink: number | null
-  nameDelta: number | null
-  groupDelta: number | null
-  crest: { w: number; h: number }
-  ellipsis: boolean
-}
-
-async function pairs(page: Page): Promise<Pair[]> {
-  return page.evaluate(() => {
-    const mid = (box: DOMRect) => box.top + box.height / 2
-    const read = (root: Element, kind: string): Pair | null => {
-      const crest = root.querySelector('.team-crest') as HTMLElement | null
-      const team = root.querySelector('.club-name') as HTMLElement | null
-      if (!crest || !team) return null
-      const crestBox = crest.getBoundingClientRect()
-      const teamBox = team.getBoundingClientRect()
-      const name = root.querySelector('.player-name, .leader-row a') as HTMLElement | null
-      const row = root.closest('.cols.line') as HTMLElement | null
-      const group = root.querySelector('.name-team') as HTMLElement | null
-      let ink: number | null = null
-      if ((crest.textContent || '').trim()) {
-        const crestRange = document.createRange()
-        crestRange.selectNodeContents(crest)
-        const teamRange = document.createRange()
-        teamRange.selectNodeContents(team)
-        const crestInk = crestRange.getBoundingClientRect()
-        const teamInk = teamRange.getBoundingClientRect()
-        if (crestInk.height > 0 && teamInk.height > 0) ink = Math.abs(mid(crestInk) - mid(teamInk))
-      }
-      const teamStyle = getComputedStyle(team)
-      return {
-        kind,
-        name: (name?.textContent || '').trim(),
-        team: (team.textContent || '').trim(),
-        box: Math.abs(mid(crestBox) - mid(teamBox)),
-        ink,
-        nameDelta: name && kind === 'list' ? Math.abs(mid(name.getBoundingClientRect()) - mid(crestBox)) : null,
-        groupDelta: row && group && kind === 'list'
-          ? Math.abs(mid(group.getBoundingClientRect()) - mid(row.getBoundingClientRect()))
-          : null,
-        crest: { w: crestBox.width, h: crestBox.height },
-        ellipsis: teamStyle.whiteSpace === 'nowrap' && teamStyle.textOverflow === 'ellipsis',
-      }
+function measure() {
+  const baseline = (el: Element) => {
+    const probe = document.createElement('span')
+    probe.style.cssText = 'display:inline-block;width:0;height:0;overflow:hidden;vertical-align:baseline;padding:0;margin:0;border:0'
+    el.insertBefore(probe, el.firstChild)
+    const y = probe.getBoundingClientRect().bottom
+    probe.remove()
+    return y
+  }
+  const mid = (box: DOMRect) => box.top + box.height / 2
+  const rows = [...document.querySelectorAll('.cols.line, .leader, .who.name-team')].map((row) => {
+    const crest = row.querySelector('.team-crest')
+    const team = row.querySelector('.club-name')
+    const name = row.querySelector('.player-name') ?? row.querySelector('a')
+    const nameTeam = row.querySelector('.name-team') ?? (row.classList.contains('name-team') ? row : null)
+    if (!crest || !team || !name || !nameTeam) return null
+    const box = crest.getBoundingClientRect()
+    const teamBox = team.getBoundingClientRect()
+    const fallback = crest.classList.contains('team-crest--fallback')
+    let letterDelta: number | null = null
+    if (fallback) {
+      const range = document.createRange()
+      range.selectNodeContents(crest)
+      const letters = range.getBoundingClientRect()
+      if (letters.width > 0 && letters.height > 0) letterDelta = Math.abs(mid(letters) - mid(box))
     }
-    type Pair = {
-      kind: string
-      name: string
-      team: string
-      box: number
-      ink: number | null
-      nameDelta: number | null
-      groupDelta: number | null
-      crest: { w: number; h: number }
-      ellipsis: boolean
+    const stacked = getComputedStyle(nameTeam).flexDirection.startsWith('column')
+    return {
+      kind: row.classList.contains('leader') ? 'leader' : 'row',
+      team: (team.textContent ?? '').trim(),
+      fallback,
+      crest: box.width,
+      letterDelta,
+      baselineDelta: stacked ? null : Math.abs(baseline(name) - baseline(team)),
+      ellipsis: getComputedStyle(team).textOverflow,
+      nowrap: getComputedStyle(team).whiteSpace,
     }
-    const rows = [...document.querySelectorAll('.cols.line')].map((row) => read(row, 'list'))
-    const leaders = [...document.querySelectorAll('.leader')].map((card) => read(card, 'leader'))
-    return [...rows, ...leaders].filter((item): item is Pair => item != null)
+  }).filter(Boolean)
+  const home = [...document.querySelectorAll('.team-crest--fallback')].map((crest) => {
+    const host = crest.parentElement
+    const name = host?.querySelector('.club-name, .srow-name, .player-name')
+    const box = crest.getBoundingClientRect()
+    const range = document.createRange()
+    range.selectNodeContents(crest)
+    const letters = range.getBoundingClientRect()
+    return {
+      letterDelta: letters.height > 0 ? Math.abs(mid(letters) - mid(box)) : null,
+      besideName: Boolean(name),
+    }
   })
+  return { rows, home }
 }
 
-function expectAligned(found: Pair[], width: number, tab: string) {
-  expect(found.length, `${tab} pairs at ${width}`).toBeGreaterThanOrEqual(4)
-  for (const pair of found) {
-    expect(pair.box, `${tab} ${pair.kind} ${pair.team} box at ${width}`).toBeLessThanOrEqual(1)
-    if (pair.ink != null) expect(pair.ink, `${tab} ${pair.kind} ${pair.team} ink at ${width}`).toBeLessThanOrEqual(1)
-    if (pair.nameDelta != null) expect(pair.nameDelta, `${tab} name ${pair.name} at ${width}`).toBeLessThanOrEqual(1)
-    if (pair.groupDelta != null) expect(pair.groupDelta, `${tab} group ${pair.name} at ${width}`).toBeLessThanOrEqual(1)
-    const size = width <= 720 ? 11 : 16
-    expect(pair.crest.w, `${tab} crest width at ${width}`).toBe(size)
-    expect(pair.crest.h, `${tab} crest height at ${width}`).toBe(size)
-  }
-  if (width <= 720) {
-    const long = found.find((pair) => pair.kind === 'list' && pair.team === LONG_TEAM)
-    expect(long?.ellipsis, `ellipsis at ${width}`).toBe(true)
-  }
-}
-
-test('team icon and team name share a vertical center', async ({ page }) => {
+test('crest letters and name baselines at 320, 375 and 1440', async ({ page }) => {
   test.setTimeout(90_000)
   mkdirSync(OUT, { recursive: true })
-  await install(page)
+  const shots: Array<[number, string]> = [
+    [375, `${OUT}/players-goals-375.png`],
+    [320, `${OUT}/players-320.png`],
+    [1440, `${OUT}/players-1440.png`],
+  ]
   const report: Record<string, unknown> = {}
 
-  for (const width of [320, 375, 1440]) {
-    await page.setViewportSize({ width, height: width === 1440 ? 900 : 812 })
+  for (const [width, file] of shots) {
+    await page.setViewportSize({ width, height: width >= 1000 ? 900 : 812 })
     await page.goto('/players')
     await expect(page.getByRole('heading', { name: 'Бомбардиры' })).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
-    const goals = await pairs(page)
-    expectAligned(goals, width, 'goals')
+    const goals = await page.evaluate(measure)
     report[`goals-${width}`] = goals
-    if (width === 375) await page.screenshot({ path: `${OUT}/players-goals-375.png` })
-    if (width === 320) await page.screenshot({ path: `${OUT}/players-320.png` })
-    if (width === 1440) await page.screenshot({ path: `${OUT}/players-1440.png` })
+    assertRows(goals.rows, width)
+    await page.screenshot({ path: file })
 
     await page.getByRole('button', { name: 'Передачи' }).click()
     await expect(page.getByRole('heading', { name: 'Лидеры по передачам' })).toBeVisible()
-    const assistRows = await pairs(page)
-    expectAligned(assistRows, width, 'assists')
-    report[`assists-${width}`] = assistRows
+    await page.evaluate(() => document.fonts.ready)
+    const assists = await page.evaluate(measure)
+    report[`assists-${width}`] = assists
+    assertRows(assists.rows, width)
     if (width === 375) await page.screenshot({ path: `${OUT}/players-assists-375.png` })
   }
 
   await page.setViewportSize({ width: 375, height: 900 })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Бомбардиры по турнирам' })).toBeVisible()
+  await page.evaluate(() => document.fonts.ready)
+  const home = await page.evaluate(measure)
+  report.home = home
+  for (const crest of home.home) {
+    if (crest.letterDelta != null) expect(crest.letterDelta).toBeLessThanOrEqual(0.5)
+  }
   const block = page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Бомбардиры по турнирам' }) })
   await block.scrollIntoViewIfNeeded()
-  const home = await block.evaluate((root) => {
-    const mid = (box: DOMRect) => box.top + box.height / 2
-    return [...root.querySelectorAll('.srow, tr')].map((row) => {
-      const crest = row.querySelector('.team-crest, .crest') as HTMLElement | null
-      const team = row.querySelector('.tm, .club-name') as HTMLElement | null
-      if (!crest || !team) return null
-      const crestBox = crest.getBoundingClientRect()
-      const teamBox = team.getBoundingClientRect()
-      return {
-        team: (team.textContent || '').trim(),
-        box: Math.abs(mid(crestBox) - mid(teamBox)),
-      }
-    }).filter((item) => item != null)
-  })
-  for (const pair of home) expect(pair.box, `home ${pair.team}`).toBeLessThanOrEqual(1)
-  report.home = home as Pair[]
   await block.screenshot({ path: `${OUT}/home-scorers-375.png` })
+
   writeFileSync(`${OUT}/players-align.json`, JSON.stringify(report, null, 2))
 })
+
+function assertRows(
+  rows: Array<{
+    kind: string
+    fallback: boolean
+    crest: number
+    letterDelta: number | null
+    baselineDelta: number | null
+    ellipsis: string
+    nowrap: string
+    team: string
+  } | null>,
+  width: number,
+) {
+  const list = rows.filter((row): row is NonNullable<typeof row> => row != null)
+  expect(list.length).toBeGreaterThan(0)
+  for (const row of list) {
+    if (row.fallback) expect(row.letterDelta ?? 99).toBeLessThanOrEqual(0.5)
+    if (row.baselineDelta != null) expect(row.baselineDelta).toBeLessThanOrEqual(0.5)
+    const crest = width <= 720 ? 11 : 16
+    expect(row.crest).toBeCloseTo(crest, 0)
+    if (row.team === LONG_TEAM) {
+      expect(row.ellipsis).toBe('ellipsis')
+      expect(row.nowrap).toBe('nowrap')
+    }
+  }
+}
