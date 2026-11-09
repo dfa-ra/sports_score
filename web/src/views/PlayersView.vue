@@ -13,6 +13,7 @@ import {
   goalsAside,
   goalsFromCard,
   highlightParts,
+  leaderBoardTitle,
   playerSearchParams,
   playerSearchQuery,
   teamFromCard,
@@ -402,7 +403,7 @@ onMounted(() => {
 
       <div class="sheet">
         <div class="board-head">
-          <h2>Бомбардиры</h2>
+          <h2>{{ leaderBoardTitle(mode) }}</h2>
           <div class="switch" role="group" aria-label="Показатель">
             <button type="button" :class="{ on: mode === 'goals' }" :aria-pressed="mode === 'goals'" @click="mode = 'goals'">Голы</button>
             <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Передачи</button>
@@ -590,8 +591,8 @@ onMounted(() => {
 .leaders .card { min-height: 116px; border-radius: 18px; display: block; }
 .sheet { overflow: hidden; }
 .board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.75rem 0.85rem 0.3rem; }
-.board-head h2 { margin: 0; font-size: 1rem; letter-spacing: 0.04em; }
-.switch { display: inline-flex; background: #eef3f8; border-radius: 999px; padding: 0.15rem; }
+.board-head h2 { margin: 0; min-width: 0; font-size: 1rem; letter-spacing: 0.04em; overflow-wrap: break-word; }
+.switch { display: inline-flex; flex: 0 0 auto; background: #eef3f8; border-radius: 999px; padding: 0.15rem; }
 .switch button { border: 0; background: transparent; border-radius: 999px; padding: 0.28rem 0.7rem; font-weight: 700; color: #5d6b7c; cursor: pointer; }
 .switch button.on { background: #4cb4e5; color: #04203f; }
 .cols {

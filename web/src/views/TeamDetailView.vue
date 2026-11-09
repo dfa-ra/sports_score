@@ -504,6 +504,49 @@ h2 { font-size: 1.2rem; }
 .make-captain:hover,
 .make-captain:focus-visible { color: var(--navy); }
 .make-captain:disabled { cursor: wait; opacity: 0.45; }
+@media (max-width: 399px) {
+  .stats-card { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .stats-card .table-wrap { overflow-x: clip; }
+  .stats-card .stat-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .stats-card .stat-table th:not(.who-h),
+  .stats-card .stat-table td.num {
+    padding-left: 0.08rem;
+    padding-right: 0.08rem;
+  }
+  .stats-card .stat-table th:nth-child(2),
+  .stats-card .stat-table td:nth-child(2),
+  .stats-card .stat-table th:nth-child(4),
+  .stats-card .stat-table td:nth-child(4) { width: 2.35rem; }
+  .stats-card .stat-table th:nth-child(3),
+  .stats-card .stat-table td:nth-child(3) { width: 1.95rem; }
+  .stats-card .stat-table th:nth-child(5),
+  .stats-card .stat-table td:nth-child(5) { width: 1.55rem; }
+  .stats-card .stat-table td:first-child { padding-left: 0.1rem; padding-right: 0.15rem; }
+  .stats-card .stat-table th.who-h { white-space: normal; }
+  .stats-card .stat-table .who {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 0.4rem;
+    row-gap: 0.15rem;
+    align-items: center;
+  }
+  .stats-card .stat-table .who a {
+    grid-column: 2;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: break-word;
+  }
+  .stats-card .stat-table .captain-badge {
+    grid-column: 2;
+    justify-self: start;
+    width: fit-content;
+  }
+}
 @media (hover: hover) and (pointer: fine) and (min-width: 721px) {
   .make-captain {
     max-width: 0;

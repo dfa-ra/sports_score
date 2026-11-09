@@ -62,6 +62,12 @@ export function unitWord(count: number, kind: 'goals' | 'assists') {
   return countLabel(n, 'передача', 'передачи', 'передач')
 }
 
+/** Source case for the /players sheet title. Global h2 styles uppercase it. */
+export function leaderBoardTitle(mode: 'goals' | 'assists') {
+  if (mode === 'assists') return 'Лидеры по передачам'
+  return 'Бомбардиры'
+}
+
 function numeric(value: unknown): number | null {
   if (typeof value === 'number' && !Number.isNaN(value)) return value
   if (typeof value === 'string' && value.trim() && !Number.isNaN(Number(value))) return Number(value)

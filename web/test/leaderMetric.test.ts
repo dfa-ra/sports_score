@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { goalsAside, unitWord } from '../src/lib/q2Players.ts'
+import { goalsAside, leaderBoardTitle, unitWord } from '../src/lib/q2Players.ts'
 
 const forms = [
   { count: 0, goals: 'голов', assists: 'передач' },
@@ -28,4 +28,9 @@ test('leader metric words follow the existing goal and assist forms', () => {
   assert.equal(unitWord(22, 'assists'), 'передачи')
   assert.equal(unitWord(0, 'goals'), 'голов')
   assert.equal(goalsAside(null), '–')
+})
+
+test('players leader table title follows the goals and passes tabs', () => {
+  assert.equal(leaderBoardTitle('goals'), 'Бомбардиры')
+  assert.equal(leaderBoardTitle('assists'), 'Лидеры по передачам')
 })
