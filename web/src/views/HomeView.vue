@@ -911,7 +911,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .sk-matches { height: 521px; min-height: 521px; }
 .sk-tcard { height: 455px; min-height: 455px; }
 .sk-scorers { height: 321px; min-height: 321px; }
-@media (max-width: 719px) {
+@media (max-width: 720px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; padding: 1.25rem; }
   .hero-card { min-height: 446px; }
   .vs { gap: 0.45rem; flex-wrap: nowrap; font-size: 1.1rem; }
@@ -972,7 +972,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .sk-tcard { height: 554px; min-height: 554px; }
   .sk-scorers { height: 291px; min-height: 291px; }
 }
-@container home (max-width: 719px) {
+@container home (max-width: 720px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
   .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
@@ -994,22 +994,127 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .tgrid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
-  .hero-card { margin-inline: -0.75rem; }
-  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
-  .vs { gap: 0.15rem; }
-  .side { gap: 0.15rem; }
+  .vs { gap: 0.35rem; }
+  .side { gap: 0.35rem; }
   .x { letter-spacing: 0; }
-  .team-name { font-size: 0.95rem; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
 }
 @container home (max-width: 480px) {
-  .hero-card { margin-inline: -0.75rem; }
-  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { padding-left: 0.7rem; padding-right: 0.7rem; }
-  .vs { gap: 0.15rem; }
-  .side { gap: 0.15rem; }
+  .vs { gap: 0.35rem; }
+  .side { gap: 0.35rem; }
   .x { letter-spacing: 0; }
-  .team-name { font-size: 0.95rem; }
-  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 32px; height: 32px; font-size: 0.7rem; }
+}
+@media (max-width: 720px) {
+  .container { width: min(1120px, calc(100% - 2 * var(--page-gutter))); }
+  .band { background: #001433; padding: 10px 0; }
+  .block { padding-top: 12px; }
+  .hero-card {
+    background: #0a2149;
+    border-radius: 16px;
+    min-height: 0 !important;
+    margin-inline: 0;
+  }
+  .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) {
+    padding: 12px;
+    min-height: 0;
+  }
+  .hero-card.has-live, .hero-card:has(.livebar) { min-height: 0; }
+  .wm { width: 140px; opacity: 0.15; right: -8px; top: -18px; }
+  .eyebrow { font-size: 11px; font-weight: 700; line-height: 14px; letter-spacing: 0.06em; }
+  .vs { height: 36px; margin: 10px 0; gap: 8px; font-size: 14px; align-items: center; }
+  .side { gap: 8px; }
+  .team-name { font-size: 14px; line-height: 16px; font-weight: 800; }
+  .x { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
+  .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 28px; height: 28px; font-size: 10px; }
+  .meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; height: 22px; margin: 0 0 10px; }
+  .meta .stage { flex: 1 1 auto; text-align: left; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta .tb { height: 22px; border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 700; line-height: 22px; }
+  .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .hv-btn { height: 44px; width: 100%; border-radius: 12px; padding: 0 12px; font-size: 14px; position: relative; }
+  .stats {
+    box-sizing: border-box;
+    height: 58px;
+    padding: 6px 0 4px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .stats .eyebrow { font-size: 10px; line-height: 12px; font-weight: 700; letter-spacing: 0.06em; margin: 0 0 2px 10px; }
+  .stat { border-left: 0; padding: 0 2px; position: relative; }
+  .stat:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 1px;
+    height: 30px;
+    transform: translateY(-50%);
+    background: #dce5ee;
+  }
+  .stat b { font-size: 17px; line-height: 17px; font-weight: 800; }
+  .stat > span { min-height: 0; font-size: 10.5px; line-height: 12px; font-weight: 500; }
+  .card { border-radius: 12px; }
+  .card-head { height: 44px; padding: 0 12px; background: #fff; border-bottom: 0; }
+  .card-head small { display: none; }
+  .card-head h2 { font-size: 16px; line-height: 20px; font-weight: 800; }
+  .more-link { font-size: 12px; font-weight: 800; line-height: 16px; }
+  .filters { height: 44px; padding: 0; border-bottom: 0; display: flex; align-items: center; }
+  .chips { gap: 8px; padding: 0; scroll-padding-inline: 12px; }
+  .chips::before { flex-basis: 12px; }
+  .chips::after { flex-basis: 28px; }
+  .chip {
+    position: relative;
+    height: 32px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 16px;
+  }
+  .chip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .feed-cards { gap: 10px; padding: 4px 0 12px 12px; scroll-padding-inline: 0; }
+  .mc {
+    flex: 0 0 calc(100% - 66px);
+    width: calc(100% - 66px);
+    height: 118px;
+    padding: 8px 10px;
+    gap: 0;
+    border-radius: 14px;
+    grid-template-rows: 22px 26px 26px auto;
+    align-content: start;
+  }
+  .mc-top { height: 22px; }
+  .mc .tb, .mc .st { height: 22px; font-size: 11px; line-height: 22px; padding: 0 8px; }
+  .mc-t { height: 26px; font-size: 14px; font-weight: 700; }
+  .mc-t :deep(.crest) { width: 22px !important; height: 22px !important; font-size: 10px; }
+  .mc-t b { font-size: 14px; }
+  .mc-foot { font-size: 11.5px; line-height: 14px; font-weight: 500; padding-top: 4px; }
+  .tabs { height: 44px; }
+  .tabs button { height: 44px; padding: 0 12px; font-size: 12px; font-weight: 700; }
+  .sk-hero { height: 170px; min-height: 170px; border-radius: 16px; }
+  .sk-stats { height: 58px; min-height: 58px; border-radius: 12px; }
+  .sk-matches { height: 214px; min-height: 214px; }
+  .block-empty, .block-error {
+    box-sizing: border-box;
+    min-height: 60px;
+    max-height: 68px;
+    height: 64px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+  .block-error .hv-btn { width: auto; min-width: 108px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

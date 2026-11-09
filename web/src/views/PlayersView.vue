@@ -632,11 +632,175 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
 .bars { height: 28px; min-height: 0; }
 .num { height: 18px; min-height: 0; }
 @media (max-width: 720px) {
-  .hero { border-radius: 16px; }
-  .hero h1 { font-size: 1.55rem; }
-  .chips-sticky { top: 56px; }
-  .leaders { grid-template-columns: 1fr; }
-  .cols { grid-template-columns: 1.5rem minmax(0, 1fr) 2rem; }
+  .players { gap: 8px; margin-top: -8px; }
+  .hero {
+    box-sizing: border-box;
+    height: 68px;
+    min-height: 68px;
+    padding: 12px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .hero h1 {
+    flex: 0 0 auto;
+    font-size: 20px;
+    line-height: 24px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .search { flex: 1 1 auto; min-width: 150px; }
+  .search input {
+    height: 44px;
+    border-radius: 10px;
+    padding: 0 36px 0 12px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+  .search button { width: 44px; height: 44px; right: 0; font-size: 18px; }
+  .chips-sticky { top: var(--chrome-h); height: 44px; padding: 0; display: flex; align-items: center; }
+  .chips { gap: 8px; height: 44px; align-items: center; }
+  .chip {
+    position: relative;
+    height: 32px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 32px;
+  }
+  .chip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .leaders { grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
+  .leader {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label label label"
+      "avatar spacer metric"
+      "name name name";
+    gap: 4px 6px;
+    align-content: start;
+    box-sizing: border-box;
+    min-height: 104px;
+    height: 104px;
+    overflow: hidden;
+    padding: 10px;
+    border-radius: 12px;
+  }
+  .leader p {
+    grid-area: label;
+    margin: 0;
+    font-size: 10px;
+    line-height: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .leader-row { display: contents; }
+  .leader-row :deep(.player-avatar) {
+    grid-area: avatar;
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .leader-metric {
+    grid-area: metric;
+    min-width: 0;
+    align-items: flex-end;
+    align-self: center;
+    text-align: right;
+    gap: 0;
+  }
+  .leader-metric b { font-size: 28px; font-weight: 800; line-height: 1; }
+  .leader-metric small { font-size: 10.5px; font-weight: 500; line-height: 14px; }
+  .leader-row .name-team { grid-area: name; gap: 1px; min-width: 0; max-width: 100%; overflow: hidden; }
+  .leader-row .who a {
+    display: block;
+    max-width: 100%;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 16px;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .leader-row .club { font-size: 11px; line-height: 14px; font-weight: 500; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
+  .leader-row .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .leader-row .club-name {
+    display: block;
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+  .leaders .card { min-height: 104px; height: 104px; border-radius: 12px; }
+  .sheet { border-radius: 12px; }
+  .board-head { box-sizing: border-box; height: 48px; padding: 0 12px; }
+  .board-head h2 { font-size: 16px; line-height: 20px; font-weight: 800; }
+  .switch { width: 150px; height: 36px; align-items: center; }
+  .switch button {
+    position: relative;
+    height: 30px;
+    min-width: 66px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .switch button::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .cols { grid-template-columns: 20px minmax(0, 1fr) 28px; padding: 0 12px; }
+  .cols.head { height: 24px; font-size: 11px; font-weight: 600; line-height: 14px; }
+  .cols.line { box-sizing: border-box; height: 48px; }
   .stat-m, .stat-side { display: none; }
+  .line .stat-main { font-size: 15px; font-weight: 800; }
+  .row-who { gap: 8px; min-width: 0; }
+  .line .name-team { flex-direction: row; align-items: center; gap: 6px; min-width: 0; }
+  .line .player-name {
+    max-width: 132px;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .line .club { max-width: 82px; font-size: 11px; line-height: 14px; }
+  .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
+  .place { font-size: 13px; font-weight: 700; }
+  .skel { height: 48px; box-sizing: border-box; }
+  .note {
+    box-sizing: border-box;
+    height: 64px;
+    min-height: 60px;
+    max-height: 68px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+  }
+  .note p { font-size: 13.5px; font-weight: 700; line-height: 18px; }
+  .note .btn { height: 44px; min-height: 44px; }
 }
 </style>

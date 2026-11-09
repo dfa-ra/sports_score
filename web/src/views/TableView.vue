@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -76,6 +77,7 @@ const tab = computed<Tab>(() => {
 })
 
 const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
 const ink = ref({ x: 0, y: 0, w: 0, slide: false })
 let inkObserver: ResizeObserver | null = null
 
@@ -546,12 +548,75 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   line-height: 1.4;
 }
 @media (max-width: 720px) {
-  .league-tabs button {
-    padding: 0.5rem 0.42rem 0.45rem;
-    letter-spacing: 0.02em;
-    font-size: 0.7rem;
+  .page { gap: 0; margin-top: -9px; }
+  .league {
+    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-rows: minmax(36px, auto) 44px;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    height: auto;
+    min-height: 88px;
+    padding: 0;
   }
-  .tie-note { padding-inline: 0.85rem; }
+  .league :deep(.brand-mark) { width: 36px !important; height: 36px !important; grid-row: 1; }
+  .league > div { display: contents; }
+  .league h1 {
+    grid-row: 1;
+    grid-column: 2;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 800;
+    white-space: normal;
+  }
+  .season { grid-row: 2; grid-column: 1 / -1; max-width: none; margin: 0; }
+  .season :deep(select),
+  .season select {
+    height: 44px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    padding: 0 32px 0 12px;
+  }
+  .league-tabs { margin-top: 12px; }
+  .league-tabs button {
+    padding: 0 10px;
+    letter-spacing: 0.02em;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .sheet-stack { gap: 8px; margin-top: 6px; }
+  .sheet { display: grid; }
+  .group-title {
+    grid-row: 1;
+    box-sizing: border-box;
+    height: 34px;
+    margin: 0;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .sheet :deep(.board) { display: contents; }
+  .sheet :deep(.line.head) {
+    grid-row: 1;
+    height: 34px;
+    min-height: 34px;
+    background: transparent;
+  }
+  .sheet :deep(.line.head span:first-child),
+  .sheet :deep(.line.head .team-label) { visibility: hidden; }
+  .tie-note {
+    margin: 8px 0 0;
+    padding: 0 12px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+  }
 }
 .sheet {
   background: #fff;

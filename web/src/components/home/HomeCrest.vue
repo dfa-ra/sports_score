@@ -51,11 +51,8 @@ const letters = computed(() => initials(props.name || ''))
   display: block;
   box-shadow: none;
 }
-@media (max-width: 719px) {
-  .crest.lg { width: 44px; height: 44px; font-size: 0.9rem; }
-}
-@media (max-width: 480px) {
-  .crest.lg { width: 32px; height: 32px; font-size: 0.7rem; }
+@media (max-width: 720px) {
+  .crest.lg { width: 28px; height: 28px; font-size: 0.7rem; }
 }
 .c0 { background: var(--navy); color: #fff; }
 .c1 { background: var(--ice); color: var(--navy); }

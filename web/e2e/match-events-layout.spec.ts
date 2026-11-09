@@ -187,6 +187,7 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
           scorerBottom: scorerBox.bottom,
           scorerHeight: scorerBox.height,
           scorerLine: parseFloat(scorerStyle.fontSize) || 14,
+          scorerOverflow: scorer.scrollWidth > scorer.clientWidth + 1,
           assistTop: assist ? box(assist).top : null,
           assistLeft: assist ? box(assist).left : null,
           assistRight: assist ? box(assist).right : null,
@@ -218,7 +219,8 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
       expect(row.scoreTop).toBeGreaterThanOrEqual(row.rowTop - 1)
       expect(row.scoreBottom).toBeLessThanOrEqual(row.rowBottom + 1)
       expect(row.scoreTop).toBeLessThan(row.scorerBottom)
-      expect(row.scorerHeight).toBeGreaterThan(row.scorerLine * 1.4)
+      if (width > 720) expect(row.scorerHeight).toBeGreaterThan(row.scorerLine * 1.4)
+      else expect(row.scorerOverflow).toBe(false)
       expect(row.rowWidth).toBeLessThanOrEqual(width)
       if (row.home) {
         expect(row.textAlign).toBe('left')
@@ -229,7 +231,7 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
         expect(row.scoreLeft).toBeGreaterThanOrEqual(row.minuteRight - 1)
       }
       if (row.assist) {
-        expect(row.assistSize).toBe('12px')
+        expect(row.assistSize).toBe(width <= 720 ? '11px' : '12px')
         expect(row.assistTop!).toBeGreaterThanOrEqual(row.scorerBottom - 2)
         expect(row.scoreTop).toBeLessThan(row.assistTop!)
         if (row.home) expect(Math.abs(row.assistLeft! - row.scorerLeft)).toBeLessThanOrEqual(2)

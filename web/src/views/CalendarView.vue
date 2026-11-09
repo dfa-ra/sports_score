@@ -110,6 +110,11 @@ const chipTournaments = computed(() => {
   return [...ids].map((id) => tournaments.value[id] || { id, name: matchName(id) }).sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 })
 
+const showToday = computed(() => !liveOnly.value && filter.value.kind !== 'undated' && selectedDay.value === todayKey.value)
+const phone = ref(false)
+let phoneMedia: MediaQueryList | null = null
+function syncPhone() { phone.value = !!phoneMedia?.matches }
+
 const eyebrow = computed(() => {
   if (liveOnly.value) return 'Игры · Live'
   if (filter.value.kind === 'undated') return 'Игры · Без даты'
@@ -287,6 +292,9 @@ function hint(match: CalendarMatch) {
 }
 
 onMounted(async () => {
+  phoneMedia = window.matchMedia('(max-width: 720px)')
+  syncPhone()
+  phoneMedia.addEventListener('change', syncPhone)
   syncCalendarQuery()
   await load(true)
   armRefresh()
@@ -312,17 +320,19 @@ watch(() => week.value.join('|'), (next, prev) => {
 })
 
 onUnmounted(() => {
+  phoneMedia?.removeEventListener('change', syncPhone)
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 </script>
 
 <template>
   <section class="calendar">
-    <header class="hero">
+    <div class="hero-band">
+    <header class="hero" :class="{ 'is-today': showToday }">
       <p class="eyebrow">{{ eyebrow }}</p>
       <h1>{{ title }}</h1>
       <p v-if="meta" class="meta">
-        <span>{{ meta }}</span>
+        <span class="today-bit">Сегодня · </span><span>{{ meta }}</span>
       </p>
       <p v-else-if="heroPending" class="meta quiet">Загрузка матчей…</p>
       <div v-if="!liveOnly && filter.kind !== 'undated'" class="week">
@@ -345,7 +355,7 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <ScrollFade class="filters-fade" arrows solid fade="#e8eef4">
+    <ScrollFade class="filters-fade" arrows :fade="phone ? '#001433' : '#e8eef4'">
       <div class="filters" role="tablist" aria-label="Фильтр матчей">
         <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
           <span class="full chip-label">Все турниры</span><span class="short chip-label">Все</span>
@@ -369,6 +379,7 @@ onUnmounted(() => {
         </button>
       </div>
     </ScrollFade>
+    </div>
 
     <p v-if="!countsReady && !loading && !error" class="note">Показаны не все матчи</p>
 
@@ -467,6 +478,8 @@ onUnmounted(() => {
 
 <style scoped>
 .calendar { display: grid; gap: 0.9rem; min-width: 0; }
+.hero-band { display: contents; }
+.today-bit { display: none; }
 .hero {
   background: var(--ink);
   color: #fff;
@@ -616,15 +629,134 @@ onUnmounted(() => {
 .mini span { grid-column: 1 / -1; color: var(--muted); font-size: 0.75rem; }
 .fav-mobile { display: none; }
 @media (max-width: 720px) {
-  .layout { grid-template-columns: 1fr; }
+  .calendar { gap: 0; }
+  .hero-band {
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: var(--chrome-h);
+    z-index: 6;
+    background: #001433;
+    margin-inline: calc(var(--page-gutter) * -1);
+    margin-top: -16px;
+    width: calc(100% + 2 * var(--page-gutter));
+    min-height: 150px;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+  }
+  .hero, .week, .days, .filters-fade { min-width: 0; max-width: 100%; }
+  .days { width: 100%; }
+  .day { min-width: 0; }
+  .hero {
+    border-radius: 0;
+    background: transparent;
+    padding: 8px var(--page-gutter) 0;
+    min-height: 0;
+  }
+  .hero.is-today .eyebrow { display: none; }
+  .hero.is-today .today-bit { display: inline; }
+  .hero h1 {
+    font-size: 18px;
+    line-height: 22px;
+    font-weight: 800;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .meta { margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; white-space: normal; }
+  .meta.quiet { white-space: nowrap; }
+  .week { height: 44px; margin: 0; gap: 4px; }
+  .days { gap: 4px; }
+  .arrow { width: 32px; height: 44px; border-radius: 10px; font-size: 16px; }
+  .day {
+    height: 44px;
+    border-radius: 10px;
+    padding: 2px 0;
+    gap: 0;
+    background: #0d2552;
+  }
+  .day span { font-size: 10px; font-weight: 600; line-height: 12px; }
+  .day b { font-size: 14px; font-weight: 800; line-height: 16px; }
+  .dot { width: 4px; height: 4px; bottom: 3px; }
+  .filters-fade {
+    position: static;
+    height: 44px;
+    margin-top: auto;
+    padding: 0 var(--page-gutter);
+    background: transparent;
+  }
+  .filters { height: 44px; align-items: center; gap: 8px; padding: 0; scroll-padding-inline: 0; }
+  .filters::before, .filters::after { display: none; }
+  .filters button {
+    position: relative;
+    height: 32px;
+    padding: 0 14px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 16px;
+    background: #0d2552;
+    color: #fff;
+    border: 1px solid #2c4677;
+  }
+  .filters button.on { background: #4cb4e5; color: var(--navy); border-color: #4cb4e5; }
+  .filters button::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .layout { grid-template-columns: 1fr; margin-top: 12px; gap: 12px; }
+  .main-col { gap: 12px; }
   .side { display: none; }
-  .fav-mobile { display: block; }
+  .fav-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+    height: 60px;
+    padding: 0 12px;
+    border-radius: 12px;
+  }
+  .fav-mobile .card-head { padding: 0; gap: 8px; width: auto; }
+  .fav-mobile .card-head b { font-size: 14px; font-weight: 800; line-height: 18px; }
+  .fav-mobile .empty {
+    display: block;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    color: var(--muted);
+  }
   .filters .full { display: none; }
   .filters .short { display: inline; }
-  .hero { border-radius: 18px; padding: 0.95rem 0.8rem 0.8rem; }
-  .card-head { gap: 1rem; align-items: flex-start; padding: 0.9rem 1rem; }
-  .card-head a { margin-left: 0.25rem; padding-top: 0.15rem; }
-  .days { gap: 0.2rem; }
+  .card { border-radius: 12px; }
+  .card.state, .skeleton {
+    box-sizing: border-box;
+    height: 68px;
+    min-height: 60px;
+    max-height: 68px;
+    padding: 0 12px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+  }
+  .card.state strong { font-size: 13.5px; font-weight: 700; line-height: 18px; }
+  .card.state .btn { height: 44px; min-height: 44px; min-width: 100px; border-radius: 12px; }
+  .card-head { gap: 8px; align-items: center; padding: 0 12px; height: 44px; }
+  .days { gap: 4px; }
   .day { padding-inline: 0; }
 }
 </style>

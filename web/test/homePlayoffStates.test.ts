@@ -24,12 +24,12 @@ test('home blocks keep their own loading, empty and error copy', () => {
   assert.match(home, /showStats = computed\(\(\) => !failed\.value/)
 })
 
-test('hero crests follow the approved sizes: 56, 44, and 32 only under 480', () => {
+test('hero crests are 56 on desktop and 28 in the compact mobile band', () => {
   assert.match(crest, /\.crest\.lg \{ width: 56px; height: 56px;/)
-  assert.match(crest, /@media \(max-width: 719px\) \{\s*\.crest\.lg \{ width: 44px; height: 44px;/)
-  assert.match(crest, /@media \(max-width: 480px\) \{\s*\.crest\.lg \{ width: 32px; height: 32px;/)
-  assert.match(home, /max-width: 719px\) \{[\s\S]*width: 44px; height: 44px;/)
-  assert.doesNotMatch(home, /max-width: 719px\) \{[\s\S]{0,400}width: 32px; height: 32px;/)
+  assert.match(crest, /@media \(max-width: 720px\) \{\s*\.crest\.lg \{ width: 28px; height: 28px;/)
+  assert.doesNotMatch(crest, /width: 32px/)
+  assert.match(home, /max-width: 720px\) \{[\s\S]*width: 28px; height: 28px;/)
+  assert.doesNotMatch(home, /width: 32px; height: 32px;/)
 })
 
 test('playoff card keeps the approved title and the three states', () => {

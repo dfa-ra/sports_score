@@ -205,6 +205,19 @@ watch(() => props.watchKey, () => {
 }
 .scroll-fade-edge.left { left: 0; }
 .scroll-fade-edge.right { right: 0; }
+@media (max-width: 720px) {
+  .scroll-fade-edge { width: 40px; }
+  .scroll-fade-arrow { position: absolute; }
+  .scroll-fade-arrow::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
+}
 .scroll-fade-plate {
   position: absolute;
   top: 0;

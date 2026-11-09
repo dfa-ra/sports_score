@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
@@ -71,6 +72,8 @@ const homeStarTap = ref(0)
 const awayStarTap = ref(0)
 type MatchTab = 'overview' | 'stats' | 'lineups' | 'protocol'
 const matchTabs: MatchTab[] = ['overview', 'stats', 'lineups', 'protocol']
+const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
 const tab = computed<MatchTab>(() => {
   const raw = String(route.query.tab || '')
   return matchTabs.includes(raw as MatchTab) ? raw as MatchTab : 'overview'
@@ -960,7 +963,7 @@ onUnmounted(() => {
       </form>
     </AdminOnly>
 
-    <div class="match-tabs" role="tablist">
+    <div ref="tabBar" class="match-tabs" role="tablist">
       <button type="button" :class="{ on: tab === 'overview' }" @click="setTab('overview')"><span class="tab-label">Обзор</span></button>
       <button type="button" :class="{ on: tab === 'stats' }" @click="setTab('stats')"><span class="tab-label"><span class="full">Статистика</span><span class="short">Стат.</span></span></button>
       <button type="button" :class="{ on: tab === 'lineups' }" @click="setTab('lineups')"><span class="tab-label">Составы</span></button>
@@ -1765,12 +1768,157 @@ h2 a { color: inherit; }
 .card.events { align-self: start; height: auto; min-width: 0; max-width: 100%; overflow-x: clip; }
 .empty-events { margin: 0; padding: 0.4rem 0 0.15rem; }
 @media (max-width: 720px) {
-  .overview { grid-template-columns: 1fr; }
-  .match-tabs { flex-wrap: wrap; overflow: visible; }
-  .match-tabs button { flex: 1 1 auto; min-width: max-content; }
+  .match-page { gap: 10px; margin-top: -6px; }
+  .overview { grid-template-columns: 1fr; gap: 12px; }
+  .pitch {
+    box-sizing: border-box;
+    min-height: 152px;
+    border-radius: 16px;
+    padding: 8px 12px 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: stretch;
+    align-items: center;
+    align-content: space-between;
+    text-align: left;
+    gap: 4px 8px;
+  }
+  .pitch-top { grid-column: 1 / -1; min-height: 28px; }
+  .pitch-top a, .pitch-top span {
+    position: relative;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 18px;
+  }
+  .pitch-top a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .pill { height: 22px; padding: 0 8px; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
+  .pitch-score { grid-column: 1 / -1; margin: 0; align-items: center; }
+  .pitch-side {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0;
+  }
+  .pitch-side.away { justify-content: flex-end; }
+  .pitch-who { gap: 2px; }
+  .pitch-who :deep(.team-crest) { width: 36px !important; height: 36px !important; font-size: 12px !important; }
+  .pitch-who strong {
+    font-size: 12.5px;
+    line-height: 16px;
+    font-weight: 800;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 7.5rem;
+  }
+  .fav-star {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    margin-top: 9px;
+    padding: 0;
+    font-size: 11px;
+    line-height: 18px;
+  }
+  .fav-star::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
+  .nums b { font-size: 32px; line-height: 1; font-weight: 800; letter-spacing: 0.02em; }
+  .pitch-meta {
+    grid-column: 1;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .pitch :deep(.share) {
+    grid-column: 2;
+    align-self: center;
+    margin: 0;
+    box-sizing: border-box;
+    width: 104px;
+    height: 32px;
+    border-radius: 16px;
+    font-size: 13px;
+  }
+  .match-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    height: 44px;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    position: static;
+    border-bottom: 1px solid #dce5ee;
+    scrollbar-width: none;
+  }
+  .match-tabs::-webkit-scrollbar { display: none; }
+  .match-tabs button {
+    flex: 0 0 auto;
+    height: 44px;
+    min-width: 0;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: none;
+  }
+  .match-tabs .tab-label { padding: 0 0 0; border-bottom-width: 3px; font-size: 14px; line-height: 20px; }
   .match-tabs .full { display: none; }
   .match-tabs .short { display: inline; }
-  .pitch { border-radius: 18px; }
-  .pitch-who strong { font-size: 0.85rem; }
+  .card { border-radius: 12px; padding: 0 12px 12px; }
+  .card header { height: 36px; }
+  .card header b { font-size: 15px; line-height: 20px; font-weight: 800; text-transform: none; }
+  .card header span { font-size: 14px; font-weight: 700; }
+  .half { height: 36px; padding: 0; font-size: 13.5px; font-weight: 600; }
+  .card.events .ev {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 44px;
+    padding: 0;
+    align-items: center;
+  }
+  .card.events .ev .who { max-width: 100%; }
+  .card.events .ev b,
+  .card.events .ev b a {
+    display: block;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 800;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .card.events .ev .min { font-size: 12px; font-weight: 600; }
+  .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
+  .card.events .run { font-size: 13px; font-weight: 800; }
+  .total { height: 40px; margin-top: 4px; border-radius: 10px; padding: 0 10px; background: #eef5fc; }
+  .form-row { padding: 4px 0; }
+  .form-row :deep(.team-crest) { width: 22px !important; height: 22px !important; }
+  .form-row b { font-size: 14px; font-weight: 800; }
+  .marks { gap: 4px; }
+  .marks i { width: 22px; height: 22px; border-radius: 5px; font-size: 11px; }
+  .empty-events { padding: 8px 0 4px; }
 }
 </style>

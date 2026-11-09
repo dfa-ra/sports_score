@@ -125,12 +125,36 @@ function advances(index: number) {
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
 .rank.navy { background: var(--navy); color: #fff; }
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .line,
   .compact .line {
-    grid-template-columns: 2.2rem minmax(0, 1fr) 1.8rem 3.4rem 2.1rem;
-    padding: 0 0.55rem;
+    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 2px 0 12px;
+    font-size: 14px;
+  }
+  .head {
+    height: 34px;
+    min-height: 34px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
   .wide { display: none; }
+  .club { grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+  .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
+  .club b { font-size: 14px; font-weight: 600; line-height: 18px; }
+  .rank {
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    background: transparent;
+    color: #8b97a8;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .rank.ice, .rank.navy { background: transparent; color: #8b97a8; }
+  .points { font-size: 14px; font-weight: 700; }
 }
 </style>

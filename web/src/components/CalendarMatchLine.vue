@@ -180,16 +180,32 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
 .badge.cancelled { background: #eef2f6; color: #8b97a6; }
 .badge.phone { display: none; }
 @media (max-width: 720px) {
+  .line { min-height: var(--row-match); }
+  .star { width: 44px; font-size: 12px; position: relative; }
+  .star::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
   .body {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: 0.45rem;
-    padding-right: 0.65rem;
+    gap: 8px;
+    min-height: var(--row-match);
+    padding: 4px 8px 4px 0;
+    align-items: center;
   }
-  .pair { grid-template-columns: minmax(0, 1fr); gap: 0.28rem; }
+  .when b { font-size: 12px; font-weight: 800; line-height: 16px; }
+  .badge.phone { font-size: 10.5px; font-weight: 500; line-height: 14px; }
+  .pair { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .side.home, .side.away { justify-content: flex-start; text-align: left; }
-  .side :deep(.team-crest) { width: 24px !important; height: 24px !important; }
+  .side { font-size: 14px; line-height: 18px; }
+  .side :deep(.team-crest) { width: 20px !important; height: 20px !important; font-size: 10px !important; }
   .score.desk, .badge.desk { display: none; }
   .score.phone, .badge.phone { display: grid; }
-  .score.phone { justify-items: end; gap: 0.28rem; }
+  .score.phone { justify-items: end; gap: 2px; font-size: 15px; font-weight: 800; }
 }
 </style>

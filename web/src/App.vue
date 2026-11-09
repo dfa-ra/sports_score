@@ -386,8 +386,8 @@ const stickyChrome = computed(() => {
 @media (max-width: 719px) {
   .referee-frame { width: min(1260px, calc(100% - 28px)); }
 }
-.main { padding: 1.4rem 0 2.4rem; }
-.main.flush { padding: 0 0 2.4rem; }
+.main { padding: var(--main-pad-top) 0 var(--main-pad-bottom); }
+.main.flush { padding: 0 0 var(--main-pad-bottom); }
 .foot { color: var(--muted); font-size: 0.78rem; padding: 0 0 1.4rem; }
 .foot-inner {
   display: flex;
@@ -425,6 +425,30 @@ const stickyChrome = computed(() => {
   .menu { margin-left: 0.85rem; }
 }
 @media (max-width: 720px) {
+  .nav-inner { justify-content: flex-start; min-height: var(--chrome-h); gap: 8px; }
+  .brand { gap: 8px; }
+  .brand-name { font-size: 13px; font-weight: 700; line-height: 16px; letter-spacing: 0.04em; }
+  .brand :deep(.brand-mark) { width: 34px !important; height: 34px !important; }
+  .auth { margin-left: auto; }
+  .login-pill {
+    position: relative;
+    box-sizing: border-box;
+    height: 36px;
+    min-width: 84px;
+    padding: 0 14px;
+    justify-content: center;
+  }
+  .login-pill::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .menu { margin-left: 18px; }
+  .menu-button { width: 44px; height: 44px; border-radius: 12px; }
   .profile-button { width: 36px; height: 36px; }
   .foot-inner { min-width: 0; padding-right: 0.15rem; }
   .foot-ver {

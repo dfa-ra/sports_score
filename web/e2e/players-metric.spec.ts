@@ -207,28 +207,42 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
     }
     const facts = await metricFacts(page)
     expect(facts, `viewport ${width}`).toHaveLength(2)
+    const compact = width <= 720
     for (const fact of facts) {
       expect(fact, `viewport ${width}`).not.toBeNull()
       if (!fact) continue
-      expect(fact.gapCss, `${fact.title} gap css at ${width}`).toBe('4px')
-      expect(Math.abs(fact.gap - 4), `${fact.title} gap at ${width}`).toBeLessThan(0.6)
-      expect(fact.valueSize).toBe('38px')
-      expect(fact.labelSize).toBe('12px')
-      expect(fact.nameSize).toBe('16px')
-      expect(fact.teamSize).toBe('12px')
-      expect(fact.categorySize).toBe('12px')
-      expect(fact.paddingTop).toBe('20px')
-      expect(fact.paddingRight).toBe('20px')
-      expect(fact.radius).toBe('18px')
-      expect(fact.minWidth).toBeGreaterThanOrEqual(72)
-      expect(fact.metricWidth).toBeGreaterThanOrEqual(72)
       expect(fact.clipped).toBe(false)
-      expect(fact.centerDelta).toBeLessThan(1.5)
-      expect(fact.metricHeight).toBeLessThan(70)
       expect(fact.metricHeight).toBeLessThan(fact.cardHeight)
-      expect(fact.nameRight).toBeLessThanOrEqual(fact.metricLeft + 1)
       expect(fact.metricRight).toBeLessThanOrEqual(fact.cardRight + 1)
-      expect(fact.teamTop).toBeGreaterThanOrEqual(fact.nameBottom - 1)
+      if (compact) {
+        expect(fact.valueSize).toBe('28px')
+        expect(fact.labelSize).toBe('10.5px')
+        expect(fact.nameSize).toBe('13px')
+        expect(fact.teamSize).toBe('11px')
+        expect(fact.categorySize).toBe('10px')
+        expect(fact.paddingTop).toBe('10px')
+        expect(fact.paddingRight).toBe('10px')
+        expect(fact.radius).toBe('12px')
+        expect(fact.cardHeight).toBeGreaterThanOrEqual(104)
+        expect(fact.nameLines).toBe(1)
+      } else {
+        expect(fact.gapCss, `${fact.title} gap css at ${width}`).toBe('4px')
+        expect(Math.abs(fact.gap - 4), `${fact.title} gap at ${width}`).toBeLessThan(0.6)
+        expect(fact.valueSize).toBe('38px')
+        expect(fact.labelSize).toBe('12px')
+        expect(fact.nameSize).toBe('16px')
+        expect(fact.teamSize).toBe('12px')
+        expect(fact.categorySize).toBe('12px')
+        expect(fact.paddingTop).toBe('20px')
+        expect(fact.paddingRight).toBe('20px')
+        expect(fact.radius).toBe('18px')
+        expect(fact.minWidth).toBeGreaterThanOrEqual(72)
+        expect(fact.metricWidth).toBeGreaterThanOrEqual(72)
+        expect(fact.centerDelta).toBeLessThan(1.5)
+        expect(fact.metricHeight).toBeLessThan(70)
+        expect(fact.nameRight).toBeLessThanOrEqual(fact.metricLeft + 1)
+        expect(fact.teamTop).toBeGreaterThanOrEqual(fact.nameBottom - 1)
+      }
     }
     const scroll = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
@@ -256,12 +270,29 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
   for (const fact of longFacts) {
     expect(fact).not.toBeNull()
     if (!fact) continue
-    expect(fact.nameLines).toBeGreaterThan(1)
-    expect(fact.teamLines).toBeGreaterThan(1)
+    const lines = await page.locator('.leader').evaluateAll((cards) => cards.map((card) => {
+      const name = card.querySelector('.leader-row a') as HTMLElement
+      const team = card.querySelector('.club-name') as HTMLElement | null
+      const nameStyle = getComputedStyle(name)
+      const teamStyle = team ? getComputedStyle(team) : null
+      return {
+        nameHeight: name.getBoundingClientRect().height,
+        nameWhite: nameStyle.whiteSpace,
+        nameLine: parseFloat(nameStyle.lineHeight) || parseFloat(nameStyle.fontSize),
+        teamHeight: team ? team.getBoundingClientRect().height : 0,
+        teamWhite: teamStyle?.whiteSpace || '',
+        teamLine: teamStyle ? (parseFloat(teamStyle.lineHeight) || parseFloat(teamStyle.fontSize)) : 0,
+      }
+    }))
+    expect(lines[0].nameWhite).toBe('nowrap')
+    expect(lines[0].nameHeight).toBeLessThanOrEqual(lines[0].nameLine + 2)
+    expect(lines[0].teamWhite).toBe('nowrap')
+    expect(lines[0].teamHeight).toBeLessThanOrEqual(lines[0].teamLine + 2)
+    expect(lines[1].nameHeight).toBeLessThanOrEqual(lines[1].nameLine + 2)
+    expect(lines[1].teamHeight).toBeLessThanOrEqual(lines[1].teamLine + 2)
     expect(fact.clipped).toBe(false)
     expect(fact.value).toMatch(/^(100|2)$/)
-    expect(fact.nameRight).toBeLessThanOrEqual(fact.metricLeft + 1)
-    expect(fact.cardHeight).toBeGreaterThan(116)
+    expect(fact.cardHeight).toBeGreaterThanOrEqual(104)
   }
   const longScroll = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

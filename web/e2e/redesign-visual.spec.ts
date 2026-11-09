@@ -431,8 +431,22 @@ test('match stars, empty events and header gap', async ({ page }) => {
       return { starTop: star.top, crestTop: crest.top }
     }))
     expect(stars).toHaveLength(2)
-    expect(stars[0].starTop).toBeLessThan(stars[0].crestTop)
-    expect(stars[1].starTop).toBeLessThan(stars[1].crestTop)
+    if (width > 720) {
+      expect(stars[0].starTop).toBeLessThan(stars[0].crestTop)
+      expect(stars[1].starTop).toBeLessThan(stars[1].crestTop)
+    } else {
+      const beside = await page.locator('.pitch-side').evaluateAll((nodes) => nodes.map((node) => {
+        const star = node.querySelector('.fav-star')!.getBoundingClientRect()
+        const crest = node.querySelector('.team-crest')!.getBoundingClientRect()
+        const starMid = star.top + star.height / 2
+        const crestMid = crest.top + crest.height / 2
+        return { starMid, crestMid, starLeft: star.left, crestLeft: crest.left }
+      }))
+      expect(Math.abs(beside[0].starMid - beside[0].crestMid)).toBeLessThanOrEqual(8)
+      expect(Math.abs(beside[1].starMid - beside[1].crestMid)).toBeLessThanOrEqual(8)
+      expect(beside[0].starLeft).toBeLessThan(beside[0].crestLeft)
+      expect(beside[1].starLeft).toBeGreaterThan(beside[1].crestLeft)
+    }
     expect(Math.abs(stars[0].starTop - stars[1].starTop)).toBeLessThanOrEqual(2)
     const underline = await page.locator('.match-tabs button.on .tab-label').evaluate((label) => {
       const text = label.getBoundingClientRect()

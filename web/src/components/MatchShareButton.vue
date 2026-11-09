@@ -33,6 +33,7 @@ async function share() {
 
 <style scoped>
 .share {
+  position: relative;
   margin-top: 0.7rem;
   border: 0;
   background: var(--ice);
@@ -41,8 +42,19 @@ async function share() {
   padding: 0.4rem 0.95rem;
   font-weight: 800;
   font-size: 0.72rem;
-  font-weight: 800;
   cursor: pointer;
+}
+@media (max-width: 720px) {
+  .share { margin-top: 0; width: 104px; height: 32px; padding: 0; border-radius: 16px; font-size: 13px; font-weight: 800; }
+  .share::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
 }
 .share:hover { border-color: var(--ice); }
 </style>

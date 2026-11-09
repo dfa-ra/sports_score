@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -31,6 +32,8 @@ const stats = ref<any[]>([])
 const matches = ref<any[]>([])
 type TeamTab = 'results' | 'calendar' | 'squad' | 'stats'
 const teamTabs: TeamTab[] = ['results', 'calendar', 'squad', 'stats']
+const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
 const tab = computed<TeamTab>(() => {
   const raw = String(route.query.tab || '')
   return teamTabs.includes(raw as TeamTab) ? raw as TeamTab : 'results'
@@ -237,7 +240,7 @@ async function deleteTeam() {
       ><span class="star-glyph" :key="starTap" :class="{ 'star-tap': starTap }">★</span></button>
     </div>
 
-    <div class="fs-tabs">
+    <div ref="tabBar" class="fs-tabs">
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'calendar' }" @click="setTab('calendar')">Календарь</button>
       <button type="button" :class="{ on: tab === 'squad' }" @click="setTab('squad')">Состав</button>
@@ -546,6 +549,28 @@ h2 { font-size: 1.2rem; }
     justify-self: start;
     width: fit-content;
   }
+}
+@media (max-width: 720px) {
+  .stack { gap: 12px; margin-top: -5px; }
+  .team-head { gap: 0; min-height: 44px; margin-bottom: 0; align-items: center; }
+  .team-head :deep(.team-crest) { width: 44px !important; height: 44px !important; font-size: 14px !important; }
+  .team-head h1 { font-size: 20px; line-height: 24px; font-weight: 800; }
+  .team-head p { margin: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
+  .star {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+    display: grid;
+    place-items: center;
+  }
+  .star::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .fs-tabs button { padding: 0 9px; font-size: 12px; }
+  .sheet { border-radius: 12px; }
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 721px) {
   .make-captain {

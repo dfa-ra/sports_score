@@ -208,15 +208,55 @@ function tapStar() {
 }
 
 @media (max-width: 720px) {
+  .row { min-height: var(--row-match); height: var(--row-match); }
+  .star {
+    position: relative;
+    width: 44px;
+    font-size: 12px;
+  }
+  .star::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
   .body {
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    gap: 0.3rem;
-    padding: 0.45rem 0.4rem 0.45rem 0;
+    grid-template-columns: 46px minmax(0, 1fr) auto auto;
+    gap: 6px;
+    min-height: var(--row-match);
+    height: var(--row-match);
+    padding: 0 8px 0 0;
+    align-items: center;
   }
-  .nums {
-    justify-items: center;
-    align-content: center;
+  .kick-slot :deep(.kick-date) { font-size: 12px; font-weight: 800; line-height: 16px; color: var(--navy); }
+  .kick-slot :deep(.kick-time) { font-size: 10.5px; font-weight: 500; line-height: 14px; }
+  .sides { gap: 4px; }
+  .venue, .scorer { display: none; }
+  .side {
+    grid-template-columns: 20px minmax(0, 1fr);
+    gap: 6px;
+    height: 18px;
   }
-  .side { gap: 0.3rem; }
+  .side :deep(.team-crest) {
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px;
+    min-height: 20px;
+    font-size: 10px !important;
+  }
+  .side b {
+    font-size: 14px;
+    line-height: 18px;
+    font-weight: 500;
+    white-space: nowrap;
+    display: block;
+    -webkit-line-clamp: 1;
+  }
+  .side.own b { font-weight: 800; color: var(--navy); }
+  .nums { font-size: 15px; font-weight: 800; justify-items: end; align-content: center; gap: 0; }
+  .mark { width: 22px; height: 22px; border-radius: 5px; font-size: 11px; font-weight: 800; }
 }
 </style>
