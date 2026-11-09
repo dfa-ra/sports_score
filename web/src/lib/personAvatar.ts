@@ -10,12 +10,12 @@ function firstLetter(value?: string | null) {
 }
 
 /**
- * Avatar letters from the legal given name, then the surname.
+ * Avatar letters in the same order as the registered name: surname, then given name.
  * A missing field leaves a single letter. Both missing stays on the empty mark
  * and is never parsed from the caption beside the avatar.
  */
 export function personInitials(firstName?: string | null, lastName?: string | null) {
-  return `${firstLetter(firstName)}${firstLetter(lastName)}` || 'SL'
+  return `${firstLetter(lastName)}${firstLetter(firstName)}` || 'SL'
 }
 
 /**

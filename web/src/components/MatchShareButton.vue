@@ -6,9 +6,10 @@ const props = defineProps<{
   awayName: string
   homeScore: number
   awayScore: number
+  scoreText?: string
 }>()
 
-const text = computed(() => `${props.homeName} ${props.homeScore}:${props.awayScore} ${props.awayName}`)
+const text = computed(() => `${props.homeName} ${props.scoreText || `${props.homeScore}:${props.awayScore}`} ${props.awayName}`)
 
 async function share() {
   const url = window.location.href
@@ -32,15 +33,28 @@ async function share() {
 
 <style scoped>
 .share {
-  margin-top: 0.35rem;
-  border: 1px solid var(--line);
-  background: #fff;
+  position: relative;
+  margin-top: 0.7rem;
+  border: 0;
+  background: var(--ice);
   color: var(--navy);
   border-radius: 999px;
-  padding: 0.22rem 0.7rem;
-  font-size: 0.72rem;
+  padding: 0.4rem 0.95rem;
   font-weight: 800;
+  font-size: 0.72rem;
   cursor: pointer;
+}
+@media (max-width: 720px) {
+  .share { margin-top: 0; width: 104px; height: 32px; padding: 0; border-radius: 16px; font-size: 13px; font-weight: 800; }
+  .share::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
 }
 .share:hover { border-color: var(--ice); }
 </style>

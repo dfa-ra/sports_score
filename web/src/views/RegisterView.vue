@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import GoogleSignInButton from '../components/GoogleSignInButton.vue'
+import PasswordPeek from '../components/PasswordPeek.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api/client'
@@ -164,19 +165,12 @@ async function onGoogle(idToken: string) {
           <span v-if="fieldErrors.email" class="field-error">{{ fieldErrors.email }}</span>
         </label>
         <label class="field" :class="{ invalid: fieldErrors.password }">Пароль *
-          <span class="pass-row">
-            <input
-              v-model="password"
-              :type="showPassword ? 'text' : 'password'"
-              maxlength="100"
-              autocomplete="new-password"
-              required
-              @input="clearField('password')"
-            />
-            <button class="btn ghost peek" type="button" @click="showPassword = !showPassword">
-              {{ showPassword ? 'Скрыть' : 'Показать' }}
-            </button>
-          </span>
+          <PasswordPeek
+            v-model="password"
+            v-model:visible="showPassword"
+            autocomplete="new-password"
+            @input="clearField('password')"
+          />
           <span v-if="fieldErrors.password" class="field-error">{{ fieldErrors.password }}</span>
           <span v-else class="field-hint">{{ hint }}</span>
         </label>
@@ -235,8 +229,6 @@ async function onGoogle(idToken: string) {
 <style scoped>
 .auth-wrap { display: grid; place-items: center; min-height: calc(100vh - 170px); }
 .card { width: min(520px, 100%); border-radius: 28px 18px 24px 16px; }
-.pass-row { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }
-.peek { min-width: 92px; }
 .role-pick { display: grid; gap: 0.7rem; }
 .role-card {
   text-align: left;

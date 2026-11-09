@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { registeredName } from '../lib/playerTitle'
+import { playerSearchQuery, unitWord } from '../lib/q2Players'
 import PlayerAvatar from './PlayerAvatar.vue'
+
+const props = defineProps<{ tournamentId?: string }>()
 
 const query = ref('')
 const items = ref<any[]>([])
@@ -20,16 +23,25 @@ function labelOf(player: any) {
 }
 
 async function loadLeaders() {
+  const pinned = props.tournamentId
   leadersLoading.value = true
   leadersError.value = ''
   try {
-    const current = await api.get('/tournaments/current')
-    const id = current.data?.id
+    let id = pinned
+    if (!id) {
+      if (pinned === '') {
+        leaders.value = []
+        return
+      }
+      const current = await api.get('/tournaments/current')
+      id = current.data?.id
+    }
     if (!id) {
       leaders.value = []
       return
     }
     const { data } = await api.get('/statistics/board', { params: { tournamentId: id, limit: 12 } })
+    if (props.tournamentId !== pinned) return
     const seen = new Set<string>()
     const rows: any[] = []
     for (const player of [...(data.scorers ?? []), ...(data.assists ?? [])]) {
@@ -40,15 +52,18 @@ async function loadLeaders() {
     }
     leaders.value = rows
   } catch {
+    if (props.tournamentId !== pinned) return
     leaders.value = []
     leadersError.value = 'Список игроков не загрузился.'
   } finally {
-    leadersLoading.value = false
+    if (pinned === '' && props.tournamentId === '') return
+    if (props.tournamentId === pinned) leadersLoading.value = false
   }
 }
 
 async function search() {
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
+  const pinned = props.tournamentId
   if (q.length < 2) {
     items.value = []
     searched.value = false
@@ -59,23 +74,25 @@ async function search() {
   pending.value = true
   searchError.value = ''
   try {
-    const { data } = await api.get('/players', { params: { q, size: 8, sort: 'lastName,asc' } })
-    if (query.value.trim() !== q) return
+    const params: Record<string, string | number> = { q, size: 8, sort: 'lastName,asc' }
+    if (pinned) params.tournamentId = pinned
+    const { data } = await api.get('/players', { params })
+    if (playerSearchQuery(query.value) !== q || props.tournamentId !== pinned) return
     items.value = data.content ?? []
     searched.value = true
   } catch {
-    if (query.value.trim() !== q) return
+    if (playerSearchQuery(query.value) !== q || props.tournamentId !== pinned) return
     items.value = []
     searched.value = true
     searchError.value = 'Поиск не выполнился.'
   } finally {
-    if (query.value.trim() === q) pending.value = false
+    if (playerSearchQuery(query.value) === q && props.tournamentId === pinned) pending.value = false
   }
 }
 
 function schedule() {
   if (timer) window.clearTimeout(timer)
-  const q = query.value.trim()
+  const q = playerSearchQuery(query.value)
   if (q.length < 2) {
     items.value = []
     searched.value = false
@@ -88,7 +105,10 @@ function schedule() {
   timer = window.setTimeout(() => { void search() }, 250)
 }
 
-onMounted(loadLeaders)
+watch(() => props.tournamentId, () => {
+  void loadLeaders()
+  if (playerSearchQuery(query.value).length >= 2) void search()
+}, { immediate: true })
 onUnmounted(() => {
   if (timer) window.clearTimeout(timer)
 })
@@ -124,15 +144,18 @@ onUnmounted(() => {
 
     <template v-if="query.trim().length < 2">
       <p v-if="leadersLoading" class="pending"><span class="spin" aria-hidden="true" /> Загружаем игроков…</p>
-      <p v-else-if="leadersError" class="form-error">{{ leadersError }}</p>
+      <div v-else-if="leadersError" class="form-error">
+        <p>{{ leadersError }}</p>
+        <button class="btn secondary" type="button" @click="loadLeaders">Повторить</button>
+      </div>
       <div v-else-if="leaders.length" class="leaders">
-        <p class="muted">Бомбардиры текущего турнира</p>
+        <p class="muted">Бомбардиры турнира</p>
         <div class="hints">
           <RouterLink v-for="player in leaders" :key="player.playerId" class="hint" :to="`/players/${player.playerId}`">
             <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :first-name="player.firstName" :last-name="player.lastName" :size="32" />
             <span>
               <strong>{{ labelOf(player) }}</strong>
-              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} пас.` : '' }}</small>
+              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} ${unitWord(player.assists, 'assists')}` : '' }}</small>
             </span>
           </RouterLink>
         </div>

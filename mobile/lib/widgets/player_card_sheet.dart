@@ -32,7 +32,7 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
     return [
       if (row.minutesPlayed != null) "${row.minutesPlayed}'",
       if (row.goals > 0) '${row.goals}Г',
-      if (row.assists > 0) '${row.assists}П',
+      if (row.assists > 0) '${row.assists} ${assistWord(row.assists)}',
       if (row.yellowCards > 0) '${row.yellowCards}Ж',
       if (row.redCards > 0) '${row.redCards}К',
     ].join(' · ');
@@ -45,7 +45,7 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
     final stats = <({String label, Object value})>[
       if (card.statistics['appearances'] != null) (label: 'Игры', value: card.statistics['appearances']!),
       if (card.statistics['goals'] != null) (label: 'Голы', value: card.statistics['goals']!),
-      if (card.statistics['assists'] != null) (label: 'Ассисты', value: card.statistics['assists']!),
+      if (card.statistics['assists'] != null) (label: 'Передачи', value: card.statistics['assists']!),
       if (card.statistics['yellowCards'] != null) (label: 'Жёлтые', value: card.statistics['yellowCards']!),
       if (card.statistics['redCards'] != null) (label: 'Красные', value: card.statistics['redCards']!),
       if (card.statistics['cleanSheets'] != null) (label: 'Сухие', value: card.statistics['cleanSheets']!),

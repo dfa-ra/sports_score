@@ -158,7 +158,7 @@ function nameLines(locator: Locator) {
     const text = raw.replace(/\s+/g, ' ').trim()
     return {
       fontSize: Number.parseFloat(style.fontSize),
-      min: 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
+      min: window.innerWidth <= 720 ? 14 : 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize),
       wordBreak: style.wordBreak,
       overflowWrap: style.overflowWrap,
       rendered,

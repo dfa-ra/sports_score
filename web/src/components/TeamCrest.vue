@@ -58,8 +58,13 @@ const label = computed(() => initials(props.name || ''))
   padding: 2px;
 }
 .team-crest--fallback {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex: 0 0 auto;
+  aspect-ratio: 1;
+  padding: 0;
   background: var(--accent-soft, #eef3f8);
   color: var(--navy);
   font-weight: 800;

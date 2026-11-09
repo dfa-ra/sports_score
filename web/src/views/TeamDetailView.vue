@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -15,6 +16,7 @@ import TeamCardEditor from '../components/TeamCardEditor.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import { setPageMeta } from '../lib/pageMeta'
+import NotFoundView from './NotFoundView.vue'
 import { matchInstant } from '../lib/match'
 import { formatMoscowDate } from '../lib/moscowTime'
 import { registeredName } from '../lib/playerTitle'
@@ -28,7 +30,27 @@ const team = ref<any>(null)
 const members = ref<any[]>([])
 const stats = ref<any[]>([])
 const matches = ref<any[]>([])
-const tab = ref<'results' | 'calendar' | 'squad' | 'stats'>('results')
+type TeamTab = 'results' | 'calendar' | 'squad' | 'stats'
+const teamTabs: TeamTab[] = ['results', 'calendar', 'squad', 'stats']
+const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
+const tab = computed<TeamTab>(() => {
+  const raw = String(route.query.tab || '')
+  return teamTabs.includes(raw as TeamTab) ? raw as TeamTab : 'results'
+})
+function setTab(next: TeamTab) {
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(route.query)) {
+    if (key === 'tab') continue
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  if (next !== 'results') query.tab = next
+  if (String(route.query.tab || '') === (query.tab || '')) return
+  void router.replace({ query })
+}
+function rowName(id?: string | null) {
+  return names.fullName(id)
+}
 const played = computed(() => matches.value
   .filter((m) => m.status === 'FINISHED' || m.status === 'CANCELLED')
   .slice()
@@ -60,6 +82,19 @@ onMounted(load)
 watch(() => route.params.id, () => {
   load()
 })
+watch(() => route.fullPath, () => {
+  const name = team.value?.name
+  if (!name || missing.value) return
+  const id = String(route.params.id || '')
+  void nextTick(() => {
+    if (team.value?.name !== name || String(route.params.id || '') !== id) return
+    setPageMeta({
+      title: name,
+      description: `Лига ИТМО: ${name}`,
+      path: `/teams/${id}`,
+    })
+  })
+})
 
 async function load() {
   const id = route.params.id
@@ -70,20 +105,21 @@ async function load() {
     const [t, m, games, squadStats] = await Promise.all([
       api.get(`/teams/${id}`),
       api.get(`/teams/${id}/members`),
-      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+      api.get('/matches', { params: { teamId: id, size: 100, sort: 'scheduledAt,desc' } }),
       api.get(`/teams/${id}/player-stats`),
     ])
     team.value = t.data
-    setPageMeta({
-      title: t.data?.name || 'Команда',
-      description: `${t.data?.name || 'Команда'} — состав и матчи Лиги ИТМО.`,
+    const title = t.data?.name || 'Команда'
+    const publish = () => setPageMeta({
+      title,
+      description: `Лига ИТМО: ${title}`,
       path: `/teams/${id}`,
     })
+    publish()
+    void nextTick(publish)
     members.value = m.data
     stats.value = squadStats.data ?? []
-    matches.value = (games.data.content ?? []).filter((row: any) =>
-      row.homeTeamId === t.data.id || row.awayTeamId === t.data.id
-    )
+    matches.value = games.data.content ?? []
     if (auth.isAuthenticated) {
       try {
         const { data } = await api.get('/players/me')
@@ -202,11 +238,11 @@ async function deleteTeam() {
       ><span class="star-glyph" :key="starTap" :class="{ 'star-tap': starTap }">★</span></button>
     </div>
 
-    <div class="fs-tabs">
-      <button type="button" :class="{ on: tab === 'results' }" @click="tab = 'results'">Результаты</button>
-      <button type="button" :class="{ on: tab === 'calendar' }" @click="tab = 'calendar'">Календарь</button>
-      <button type="button" :class="{ on: tab === 'squad' }" @click="tab = 'squad'">Состав</button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
+    <div ref="tabBar" class="fs-tabs">
+      <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
+      <button type="button" :class="{ on: tab === 'calendar' }" @click="setTab('calendar')">Календарь</button>
+      <button type="button" :class="{ on: tab === 'squad' }" @click="setTab('squad')">Состав</button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="setTab('stats')">Статистика</button>
     </div>
 
     <div v-if="canManage && isCaptain" class="panel stack">
@@ -220,8 +256,8 @@ async function deleteTeam() {
         v-for="m in played"
         :key="m.id"
         :match="m"
-        :home-name="names.fullName(m.homeTeamId)"
-        :away-name="names.fullName(m.awayTeamId)"
+        :home-name="rowName(m.homeTeamId)"
+        :away-name="rowName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
@@ -232,8 +268,8 @@ async function deleteTeam() {
         v-for="m in upcoming"
         :key="m.id"
         :match="m"
-        :home-name="names.fullName(m.homeTeamId)"
-        :away-name="names.fullName(m.awayTeamId)"
+        :home-name="rowName(m.homeTeamId)"
+        :away-name="rowName(m.awayTeamId)"
         :highlight-team-id="team.id"
       />
     </div>
@@ -284,7 +320,7 @@ async function deleteTeam() {
             <tr>
               <th class="who-h" scope="col">Фамилия Имя</th>
               <th scope="col">Голы</th>
-              <th scope="col">Пасы</th>
+              <th scope="col"><span class="assists-short">Пер.</span><span class="assists-wide">Передачи</span></th>
               <th scope="col">Игры</th>
               <th scope="col">ЖК</th>
             </tr>
@@ -347,10 +383,11 @@ async function deleteTeam() {
       <p v-if="ok" class="form-ok">{{ ok }}</p>
     </AdminOnly>
   </section>
-  <section v-else-if="missing" class="stack">
-    <h1>Команда не найдена</h1>
+  <NotFoundView v-else-if="missing" heading="Команда не найдена" />
+  <section v-else-if="error" class="stack">
+    <strong>{{ error }}</strong>
+    <button class="btn secondary" type="button" @click="load">Повторить</button>
   </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>
@@ -407,6 +444,11 @@ h2 { font-size: 1.2rem; }
   white-space: nowrap;
 }
 .stat-table th.who-h { text-align: left; }
+.assists-wide { display: none; }
+@media (min-width: 400px) {
+  .assists-short { display: none; }
+  .assists-wide { display: inline; }
+}
 .stat-table td {
   padding: 0.65rem 0.35rem;
   border-top: 1px solid var(--line);
@@ -463,6 +505,71 @@ h2 { font-size: 1.2rem; }
 .make-captain:hover,
 .make-captain:focus-visible { color: var(--navy); }
 .make-captain:disabled { cursor: wait; opacity: 0.45; }
+@media (max-width: 399px) {
+  .stats-card { padding-left: 0.7rem; padding-right: 0.7rem; }
+  .stats-card .table-wrap { overflow-x: clip; }
+  .stats-card .stat-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  .stats-card .stat-table th:not(.who-h),
+  .stats-card .stat-table td.num {
+    padding-left: 0.08rem;
+    padding-right: 0.08rem;
+  }
+  .stats-card .stat-table th:nth-child(2),
+  .stats-card .stat-table td:nth-child(2),
+  .stats-card .stat-table th:nth-child(4),
+  .stats-card .stat-table td:nth-child(4) { width: 2.35rem; }
+  .stats-card .stat-table th:nth-child(3),
+  .stats-card .stat-table td:nth-child(3) { width: 1.95rem; }
+  .stats-card .stat-table th:nth-child(5),
+  .stats-card .stat-table td:nth-child(5) { width: 1.55rem; }
+  .stats-card .stat-table td:first-child { padding-left: 0.1rem; padding-right: 0.15rem; }
+  .stats-card .stat-table th.who-h { white-space: normal; }
+  .stats-card .stat-table .who {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 0.4rem;
+    row-gap: 0.15rem;
+    align-items: center;
+  }
+  .stats-card .stat-table .who a {
+    grid-column: 2;
+    min-width: 0;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    overflow-wrap: break-word;
+  }
+  .stats-card .stat-table .captain-badge {
+    grid-column: 2;
+    justify-self: start;
+    width: fit-content;
+  }
+}
+@media (max-width: 720px) {
+  .stack { gap: 12px; margin-top: -5px; }
+  .team-head { gap: 0; min-height: 44px; margin-bottom: 0; align-items: center; }
+  .team-head :deep(.team-crest) { width: 44px !important; height: 44px !important; font-size: 14px !important; }
+  .team-head h1 { font-size: 20px; line-height: 24px; font-weight: 800; }
+  .team-head p { margin: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
+  .star {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+    display: grid;
+    place-items: center;
+  }
+  .star::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+  .fs-tabs button { padding: 0 9px; font-size: 12px; }
+  .sheet { border-radius: 12px; }
+}
 @media (hover: hover) and (pointer: fine) and (min-width: 721px) {
   .make-captain {
     max-width: 0;

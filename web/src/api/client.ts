@@ -1,14 +1,21 @@
 import axios from 'axios'
 import { isUnauthorized, useAuthStore } from '../stores/auth'
 
+/** Cold reads must fail instead of sitting on a skeleton. Uploads opt out below. */
+export const READ_TIMEOUT_MS = 12_000
+
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  timeout: READ_TIMEOUT_MS,
 })
 
 api.interceptors.request.use((config) => {
   const auth = useAuthStore()
   if (auth.accessToken) {
     config.headers.Authorization = `Bearer ${auth.accessToken}`
+  }
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.timeout = 0
   }
   return config
 })

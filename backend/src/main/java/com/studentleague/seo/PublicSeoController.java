@@ -1,10 +1,14 @@
 package com.studentleague.seo;
 
+import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.repository.MatchRepository;
 import com.studentleague.players.entity.PlayerProfile;
 import com.studentleague.players.repository.PlayerProfileRepository;
+import com.studentleague.teams.domain.TeamMemberStatus;
 import com.studentleague.teams.entity.Team;
+import com.studentleague.teams.entity.TeamMember;
+import com.studentleague.teams.repository.TeamMemberRepository;
 import com.studentleague.teams.repository.TeamRepository;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.repository.TournamentRepository;
@@ -32,20 +36,24 @@ public class PublicSeoController {
     static final int SITEMAP_LIMIT = 500;
     private static final Pattern HOST = Pattern.compile("^[A-Za-z0-9.-]+(?::\\d+)?$");
     private static final String SITE = "Лига ИТМО";
+    private static final String SITE_GENITIVE = "Лиги ИТМО";
 
     private final TournamentRepository tournamentRepository;
     private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final MatchRepository matchRepository;
     private final PlayerProfileRepository playerProfileRepository;
 
     public PublicSeoController(
             TournamentRepository tournamentRepository,
             TeamRepository teamRepository,
+            TeamMemberRepository teamMemberRepository,
             MatchRepository matchRepository,
             PlayerProfileRepository playerProfileRepository
     ) {
         this.tournamentRepository = tournamentRepository;
         this.teamRepository = teamRepository;
+        this.teamMemberRepository = teamMemberRepository;
         this.matchRepository = matchRepository;
         this.playerProfileRepository = playerProfileRepository;
     }
@@ -124,18 +132,39 @@ public class PublicSeoController {
 
     private PageCopy copyFor(String path) {
         if ("/".equals(path)) {
-            return new PageCopy("Главная", "Таблица, ближайшие матчи и бомбардиры " + SITE + ".");
+            return new PageCopy("Главная", SITE + ": бомбардиры и лучшие по передачам");
         }
+        PageCopy fixed = staticCopy(path);
+        if (fixed != null) {
+            return fixed;
+        }
+        return dynamicCopy(path);
+    }
+
+    private PageCopy staticCopy(String path) {
         return switch (path) {
-            case "/table" -> new PageCopy("Таблица", "Турнирная таблица, результаты, бомбардиры и ассистенты.");
-            case "/calendar" -> new PageCopy("Игры", "Календарь матчей " + SITE + ".");
+            case "/table", "/statistics" -> new PageCopy(
+                    "Таблица",
+                    SITE + ": турнирная таблица, результаты, бомбардиры и лидеры по передачам"
+            );
+            case "/calendar", "/matches" -> new PageCopy("Игры", SITE + ": календарь матчей");
             case "/live" -> new PageCopy("Live", "Матчи, которые идут сейчас.");
-            case "/tournaments" -> new PageCopy("Турниры", "Турниры " + SITE + ": вид спорта, сезон и формат.");
-            case "/teams" -> new PageCopy("Команды", "Команды " + SITE + ".");
-            case "/players" -> new PageCopy("Игроки", "Поиск игроков " + SITE + ".");
+            case "/tournaments" -> new PageCopy("Турниры", SITE + ": турниры, вид спорта, сезон и формат");
+            case "/teams" -> new PageCopy("Команды", SITE + ": команды");
+            case "/players" -> new PageCopy("Игроки", SITE + ": поиск игроков");
             case "/privacy" -> new PageCopy("Политика конфиденциальности", "Как " + SITE + " обрабатывает персональные данные.");
-            case "/terms" -> new PageCopy("Условия пользования", "Условия использования сайта " + SITE + ".");
-            default -> dynamicCopy(path);
+            case "/terms" -> new PageCopy("Условия пользования", SITE + ": условия использования сайта");
+            case "/login" -> new PageCopy("Вход", SITE + ": вход");
+            case "/register" -> new PageCopy("Регистрация", SITE + ": регистрация");
+            case "/forgot-password" -> new PageCopy("Восстановление пароля", SITE + ": восстановление пароля");
+            case "/reset-password" -> new PageCopy("Новый пароль", SITE + ": новый пароль");
+            case "/my-team" -> new PageCopy("Моя команда", SITE + ": моя команда");
+            case "/profile" -> new PageCopy("Профиль", SITE + ": профиль");
+            case "/admin" -> new PageCopy("Админ", SITE + ": управление лигой");
+            case "/referee" -> new PageCopy("Судья", SITE + ": матчи судьи");
+            case "/analyst" -> new PageCopy("Аналитик", SITE + ": матчи аналитика");
+            case "/forbidden" -> new PageCopy("Недостаточно прав", SITE + ": недостаточно прав");
+            default -> null;
         };
     }
 
@@ -143,26 +172,23 @@ public class PublicSeoController {
         UUID id = idAfter(path, "/tournaments/");
         if (id != null) {
             return tournamentRepository.findById(id)
-                    .map(tournament -> new PageCopy(tournament.getName(), tournament.getName() + " — турнир " + SITE + "."))
+                    .map(tournament -> new PageCopy(tournament.getName(), SITE + ": " + tournament.getName()))
                     .orElse(null);
         }
         id = idAfter(path, "/teams/");
         if (id != null) {
             return teamRepository.findById(id)
                     .filter(team -> !team.isDisbanded())
-                    .map(team -> new PageCopy(team.getName(), team.getName() + " — команда " + SITE + "."))
+                    .map(team -> new PageCopy(team.getName(), SITE + ": " + team.getName()))
                     .orElse(null);
         }
         id = idAfter(path, "/players/");
         if (id != null) {
             return playerProfileRepository.findById(id)
-                    .map(profile -> {
-                        String name = playerName(profile);
-                        return new PageCopy(name, name + " — игрок " + SITE + ".");
-                    })
+                    .map(profile -> new PageCopy(playerName(profile), playerDescription(profile)))
                     .orElse(null);
         }
-        id = idAfter(path, "/matches/");
+        id = matchId(path);
         if (id != null) {
             return matchRepository.findById(id)
                     .map(this::matchCopy)
@@ -171,12 +197,42 @@ public class PublicSeoController {
         return null;
     }
 
+    private static UUID matchId(String path) {
+        UUID id = idAfter(path, "/matches/");
+        if (id != null) {
+            return id;
+        }
+        id = idAfter(path, "/referee/matches/");
+        if (id != null) {
+            return id;
+        }
+        return idAfter(path, "/analyst/matches/");
+    }
+
     private PageCopy matchCopy(Match match) {
-        String home = teamRepository.findById(match.getHomeTeamId()).map(Team::getName).orElse("Хозяева");
-        String away = teamRepository.findById(match.getAwayTeamId()).map(Team::getName).orElse("Гости");
+        String home = teamName(match.getHomeTeamId(), "Хозяева");
+        String away = teamName(match.getAwayTeamId(), "Гости");
         String title = home + " — " + away;
-        String description = "Матч " + title + ". Счёт " + match.getHomeScore() + ":" + match.getAwayScore() + ".";
+        String description = SITE + ": матч " + title;
+        if (scoreKnown(match.getStatus())) {
+            description = description + ", счёт " + match.getHomeScore() + ":" + match.getAwayScore();
+        }
         return new PageCopy(title, description);
+    }
+
+    private String teamName(UUID teamId, String fallback) {
+        if (teamId == null) {
+            return fallback;
+        }
+        return teamRepository.findById(teamId)
+                .map(Team::getName)
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .orElse(fallback);
+    }
+
+    private static boolean scoreKnown(MatchStatus status) {
+        return status == MatchStatus.LIVE || status == MatchStatus.PAUSED || status == MatchStatus.FINISHED;
     }
 
     private static String playerName(PlayerProfile profile) {
@@ -190,6 +246,26 @@ public class PublicSeoController {
             return profile.getDisplayName().trim();
         }
         return "Игрок";
+    }
+
+    private String playerDescription(PlayerProfile profile) {
+        String name = playerName(profile);
+        String team = activeTeamName(profile.getId());
+        if (team == null) {
+            return "Игрок " + SITE_GENITIVE + ": " + name;
+        }
+        return "Игрок " + SITE_GENITIVE + ": " + name + ", " + team;
+    }
+
+    private String activeTeamName(UUID playerId) {
+        for (TeamMember member : teamMemberRepository.findByPlayerIdAndStatus(playerId, TeamMemberStatus.ACTIVE)) {
+            Team team = teamRepository.findById(member.getTeamId()).orElse(null);
+            if (team == null || team.isDisbanded() || team.getName() == null || team.getName().isBlank()) {
+                continue;
+            }
+            return team.getName().trim();
+        }
+        return null;
     }
 
     private static UUID idAfter(String path, String prefix) {

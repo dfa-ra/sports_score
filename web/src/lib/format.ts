@@ -71,7 +71,7 @@ export const roleLabel: Record<string, string> = {
 
 export const eventLabel: Record<string, string> = {
   GOAL: 'Гол',
-  ASSIST: 'Голевая',
+  ASSIST: 'Передача',
   YELLOW_CARD: 'Жёлтая',
   RED_CARD: 'Красная',
   SUBSTITUTION: 'Замена',
@@ -176,7 +176,7 @@ export function eventDetail(ev: {
   const main = playerTag(registeredName(ev), ev.playerJersey)
   if (isOwnGoal(ev)) return main ? `${main} · Автогол` : 'Автогол'
   const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
-  if (ev.eventType === 'GOAL' && second) return `${main} · пас ${second}`
+  if (ev.eventType === 'GOAL' && second) return `${main} · передача ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `${main} → ${second}`
   return main
 }

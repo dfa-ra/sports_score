@@ -31,7 +31,7 @@ class _Sheet {
     if (kind == _Kind.goal) {
       if (step == _Step.team) return 'Кто забил?';
       if (step == _Step.player) return 'Кто забил гол?';
-      return 'Кто отдал передачу?';
+      return 'Отдал передачу';
     }
     if (kind == _Kind.yellow) {
       return step == _Step.team ? 'Кому жёлтая?' : 'Кому показать жёлтую?';
@@ -41,7 +41,7 @@ class _Sheet {
 
   String hint({required bool held, required String scorer}) {
     if (kind == _Kind.goal && step == _Step.assist) {
-      return 'Гол: $scorer. Если паса не было — пропустите.';
+      return 'Гол: $scorer. Если передачи не было — пропустите.';
     }
     if (step == _Step.team) return held ? 'Часы стоят. Сначала команда.' : 'Сначала команда.';
     return held ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.';

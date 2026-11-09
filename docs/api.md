@@ -235,7 +235,7 @@ Backend проверяет подпись токена, срок, issuer Google 
 | POST | `/matches` | ADMIN. Опционально `periodCount` (1–8), `periodLengthMinutes` (1–90, иначе 2×20) и `venue` (зал, до 120 символов) |
 | PUT | `/matches/{id}` | ADMIN. Опционально `venue` (зал, до 120 символов); пустая строка очищает |
 | POST | `/matches/{id}/referees` | ADMIN |
-| GET | `/matches/{id}/events` | Публичный. Имена игроков, `period`, `secondaryPlayer*` = пас / кто вышел |
+| GET | `/matches/{id}/events` | Публичный. Имена игроков, `period`, `secondaryPlayer*` = передача / кто вышел |
 | GET | `/matches/{id}/shootout` | Публичный. `{ penaltyHome, penaltyAway, decisive, kicks }`. Без серии `penaltyHome` и `penaltyAway` — `null`, `kicks` — пустой список |
 | GET | `/matches/{id}/referees` | Публичный |
 | GET | `/matches/{id}/lineups` | Публичный — основа и скамейка; если капитан не записал, вся заявка как скамейка |

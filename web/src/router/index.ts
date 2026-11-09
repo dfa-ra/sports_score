@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ADMIN_LEGACY_PATHS } from '../lib/adminTabs'
 import { setPageMeta } from '../lib/pageMeta'
 import { useAuthStore } from '../stores/auth'
 
@@ -7,34 +8,39 @@ const FALLBACK_DESCRIPTION = 'Турниры, таблица, календарь
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Ближайшие матчи, идущие турниры и бомбардиры Лиги ИТМО.' } },
-    { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { guest: true, title: 'Вход', description: 'Вход в Лигу ИТМО.' } },
-    { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { guest: true, title: 'Регистрация', description: 'Регистрация в Лиге ИТМО.' } },
-    { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/ForgotPasswordView.vue'), meta: { guest: true, title: 'Восстановление пароля', description: 'Ссылка для нового пароля.' } },
-    { path: '/reset-password', name: 'reset-password', component: () => import('../views/ResetPasswordView.vue'), meta: { title: 'Новый пароль', description: 'Задайте новый пароль.' } },
+    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Лига ИТМО: бомбардиры и лучшие по передачам' } },
+    { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { guest: true, title: 'Вход', description: 'Лига ИТМО: вход' } },
+    { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { guest: true, title: 'Регистрация', description: 'Лига ИТМО: регистрация' } },
+    { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/ForgotPasswordView.vue'), meta: { guest: true, title: 'Восстановление пароля', description: 'Лига ИТМО: восстановление пароля' } },
+    { path: '/reset-password', name: 'reset-password', component: () => import('../views/ResetPasswordView.vue'), meta: { title: 'Новый пароль', description: 'Лига ИТМО: новый пароль' } },
     { path: '/privacy', name: 'privacy', component: () => import('../views/PrivacyView.vue'), meta: { title: 'Политика конфиденциальности', description: 'Как Лига ИТМО обрабатывает персональные данные.' } },
-    { path: '/terms', name: 'terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Условия пользования', description: 'Условия использования сайта Лиги ИТМО.' } },
-    { path: '/table', name: 'table', component: () => import('../views/TableView.vue'), meta: { title: 'Таблица', description: 'Турнирная таблица, результаты, бомбардиры и ассистенты.' } },
-    { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Игры', description: 'Календарь матчей Лиги ИТМО.' } },
+    { path: '/terms', name: 'terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Условия пользования', description: 'Лига ИТМО: условия использования сайта' } },
+    { path: '/table', name: 'table', component: () => import('../views/TableView.vue'), meta: { title: 'Таблица', description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам' } },
+    { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Игры', description: 'Лига ИТМО: календарь матчей' } },
     { path: '/live', name: 'live', component: () => import('../views/CalendarView.vue'), meta: { title: 'Live', description: 'Матчи, которые идут сейчас.' } },
-    { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue'), meta: { title: 'Турниры', description: 'Турниры Лиги ИТМО: сезон и формат.' } },
-    { path: '/tournaments/:id', name: 'tournament', component: () => import('../views/TournamentDetailView.vue'), meta: { title: 'Турнир', description: 'Турнир Лиги ИТМО.' } },
+    { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue'), meta: { title: 'Турниры', description: 'Лига ИТМО: турниры, сезон и формат' } },
+    { path: '/tournaments/:id', name: 'tournament', component: () => import('../views/TournamentDetailView.vue'), meta: { title: 'Турнир', description: 'Лига ИТМО: турнир' } },
     { path: '/matches', redirect: '/calendar' },
-    { path: '/matches/:id', name: 'match', component: () => import('../views/MatchDetailView.vue'), meta: { title: 'Матч', description: 'Протокол матча Лиги ИТМО.' } },
-    { path: '/teams', name: 'teams', component: () => import('../views/TeamsView.vue'), meta: { title: 'Команды', description: 'Команды Лиги ИТМО.' } },
-    { path: '/teams/:id', name: 'team', component: () => import('../views/TeamDetailView.vue'), meta: { title: 'Команда', description: 'Команда Лиги ИТМО.' } },
-    { path: '/players', name: 'players', component: () => import('../views/PlayersView.vue'), meta: { title: 'Игроки', description: 'Поиск игроков Лиги ИТМО.' } },
-    { path: '/players/:id', name: 'player', component: () => import('../views/PlayerDetailView.vue'), meta: { title: 'Игрок', description: 'Карточка игрока Лиги ИТМО.' } },
+    { path: '/matches/:id', name: 'match', component: () => import('../views/MatchDetailView.vue'), meta: { title: 'Матч', description: 'Лига ИТМО: протокол матча' } },
+    { path: '/teams', name: 'teams', component: () => import('../views/TeamsView.vue'), meta: { title: 'Команды', description: 'Лига ИТМО: команды' } },
+    { path: '/teams/:id', name: 'team', component: () => import('../views/TeamDetailView.vue'), meta: { title: 'Команда', description: 'Лига ИТМО: команда' } },
+    { path: '/players', name: 'players', component: () => import('../views/PlayersView.vue'), meta: { title: 'Игроки', description: 'Лига ИТМО: поиск игроков' } },
+    { path: '/players/:id', name: 'player', component: () => import('../views/PlayerDetailView.vue'), meta: { title: 'Игрок', description: 'Игрок Лиги ИТМО' } },
     { path: '/statistics', redirect: { path: '/table', query: { tab: 'scorers' } } },
-    { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, title: 'Моя команда', description: 'Заявка и матчи вашей команды.' } },
-    { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { auth: true, title: 'Профиль', description: 'Профиль участника Лиги ИТМО.' } },
-    { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboard.vue'), meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Управление лигой.' } },
-    { path: '/referee', name: 'referee', component: () => import('../views/referee/RefereeDashboard.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Судья', description: 'Матчи судьи.' } },
-    { path: '/referee/matches/:id', name: 'referee-match', component: () => import('../views/referee/LiveMatchControl.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Пульт судьи', description: 'Протокол матча.' } },
-    { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Аналитик', description: 'Матчи аналитика.' } },
-    { path: '/analyst/matches/:id', name: 'analyst-match', component: () => import('../views/analyst/AnalystPad.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Пульт аналитика', description: 'Статистика матча.' } },
-    { path: '/forbidden', name: 'forbidden', component: () => import('../views/ForbiddenView.vue'), meta: { title: 'Недостаточно прав', description: 'Этот раздел закрыт для вашей роли.' } },
-    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Такой страницы нет', description: 'Страница не найдена.' } },
+    { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, title: 'Моя команда', description: 'Лига ИТМО: моя команда' } },
+    { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { auth: true, title: 'Профиль', description: 'Лига ИТМО: профиль' } },
+    { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboard.vue'), meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Лига ИТМО: управление лигой' } },
+    ...Object.entries(ADMIN_LEGACY_PATHS).map(([path, tab]) => ({
+      path,
+      redirect: { path: '/admin', query: { tab } },
+      meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Лига ИТМО: управление лигой' },
+    })),
+    { path: '/referee', name: 'referee', component: () => import('../views/referee/RefereeDashboard.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Судья', description: 'Лига ИТМО: матчи судьи' } },
+    { path: '/referee/matches/:id', name: 'referee-match', component: () => import('../views/referee/LiveMatchControl.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Пульт судьи', description: 'Лига ИТМО: протокол матча' } },
+    { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Аналитик', description: 'Лига ИТМО: матчи аналитика' } },
+    { path: '/analyst/matches/:id', name: 'analyst-match', component: () => import('../views/analyst/AnalystPad.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Пульт аналитика', description: 'Лига ИТМО: статистика матча' } },
+    { path: '/forbidden', name: 'forbidden', component: () => import('../views/ForbiddenView.vue'), meta: { title: 'Недостаточно прав', description: 'Лига ИТМО: недостаточно прав' } },
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('../views/NotFoundView.vue'), meta: { title: 'Не найдено', description: 'Страница не найдена.' } },
   ],
   scrollBehavior: () => ({ top: 0 }),
 })
@@ -49,7 +55,7 @@ router.beforeEach(async (to) => {
   // Signed-in visitors can open /my-team. The page shows a stub unless they are a player or captain.
   const roles = to.meta.roles as string[] | undefined
   if (roles && !roles.some((role) => auth.hasRole(role as any))) {
-    if (to.path === '/admin' || to.path.startsWith('/referee')) {
+    if (to.path === '/admin' || to.path.startsWith('/admin/') || to.path.startsWith('/referee')) {
       return { name: 'forbidden', replace: true }
     }
     return { name: 'home' }

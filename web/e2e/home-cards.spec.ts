@@ -125,7 +125,8 @@ async function assertWholeWords(locator: Locator) {
     const rendered = lines.map((line) => line.trim()).filter(Boolean)
     const words = text.split(' ').filter(Boolean)
     const flat = rendered.flatMap((line) => line.split(/\s+/).filter(Boolean))
-    const min = 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    const root = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    const min = window.innerWidth <= 720 ? 14 : 0.95 * root
     return {
       wordBreak: style.wordBreak,
       overflowWrap: style.overflowWrap,
@@ -185,7 +186,8 @@ async function assertHeroName(locator: Locator) {
     document.body.appendChild(probe)
     const fullHeight = probe.getBoundingClientRect().height
     probe.remove()
-    const min = 0.95 * Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    const root = Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+    const min = window.innerWidth <= 720 ? 14 : 0.95 * root
     return {
       wordBreak: style.wordBreak,
       overflowWrap: style.overflowWrap,
@@ -462,7 +464,9 @@ test('guest burger switches at 1024 and the menu matches on home and a tournamen
     await expect(button).toBeVisible()
     await expect(button).toHaveAttribute('aria-expanded', open ? 'true' : 'false')
     await expect(button).toHaveAccessibleName(open ? 'Закрыть меню' : 'Открыть меню')
-    await expect(button.locator('.menu-glyph')).toHaveText(open ? '✕' : '☰')
+    await expect(button.locator('.menu-icon')).toBeVisible()
+    await expect(button).not.toContainText('☰')
+    await expect(button.locator('.menu-icon span')).toHaveCount(open ? 2 : 3)
     const panel = page.locator('.menu-panel')
     if (!open) {
       await expect(panel).toHaveCount(0)
@@ -511,7 +515,7 @@ test('guest burger switches at 1024 and the menu matches on home and a tournamen
   await page.setViewportSize({ width: 1024, height: 900 })
   await expect(page.locator('.menu-button')).toBeHidden()
   await expect(page.locator('nav.primary')).toBeVisible()
-  await expect(page.locator('nav.primary a')).toHaveCount(6)
+  await expect(page.locator('nav.primary a')).toHaveCount(7)
   await expect(page.locator('nav.primary a.on')).toHaveText('Главная')
   await expect(page.locator('.login-pill', { hasText: 'Войти' })).toBeVisible()
 

@@ -40,7 +40,7 @@ const letters = computed(() => initials(props.name || ''))
   letter-spacing: 0;
   line-height: 1;
 }
-.crest.lg { width: 36px; height: 36px; font-size: 0.8rem; }
+.crest.lg { width: 56px; height: 56px; font-size: 1.05rem; }
 .crest.has-photo { background: var(--accent-soft, #eef3f8); box-shadow: none; }
 .crest img {
   width: 100%;
@@ -52,7 +52,7 @@ const letters = computed(() => initials(props.name || ''))
   box-shadow: none;
 }
 @media (max-width: 720px) {
-  .crest.lg { width: 32px; height: 32px; font-size: 0.7rem; }
+  .crest.lg { width: 28px; height: 28px; font-size: 0.7rem; }
 }
 .c0 { background: var(--navy); color: #fff; }
 .c1 { background: var(--ice); color: var(--navy); }

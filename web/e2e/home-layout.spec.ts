@@ -81,7 +81,7 @@ async function columns(page: Page, selector: string) {
   )
 }
 
-test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
+test('home stacks through 720 CSS px and stays a row above it', async ({ page }) => {
   await mockApi(page)
   mkdirSync('/opt/cursor/artifacts', { recursive: true })
   const scroll: Record<string, { scrollWidth: number; clientWidth: number; heroColumns: number; cardColumns: number }> = {}
@@ -149,9 +149,8 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
     expect(awayBox!.y).toBeLessThan(homeBox!.y + homeBox!.height)
     expect(markBox!.x).toBeGreaterThan(homeBox!.x + 20)
     expect(awayBox!.x).toBeGreaterThan(markBox!.x)
-    const crestSize = width <= 480 ? 32 : 44
-    expect(Math.round(crestBox!.width)).toBe(crestSize)
-    expect(Math.round(crestBox!.height)).toBe(crestSize)
+    expect(Math.round(crestBox!.width)).toBe(28)
+    expect(Math.round(crestBox!.height)).toBe(28)
     const nameStyle = await homeSide.locator('.team-name').evaluate((el) => {
       const style = getComputedStyle(el)
       return { fontSize: style.fontSize, whiteSpace: style.whiteSpace, textOverflow: style.textOverflow }
@@ -160,17 +159,15 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
       const style = getComputedStyle(el)
       return { fontSize: style.fontSize, color: style.color }
     })
-    expect(vsStyle.fontSize).toBe('17.6px')
-    expect(parseFloat(nameStyle.fontSize)).toBeGreaterThanOrEqual(15.2)
+    expect(vsStyle.fontSize).toBe('15px')
+    expect(parseFloat(nameStyle.fontSize)).toBeGreaterThanOrEqual(14)
     expect(parseFloat(nameStyle.fontSize)).toBeLessThanOrEqual(parseFloat(vsStyle.fontSize) + 0.05)
     expect(vsStyle.color).toBe('rgb(76, 180, 229)')
     expect(nameStyle.whiteSpace).not.toBe('nowrap')
     expect(nameStyle.textOverflow).not.toBe('ellipsis')
     const nameBox = await homeSide.locator('.team-name').boundingBox()
     expect(nameBox!.width).toBeLessThan(homeBox!.width)
-    if (width <= 512) {
-      expect(nameBox!.height).toBeGreaterThan(parseFloat(nameStyle.fontSize) * 1.4)
-    }
+    expect(nameBox!.height).toBeLessThanOrEqual(parseFloat(nameStyle.fontSize) * 2.4)
 
     await page.screenshot({ path: `/opt/cursor/artifacts/home-${width}.png`, fullPage: true })
     if (width === 375) {
@@ -178,7 +175,7 @@ test('home stacks at 719 CSS px and stays a row at 720', async ({ page }) => {
     }
   }
 
-  await page.setViewportSize({ width: 720, height: 900 })
+  await page.setViewportSize({ width: 721, height: 900 })
   await page.goto('/')
   await expect(page.locator('.eyebrow', { hasText: 'Ближайший матч' })).toBeVisible()
   expect(await columns(page, '.hero-match')).toBe(2)

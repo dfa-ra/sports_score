@@ -206,7 +206,7 @@ String recentGameLine({
 const eventLabels = {
   'GOAL': 'Гол',
   'OWN_GOAL': 'Автогол',
-  'ASSIST': 'Голевая',
+  'ASSIST': 'Передача',
   'YELLOW_CARD': 'Жёлтая',
   'RED_CARD': 'Красная',
   'SUBSTITUTION': 'Замена',
@@ -220,6 +220,15 @@ const eventLabels = {
 
 String eventLabel(String? type) => eventLabels[type] ?? type ?? 'Событие';
 
+String assistWord(int count) {
+  final abs = count.abs() % 100;
+  final last = abs % 10;
+  if (abs > 10 && abs < 20) return 'передач';
+  if (last == 1) return 'передача';
+  if (last >= 2 && last <= 4) return 'передачи';
+  return 'передач';
+}
+
 String eventDetail({
   String? eventType,
   String? playerName,
@@ -229,7 +238,7 @@ String eventDetail({
 }) {
   final main = playerTag(playerName, playerJersey);
   final second = playerTag(secondaryPlayerName, secondaryPlayerJersey);
-  if (eventType == 'GOAL' && second.isNotEmpty) return '$main · пас $second';
+  if (eventType == 'GOAL' && second.isNotEmpty) return '$main · передача $second';
   if (eventType == 'SUBSTITUTION' && second.isNotEmpty) return '$main → $second';
   return main;
 }

@@ -30,7 +30,7 @@ void main() {
     expect(find.text('ТАБЛИЦА'), findsWidgets);
     expect(find.text('РЕЗУЛЬТАТЫ'), findsOneWidget);
     expect(find.text('БОМБАРДИРЫ'), findsOneWidget);
-    expect(find.text('АССИСТЕНТЫ'), findsOneWidget);
+    expect(find.text('ЛИДЕРЫ ПО ПЕРЕДАЧАМ'), findsOneWidget);
     expect(find.text('ВРАТАРИ'), findsOneWidget);
     expect(find.text('ИГРОКИ'), findsOneWidget);
   });
@@ -100,7 +100,7 @@ void main() {
         secondaryPlayerName: 'Петров',
         secondaryPlayerJersey: 8,
       ),
-      '#9 Иванов · пас #8 Петров',
+      '#9 Иванов · передача #8 Петров',
     );
     expect(
       eventDetail(eventType: 'YELLOW_CARD', playerName: 'Иванов', playerJersey: 9),
@@ -117,6 +117,10 @@ void main() {
       '#1 А → #2 Б',
     );
     expect(eventDetail(eventType: 'GOAL', playerName: 'Иванов', playerJersey: 9), '#9 Иванов');
+    expect(assistWord(1), 'передача');
+    expect(assistWord(3), 'передачи');
+    expect(assistWord(12), 'передач');
+    expect(assistWord(21), 'передача');
   });
 
   test('formatWhen matches the web kickoff line', () {

@@ -13,6 +13,5 @@ registerServiceWorker()
 const pinia = createPinia()
 setActivePinia(pinia)
 
-void useAuthStore().restoreSession().finally(() => {
-  createApp(App).use(pinia).use(router).mount('#app')
-})
+void useAuthStore().restoreSession()
+createApp(App).use(pinia).use(router).mount('#app')

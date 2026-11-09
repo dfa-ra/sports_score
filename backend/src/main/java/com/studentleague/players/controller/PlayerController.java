@@ -39,13 +39,14 @@ public class PlayerController {
     }
 
     @GetMapping
-    @Operation(summary = "Search players by first or last name. Shirt nickname is not matched. Empty without a query of at least 2 characters, unless teamId is set. Page size is capped at 12.")
+    @Operation(summary = "Search players by registration name. Each word must occur in the first or last name; case and extra spaces are ignored. Shirt nickname is not matched. Empty without a query of at least 2 characters, unless teamId is set. Optional tournamentId keeps active players of pending or approved teams. Page size is capped at 12.")
     public PageResponse<PlayerProfileResponse> list(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) UUID teamId,
+            @RequestParam(required = false) UUID tournamentId,
             @PageableDefault(size = 20, sort = "lastName", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return PageResponse.from(playerService.list(q, teamId, pageable));
+        return PageResponse.from(playerService.list(q, teamId, tournamentId, pageable));
     }
 
     @GetMapping("/me")

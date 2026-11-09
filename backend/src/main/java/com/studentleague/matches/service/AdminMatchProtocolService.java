@@ -187,7 +187,7 @@ public class AdminMatchProtocolService {
             throw ApiException.conflict("Событие уже убрано из протокола");
         }
         if (event.getEventType() != MatchEventType.GOAL) {
-            throw ApiException.badRequest("Забившего и ассистента можно менять только у гола");
+            throw ApiException.badRequest("Забившего и того, кто отдал передачу, можно менять только у гола");
         }
         if (request.playerId() == null) {
             throw ApiException.badRequest("Укажите забившего");
@@ -201,7 +201,7 @@ public class AdminMatchProtocolService {
             return;
         }
         if (assistId.equals(request.playerId())) {
-            throw ApiException.badRequest("Ассистент и забивший — разные игроки");
+            throw ApiException.badRequest("Тот, кто отдал передачу, и забивший — разные игроки");
         }
         teamOf(match, assistId, scorerTeam);
         event.setSecondaryPlayerId(assistId);

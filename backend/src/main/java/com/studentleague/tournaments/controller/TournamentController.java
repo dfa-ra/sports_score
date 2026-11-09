@@ -9,6 +9,7 @@ import com.studentleague.tournaments.dto.CalendarImportResponse;
 import com.studentleague.tournaments.dto.CreateTournamentRequest;
 import com.studentleague.tournaments.dto.RegisterTeamRequest;
 import com.studentleague.tournaments.dto.ReplaceTournamentTablesRequest;
+import com.studentleague.tournaments.dto.TournamentCatalogResponse;
 import com.studentleague.tournaments.dto.TournamentFormatResponse;
 import com.studentleague.tournaments.dto.TournamentOverviewResponse;
 import com.studentleague.tournaments.dto.TournamentResponse;
@@ -17,6 +18,7 @@ import com.studentleague.tournaments.dto.TournamentTableResponse;
 import com.studentleague.tournaments.dto.TournamentTeamResponse;
 import com.studentleague.tournaments.dto.UpdateTournamentRequest;
 import com.studentleague.tournaments.service.CalendarImportService;
+import com.studentleague.tournaments.service.TournamentCatalogService;
 import com.studentleague.tournaments.service.TournamentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -53,15 +55,18 @@ import java.util.UUID;
 public class TournamentController {
 
     private final TournamentService tournamentService;
+    private final TournamentCatalogService tournamentCatalogService;
     private final MatchService matchService;
     private final CalendarImportService calendarImportService;
 
     public TournamentController(
             TournamentService tournamentService,
+            TournamentCatalogService tournamentCatalogService,
             MatchService matchService,
             CalendarImportService calendarImportService
     ) {
         this.tournamentService = tournamentService;
+        this.tournamentCatalogService = tournamentCatalogService;
         this.matchService = matchService;
         this.calendarImportService = calendarImportService;
     }
@@ -82,6 +87,12 @@ public class TournamentController {
     @Operation(summary = "Create tournament (ADMIN)")
     public TournamentResponse create(@Valid @RequestBody CreateTournamentRequest request) {
         return tournamentService.create(request);
+    }
+
+    @GetMapping("/catalog")
+    @Operation(summary = "Public tournament directory with counts, stage, progress and winner")
+    public List<TournamentCatalogResponse> catalog() {
+        return tournamentCatalogService.catalog();
     }
 
     @GetMapping("/current")

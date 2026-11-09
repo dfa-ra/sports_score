@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
@@ -33,11 +34,19 @@ const tournament = ref<any>(null)
 const playoff = ref<any>(null)
 const statsLoadedFor = ref('')
 const loading = ref(true)
+const bootstrapError = ref('')
 const loadError = ref('')
 const playoffError = ref(false)
 const statsLoading = ref(false)
 const statsError = ref('')
 const expanded = ref({ scorers: false, assists: false, keepers: false })
+let hydratedId = ''
+
+const advancingPlaces = computed(() => {
+  const raw = playoff.value?.advancingPlaces
+  if (!Array.isArray(raw)) return []
+  return raw.map((place: unknown) => Number(place)).filter((place) => Number.isFinite(place))
+})
 
 const hasPlayoff = computed(() => {
   const picked = tournaments.value.find((item) => item.id === tournamentId.value)
@@ -45,6 +54,15 @@ const hasPlayoff = computed(() => {
   return (playoff.value?.rounds?.length ?? 0) > 0
 })
 
+const championMeta = computed(() => {
+  const current = tournament.value
+  if (!current) return ''
+  const name = String(current.name || '').trim()
+  const seasonLabel = String(current.seasonLabel || '').trim()
+  const year = current.seasonYear
+  const season = seasonLabel || (typeof year === 'number' && year > 0 ? `Сезон ${year}` : '')
+  return [name, season].filter(Boolean).join(' · ')
+})
 const headingName = computed(() => {
   const picked = tournaments.value.find((item) => item.id === tournamentId.value)
   if (picked?.name) return picked.name
@@ -60,7 +78,8 @@ const tab = computed<Tab>(() => {
 })
 
 const tabBar = ref<HTMLElement | null>(null)
-const ink = ref({ x: 0, w: 0, slide: false })
+bindActiveTab(tabBar)
+const ink = ref({ x: 0, y: 0, w: 0, slide: false })
 let inkObserver: ResizeObserver | null = null
 
 function placeInk(slide: boolean) {
@@ -69,6 +88,7 @@ function placeInk(slide: boolean) {
   if (!bar || !btn) return
   ink.value = {
     x: btn.offsetLeft,
+    y: btn.offsetTop + btn.offsetHeight - 3,
     w: btn.offsetWidth,
     slide: slide && ink.value.w > 0,
   }
@@ -111,27 +131,103 @@ onMounted(async () => {
     inkObserver = new ResizeObserver(() => placeInk(true))
     inkObserver.observe(tabBar.value)
   }
-  await teams.load()
-  const [{ data }, games] = await Promise.all([
-    api.get('/tournaments', { params: { size: 50 } }),
-    api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
-  ])
-  tournaments.value = data.content ?? []
-  matches.value = games.data.content ?? []
-  const requested = String(route.query.tournament || '')
-  if (requested && tournaments.value.some((item) => item.id === requested)) {
-    tournamentId.value = requested
-  } else {
-    try {
-      const current = await api.get('/tournaments/current')
-      if (current.data?.id) tournamentId.value = current.data.id
-    } catch {
-      if (tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-    }
-    if (!tournamentId.value && tournaments.value[0]) tournamentId.value = tournaments.value[0].id
-  }
-  if (!tournamentId.value) await load()
+  await bootstrap()
 })
+
+async function bootstrap() {
+  bootstrapError.value = ''
+  loading.value = true
+  const requested = String(route.query.tournament || '')
+  try {
+    const directory = teams.load().catch(() => undefined)
+    const currentReq = requested
+      ? Promise.resolve(null)
+      : api.get('/tournaments/current').then((res) => res.data).catch(() => null)
+    const bundleReq = requested ? loadTournamentBundle(requested) : Promise.resolve(null)
+    const [{ data }, games, current, bundle] = await Promise.all([
+      api.get('/tournaments', { params: { size: 50 } }),
+      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
+      currentReq,
+      bundleReq,
+      directory,
+    ])
+    tournaments.value = data.content ?? []
+    matches.value = games.data.content ?? []
+    const known = (id: string) => tournaments.value.some((item) => item.id === id)
+    let nextId = ''
+    if (requested && known(requested)) nextId = requested
+    else if (current?.id && known(current.id)) nextId = current.id
+    else if (tournaments.value[0]) nextId = tournaments.value[0].id
+    const ready = Boolean(nextId && bundle && nextId === requested && !bundle.failed)
+    if (ready && bundle) {
+      applyBundle(nextId, bundle)
+      hydratedId = nextId
+    }
+    if (!nextId) {
+      await load()
+      return
+    }
+    if (tournamentId.value === nextId) {
+      if (hydratedId === nextId) {
+        hydratedId = ''
+        loading.value = false
+        syncPlayoffTab(nextId, false, fullList.value)
+      } else {
+        await load()
+      }
+      return
+    }
+    tournamentId.value = nextId
+  } catch {
+    bootstrapError.value = 'Таблица не загрузилась.'
+    loading.value = false
+  }
+}
+
+function applyBundle(id: string, bundle: TournamentBundle) {
+  tournament.value = bundle.tournament
+  playoff.value = bundle.playoff
+  playoffError.value = bundle.playoffFailed
+  standings.value = parseStandings(bundle.standings)
+  if (bundle.board) {
+    scorers.value = bundle.board.scorers ?? []
+    assists.value = bundle.board.assists ?? []
+    keepers.value = bundle.board.goalkeepers ?? []
+    statsLoadedFor.value = id
+  }
+  const name = bundle.tournament?.name || 'Таблица'
+  setPageMeta({
+    title: name,
+    description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам',
+    path: '/table',
+  })
+}
+
+type TournamentBundle = {
+  failed: boolean
+  tournament: any
+  standings: unknown
+  playoff: any
+  playoffFailed: boolean
+  board: { scorers?: any[]; assists?: any[]; goalkeepers?: any[] } | null
+}
+
+async function loadTournamentBundle(id: string): Promise<TournamentBundle> {
+  const [tournamentRes, standingsRes, playoffRes, boardRes] = await Promise.all([
+    api.get(`/tournaments/${id}`).then((res) => ({ ok: true as const, data: res.data })).catch(() => ({ ok: false as const, data: null })),
+    api.get(`/tournaments/${id}/standings`).then((res) => ({ ok: true as const, data: res.data })).catch(() => ({ ok: false as const, data: null })),
+    api.get(`/tournaments/${id}/playoff`).then((res) => ({ data: res.data, failed: false })).catch(() => ({ data: null, failed: true })),
+    api.get('/statistics/board', { params: { tournamentId: id, limit: 50 } }).then((res) => res.data).catch(() => null),
+  ])
+  return {
+    failed: !tournamentRes.ok || !standingsRes.ok,
+    tournament: tournamentRes.data,
+    standings: standingsRes.data,
+    playoff: playoffRes.data,
+    playoffFailed: playoffRes.failed,
+    board: boardRes,
+  }
+}
 
 watch(tournamentId, (id) => {
   const requested = String(route.query.tab || '')
@@ -148,6 +244,12 @@ watch(tournamentId, (id) => {
           listAll,
         }),
       })
+    }
+    if (hydratedId && hydratedId === id) {
+      hydratedId = ''
+      loading.value = false
+      syncPlayoffTab(id, rememberPlayoff, listAll)
+      return
     }
     await load({ rememberPlayoff, listAll })
   })()
@@ -211,6 +313,11 @@ async function loadStats() {
   }
 }
 
+function retryStats() {
+  statsLoadedFor.value = ''
+  void loadStats()
+}
+
 function syncPlayoffTab(id: string, rememberPlayoff: boolean, listAll: boolean) {
   if (tournamentId.value !== id) return
   const queryTab = String(route.query.tab || '')
@@ -259,7 +366,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     const name = t.data?.name || 'Таблица'
     setPageMeta({
       title: name,
-      description: `Таблица, результаты и бомбардиры: ${name}.`,
+      description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам',
       path: '/table',
     })
     if (tab.value === 'scorers' || tab.value === 'assists' || tab.value === 'keepers') await loadStats()
@@ -302,26 +409,53 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <button v-if="hasPlayoff" type="button" :class="{ on: tab === 'playoff' }" @click="setTab('playoff')">Плей-офф</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
-      <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
+      <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Лидеры по передачам</button>
       <button type="button" :class="{ on: tab === 'keepers' }" @click="setTab('keepers')">Вратари</button>
       <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
       <span
         class="tab-ink"
         :class="{ slide: ink.slide, ready: ink.w > 0 }"
-        :style="{ transform: `translateX(${ink.x}px)`, width: `${ink.w}px` }"
+        :style="{ transform: `translate(${ink.x}px, ${ink.y}px)`, width: `${ink.w}px` }"
       />
     </div>
 
-    <div :key="tab" class="tab-panel">
-    <p v-if="loadError" class="form-error">{{ loadError }}</p>
-    <div v-if="loading" class="skeleton" />
+    <div v-if="bootstrapError" class="load-fail" role="alert">
+      <strong>{{ bootstrapError }}</strong>
+      <button class="btn secondary" type="button" @click="bootstrap">Повторить</button>
+    </div>
+    <div v-else :key="tab" class="tab-panel">
+    <div v-if="loadError" class="load-fail" role="alert">
+      <strong>{{ loadError }}</strong>
+      <button class="btn secondary" type="button" @click="load()">Повторить</button>
+    </div>
+    <template v-if="loading">
+      <div class="sheet-stack">
+        <div class="sheet tab-skel" aria-hidden="true">
+          <h2 class="group-title">Таблица</h2>
+          <div class="board">
+            <div class="line head">
+              <span>#</span>
+              <span class="team-label">Команда</span>
+              <span>И</span>
+              <span class="wide">В</span>
+              <span class="wide">Н</span>
+              <span class="wide">П</span>
+              <span>Г</span>
+              <span>О</span>
+            </div>
+            <div v-for="n in 5" :key="n" class="line sk-row"></div>
+          </div>
+        </div>
+        <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
+      </div>
+    </template>
 
     <template v-else-if="tab === 'table'">
       <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
       <div v-else class="sheet-stack">
         <div v-for="(table, i) in standings" :key="table.id || i" class="sheet">
           <h2 v-if="table.name" class="group-title">{{ table.name }}</h2>
-          <StandingTable :rows="table.rows" />
+          <StandingTable :rows="table.rows" :marked-places="advancingPlaces" />
         </div>
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
       </div>
@@ -331,6 +465,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <PlayoffBracket
         :tournament-id="tournamentId"
         :rounds="playoff?.rounds ?? []"
+        :meta="championMeta"
         :loading="false"
         :error="playoffError"
         @retry="load()"
@@ -353,7 +488,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 
     <template v-else-if="tab === 'players'">
       <div class="panel">
-        <PlayerSearch />
+        <PlayerSearch :tournament-id="tournamentId" />
       </div>
     </template>
 
@@ -363,8 +498,19 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Бомбардиры</h2>
           <p v-if="topNote(scorers, 'scorers')" class="muted">{{ topNote(scorers, 'scorers') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
         <EmptyState v-else-if="!scorers.length" title="Голов пока нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
@@ -385,6 +531,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('scorers', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('scorers')">← К топ-10</button>
         </div>
+        </div>
       </div>
     </template>
 
@@ -394,8 +541,19 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Вратари</h2>
           <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
         <EmptyState v-else-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
@@ -416,21 +574,45 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('keepers', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('keepers')">← К топ-10</button>
         </div>
+        </div>
       </div>
     </template>
 
     <template v-else-if="tab === 'assists'">
       <div class="panel">
         <div class="stat-head">
-          <h2>Ассистенты</h2>
+          <h2>Лидеры по передачам</h2>
           <p v-if="topNote(assists, 'assists')" class="muted">{{ topNote(assists, 'assists') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
-        <p v-else-if="statsError" class="form-error">{{ statsError }}</p>
-        <EmptyState v-else-if="!assists.length" title="Ассистов ещё нет" />
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
+                <th class="num">Игры</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else-if="statsError" class="load-fail" role="alert">
+          <strong>{{ statsError }}</strong>
+          <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
+        </div>
+        <EmptyState v-else-if="!assists.length" title="Передач ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Ассисты</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
+                <th class="num">Игры</th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(assists, 'assists')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -447,6 +629,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('assists', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('assists')">← К топ-10</button>
         </div>
+        </div>
       </div>
     </template>
     </div>
@@ -462,7 +645,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 .tab-ink {
   position: absolute;
   left: 0;
-  bottom: 0;
+  top: 0;
   height: 3px;
   background: var(--ice);
   pointer-events: none;
@@ -483,9 +666,105 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 .season { max-width: 360px; margin-top: 0.35rem; }
 .sheet-stack { display: grid; gap: 0.85rem; }
 .tie-note {
-  margin: 0.1rem 0.2rem 0;
+  margin: 0.7rem 0 0.15rem;
+  padding: 0 0.95rem;
   color: var(--muted);
   font-size: 0.78rem;
+  line-height: 1.4;
+}
+@media (max-width: 720px) {
+  .page { gap: 0; margin-top: -9px; }
+  .league {
+    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-rows: minmax(36px, auto) 44px;
+    gap: 8px;
+    align-items: center;
+    box-sizing: border-box;
+    height: auto;
+    min-height: 88px;
+    padding: 0;
+  }
+  .league :deep(.brand-mark) { width: 36px !important; height: 36px !important; grid-row: 1; }
+  .league > div { display: contents; }
+  .league h1 {
+    grid-row: 1;
+    grid-column: 2;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 800;
+    white-space: normal;
+  }
+  .season { grid-row: 2; grid-column: 1 / -1; max-width: none; margin: 0; }
+  .season :deep(select),
+  .season select {
+    height: 44px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    padding: 0 32px 0 12px;
+  }
+  .league-tabs { margin-top: 12px; }
+  .league-tabs button {
+    padding: 0 10px;
+    letter-spacing: 0.02em;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .sheet-stack { gap: 8px; margin-top: 6px; }
+  .sheet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sheet > .group-title {
+    grid-row: 1;
+    grid-column: 1;
+    box-sizing: border-box;
+    height: 34px;
+    margin: 0;
+    padding: 0 108px 0 12px;
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 13px;
+    line-height: 34px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+  .sheet :deep(.board) { display: contents; }
+  .sheet :deep(.line) { grid-column: 1; min-width: 0; width: 100%; }
+  .sheet :deep(.line.head) {
+    grid-row: 1;
+    height: 34px;
+    min-height: 34px;
+    background: transparent;
+  }
+  .sheet :deep(.line.head span:first-child),
+  .sheet :deep(.line.head .team-label) { visibility: hidden; }
+  .tie-note {
+    margin: 8px 0 0;
+    padding: 0 12px;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+  }
+  .stat-body,
+  .stat-body :deep(.empty) { min-height: calc(44px + 5 * 56px); }
+}
+@media (max-width: 720px) {
+  .tab-skel .line {
+    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    padding: 0 2px 0 12px;
+  }
+  .tab-skel .line.head {
+    height: 34px;
+    min-height: 34px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .tab-skel .wide { display: none; }
 }
 .sheet {
   background: #fff;
@@ -521,13 +800,70 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   width: 4.8rem;
   white-space: nowrap;
   vertical-align: middle;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
+.load-fail {
+  display: grid;
+  justify-items: start;
+  gap: 0.7rem;
+  padding: 1rem 0.2rem;
+}
+.load-fail strong { color: var(--navy); }
 .stat-table .who {
   vertical-align: middle;
   overflow: hidden;
 }
 @media (max-width: 720px) {
   .stat-table .num { width: 4.15rem; }
+}
+.sheet :deep(a.line) {
+  box-sizing: border-box;
+  height: 56px;
+  min-height: 56px;
+}
+.tab-skel .line {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 56px;
+  height: 56px;
+  padding: 0 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.tab-skel .line.head {
+  min-height: 2.15rem;
+  height: 2.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tab-skel .sk-row { background: linear-gradient(90deg, #eef3f8, #f7fafc, #eef3f8); }
+.stat-body { min-height: calc(2.6rem + 5 * 56px); }
+.stat-table tbody td,
+.stat-skel tbody td {
+  box-sizing: border-box;
+  height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.stat-body :deep(.empty) {
+  box-sizing: border-box;
+  height: auto;
+  max-height: none;
+  min-height: calc(2.6rem + 5 * 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pass-wide { display: none; }
+@media (min-width: 721px) {
+  .pass-short { display: none; }
+  .pass-wide { display: inline; }
 }
 .people { display: grid; }
 .person {
@@ -542,4 +878,10 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 .person b { color: var(--navy); }
 .person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
+@media (max-width: 720px) {
+  .tab-skel .line.head {
+    height: 34px;
+    min-height: 34px;
+  }
+}
 </style>

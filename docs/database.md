@@ -136,7 +136,7 @@ User 1──* DeviceToken
 | period | INT | какой тайм |
 | team_id | UUID | nullable |
 | player_id | UUID | индекс; nullable |
-| secondary_player_id | UUID | ассист / партнёр замены |
+| secondary_player_id | UUID | передача / партнёр замены |
 
 ### match_lineup_players
 | Колонка | Тип | Примечание |

@@ -1,14 +1,36 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { nextTick, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { setPageMeta } from '../lib/pageMeta'
+
+defineProps<{ heading?: string }>()
+
+const route = useRoute()
+const router = useRouter()
+
+function applyTitle() {
+  setPageMeta({
+    title: 'Не найдено',
+    description: 'Страница не найдена.',
+    path: route.fullPath,
+  })
+}
+
+function back() {
+  if (window.history.length > 1) router.back()
+  else void router.push('/')
+}
+
+onMounted(() => { void nextTick(applyTitle) })
+watch(() => route.fullPath, () => { void nextTick(applyTitle) })
 </script>
 
 <template>
   <section class="lost rise">
     <div class="panel stack">
-      <h1>Такой страницы нет</h1>
+      <h1>{{ heading || 'Не найдено' }}</h1>
       <div class="cta">
-        <RouterLink class="btn" to="/">На главную</RouterLink>
-        <RouterLink class="btn secondary" to="/matches">К матчам</RouterLink>
+        <button class="btn" type="button" @click="back">Назад</button>
       </div>
     </div>
   </section>

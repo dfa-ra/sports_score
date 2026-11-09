@@ -1,22 +1,24 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
-import { eventLabel, formatClock, isOwnGoal, labelOf, matchListWhen, periodLabel, playerTag } from '../lib/format'
+import { eventLabel, isOwnGoal, labelOf, periodLabel, playerTag, statusLabel } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, matchInstant, matchStateLabel, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
+import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
-import MatchStageNote from '../components/MatchStageNote.vue'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
+import { cardScoreText } from '../lib/calendarFeed'
+import { aboutStage, classifyFormPayload, formMarks, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import NotFoundView from './NotFoundView.vue'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import { useFavorites } from '../stores/favorites'
 import AdminOnly from '../components/AdminOnly.vue'
-import PlayerAvatar from '../components/PlayerAvatar.vue'
 import AnalystAssignForm from '../components/AnalystAssignForm.vue'
 import CopyChip from '../components/CopyChip.vue'
 import FutsalBoard from '../components/FutsalBoard.vue'
@@ -25,7 +27,6 @@ import MatchGoalAlerts from '../components/MatchGoalAlerts.vue'
 import MatchLineupBoard from '../components/MatchLineupBoard.vue'
 import MatchShareButton from '../components/MatchShareButton.vue'
 import PenaltyShootoutAdmin from '../components/PenaltyShootoutAdmin.vue'
-import ScorePop from '../components/ScorePop.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import MatchAnalystStats from '../components/MatchAnalystStats.vue'
 
@@ -41,8 +42,10 @@ const referees = ref<any[]>([])
 const lineups = ref<any>(null)
 const homeForm = ref<any[]>([])
 const awayForm = ref<any[]>([])
-const allMatches = ref<any[]>([])
+const formError = ref(false)
+const formReady = ref(false)
 const tournament = ref<any>(null)
+const loading = ref(true)
 const me = ref<any>(null)
 const users = ref<any[]>([])
 const refereeId = ref('')
@@ -67,7 +70,24 @@ function crestForViewport() {
 const crestSize = ref(crestForViewport())
 const homeStarTap = ref(0)
 const awayStarTap = ref(0)
-const tab = ref<'overview' | 'stats' | 'lineups' | 'protocol'>('overview')
+type MatchTab = 'overview' | 'stats' | 'lineups' | 'protocol'
+const matchTabs: MatchTab[] = ['overview', 'stats', 'lineups', 'protocol']
+const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
+const tab = computed<MatchTab>(() => {
+  const raw = String(route.query.tab || '')
+  return matchTabs.includes(raw as MatchTab) ? raw as MatchTab : 'overview'
+})
+function setTab(next: MatchTab) {
+  const query: Record<string, string> = {}
+  for (const [key, value] of Object.entries(route.query)) {
+    if (key === 'tab') continue
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  if (next !== 'overview') query.tab = next
+  if (String(route.query.tab || '') === (query.tab || '')) return
+  void router.replace({ query })
+}
 const connected = ref(false)
 const error = ref('')
 const ok = ref('')
@@ -75,7 +95,7 @@ const pending = ref(false)
 const missing = ref(false)
 const teams = useTeamDirectory()
 const fav = useFavorites()
-const { minute, expired, cap } = useMatchClock(match)
+const { minute, expired } = useMatchClock(match)
 let client: Client | null = null
 let pollTimer = 0
 
@@ -84,30 +104,14 @@ const timeline = computed(() =>
     .filter((event) => !event.voided)
     .sort(compareMatchEvents),
 )
-const headToHead = computed(() => {
-  if (!match.value) return []
-  const a = match.value.homeTeamId
-  const b = match.value.awayTeamId
-  return allMatches.value
-    .filter((row) =>
-      (row.status === 'FINISHED' || row.status === 'CANCELLED')
-      && row.id !== match.value.id
-      && ((row.homeTeamId === a && row.awayTeamId === b) || (row.homeTeamId === b && row.awayTeamId === a))
-    )
-    .slice()
-    .sort((x, y) => String(matchInstant(y) || '').localeCompare(String(matchInstant(x) || '')))
-    .slice(0, 5)
-})
+const homeMarks = computed(() => formMarks(homeForm.value, match.value?.homeTeamId, match.value?.id))
+const awayMarks = computed(() => formMarks(awayForm.value, match.value?.awayTeamId, match.value?.id))
+const publicReferees = computed(() => refereeNames(referees.value))
+const stageText = computed(() => aboutStage(match.value, tournament.value))
+const placeText = computed(() => venueLabel(match.value?.venue))
+const heroScore = computed(() => match.value ? cardScoreText(match.value) : '')
+const tournamentTitle = computed(() => tournament.value?.name || match.value?.tournamentName || 'Турнир')
 
-function formSide(row: any, side: 'home' | 'away') {
-  const id = side === 'home' ? row.homeTeamId : row.awayTeamId
-  const apiName = side === 'home' ? row.homeTeamName : row.awayTeamName
-  const apiLogo = side === 'home' ? row.homeLogoUrl : row.awayLogoUrl
-  return {
-    name: apiName || teams.fullName(id),
-    logo: apiLogo || teams.logo(id),
-  }
-}
 const protocolMinuteMax = computed(() =>
   protocolMinuteLimit(match.value?.periodLengthSeconds, match.value?.periodCount),
 )
@@ -139,8 +143,6 @@ function playersOf(teamId: string) {
 }
 
 const protocolPlayers = computed(() => playersOf(protocolTeamId.value))
-
-const playerOfTheMatchName = computed(() => registeredName(match.value?.playerOfTheMatch))
 
 const goalPlayerOptions = computed(() => {
   if (!match.value) return []
@@ -256,7 +258,7 @@ function protocolExtra(ev: {
 }) {
   if (isOwnGoal(ev)) return ''
   const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
-  if (ev.eventType === 'GOAL' && second) return `· пас ${second}`
+  if (ev.eventType === 'GOAL' && second) return `· передача ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `→ ${second}`
   return ''
 }
@@ -294,25 +296,40 @@ function typedMinute(eventId: string) {
   return Number(value)
 }
 
+function describeMatch(homeName: string, awayName: string) {
+  const base = `Лига ИТМО: матч ${homeName} — ${awayName}`
+  const status = match.value?.status
+  if (status !== 'LIVE' && status !== 'PAUSED' && status !== 'FINISHED') return base
+  return `${base}, счёт ${Number(match.value?.homeScore ?? 0)}:${Number(match.value?.awayScore ?? 0)}`
+}
+
+let pageTicket = 0
 async function load() {
-  const id = route.params.id
+  const ticket = ++pageTicket
+  const id = String(route.params.id || '')
   missing.value = false
+  if (!match.value) loading.value = true
   try {
-  await teams.load()
+  const directory = teams.load()
   const [m, e, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/referees`),
     api.get(`/matches/${id}/lineups`),
+    directory,
   ])
+  if (ticket !== pageTicket || String(route.params.id || '') !== id) return
   match.value = m.data
+  error.value = ''
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
-  setPageMeta({
+  const publish = () => setPageMeta({
     title: `${homeName} — ${awayName}`,
-    description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
+    description: describeMatch(homeName, awayName),
     path: `/matches/${id}`,
   })
+  publish()
+  void nextTick(publish)
   motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
   homeKeeperId.value = m.data.homeGoalkeeper?.playerId || ''
   awayKeeperId.value = m.data.awayGoalkeeper?.playerId || ''
@@ -323,49 +340,39 @@ async function load() {
   if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
   homeRoster.value = []
   awayRoster.value = []
-  if (auth.canManageLeague) {
-    try {
-      const [homeMembers, awayMembers] = await Promise.all([
-        api.get(`/teams/${m.data.homeTeamId}/members`),
-        api.get(`/teams/${m.data.awayTeamId}/members`),
-      ])
-      homeRoster.value = homeMembers.data ?? []
-      awayRoster.value = awayMembers.data ?? []
-    } catch {
-      homeRoster.value = []
-      awayRoster.value = []
-    }
+  const forms = loadForms(m.data.homeTeamId, m.data.awayTeamId)
+  const tournamentReq = api.get(`/tournaments/${m.data.tournamentId}`)
+    .then((res) => res.data)
+    .catch(() => null)
+  const membersReq = auth.canManageLeague
+    ? Promise.all([
+      api.get(`/teams/${m.data.homeTeamId}/members`),
+      api.get(`/teams/${m.data.awayTeamId}/members`),
+    ]).then(([homeMembers, awayMembers]) => ({
+      home: homeMembers.data ?? [],
+      away: awayMembers.data ?? [],
+    })).catch(() => ({ home: [] as any[], away: [] as any[] }))
+    : Promise.resolve(null)
+  const meReq = auth.isAuthenticated
+    ? api.get('/players/me').then((res) => res.data).catch(() => null)
+    : Promise.resolve(undefined)
+  const refereesReq = auth.canManageLeague ? loadAllReferees() : Promise.resolve(null)
+  const [tournamentData, members, meData, refereeUsers] = await Promise.all([
+    tournamentReq,
+    membersReq,
+    meReq,
+    refereesReq,
+    forms,
+  ])
+  if (ticket !== pageTicket) return
+  tournament.value = tournamentData
+  if (members) {
+    homeRoster.value = members.home
+    awayRoster.value = members.away
   }
-  try {
-    const [hf, af, games] = await Promise.all([
-      api.get(`/teams/${m.data.homeTeamId}/form`, { params: { limit: 5 } }),
-      api.get(`/teams/${m.data.awayTeamId}/form`, { params: { limit: 5 } }),
-      api.get('/matches', { params: { size: 100, sort: 'scheduledAt,desc' } }),
-    ])
-    homeForm.value = [...(hf.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
-    awayForm.value = [...(af.data ?? [])].sort((a, b) => String(matchInstant(b) || '').localeCompare(String(matchInstant(a) || '')))
-    allMatches.value = games.data.content ?? []
-  } catch {
-    homeForm.value = []
-    awayForm.value = []
-    allMatches.value = []
-  }
-  try {
-    const { data } = await api.get(`/tournaments/${m.data.tournamentId}`)
-    tournament.value = data
-  } catch {
-    tournament.value = null
-  }
-  if (auth.isAuthenticated) {
-    try {
-      const { data } = await api.get('/players/me')
-      me.value = data
-    } catch {
-      me.value = null
-    }
-  }
-  if (auth.canManageLeague) {
-    users.value = await loadAllReferees()
+  if (meData !== undefined) me.value = meData
+  if (refereeUsers) {
+    users.value = refereeUsers
     const stillListed = users.value.some((user) => user.id === refereeId.value)
     if (!refereeId.value || !stillListed) {
       const assignedId = referees.value.find((row) =>
@@ -374,15 +381,83 @@ async function load() {
       refereeId.value = assignedId || users.value[0]?.id || ''
     }
   }
+  error.value = ''
   } catch (e: any) {
+    if (ticket !== pageTicket) return
     const status = e?.response?.status
     if (status === 400 || status === 404) {
       match.value = null
       missing.value = true
+      error.value = ''
       return
     }
-    error.value = apiError(e, 'Матч не загрузился.')
+    if (!match.value) error.value = 'Матч не загрузился'
+  } finally {
+    if (ticket === pageTicket) loading.value = false
   }
+}
+
+let formTicket = 0
+let formPending = false
+async function loadForms(homeTeamId?: string, awayTeamId?: string) {
+  const ticket = ++formTicket
+  formPending = true
+  const matchId = String(route.params.id || '')
+  const stillThisMatch = () => ticket === formTicket && matchId === String(route.params.id || '')
+  try {
+    if (!homeTeamId || !awayTeamId) {
+      if (!stillThisMatch()) return
+      homeForm.value = []
+      awayForm.value = []
+      formError.value = false
+      formReady.value = true
+      return
+    }
+    const [hf, af] = await Promise.all([
+      api.get(`/teams/${homeTeamId}/form`, { params: { limit: 5 } }),
+      api.get(`/teams/${awayTeamId}/form`, { params: { limit: 5 } }),
+    ])
+    const homeRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), hf.data)
+    const awayRaw = keepFormPayload(ticket, formTicket, matchId, String(route.params.id || ''), af.data)
+    if (!stillThisMatch()) return
+    if (homeRaw == null || awayRaw == null) {
+      formError.value = true
+      return
+    }
+    if (match.value && (String(match.value.homeTeamId) !== String(homeTeamId) || String(match.value.awayTeamId) !== String(awayTeamId))) {
+      formError.value = true
+      return
+    }
+    const home = classifyFormPayload(homeRaw, homeTeamId, matchId)
+    const away = classifyFormPayload(awayRaw, awayTeamId, matchId)
+    if (!stillThisMatch()) return
+    if (!home.ok || !away.ok) {
+      formError.value = true
+      return
+    }
+    homeForm.value = home.rows
+    awayForm.value = away.rows
+    formError.value = false
+    formReady.value = true
+  } catch {
+    if (!stillThisMatch()) return
+    formError.value = true
+  } finally {
+    if (ticket === formTicket) formPending = false
+  }
+}
+
+function markClass(mark: string) {
+  if (mark === 'В') return 'win'
+  if (mark === 'Н') return 'draw'
+  return 'loss'
+}
+
+function blockScore(value?: string | null) {
+  if (!value) return ''
+  const parts = String(value).split('-')
+  if (parts.length !== 2) return value
+  return `${parts[0]} : ${parts[1]}`
 }
 
 function eventSignature(list: any[]) {
@@ -391,17 +466,21 @@ function eventSignature(list: any[]) {
 
 async function refreshLive() {
   if (pending.value || !route.params.id) return
-  const id = route.params.id
+  const id = String(route.params.id || '')
   const [m, e] = await Promise.all([
     api.get(`/matches/${id}`),
     api.get(`/matches/${id}/events`),
   ])
+  if (String(route.params.id || '') !== id) return
+  const needsForm = !formReady.value && !formError.value && !formPending
   match.value = { ...match.value, ...m.data }
+  if (needsForm) void loadForms(match.value?.homeTeamId, match.value?.awayTeamId)
   const next = e.data ?? []
   if (eventSignature(next) !== eventSignature(events.value)) {
     events.value = next
     syncDrafts()
   }
+  error.value = ''
 }
 
 function mergeLive(live: any) {
@@ -649,6 +728,21 @@ onMounted(async () => {
   }, 4_000)
 })
 
+watch(() => route.fullPath, () => {
+  if (!match.value || missing.value) return
+  const id = String(route.params.id || '')
+  const homeName = teams.fullName(match.value.homeTeamId, match.value.homeTeamName || 'Команда')
+  const awayName = teams.fullName(match.value.awayTeamId, match.value.awayTeamName || 'Команда')
+  void nextTick(() => {
+    if (!match.value || String(route.params.id || '') !== id) return
+    setPageMeta({
+      title: `${homeName} — ${awayName}`,
+      description: describeMatch(homeName, awayName),
+      path: `/matches/${id}`,
+    })
+  })
+})
+
 onUnmounted(() => {
   window.removeEventListener('resize', applyCrest)
   if (pollTimer) window.clearInterval(pollTimer)
@@ -658,73 +752,50 @@ onUnmounted(() => {
 
 <template>
   <MatchGoalAlerts headless />
-  <section v-if="match" class="stack">
-    <RouterLink v-if="match.tournamentId" class="league-bar" :to="`/tournaments/${match.tournamentId}`">
-      {{ tournament?.name || 'Турнир' }}
-      <span>›</span>
-    </RouterLink>
-    <p v-else class="league-bar">{{ tournament?.name || 'Матч' }}</p>
-
-    <MatchStageNote variant="protocol" :match="match" />
-    <h1 class="match-title">{{ teams.fullName(match.homeTeamId) }} — {{ teams.fullName(match.awayTeamId) }}</h1>
-
-    <div class="board" :class="{ 'live-pulse': match.status === 'LIVE' }">
-      <p class="when">{{ matchCardWhen(match) }}</p>
-      <div class="club">
-        <button
-          class="star"
-          type="button"
-          :class="{ on: fav.hasTeam(match.homeTeamId) }"
-          :aria-label="teams.fullName(match.homeTeamId)"
-          @click="tapTeamStar('home', match.homeTeamId)"
-        ><span class="star-glyph" :key="homeStarTap" :class="{ 'star-tap': homeStarTap }">★</span></button>
-        <RouterLink class="who" :to="`/teams/${match.homeTeamId}`">
-          <TeamCrest enter-once :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId)" :size="crestSize" />
-          <strong>{{ teams.fullName(match.homeTeamId) }}</strong>
-        </RouterLink>
+  <section v-if="loading" class="match-state" role="status">
+    <p>Загрузка матча…</p>
+    <span class="bar"></span>
+    <span class="bar short"></span>
+  </section>
+  <section v-else-if="match" class="stack match-page">
+    <header class="pitch">
+      <div class="pitch-top">
+        <RouterLink v-if="match.tournamentId" :to="`/tournaments/${match.tournamentId}`">‹ {{ tournamentTitle }}</RouterLink>
+        <span v-else>‹ {{ tournamentTitle }}</span>
+        <i class="pill" :class="(match.status || '').toLowerCase()">{{ statusLabel[match.status] || match.status }}</i>
       </div>
-      <div class="center">
-        <p v-if="pendingScore" class="score">{{ pendingScore }}</p>
-        <p v-else-if="shootoutScore" class="score shootout">{{ shootoutScore }}</p>
-        <p v-else class="score"><ScorePop :value="match.homeScore" /> - <ScorePop :value="match.awayScore" /></p>
-        <p v-if="playerOfTheMatchName" :key="match.playerOfTheMatch.playerId" class="motm motm-enter">
-          <span>Игрок матча</span>
-          <RouterLink class="motm-who" :to="`/players/${match.playerOfTheMatch.playerId}`">{{ playerOfTheMatchName }}</RouterLink>
-        </p>
-        <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
-          <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
-        </p>
-        <p v-else-if="match.status === 'SCHEDULED'" class="muted clock-note">
-          {{ match.periodCount }} × {{ formatClock(cap) }}
-        </p>
+      <div class="pitch-score">
+        <div class="pitch-side">
+          <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.homeTeamId) }" :aria-label="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" @click="tapTeamStar('home', match.homeTeamId)">★</button>
+          <RouterLink class="pitch-who" :to="`/teams/${match.homeTeamId}`">
+            <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="72" />
+            <strong>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</strong>
+          </RouterLink>
+        </div>
+        <div class="nums">
+          <b>{{ heroScore }}</b>
+          <p v-if="shootoutScore && !pendingScore" class="pens">{{ shootoutScore }}</p>
+          <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
+            <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
+          </p>
+        </div>
+        <div class="pitch-side away">
+          <RouterLink class="pitch-who" :to="`/teams/${match.awayTeamId}`">
+            <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="72" />
+            <strong>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</strong>
+          </RouterLink>
+          <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.awayTeamId) }" @click="tapTeamStar('away', match.awayTeamId)">★</button>
+        </div>
       </div>
-      <div class="club away">
-        <RouterLink class="who" :to="`/teams/${match.awayTeamId}`">
-          <TeamCrest enter-once :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId)" :size="crestSize" />
-          <strong>{{ teams.fullName(match.awayTeamId) }}</strong>
-        </RouterLink>
-        <button
-          class="star"
-          type="button"
-          :class="{ on: fav.hasTeam(match.awayTeamId) }"
-          @click="tapTeamStar('away', match.awayTeamId)"
-        ><span class="star-glyph" :key="awayStarTap" :class="{ 'star-tap': awayStarTap }">★</span></button>
-      </div>
-      <div class="under">
-        <p class="state" :class="{ done: match.status === 'FINISHED' }">
-          <i v-if="match.status === 'LIVE'" class="live-dot" aria-hidden="true" />
-          {{ matchStateLabel(match.status) }}
-        </p>
-        <MatchShareButton
-          :home-name="teams.fullName(match.homeTeamId)"
-          :away-name="teams.fullName(match.awayTeamId)"
-          :home-score="match.homeScore"
-          :away-score="match.awayScore"
-        />
-      </div>
-    </div>
-
-    <p v-if="match.venue?.trim()" class="venue-line">{{ match.venue.trim() }}</p>
+      <p class="pitch-meta">{{ matchCardWhen(match) }} · {{ placeText }}</p>
+      <MatchShareButton
+        :home-name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
+        :away-name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
+        :home-score="match.homeScore"
+        :away-score="match.awayScore"
+        :score-text="heroScore"
+      />
+    </header>
 
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
@@ -786,7 +857,7 @@ onUnmounted(() => {
         @saved="load"
       />
       <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и ассистента можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
+      <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и того, кто отдал передачу, можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
         <label class="field">Событие
           <select v-model="protocolType">
@@ -842,11 +913,11 @@ onUnmounted(() => {
             />
             Автогол
           </label>
-          <span v-if="!ownGoalDrafts[ev.id]" class="field player">Ассистент
+          <span v-if="!ownGoalDrafts[ev.id]" class="field player">Отдал передачу
             <SquadPlayerSelect
               v-model="assistDrafts[ev.id]"
               :options="assistOptions(ev.id)"
-              empty-label="без ассистента"
+              empty-label="Без передачи"
               :fallback="registeredName(ev, 'secondary')"
               :disabled="pending"
             />
@@ -859,7 +930,7 @@ onUnmounted(() => {
           v-if="ev.eventType === 'GOAL'"
           class="btn secondary"
           type="button"
-          title="Сохранить забившего, ассистента и минуту"
+          title="Сохранить гол, передачу и минуту"
           :disabled="pending"
           @click="saveGoal(ev)"
         >Сохранить</button>
@@ -892,121 +963,87 @@ onUnmounted(() => {
       </form>
     </AdminOnly>
 
-    <div class="fs-tabs">
-      <button type="button" :class="{ on: tab === 'overview' }" @click="tab = 'overview'">Обзор</button>
-      <button type="button" :class="{ on: tab === 'stats' }" @click="tab = 'stats'">Статистика</button>
-      <button type="button" :class="{ on: tab === 'lineups' }" @click="tab = 'lineups'">Составы</button>
-      <button type="button" :class="{ on: tab === 'protocol' }" @click="tab = 'protocol'">Протокол</button>
+    <div ref="tabBar" class="match-tabs" role="tablist">
+      <button type="button" :class="{ on: tab === 'overview' }" @click="setTab('overview')"><span class="tab-label">Обзор</span></button>
+      <button type="button" :class="{ on: tab === 'stats' }" @click="setTab('stats')"><span class="tab-label"><span class="full">Статистика</span><span class="short">Стат.</span></span></button>
+      <button type="button" :class="{ on: tab === 'lineups' }" @click="setTab('lineups')"><span class="tab-label">Составы</span></button>
+      <button type="button" :class="{ on: tab === 'protocol' }" @click="setTab('protocol')"><span class="tab-label">Протокол</span></button>
     </div>
 
-    <div v-if="tab === 'overview'" class="stack">
-      <FutsalBoard
-        :match="match"
-        :events="events"
-        :home-label="teams.fullName(match.homeTeamId)"
-        :away-label="teams.fullName(match.awayTeamId)"
-      />
-      <div class="sheet">
-        <template v-if="periodBlocks.length">
-          <section v-for="block in periodBlocks" :key="block.period">
-            <div class="half-head">
-              <span>{{ block.label }}</span>
-              <span>{{ block.score }}</span>
-            </div>
-            <div
-              v-for="ev in block.items"
-              :key="ev.id"
-              class="ev"
-              :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]"
-            >
-              <span class="who-ev">
-                <b class="who-name">
-                  <PlayerAvatar
-                    v-if="ev.playerId"
-                    :src="ev.playerAvatarUrl"
-                    :name="registeredName(ev) || ev.playerName"
-                    :first-name="ev.playerFirstName"
-                    :last-name="ev.playerLastName"
-                    :size="28"
-                  />
-                  <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
-                  <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
-                </b>
-                <em v-if="isOwnGoal(ev)" class="own-tag">Автогол</em>
-                <span v-if="ev.eventType === 'GOAL' && !isOwnGoal(ev) && registeredName(ev, 'secondary')" class="line">
-                  пас
-                  <RouterLink v-if="ev.secondaryPlayerId" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
-                  <template v-else>{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template>
-                </span>
-                <span v-if="ev.scoreline" class="line">{{ ev.scoreline }}</span>
+    <div v-if="tab === 'overview'" class="overview">
+      <div class="stack">
+        <FutsalBoard
+          :match="match"
+          :events="events"
+          :home-label="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
+          :away-label="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
+        />
+        <section class="card events">
+          <header><b>События</b><span>{{ heroScore }}</span></header>
+          <p v-if="!periodBlocks.length" class="muted empty-events">Событий пока нет</p>
+          <template v-else>
+            <section v-for="block in periodBlocks" :key="block.period">
+              <div class="half">
+                <span>{{ block.label }}</span>
+                <span>{{ blockScore(block.score) }}</span>
+              </div>
+              <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
+                <em class="min">{{ shownMinute(ev) != null ? `${shownMinute(ev)}'` : '' }}</em>
+                <div class="who">
+                  <b>
+                    <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
+                    <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
+                  </b>
+                  <span v-if="isOwnGoal(ev)" class="assist">Автогол</span>
+                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && registeredName(ev, 'secondary')" class="assist">→ {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                </div>
+                <span class="run">{{ ev.scoreline ? blockScore(ev.scoreline) : '' }}</span>
+              </div>
+            </section>
+            <div class="total"><span>Итог</span><b>{{ heroScore }}</b></div>
+          </template>
+        </section>
+      </div>
+      <aside class="rail">
+        <section class="card">
+          <header><b>Форма</b><span>последние 5</span></header>
+          <div v-if="formError" class="fail">
+            <p>Форма не загрузилась</p>
+            <button class="btn secondary" type="button" @click="loadForms(match.homeTeamId, match.awayTeamId)">Повторить</button>
+          </div>
+          <p v-else-if="!formReady" class="muted">Загрузка…</p>
+          <template v-else>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</b>
+              <span class="marks">
+                <i v-for="(mark, index) in homeMarks" :key="`h-${index}`" :class="markClass(mark)">{{ mark }}</i>
+                <em v-if="!homeMarks.length">нет матчей</em>
               </span>
-              <i class="mark" :class="ev.eventType.toLowerCase()" />
-              <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
             </div>
-          </section>
-        </template>
-        <p v-else class="empty-line">Событий пока нет</p>
-      </div>
-      <div class="stack recent">
-        <div class="panel">
-          <h2>Последние игры <RouterLink :to="`/teams/${match.homeTeamId}`">{{ teams.fullName(match.homeTeamId) }}</RouterLink></h2>
-          <RouterLink
-            v-for="f in homeForm"
-            :key="f.id"
-            class="recent-row"
-            :to="`/matches/${f.id}`"
-          >
-            <span class="recent-side home">
-              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
-            </span>
-            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
-            <span class="recent-side away">
-              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
-            </span>
-            <span class="recent-when">{{ matchListWhen(f) }}</span>
-          </RouterLink>
-          <p v-if="!homeForm.length" class="muted">Пока нет сыгранных матчей</p>
-        </div>
-        <div class="panel">
-          <h2>Последние игры <RouterLink :to="`/teams/${match.awayTeamId}`">{{ teams.fullName(match.awayTeamId) }}</RouterLink></h2>
-          <RouterLink
-            v-for="f in awayForm"
-            :key="f.id"
-            class="recent-row"
-            :to="`/matches/${f.id}`"
-          >
-            <span class="recent-side home">
-              <TeamCrest :src="formSide(f, 'home').logo" :name="formSide(f, 'home').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'home').name }}</span>
-            </span>
-            <span class="recent-score">{{ f.homeScore }}:{{ f.awayScore }}</span>
-            <span class="recent-side away">
-              <TeamCrest :src="formSide(f, 'away').logo" :name="formSide(f, 'away').name" :size="32" />
-              <span class="recent-name">{{ formSide(f, 'away').name }}</span>
-            </span>
-            <span class="recent-when">{{ matchListWhen(f) }}</span>
-          </RouterLink>
-          <p v-if="!awayForm.length" class="muted">Пока нет сыгранных матчей</p>
-        </div>
-        <div class="panel">
-          <h2>Очные встречи</h2>
-          <RouterLink v-for="f in headToHead" :key="f.id" class="muted recent-line" :to="`/matches/${f.id}`">
-            <TeamCrest :src="teams.logo(f.homeTeamId)" :name="teams.fullName(f.homeTeamId)" :size="16" />
-            {{ teams.fullName(f.homeTeamId) }} {{ f.homeScore }}:{{ f.awayScore }} {{ teams.fullName(f.awayTeamId) }}
-            <TeamCrest :src="teams.logo(f.awayTeamId)" :name="teams.fullName(f.awayTeamId)" :size="16" />
-            · {{ matchListWhen(f) }}
-          </RouterLink>
-          <p v-if="!headToHead.length" class="muted">Пока не играли друг с другом</p>
-        </div>
-      </div>
-      <div v-if="referees.length || auth.canOfficiate" class="panel stack">
-        <h2>Бригада</h2>
-        <p v-for="r in referees" :key="r.id" class="muted">Судья {{ registeredName(r) || r.email || r.refereeId }}</p>
-        <p v-if="!referees.length" class="muted">Судья не назначен.</p>
-        <RouterLink v-if="canUsePad" class="btn secondary" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
-      </div>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</b>
+              <span class="marks">
+                <i v-for="(mark, index) in awayMarks" :key="`a-${index}`" :class="markClass(mark)">{{ mark }}</i>
+                <em v-if="!awayMarks.length">нет матчей</em>
+              </span>
+            </div>
+          </template>
+        </section>
+        <section class="card about">
+          <header><b>О матче</b></header>
+          <dl>
+            <div><dt>Турнир</dt><dd><RouterLink v-if="match.tournamentId" :to="`/tournaments/${match.tournamentId}`">{{ tournamentTitle }}</RouterLink><template v-else>{{ tournamentTitle }}</template></dd></div>
+            <div><dt>Стадия</dt><dd>{{ stageText }}</dd></div>
+            <div><dt>Дата</dt><dd>{{ matchCardWhen(match) }}</dd></div>
+            <div><dt>Место</dt><dd>{{ placeText }}</dd></div>
+            <div><dt>Судьи</dt><dd>{{ publicReferees.length ? publicReferees.join(', ') : 'Судьи не назначены' }}</dd></div>
+          </dl>
+          <RouterLink v-if="canUsePad" class="btn secondary pad" :to="`/referee/matches/${match.id}`">Открыть пульт</RouterLink>
+        </section>
+      </aside>
     </div>
 
     <div v-else-if="tab === 'stats'">
@@ -1047,7 +1084,7 @@ onUnmounted(() => {
                 <RouterLink v-if="ev.playerId" class="player-link" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || 'Игрок' }}</RouterLink>
                 <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) }}</template>
                 <template v-if="ev.secondaryPlayerId && ev.eventType === 'GOAL' && !isOwnGoal(ev)">
-                  · пас <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
+                  · передача <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
                 </template>
                 <template v-else-if="ev.secondaryPlayerId && ev.eventType === 'SUBSTITUTION'">
                   → <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
@@ -1064,10 +1101,11 @@ onUnmounted(() => {
     </div>
 
   </section>
-  <section v-else-if="missing" class="stack">
-    <h1>Матч не найден</h1>
+  <NotFoundView v-else-if="missing" heading="Матч не найден" />
+  <section v-else-if="error" class="match-state">
+    <strong>Матч не загрузился</strong>
+    <button class="btn secondary" type="button" @click="load">Повторить</button>
   </section>
-  <p v-else-if="error" class="form-error">{{ error }}</p>
 </template>
 
 <style scoped>
@@ -1480,5 +1518,407 @@ h2 a { color: inherit; }
     gap: 0.35rem 0.3rem;
   }
   .score { font-size: 1.75rem; }
+}
+.match-state {
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  padding: 1.4rem 1rem;
+  background: #fff;
+  border-radius: 18px;
+  text-align: center;
+}
+.match-state h1 { font-size: 1.4rem; text-transform: none; }
+.bar {
+  display: block;
+  width: min(100%, 28rem);
+  height: 4.5rem;
+  border-radius: 16px;
+  background: linear-gradient(90deg, #d5e0ec 25%, #eef3f8 50%, #d5e0ec 75%);
+  background-size: 200% 100%;
+}
+.bar.short { width: min(100%, 16rem); height: 2.2rem; }
+.pitch {
+  background: var(--ink);
+  color: #fff;
+  border-radius: 22px;
+  padding: 1rem 1.1rem 1.15rem;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.pitch-top, .pitch-score {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.pitch-top a, .pitch-top span { color: var(--ice); font-weight: 800; text-decoration: none; }
+.pill {
+  border-radius: 999px;
+  padding: 0.18rem 0.65rem;
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.pill.live { background: var(--status-live-soft); color: #ffd2cb; }
+.pill.paused { background: var(--status-warn-soft); color: #ffe0a8; }
+.pill.finished { background: rgba(255,255,255,0.14); }
+.pill.cancelled { color: rgba(255,255,255,0.65); }
+.pitch-score { margin-top: 0.8rem; align-items: flex-start; }
+.pitch-side {
+  display: grid;
+  grid-template-areas: "star" "who";
+  justify-items: center;
+  align-content: start;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+.pitch-side .fav-star { grid-area: star; }
+.pitch-side .pitch-who { grid-area: who; }
+.pitch-who {
+  display: grid;
+  justify-items: center;
+  gap: 0.35rem;
+  color: #fff;
+  text-decoration: none;
+  min-width: 0;
+}
+.pitch-who strong {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: none;
+}
+.nums b {
+  display: block;
+  color: #fff;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.pens, .clock { margin: 0.15rem 0 0; color: rgba(255,255,255,0.75); font-size: 0.85rem; }
+.pitch-meta { margin: 0.75rem 0 0; color: rgba(255,255,255,0.78); }
+.fav-star {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  font-size: 1rem;
+}
+.fav-star.on { color: var(--ice); }
+.match-tabs {
+  display: flex;
+  gap: 0.2rem;
+  overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
+  position: sticky;
+  top: 56px;
+  z-index: 4;
+  background: #fff;
+  border-radius: 18px;
+  padding: 0.25rem;
+}
+.match-tabs button {
+  flex: 1 1 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  padding: 0.15rem 0.35rem 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.match-tabs .tab-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.05rem 0.42rem;
+  border-bottom: 3px solid transparent;
+  line-height: 1.2;
+}
+.match-tabs button.on { color: var(--navy); }
+.match-tabs button.on .tab-label { border-bottom-color: var(--ice); color: var(--navy); }
+.match-tabs .short { display: none; }
+.overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 0.9rem;
+  align-items: start;
+}
+.card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 0.85rem 0.95rem 1rem;
+  min-width: 0;
+}
+.card header, .half, .total {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+.card header b, .half span, .total span { color: var(--navy); }
+.half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
+.card.events .ev {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.12rem 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 2.6rem auto; }
+.card.events .ev .who {
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  gap: 0.05rem;
+  width: auto;
+  min-width: 0;
+  text-align: left;
+}
+.card.events .ev.home .who { justify-items: start; text-align: left; }
+.card.events .ev.away .who { order: 1; justify-items: end; text-align: right; }
+.card.events .ev.away .min { order: 2; text-align: right; }
+.card.events .ev.away .run { order: 3; }
+.card.events .ev .min {
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.card.events .ev b {
+  display: block;
+  min-width: 0;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.card.events .ev b a { overflow-wrap: anywhere; }
+.card.events .assist {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ev b a { color: inherit; text-decoration: none; }
+.card.events .run {
+  justify-self: end;
+  align-self: center;
+  margin: 0;
+  white-space: nowrap;
+}
+.run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
+.total {
+  margin-top: 0.35rem;
+  background: #eef5fb;
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+}
+.total b { color: var(--navy); font-variant-numeric: tabular-nums; }
+.rail { display: grid; gap: 0.75rem; }
+.form-row, .about dl div {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0;
+}
+.form-row b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.form-row .marks { align-self: center; }
+.about dl { margin: 0; }
+.about dl div { grid-template-columns: 5.5rem minmax(0, 1fr); }
+.about dt { color: var(--muted); font-weight: 700; }
+.about dd { margin: 0; text-align: right; color: var(--navy); font-weight: 700; }
+.marks { display: flex; gap: 0.25rem; }
+.marks i {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  background: var(--muted);
+}
+.marks i.win { background: var(--status-ok); }
+.marks i.draw { background: var(--status-warn); }
+.marks i.loss { background: var(--danger); }
+.marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
+.fail { display: grid; justify-items: center; gap: 0.5rem; }
+.pad { justify-self: start; margin-top: 0.6rem; }
+.overview > .stack { align-items: start; min-width: 0; }
+.card.events { align-self: start; height: auto; min-width: 0; max-width: 100%; overflow-x: clip; }
+.empty-events { margin: 0; padding: 0.4rem 0 0.15rem; }
+@media (max-width: 720px) {
+  .match-page { gap: 10px; margin-top: -6px; }
+  .overview { grid-template-columns: 1fr; gap: 12px; }
+  .pitch {
+    box-sizing: border-box;
+    min-height: 152px;
+    border-radius: 16px;
+    padding: 8px 12px 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    justify-items: stretch;
+    align-items: center;
+    align-content: space-between;
+    text-align: left;
+    gap: 4px 8px;
+  }
+  .pitch-top { grid-column: 1 / -1; min-height: 28px; }
+  .pitch-top a, .pitch-top span {
+    position: relative;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 18px;
+  }
+  .pitch-top a::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: var(--tap-min);
+    transform: translateY(-50%);
+  }
+  .pill { height: 22px; padding: 0 8px; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
+  .pitch-score { grid-column: 1 / -1; margin: 0; align-items: center; }
+  .pitch-side {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 0;
+  }
+  .pitch-side.away { justify-content: flex-end; }
+  .pitch-who { gap: 2px; }
+  .pitch-who :deep(.team-crest) { width: 36px !important; height: 36px !important; font-size: 12px !important; }
+  .pitch-who strong {
+    font-size: 12.5px;
+    line-height: 16px;
+    font-weight: 800;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 7.5rem;
+  }
+  .fav-star {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    margin-top: 9px;
+    padding: 0;
+    font-size: 11px;
+    line-height: 18px;
+  }
+  .fav-star::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: var(--tap-min);
+    height: var(--tap-min);
+    transform: translate(-50%, -50%);
+  }
+  .nums b { font-size: 32px; line-height: 1; font-weight: 800; letter-spacing: 0.02em; }
+  .pitch-meta {
+    grid-column: 1;
+    margin: 0;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .pitch :deep(.share) {
+    grid-column: 2;
+    align-self: center;
+    margin: 0;
+    box-sizing: border-box;
+    width: 104px;
+    height: 32px;
+    border-radius: 16px;
+    font-size: 13px;
+  }
+  .match-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    height: 44px;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    position: static;
+    border-bottom: 1px solid #dce5ee;
+    scrollbar-width: none;
+  }
+  .match-tabs::-webkit-scrollbar { display: none; }
+  .match-tabs button {
+    flex: 0 0 auto;
+    height: 44px;
+    min-width: 0;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: none;
+  }
+  .match-tabs .tab-label { padding: 0 0 0; border-bottom-width: 3px; font-size: 14px; line-height: 20px; }
+  .match-tabs .full { display: none; }
+  .match-tabs .short { display: inline; }
+  .card { border-radius: 12px; padding: 0 12px 12px; }
+  .card header { height: 36px; }
+  .card header b { font-size: 15px; line-height: 20px; font-weight: 800; text-transform: none; }
+  .card header span { font-size: 14px; font-weight: 700; }
+  .half { height: 36px; padding: 0; font-size: 13.5px; font-weight: 600; }
+  .card.events .ev {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 44px;
+    padding: 0;
+    align-items: center;
+  }
+  .card.events .ev .who { max-width: 100%; }
+  .card.events .ev b,
+  .card.events .ev b a {
+    display: block;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 16px;
+    font-weight: 800;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .card.events .ev .min { font-size: 12px; font-weight: 600; }
+  .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
+  .card.events .run { font-size: 13px; font-weight: 800; }
+  .total { height: 40px; margin-top: 4px; border-radius: 10px; padding: 0 10px; background: #eef5fc; }
+  .form-row { padding: 4px 0; }
+  .form-row :deep(.team-crest) { width: 22px !important; height: 22px !important; }
+  .form-row b { font-size: 14px; font-weight: 800; }
+  .marks { gap: 4px; }
+  .marks i { width: 22px; height: 22px; border-radius: 5px; font-size: 11px; }
+  .empty-events { padding: 8px 0 4px; }
 }
 </style>
