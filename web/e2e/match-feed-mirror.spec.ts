@@ -236,6 +236,147 @@ test('dev-like feeds mirror goals, cards, and an own goal', async ({ page }) => 
   await shoot(page, goalsMatch, 'bbaa-goals')
 })
 
+const alignMatch: Fixture = {
+  id: 'align0000-1111-4111-8111-align0000001',
+  homeTeamId: lawyers,
+  awayTeamId: architects,
+  homeName: 'Юристы',
+  awayName: 'Архитекторы',
+  homeScore: 2,
+  awayScore: 2,
+  periodLengthSeconds: 1200,
+  events: [
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'h0', eventType: 'GOAL', period: 1, gameTime: 10, teamId: lawyers,
+      playerId: 'h0p', playerFirstName: 'Нуль', playerLastName: 'Домашний', playerJersey: 1,
+      createdAt: '2026-11-01T12:00:01Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'a0', eventType: 'YELLOW_CARD', period: 1, gameTime: 20, teamId: architects,
+      playerId: 'a0p', playerFirstName: 'Жёлтый', playerLastName: 'Гостевой', playerJersey: 4,
+      createdAt: '2026-11-01T12:00:02Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'hadd', eventType: 'GOAL', period: 1, gameTime: 30, teamId: lawyers,
+      playerId: 'haddp', playerFirstName: 'Добавка', playerLastName: 'Домашний', playerJersey: 2,
+      metadata: { addedMinute: 4 },
+      createdAt: '2026-11-01T12:00:03Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'aadd', eventType: 'GOAL', period: 1, gameTime: 40, teamId: architects,
+      playerId: 'aaddp', playerFirstName: 'Безпаса', playerLastName: 'Гостевой', playerJersey: 7,
+      metadata: { addedMinute: 4 },
+      createdAt: '2026-11-01T12:00:04Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'h16', eventType: 'GOAL', period: 1, gameTime: 16 * 60, teamId: lawyers,
+      playerId: 'h16p', playerFirstName: 'Шестнадцать', playerLastName: 'Домашний', playerJersey: 9,
+      secondaryPlayerId: 'h16a', secondaryPlayerFirstName: 'Пас', secondaryPlayerLastName: 'Домашний', secondaryPlayerJersey: 8,
+      createdAt: '2026-11-01T12:00:05Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'a16', eventType: 'GOAL', period: 2, gameTime: 16 * 60, teamId: lawyers,
+      playerId: 'a16p', playerFirstName: 'Свой', playerLastName: 'Гостевой', playerJersey: 5,
+      metadata: { ownGoal: true },
+      createdAt: '2026-11-01T12:00:06Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'aasst', eventType: 'GOAL', period: 2, gameTime: 18 * 60, teamId: architects,
+      playerId: 'aap', playerFirstName: 'Спасом', playerLastName: 'Гостевой', playerJersey: 11,
+      secondaryPlayerId: 'aaa', secondaryPlayerFirstName: 'Отдал', secondaryPlayerLastName: 'Гостевой', secondaryPlayerJersey: 6,
+      createdAt: '2026-11-01T12:00:07Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'asub', eventType: 'SUBSTITUTION', period: 2, gameTime: 19 * 60, teamId: architects,
+      playerId: 'outp', playerFirstName: 'Ушёл', playerLastName: 'Гостевой',
+      secondaryPlayerId: 'inp', secondaryPlayerFirstName: 'Вышел', secondaryPlayerLastName: 'Гостевой', secondaryPlayerJersey: 19,
+      createdAt: '2026-11-01T12:00:08Z',
+    }),
+    event('align0000-1111-4111-8111-align0000001', {
+      id: 'h90', eventType: 'YELLOW_CARD', period: 2, gameTime: 90 * 60, teamId: lawyers,
+      playerId: 'h90p', playerFirstName: 'Девяносто', playerLastName: 'Домашний', playerJersey: 3,
+      metadata: { addedMinute: 4 },
+      createdAt: '2026-11-01T12:00:09Z',
+    }),
+  ],
+}
+
+test('away text ends at the icon and minute columns share one x', async ({ page }) => {
+  mkdirSync(shots, { recursive: true })
+  await install(page, alignMatch)
+  await page.goto(`/matches/${alignMatch.id}`)
+  const card = page.locator('.card.events')
+  await expect(card.locator('.ev').first()).toBeVisible()
+  const widths = [320, 375, 719, 720, 1440]
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: width >= 720 ? 1200 : 1000 })
+    await card.scrollIntoViewIfNeeded()
+    const facts = await card.evaluate((node) => {
+      const rows = [...node.querySelectorAll('.ev')].map((row) => {
+        const minute = row.querySelector('.min') as HTMLElement
+        const icon = row.querySelector('.mark') as HTMLElement
+        const who = row.querySelector('.who') as HTMLElement
+        const name = row.querySelector('b') as HTMLElement
+        const detail = row.querySelector('.assist') as HTMLElement | null
+        const box = (el: HTMLElement) => el.getBoundingClientRect()
+        const minuteBox = box(minute)
+        const iconBox = box(icon)
+        const whoBox = box(who)
+        const nameBox = box(name)
+        const detailBox = detail ? box(detail) : null
+        return {
+          home: row.classList.contains('home'),
+          minute: minute.textContent?.trim() || '',
+          name: name.textContent?.trim() || '',
+          detail: detail?.textContent?.trim() || '',
+          iconX: Math.round(iconBox.left * 10) / 10,
+          minuteFits: minute.scrollWidth <= minute.clientWidth + 1,
+          nameRight: Math.round(nameBox.right),
+          detailRight: detailBox ? Math.round(detailBox.right) : null,
+          whoRight: Math.round(whoBox.right),
+          nameLeft: Math.round(nameBox.left),
+          detailLeft: detailBox ? Math.round(detailBox.left) : null,
+          whoLeft: Math.round(whoBox.left),
+          minuteRight: Math.round(minuteBox.right),
+          rowRight: Math.round(box(row as HTMLElement).right),
+        }
+      })
+      return {
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        rows,
+      }
+    })
+    expect(facts.pageOverflow, `scroll at ${width}`).toBeLessThanOrEqual(1)
+    const homeX = facts.rows.filter((row) => row.home).map((row) => row.iconX)
+    const awayX = facts.rows.filter((row) => !row.home).map((row) => row.iconX)
+    expect(homeX.length).toBeGreaterThan(1)
+    expect(awayX.length).toBeGreaterThan(1)
+    expect(Math.max(...homeX) - Math.min(...homeX), `home icon x at ${width}`).toBeLessThanOrEqual(1)
+    expect(Math.max(...awayX) - Math.min(...awayX), `away icon x at ${width}`).toBeLessThanOrEqual(1)
+    for (const row of facts.rows) {
+      expect(row.minuteFits, `${row.minute} fits at ${width}`).toBe(true)
+      if (width < 720 && !row.home) {
+        expect(Math.abs(row.nameRight - row.whoRight), `${row.name} name end at ${width}`).toBeLessThanOrEqual(2)
+        if (row.detailRight != null) {
+          expect(Math.abs(row.detailRight - row.whoRight), `${row.detail} detail end at ${width}`).toBeLessThanOrEqual(2)
+        }
+        if (row.nameRight - row.nameLeft < row.whoRight - row.whoLeft - 8) {
+          expect(row.nameLeft, `${row.name} not flush left at ${width}`).toBeGreaterThan(row.whoLeft + 4)
+        }
+      }
+      if (width < 720 && row.home) {
+        expect(Math.abs(row.nameLeft - row.whoLeft), `${row.name} home start at ${width}`).toBeLessThanOrEqual(2)
+      }
+    }
+    const wanted = ["0'", "16'", "0+4'"]
+    const sample = facts.rows
+      .filter((row) => wanted.includes(row.minute))
+      .map((row) => ({ side: row.home ? 'home' : 'away', minute: row.minute, iconX: row.iconX }))
+    console.log(`icon-x ${width}`, JSON.stringify(sample))
+    await card.screenshot({ path: `${shots}/match-feed-away-align-${width}.png` })
+  }
+})
+
 test('event feed shows loading, empty, and a retry that is at least 44px', async ({ page }) => {
   mkdirSync(shots, { recursive: true })
   await page.setViewportSize({ width: 375, height: 900 })

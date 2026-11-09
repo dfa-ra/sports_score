@@ -1733,11 +1733,11 @@ h2 a { color: inherit; }
   min-height: 44px;
   box-sizing: border-box;
 }
-.card.events .ev.home.goal { grid-template-columns: auto 14px auto minmax(0, 1fr); grid-template-areas: "min mark run who"; }
-.card.events .ev.home:not(.goal) { grid-template-columns: auto 14px minmax(0, 1fr); grid-template-areas: "min mark who"; }
-.card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px auto; grid-template-areas: "who run mark min"; }
-.card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px auto; grid-template-areas: "who mark min"; }
-.card.events .min { grid-area: min; }
+.card.events .ev.home.goal { grid-template-columns: 2.6rem 14px auto minmax(0, 1fr); grid-template-areas: "min mark run who"; }
+.card.events .ev.home:not(.goal) { grid-template-columns: 2.6rem 14px minmax(0, 1fr); grid-template-areas: "min mark who"; }
+.card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px 2.6rem; grid-template-areas: "who run mark min"; }
+.card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px 2.6rem; grid-template-areas: "who mark min"; }
+.card.events .min { grid-area: min; width: 2.6rem; max-width: 2.6rem; overflow: hidden; text-align: left; }
 .card.events .mark { grid-area: mark; width: 14px; height: 14px; min-width: 14px; min-height: 14px; flex-shrink: 0; justify-self: center; }
 .card.events .run { grid-area: run; }
 .card.events .who { grid-area: who; }
@@ -1749,6 +1749,7 @@ h2 a { color: inherit; }
   text-align: left;
 }
 .card.events .ev.away .who { flex-direction: row-reverse; justify-content: flex-start; text-align: right; }
+.card.events .ev.away .min { text-align: right; }
 .card.events .ev .min {
   font-style: normal;
   color: var(--muted);
@@ -2010,8 +2011,36 @@ h2 a { color: inherit; }
   .empty-events { padding: 8px 0 4px; }
 }
 @media (max-width: 719px) {
-  .card.events .ev .who { display: grid; justify-items: start; gap: 0; }
-  .card.events .ev.away .who { justify-items: end; }
+  .card.events .ev .who {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+  .card.events .ev.home .who b,
+  .card.events .ev.home .who .assist {
+    align-self: stretch;
+    max-width: 100%;
+    text-align: left;
+  }
+  .card.events .ev.away .who {
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+  .card.events .ev.away .who b,
+  .card.events .ev.away .who b a,
+  .card.events .ev.away .who .assist {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
+    text-align: right;
+  }
   .card.events .ev .assist { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 }
 </style>
