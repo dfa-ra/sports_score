@@ -369,7 +369,7 @@ onMounted(() => {
           </div>
         </article>
         <article class="leader">
-          <p>Ассистент</p>
+          <p>Лучший по передачам</p>
           <div v-if="assist" class="leader-row">
             <PlayerAvatar :src="assist.avatarUrl" :first-name="assist.firstName" :last-name="assist.lastName" :name="nameOf(assist)" :size="40" />
             <span class="who name-team">
@@ -513,7 +513,7 @@ onMounted(() => {
 .leaders { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; align-items: start; }
 .leader, .sheet { background: #fff; border-radius: 16px; min-width: 0; }
 .leader { padding: 20px; border-radius: 18px; }
-.leader p { margin: 0 0 8px; font-size: 12px; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; color: #8b97a8; }
+.leader p { margin: 0 0 8px; max-width: 100%; font-size: 12px; line-height: 1.2; letter-spacing: 0.08em; text-transform: uppercase; color: #8b97a8; overflow-wrap: break-word; }
 .leader-row, .hit { display: flex; align-items: center; gap: 0.55rem; }
 .leader-row { align-items: center; min-width: 0; }
 .leader-row :deep(.player-avatar) { flex: 0 0 auto; }

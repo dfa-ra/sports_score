@@ -847,7 +847,7 @@ onUnmounted(() => {
         @saved="load"
       />
       <h2>Протокол</h2>
-      <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и ассистента можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
+      <p class="muted">Гол, жёлтая или красная. У гола можно отметить автогол: очко уходит сопернику, в бомбардиры этот гол не идёт, передачи нет. Забившего и того, кто отдал передачу, можно сменить. Минута — от начала матча, как её увидит зритель: во втором тайме 2×15 это 16' и дальше, не время на табло. Зрители видят счёт без убранных голов.</p>
       <form class="stack protocol-form" @submit.prevent="addProtocolEvent">
         <label class="field">Событие
           <select v-model="protocolType">
@@ -903,11 +903,11 @@ onUnmounted(() => {
             />
             Автогол
           </label>
-          <span v-if="!ownGoalDrafts[ev.id]" class="field player">Ассистент
+          <span v-if="!ownGoalDrafts[ev.id]" class="field player">Отдал передачу
             <SquadPlayerSelect
               v-model="assistDrafts[ev.id]"
               :options="assistOptions(ev.id)"
-              empty-label="без ассистента"
+              empty-label="Без передачи"
               :fallback="registeredName(ev, 'secondary')"
               :disabled="pending"
             />
@@ -920,7 +920,7 @@ onUnmounted(() => {
           v-if="ev.eventType === 'GOAL'"
           class="btn secondary"
           type="button"
-          title="Сохранить забившего, ассистента и минуту"
+          title="Сохранить гол, передачу и минуту"
           :disabled="pending"
           @click="saveGoal(ev)"
         >Сохранить</button>

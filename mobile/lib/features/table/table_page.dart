@@ -78,7 +78,7 @@ class _TablePageState extends State<TablePage> with SingleTickerProviderStateMix
             Tab(text: 'ТАБЛИЦА'),
             Tab(text: 'РЕЗУЛЬТАТЫ'),
             Tab(text: 'БОМБАРДИРЫ'),
-            Tab(text: 'АССИСТЕНТЫ'),
+            Tab(text: 'ЛИДЕРЫ ПО ПЕРЕДАЧАМ'),
             Tab(text: 'ВРАТАРИ'),
             Tab(text: 'ИГРОКИ'),
           ],
@@ -236,7 +236,7 @@ class _Assists extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        _StatCard(title: 'Ассистенты', rows: store.assists),
+        _StatCard(title: 'Лидеры по передачам', rows: store.assists, empty: 'Передач ещё нет'),
       ],
     );
   }

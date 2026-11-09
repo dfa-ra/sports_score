@@ -24,7 +24,7 @@ test('player stats keep the existing metrics and do not turn a missing card into
   assert.deepEqual(playerStatRows(null), [])
   assert.deepEqual(playerStatRows({ goals: 0, assists: 2 }), [
     { key: 'goals', label: 'Голы', value: 0 },
-    { key: 'assists', label: 'Ассисты', value: 2 },
+    { key: 'assists', label: 'Передачи', value: 2 },
   ])
 })
 

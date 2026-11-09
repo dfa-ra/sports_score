@@ -326,7 +326,7 @@ test('players board, search highlight, and phone column', async ({ page }) => {
   boardMode = 'ready'
   releaseBoard()
   await expect(page.getByText('Бомбардир')).toBeVisible()
-  await expect(page.getByText('Ассистент')).toBeVisible()
+  await expect(page.getByText('Лучший по передачам')).toBeVisible()
   await expect(page.getByText('Вратарь')).toHaveCount(0)
   await expect(page.getByText('Вратарей')).toHaveCount(0)
   await expect(page.getByRole('link', { name: 'Орлов Илья', exact: true })).toBeVisible()

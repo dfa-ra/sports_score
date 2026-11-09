@@ -4,7 +4,7 @@ import { penaltyPair, unplayedCardScore } from './match.ts'
 export const PLAYER_STAT_FIELDS = [
   { key: 'appearances', label: 'Игры' },
   { key: 'goals', label: 'Голы' },
-  { key: 'assists', label: 'Ассисты' },
+  { key: 'assists', label: 'Передачи' },
   { key: 'yellowCards', label: 'Жёлтые' },
   { key: 'redCards', label: 'Красные' },
   { key: 'cleanSheets', label: 'Сухие' },

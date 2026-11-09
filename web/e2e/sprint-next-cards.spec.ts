@@ -867,14 +867,14 @@ test('narrow tabs stay readable and the header keeps room for login', async ({ p
 
   await page.setViewportSize({ width: 375, height: 900 })
   await page.goto('/table?tournament=liga-1')
-  await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Лидеры по передачам' })).toBeVisible()
   await expectTabLabelsReadable(page, '.league-tabs')
   await stamp(page, 'left')
   await page.screenshot({ path: `${outDir}/table-tabs-375.png` })
 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/table?tournament=liga-1')
-  await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Лидеры по передачам' })).toBeVisible()
   await expectTabLabelsReadable(page, '.league-tabs', true)
   await stamp(page, 'left')
   await page.screenshot({ path: `${outDir}/table-tabs-1440.png` })

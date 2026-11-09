@@ -335,7 +335,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <button v-if="hasPlayoff" type="button" :class="{ on: tab === 'playoff' }" @click="setTab('playoff')">Плей-офф</button>
       <button type="button" :class="{ on: tab === 'results' }" @click="setTab('results')">Результаты</button>
       <button type="button" :class="{ on: tab === 'scorers' }" @click="setTab('scorers')">Бомбардиры</button>
-      <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Ассистенты</button>
+      <button type="button" :class="{ on: tab === 'assists' }" @click="setTab('assists')">Лидеры по передачам</button>
       <button type="button" :class="{ on: tab === 'keepers' }" @click="setTab('keepers')">Вратари</button>
       <button type="button" :class="{ on: tab === 'players' }" @click="setTab('players')">Игроки</button>
       <span
@@ -469,7 +469,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     <template v-else-if="tab === 'assists'">
       <div class="panel">
         <div class="stat-head">
-          <h2>Ассистенты</h2>
+          <h2>Лидеры по передачам</h2>
           <p v-if="topNote(assists, 'assists')" class="muted">{{ topNote(assists, 'assists') }}</p>
         </div>
         <div v-if="statsLoading" class="skeleton" />
@@ -477,10 +477,16 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <strong>{{ statsError }}</strong>
           <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
         </div>
-        <EmptyState v-else-if="!assists.length" title="Ассистов ещё нет" />
+        <EmptyState v-else-if="!assists.length" title="Передач ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Ассисты</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
+                <th class="num">Игры</th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(assists, 'assists')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -598,6 +604,12 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 @media (max-width: 720px) {
   .stat-table .num { width: 4.15rem; }
+}
+.pass-col { text-transform: none; }
+.pass-wide { display: none; }
+@media (min-width: 721px) {
+  .pass-short { display: none; }
+  .pass-wide { display: inline; }
 }
 .people { display: grid; }
 .person {

@@ -30,7 +30,7 @@ void main() {
     expect(find.text('ТАБЛИЦА'), findsWidgets);
     expect(find.text('РЕЗУЛЬТАТЫ'), findsOneWidget);
     expect(find.text('БОМБАРДИРЫ'), findsOneWidget);
-    expect(find.text('АССИСТЕНТЫ'), findsOneWidget);
+    expect(find.text('ЛИДЕРЫ ПО ПЕРЕДАЧАМ'), findsOneWidget);
     expect(find.text('ВРАТАРИ'), findsOneWidget);
     expect(find.text('ИГРОКИ'), findsOneWidget);
   });

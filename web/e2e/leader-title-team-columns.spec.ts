@@ -66,7 +66,25 @@ test('players sheet title follows the goals and passes tabs', async ({ page }) =
     await expect(sheet).toHaveCSS('text-transform', 'uppercase')
     await expect(page.getByRole('button', { name: 'Голы' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Передачи' })).toBeVisible()
-    await expect(page.locator('.leader p').nth(1)).toHaveText('Ассистент')
+    const eyebrow = page.locator('.leader p').nth(1)
+    await expect(page.locator('.leader p').nth(0)).toHaveText('Бомбардир')
+    await expect(eyebrow).toHaveText('Лучший по передачам')
+    await expect(eyebrow).toHaveCSS('text-transform', 'uppercase')
+    const eyebrowBox = await eyebrow.evaluate((el) => {
+      const rect = el.getBoundingClientRect()
+      const card = el.closest('.leader')?.getBoundingClientRect()
+      return {
+        clipped: el.scrollWidth > el.clientWidth + 1,
+        right: rect.right,
+        cardRight: card?.right ?? rect.right,
+        view: window.innerWidth,
+        pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      }
+    })
+    expect(eyebrowBox.clipped).toBe(false)
+    expect(eyebrowBox.right).toBeLessThanOrEqual(eyebrowBox.cardRight + 1)
+    expect(eyebrowBox.right).toBeLessThanOrEqual(eyebrowBox.view + 1)
+    expect(eyebrowBox.pageOverflow).toBeLessThanOrEqual(1)
 
     await page.getByRole('button', { name: 'Передачи' }).click()
     await expect(sheet).toHaveText('Лидеры по передачам')
@@ -247,4 +265,52 @@ test('team player table fits the numeric headers at 375 and keeps the desktop co
   expect(desktop.whoDisplay).toBe('flex')
   expect(desktop.overflow).toBe('auto')
   expect(Number.parseFloat(desktop.numWidth)).toBeGreaterThan(48)
+})
+
+test('table passes tab keeps the designer copy and the existing column width', async ({ page }) => {
+  let assists: unknown[] = [
+    { playerId: 'p1', firstName: 'Артём', lastName: 'Белов', assists: 4, appearances: 6, teamId: 'ft' },
+  ]
+  await page.route('**/api/v1/**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/v1/auth/me' || path === '/api/v1/auth/refresh') return json(route, { message: 'no' }, 401)
+    if (path === '/api/v1/tournaments') {
+      return json(route, { content: [{ id: 'liga', name: 'Лига ИТМО', status: 'ACTIVE' }], totalPages: 1 })
+    }
+    if (path === '/api/v1/tournaments/current') return json(route, { id: 'liga', name: 'Лига ИТМО' })
+    if (path === '/api/v1/tournaments/liga') return json(route, { id: 'liga', name: 'Лига ИТМО', status: 'ACTIVE' })
+    if (path === '/api/v1/tournaments/liga/standings') return json(route, [])
+    if (path === '/api/v1/tournaments/liga/playoff') return json(route, { rounds: [] })
+    if (path === '/api/v1/statistics/board') return json(route, { scorers: [], assists, goalkeepers: [] })
+    if (path === '/api/v1/teams') return json(route, { content: [{ id: 'ft', name: 'Физтех' }], totalPages: 1 })
+    if (path === '/api/v1/matches') return json(route, { content: [] })
+    return json(route, { content: [] })
+  })
+
+  for (const width of [375, 1440]) {
+    await page.setViewportSize({ width, height: width === 375 ? 812 : 900 })
+    await page.goto('/table?tournament=liga&tab=assists')
+    expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1)
+    await expect(page.getByRole('button', { name: 'Лидеры по передачам' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Лидеры по передачам' })).toBeVisible()
+    const head = page.locator('.pass-col')
+    const facts = await head.evaluate((el) => {
+      const num = el.closest('table')?.querySelector('td.num') as HTMLElement | null
+      return {
+        text: el.innerText.replace(/\s+/g, ' ').trim(),
+        clipped: el.scrollWidth > el.clientWidth + 1,
+        width: num ? getComputedStyle(num).width : '',
+        transform: getComputedStyle(el).textTransform,
+      }
+    })
+    expect(facts.text).toBe(width === 375 ? 'Пер.' : 'Передачи')
+    expect(facts.clipped).toBe(false)
+    expect(facts.transform).toBe('none')
+    const px = Number.parseFloat(facts.width)
+    expect(Math.abs(px - (width === 375 ? 66.4 : 76.8))).toBeLessThan(0.2)
+  }
+
+  assists = []
+  await page.goto('/table?tournament=liga&tab=assists')
+  await expect(page.getByText('Передач ещё нет')).toBeVisible()
 })

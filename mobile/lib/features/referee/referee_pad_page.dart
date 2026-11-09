@@ -31,7 +31,7 @@ class _Sheet {
     if (kind == _Kind.goal) {
       if (step == _Step.team) return 'Кто забил?';
       if (step == _Step.player) return 'Кто забил гол?';
-      return 'Кто отдал передачу?';
+      return 'Отдал передачу';
     }
     if (kind == _Kind.yellow) {
       return step == _Step.team ? 'Кому жёлтая?' : 'Кому показать жёлтую?';

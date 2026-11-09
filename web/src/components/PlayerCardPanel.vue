@@ -33,7 +33,7 @@ type MatchRow = {
 const STATS: { key: string; label: string }[] = [
   { key: 'appearances', label: 'Игры' },
   { key: 'goals', label: 'Голы' },
-  { key: 'assists', label: 'Ассисты' },
+  { key: 'assists', label: 'Передачи' },
   { key: 'yellowCards', label: 'Жёлтые' },
   { key: 'redCards', label: 'Красные' },
   { key: 'cleanSheets', label: 'Сухие' },

@@ -217,7 +217,7 @@ watch(scheduleRevision, () => {
 onMounted(() => {
   setPageMeta({
     title: 'Главная',
-    description: `${SITE_NAME}: ближайшие матчи, идущие турниры и бомбардиры.`,
+    description: `${SITE_NAME}: ближайшие матчи, идущие турниры, бомбардиры и лучшие по передачам.`,
     path: '/',
   })
   void load()

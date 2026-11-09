@@ -275,7 +275,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/players')
   await expect(page.getByText('Бомбардир', { exact: true })).toBeVisible()
-  await expect(page.getByText('Ассистент', { exact: true })).toBeVisible()
+  await expect(page.getByText('Лучший по передачам', { exact: true })).toBeVisible()
   await expect(page.locator('.leader-metric')).toHaveCount(0)
   await expect(page.getByText('Игроков пока нет')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Игроки' })).toBeVisible()

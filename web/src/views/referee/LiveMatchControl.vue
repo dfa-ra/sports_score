@@ -128,7 +128,7 @@ const sheetTitle = computed(() => {
     if (current.ownGoal) return 'Кто забил в свои ворота?'
     if (current.step === 'team') return 'Кто забил?'
     if (current.step === 'player') return 'Кто забил гол?'
-    return 'Кто отдал передачу?'
+    return 'Отдал передачу'
   }
   if (current.kind === 'SUBSTITUTION') {
     if (current.step === 'team') return 'Замена: какая команда?'
