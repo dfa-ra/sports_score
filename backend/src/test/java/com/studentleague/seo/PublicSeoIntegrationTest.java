@@ -48,4 +48,33 @@ class PublicSeoIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/link-preview").param("path", "/matches/not-a-uuid"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void descriptionsUseTheGenitiveLeagueNameAndTitlesStayNominative() throws Exception {
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/")
+                        .header("Host", "itmoliga.ru").header("X-Forwarded-Proto", "https"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<title>Главная — Лига ИТМО</title>")))
+                .andExpect(content().string(containsString("лучшие по передачам Лиги ИТМО.")))
+                .andExpect(content().string(not(containsString("передач Лига ИТМО"))));
+
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/players"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<h1>Игроки — Лига ИТМО</h1>")))
+                .andExpect(content().string(containsString("Поиск игроков Лиги ИТМО.")));
+
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/calendar"))
+                .andExpect(content().string(containsString("Календарь матчей Лиги ИТМО.")));
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/tournaments"))
+                .andExpect(content().string(containsString("Турниры Лиги ИТМО: вид спорта, сезон и формат.")));
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/teams"))
+                .andExpect(content().string(containsString("Команды Лиги ИТМО.")));
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/terms"))
+                .andExpect(content().string(containsString("Условия использования сайта Лиги ИТМО.")));
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/privacy"))
+                .andExpect(content().string(containsString("Как Лига ИТМО обрабатывает персональные данные.")));
+        mockMvc.perform(get("/api/v1/link-preview").param("path", "/table"))
+                .andExpect(content().string(containsString("лидеры по передачам.")))
+                .andExpect(content().string(containsString("<title>Таблица — Лига ИТМО</title>")));
+    }
 }

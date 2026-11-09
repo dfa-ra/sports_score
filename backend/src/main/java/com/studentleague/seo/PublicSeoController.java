@@ -32,6 +32,7 @@ public class PublicSeoController {
     static final int SITEMAP_LIMIT = 500;
     private static final Pattern HOST = Pattern.compile("^[A-Za-z0-9.-]+(?::\\d+)?$");
     private static final String SITE = "Лига ИТМО";
+    private static final String SITE_GENITIVE = "Лиги ИТМО";
 
     private final TournamentRepository tournamentRepository;
     private final TeamRepository teamRepository;
@@ -124,17 +125,17 @@ public class PublicSeoController {
 
     private PageCopy copyFor(String path) {
         if ("/".equals(path)) {
-            return new PageCopy("Главная", "Таблица, ближайшие матчи, бомбардиры и лучшие по передачам " + SITE + ".");
+            return new PageCopy("Главная", "Таблица, ближайшие матчи, бомбардиры и лучшие по передачам " + SITE_GENITIVE + ".");
         }
         return switch (path) {
             case "/table" -> new PageCopy("Таблица", "Турнирная таблица, результаты, бомбардиры и лидеры по передачам.");
-            case "/calendar" -> new PageCopy("Игры", "Календарь матчей " + SITE + ".");
+            case "/calendar" -> new PageCopy("Игры", "Календарь матчей " + SITE_GENITIVE + ".");
             case "/live" -> new PageCopy("Live", "Матчи, которые идут сейчас.");
-            case "/tournaments" -> new PageCopy("Турниры", "Турниры " + SITE + ": вид спорта, сезон и формат.");
-            case "/teams" -> new PageCopy("Команды", "Команды " + SITE + ".");
-            case "/players" -> new PageCopy("Игроки", "Поиск игроков " + SITE + ".");
+            case "/tournaments" -> new PageCopy("Турниры", "Турниры " + SITE_GENITIVE + ": вид спорта, сезон и формат.");
+            case "/teams" -> new PageCopy("Команды", "Команды " + SITE_GENITIVE + ".");
+            case "/players" -> new PageCopy("Игроки", "Поиск игроков " + SITE_GENITIVE + ".");
             case "/privacy" -> new PageCopy("Политика конфиденциальности", "Как " + SITE + " обрабатывает персональные данные.");
-            case "/terms" -> new PageCopy("Условия пользования", "Условия использования сайта " + SITE + ".");
+            case "/terms" -> new PageCopy("Условия пользования", "Условия использования сайта " + SITE_GENITIVE + ".");
             default -> dynamicCopy(path);
         };
     }
@@ -143,14 +144,14 @@ public class PublicSeoController {
         UUID id = idAfter(path, "/tournaments/");
         if (id != null) {
             return tournamentRepository.findById(id)
-                    .map(tournament -> new PageCopy(tournament.getName(), tournament.getName() + " — турнир " + SITE + "."))
+                    .map(tournament -> new PageCopy(tournament.getName(), tournament.getName() + " — турнир " + SITE_GENITIVE + "."))
                     .orElse(null);
         }
         id = idAfter(path, "/teams/");
         if (id != null) {
             return teamRepository.findById(id)
                     .filter(team -> !team.isDisbanded())
-                    .map(team -> new PageCopy(team.getName(), team.getName() + " — команда " + SITE + "."))
+                    .map(team -> new PageCopy(team.getName(), team.getName() + " — команда " + SITE_GENITIVE + "."))
                     .orElse(null);
         }
         id = idAfter(path, "/players/");
@@ -158,7 +159,7 @@ public class PublicSeoController {
             return playerProfileRepository.findById(id)
                     .map(profile -> {
                         String name = playerName(profile);
-                        return new PageCopy(name, name + " — игрок " + SITE + ".");
+                        return new PageCopy(name, name + " — игрок " + SITE_GENITIVE + ".");
                     })
                     .orElse(null);
         }
