@@ -561,11 +561,13 @@ onMounted(() => {
 }
 .club :deep(.team-crest) {
   flex-shrink: 0;
+  align-self: center;
   line-height: 1;
 }
 .club :deep(.team-crest--fallback) {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   line-height: 1;
 }
@@ -781,6 +783,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     align-items: center;
   }
   .leader-row .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .leader-row .club :deep(.team-crest--fallback) { line-height: 11px; }
   .leader-row .club-name {
     display: block;
     min-width: 0;
@@ -829,6 +832,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   }
   .line .club { display: inline-flex; align-items: center; max-width: 82px; font-size: 11px; line-height: 14px; }
   .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .line .club :deep(.team-crest--fallback) { line-height: 11px; }
   .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
   .place { font-size: 13px; font-weight: 700; }
   .skel { height: 48px; box-sizing: border-box; }

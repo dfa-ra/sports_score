@@ -71,12 +71,16 @@ function measure() {
     const box = crest.getBoundingClientRect()
     const teamBox = team.getBoundingClientRect()
     const fallback = crest.classList.contains('team-crest--fallback')
-    let letterDelta: number | null = null
+    let letterX: number | null = null
+    let letterY: number | null = null
     if (fallback) {
       const range = document.createRange()
       range.selectNodeContents(crest)
       const letters = range.getBoundingClientRect()
-      if (letters.width > 0 && letters.height > 0) letterDelta = Math.abs(mid(letters) - mid(box))
+      if (letters.width > 0 && letters.height > 0) {
+        letterX = Math.abs((letters.left + letters.width / 2) - (box.left + box.width / 2))
+        letterY = Math.abs(mid(letters) - mid(box))
+      }
     }
     const stacked = getComputedStyle(nameTeam).flexDirection.startsWith('column')
     return {
@@ -84,7 +88,9 @@ function measure() {
       team: (team.textContent ?? '').trim(),
       fallback,
       crest: box.width,
-      letterDelta,
+      crestH: box.height,
+      letterX,
+      letterY,
       baselineDelta: stacked ? null : Math.abs(baseline(name) - baseline(team)),
       ellipsis: getComputedStyle(team).textOverflow,
       nowrap: getComputedStyle(team).whiteSpace,
@@ -124,6 +130,21 @@ test('crest letters and name baselines at 320, 375 and 1440', async ({ page }) =
     report[`goals-${width}`] = goals
     assertRows(goals.rows, width)
     await page.screenshot({ path: file })
+    if (width === 375) {
+      const clip = await page.evaluate(() => {
+        const leaders = document.querySelector('.leaders')!.getBoundingClientRect()
+        const rows = [...document.querySelectorAll('.cols.line')].slice(0, 4)
+        const last = rows[rows.length - 1].getBoundingClientRect()
+        const top = Math.max(0, leaders.top)
+        return {
+          x: 0,
+          y: top,
+          width: window.innerWidth,
+          height: Math.min(window.innerHeight - top, last.bottom - top + 12),
+        }
+      })
+      await page.screenshot({ path: `${OUT}/crest-letters-375.png`, clip })
+    }
 
     await page.getByRole('button', { name: 'Передачи' }).click()
     await expect(page.getByRole('heading', { name: 'Лидеры по передачам' })).toBeVisible()
@@ -155,7 +176,9 @@ function assertRows(
     kind: string
     fallback: boolean
     crest: number
-    letterDelta: number | null
+    crestH: number
+    letterX: number | null
+    letterY: number | null
     baselineDelta: number | null
     ellipsis: string
     nowrap: string
@@ -166,7 +189,11 @@ function assertRows(
   const list = rows.filter((row): row is NonNullable<typeof row> => row != null)
   expect(list.length).toBeGreaterThan(0)
   for (const row of list) {
-    if (row.fallback) expect(row.letterDelta ?? 99).toBeLessThanOrEqual(0.5)
+    if (row.fallback) {
+      expect(row.letterX ?? 99).toBeLessThanOrEqual(0.5)
+      expect(row.letterY ?? 99).toBeLessThanOrEqual(0.5)
+      expect(Math.abs(row.crest - row.crestH)).toBeLessThanOrEqual(0.5)
+    }
     if (row.baselineDelta != null) expect(row.baselineDelta).toBeLessThanOrEqual(0.5)
     const crest = width <= 720 ? 11 : 16
     expect(row.crest).toBeCloseTo(crest, 0)
