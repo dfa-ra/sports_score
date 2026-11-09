@@ -143,6 +143,7 @@ const stickyChrome = computed(() => {
             >{{ item.label }}</RouterLink>
           </nav>
 
+          <div class="session">
           <div class="auth" :aria-busy="authSlot === 'pending'">
             <div v-if="authSlot === 'account'" ref="accountRoot" class="account">
               <button
@@ -169,6 +170,8 @@ const stickyChrome = computed(() => {
             <span v-else class="auth-pending" aria-hidden="true"></span>
           </div>
 
+          <span class="session-rule" aria-hidden="true"></span>
+
           <div ref="menuRoot" class="menu">
             <button
               class="menu-button"
@@ -178,7 +181,11 @@ const stickyChrome = computed(() => {
               :aria-expanded="menuOpen"
               @click="menuOpen = !menuOpen"
             >
-              <span class="menu-glyph" aria-hidden="true">{{ menuOpen ? '✕' : '☰' }}</span>
+              <span class="menu-icon" :class="{ open: menuOpen }" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span v-if="!menuOpen"></span>
+              </span>
             </button>
             <div v-if="menuOpen" class="menu-panel">
               <RouterLink
@@ -198,6 +205,7 @@ const stickyChrome = computed(() => {
                 <button class="menu-logout" type="button" @click="logout">Выйти</button>
               </template>
             </div>
+          </div>
           </div>
         </div>
       </div>
@@ -279,24 +287,45 @@ const stickyChrome = computed(() => {
 }
 .primary a:hover { color: #fff; background: rgba(255,255,255,0.08); }
 .primary a.on { color: var(--navy); background: var(--ice); }
+.session {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.session-rule { display: none; }
 .login-pill {
+  position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 40px;
   border: 1px solid rgba(255,255,255,0.45);
   color: #fff;
-  border-radius: 999px;
-  padding: 0.38rem 0.9rem;
+  border-radius: 10px;
+  padding: 0 16px;
   text-decoration: none;
   background: transparent;
+  font-family: var(--font-display);
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
 }
-.login-pill:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.login-pill:hover,
+.login-pill:active { background: rgba(255,255,255,0.08); color: #fff; }
 .login-pill.ghost { border-color: transparent; color: rgba(255,255,255,0.75); }
-.auth { display: flex; gap: 0.4rem; align-items: center; flex: 0 0 auto; margin-left: auto; }
-.auth-pending { width: 4.8rem; height: 2rem; flex: 0 0 auto; }
+.auth-pending { box-sizing: border-box; width: 40px; height: 40px; flex: 0 0 auto; }
+.auth { display: flex; align-items: center; flex: 0 0 auto; }
+.login-pill:focus-visible,
+.menu-button:focus-visible,
+.profile-button:focus-visible {
+  outline: 2px solid #4cb4e5;
+  outline-offset: 0;
+}
 .account { position: relative; display: none; }
 .profile-button {
+  position: relative;
   box-sizing: border-box;
   width: 40px;
   height: 40px;
@@ -322,6 +351,7 @@ const stickyChrome = computed(() => {
   background: rgba(255, 255, 255, 0.22);
 }
 .menu-button {
+  position: relative;
   width: 42px;
   height: 42px;
   display: grid;
@@ -333,8 +363,35 @@ const stickyChrome = computed(() => {
   cursor: pointer;
   padding: 0;
 }
-.menu-button:hover { background: rgba(255,255,255,0.08); }
-.menu-glyph { font-size: 1.25rem; line-height: 1; }
+.menu-button:hover,
+.menu-button:active { background: rgba(255,255,255,0.08); }
+.menu-icon {
+  display: grid;
+  width: 18px;
+  gap: 4px;
+}
+.menu-icon span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.menu-icon.open {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.menu-icon.open span {
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+}
+.menu-icon.open span:first-child { transform: rotate(45deg); }
+.menu-icon.open span:last-child { transform: rotate(-45deg); }
 .menu-panel {
   position: absolute;
   top: calc(100% + 0.45rem);
@@ -416,40 +473,89 @@ const stickyChrome = computed(() => {
 @media (max-width: 1023px) {
   .primary { display: none; }
   .menu { display: block; }
-  .account { display: none; }
+  .account { display: block; }
   .nav-inner { min-height: 52px; }
   .brand { min-width: 0; }
   .brand-name { font-size: 0.82rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .login-pill { white-space: nowrap; flex-shrink: 0; }
-  .menu, .menu-button { flex-shrink: 0; margin-left: 0; }
-  .menu { margin-left: 0.85rem; }
+  .session {
+    align-items: stretch;
+    box-sizing: border-box;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,0.45);
+    border-radius: 10px;
+    background: transparent;
+  }
+  .session-rule {
+    display: block;
+    align-self: center;
+    flex: 0 0 1px;
+    width: 1px;
+    height: 24px;
+    background: rgba(255,255,255,0.3);
+  }
+  .session .auth,
+  .session .account,
+  .session .menu { height: 100%; }
+  .session .auth { align-items: stretch; }
+  .session .login-pill {
+    flex: 0 0 auto;
+    height: 100%;
+    min-width: 84px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 9px 0 0 9px;
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .session .login-pill:hover,
+  .session .login-pill:active { border-radius: 9px 0 0 9px; }
+  .session .menu,
+  .session .menu-button { flex-shrink: 0; margin-left: 0; }
+  .session .menu { display: flex; }
+  .session .menu-button {
+    width: 44px;
+    height: 100%;
+    border: 0;
+    border-radius: 0 9px 9px 0;
+  }
+  .session .menu-button:hover,
+  .session .menu-button:active { border-radius: 0 9px 9px 0; }
+  .session .profile-button {
+    width: 48px;
+    height: 100%;
+    overflow: visible;
+    border: 0;
+    border-radius: 9px 0 0 9px;
+  }
+  .session .profile-button:hover,
+  .session .profile-button:active {
+    background: rgba(255,255,255,0.08);
+    border-radius: 9px 0 0 9px;
+  }
+  .session .profile-button :deep(.player-avatar) {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .session .auth-pending { width: 48px; height: 100%; }
+  .session .login-pill::before,
+  .session .menu-button::before,
+  .session .profile-button::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
 }
 @media (max-width: 720px) {
   .nav-inner { justify-content: flex-start; min-height: var(--chrome-h); gap: 8px; }
   .brand { gap: 8px; }
   .brand-name { font-size: 13px; font-weight: 700; line-height: 16px; letter-spacing: 0.04em; }
   .brand :deep(.brand-mark) { width: 34px !important; height: 34px !important; }
-  .auth { margin-left: auto; }
-  .login-pill {
-    position: relative;
-    box-sizing: border-box;
-    height: 36px;
-    min-width: 84px;
-    padding: 0 14px;
-    justify-content: center;
-  }
-  .login-pill::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: var(--tap-min);
-    transform: translateY(-50%);
-  }
-  .menu { margin-left: 18px; }
-  .menu-button { width: 44px; height: 44px; border-radius: 12px; }
-  .profile-button { width: 36px; height: 36px; }
   .foot-inner { min-width: 0; padding-right: 0.15rem; }
   .foot-ver {
     min-width: 0;

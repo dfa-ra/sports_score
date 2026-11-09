@@ -898,7 +898,8 @@ test('narrow tabs stay readable and the header keeps room for login', async ({ p
       verClipped: ver.scrollWidth > ver.clientWidth + 1,
     }
   })
-  expect(header.gap).toBeGreaterThanOrEqual(18)
+  expect(header.gap).toBeGreaterThanOrEqual(0)
+  expect(header.gap).toBeLessThanOrEqual(2)
   expect(header.loginLeft).toBeGreaterThan(40)
   expect(header.burgerRight).toBeLessThanOrEqual(header.view - 4)
   expect(header.verClipped).toBe(false)

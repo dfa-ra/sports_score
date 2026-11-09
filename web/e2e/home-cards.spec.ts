@@ -464,7 +464,9 @@ test('guest burger switches at 1024 and the menu matches on home and a tournamen
     await expect(button).toBeVisible()
     await expect(button).toHaveAttribute('aria-expanded', open ? 'true' : 'false')
     await expect(button).toHaveAccessibleName(open ? 'Закрыть меню' : 'Открыть меню')
-    await expect(button.locator('.menu-glyph')).toHaveText(open ? '✕' : '☰')
+    await expect(button.locator('.menu-icon')).toBeVisible()
+    await expect(button).not.toContainText('☰')
+    await expect(button.locator('.menu-icon span')).toHaveCount(open ? 2 : 3)
     const panel = page.locator('.menu-panel')
     if (!open) {
       await expect(panel).toHaveCount(0)

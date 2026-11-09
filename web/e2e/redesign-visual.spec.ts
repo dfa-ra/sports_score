@@ -382,7 +382,8 @@ test('home chips, tabs, pause chip and header gap stay intact', async ({ page })
         const burger = document.querySelector('.menu-button')!.getBoundingClientRect()
         return burger.left - login.right
       })
-      expect(gap).toBeGreaterThanOrEqual(18)
+      expect(gap).toBeGreaterThanOrEqual(0)
+      expect(gap).toBeLessThanOrEqual(2)
       const peek = await page.locator('.feed-cards').evaluate((bar) => {
         const cards = [...bar.querySelectorAll('.mc')] as HTMLElement[]
         if (cards.length < 2) return { cards: cards.length, peek: 0, gap: 0, firstInside: false }
@@ -473,7 +474,8 @@ test('match stars, empty events and header gap', async ({ page }) => {
         const burger = document.querySelector('.menu-button')!.getBoundingClientRect()
         return burger.left - login.right
       })
-      expect(headerGap).toBeGreaterThanOrEqual(18)
+      expect(headerGap).toBeGreaterThanOrEqual(0)
+      expect(headerGap).toBeLessThanOrEqual(2)
     }
     if (width === 1440 || width === 375) {
       await stamp(page)

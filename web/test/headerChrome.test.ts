@@ -27,6 +27,7 @@ test('wide screens have a profile menu and no burger; narrow screens have only t
   assert.doesNotMatch(src, /only-compact/)
   assert.equal(src.match(/Войти/g)?.length, 1)
   assert.match(src, /class="login-pill" to="\/login">Войти<\/RouterLink>/)
+  assert.match(src, /class="auth-pending"/)
   assert.match(src, /class="profile-button"/)
   assert.match(src, /aria-label="Профиль"/)
   assert.match(src, /class="menu-sep" role="separator"/)
@@ -35,8 +36,8 @@ test('wide screens have a profile menu and no burger; narrow screens have only t
   const compact = mediaBlock('(max-width: 1023px)')
   assert.match(compact, /\.primary \{ display: none; \}/)
   assert.match(compact, /\.menu \{ display: block; \}/)
-  assert.match(compact, /\.account \{ display: none; \}/)
-  assert.doesNotMatch(compact, /\.auth \{/)
+  assert.match(compact, /\.account \{ display: block; \}/)
+  assert.doesNotMatch(compact, /^\s*\.auth \{/m)
 
   const wide = mediaBlock('(min-width: 1024px)')
   assert.match(wide, /\.menu \{ display: none; \}/)

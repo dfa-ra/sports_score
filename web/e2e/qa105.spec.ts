@@ -360,7 +360,8 @@ test('header menus follow the width and the signed-in role', async ({ page }) =>
       } else {
         await expect(page.locator('nav.primary')).toBeHidden()
         await expect(page.locator('.menu-button')).toBeVisible()
-        await expect(page.locator('.profile-button')).toBeHidden()
+        if (kind === 'guest') await expect(page.locator('.profile-button')).toHaveCount(0)
+        else await expect(page.locator('.profile-button')).toBeVisible()
       }
       if (kind === 'guest') {
         await expect(page.locator('.login-pill', { hasText: 'Войти' })).toBeVisible()
