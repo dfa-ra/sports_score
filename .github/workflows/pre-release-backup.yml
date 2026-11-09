@@ -1,0 +1,79 @@
+# One-shot read-only backup of studentleague-prod before a tag deploy.
+# Uses the same PROD_* SSH secrets as Release. Does not recreate containers.
+name: Pre-release backup
+
+on:
+  push:
+    branches:
+      - cursor/prod-backup-v0265-206b
+    paths:
+      - .github/workflows/pre-release-backup.yml
+      - scripts/pre_release_backup.sh
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Backup studentleague-prod
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check SSH secrets
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+        run: |
+          if [ -z "${SSH_HOST}" ] || [ -z "${SSH_USER}" ] || { [ -z "${SSH_KEY}" ] && [ -z "${SSH_KEY_BASE64}" ]; }; then
+            echo "PROD SSH secrets are empty — backup cannot run."
+            exit 1
+          fi
+          echo "PROD SSH secrets are present."
+
+      - name: Prepare SSH key
+        env:
+          DEV_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          DEV_SSH_KEY_BASE64: ${{ secrets.PROD_SSH_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY="$HOME/.ssh/stand_deploy"
+          python3 deploy/normalize_ssh_key.py "$KEY"
+          if ! ssh-keygen -y -P "" -f "$KEY" >/tmp/stand.pub 2>/tmp/stand.keyerr; then
+            echo "Normalized SSH key is not a usable private key."
+            exit 1
+          fi
+          echo "Private key accepted."
+          ssh-keygen -lf "$KEY"
+
+      - name: Trust stand host
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT || '22' }}
+        run: |
+          if [ -n "${SSH_KNOWN_HOSTS}" ]; then
+            printf '%s\n' "${SSH_KNOWN_HOSTS}" | sed 's/\r$//' > ~/.ssh/known_hosts
+          else
+            echo "SSH_KNOWN_HOSTS is empty — falling back to ssh-keyscan (TOFU)."
+            ssh-keyscan -p "${SSH_PORT}" -T 10 "${SSH_HOST}" >> ~/.ssh/known_hosts
+          fi
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Run read-only backup on the stand
+        env:
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST }}
+          SSH_USER: ${{ secrets.PROD_SSH_USER }}
+          SSH_PORT: ${{ vars.PROD_SSH_PORT || '22' }}
+        run: |
+          KEY="$HOME/.ssh/stand_deploy"
+          REMOTE="${SSH_USER}@${SSH_HOST}"
+          SSH=(ssh -i "$KEY" -p "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes -o TCPKeepAlive=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          SCP=(scp -i "$KEY" -P "${SSH_PORT}" -o IdentitiesOnly=yes -o BatchMode=yes -o TCPKeepAlive=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
+          "${SCP[@]}" scripts/pre_release_backup.sh "${REMOTE}:/tmp/pre_release_backup.sh"
+          "${SSH[@]}" "${REMOTE}" "chmod 700 /tmp/pre_release_backup.sh && bash /tmp/pre_release_backup.sh; rc=\$?; rm -f /tmp/pre_release_backup.sh; exit \$rc"
