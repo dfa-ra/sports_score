@@ -1,0 +1,11 @@
+CREATE INDEX IF NOT EXISTS idx_matches_home_team_id ON matches (home_team_id);
+CREATE INDEX IF NOT EXISTS idx_matches_away_team_id ON matches (away_team_id);
+CREATE INDEX IF NOT EXISTS idx_matches_status_scheduled_at ON matches (status, scheduled_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tournament_teams_team_id ON tournament_teams (team_id);
+CREATE INDEX IF NOT EXISTS idx_match_events_team_id ON match_events (team_id);
+CREATE INDEX IF NOT EXISTS idx_match_events_secondary_player_id ON match_events (secondary_player_id);
+CREATE INDEX IF NOT EXISTS idx_match_lineup_players_player_id ON match_lineup_players (player_id);
+CREATE INDEX IF NOT EXISTS idx_match_referees_referee_id ON match_referees (referee_id);
+CREATE INDEX IF NOT EXISTS idx_playoff_slots_home_team_id ON playoff_slots (home_team_id);
+CREATE INDEX IF NOT EXISTS idx_playoff_slots_away_team_id ON playoff_slots (away_team_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_team_id_player_id ON team_members (team_id, player_id);
