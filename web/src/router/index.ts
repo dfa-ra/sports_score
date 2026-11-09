@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ADMIN_LEGACY_PATHS } from '../lib/adminTabs'
 import { setPageMeta } from '../lib/pageMeta'
 import { useAuthStore } from '../stores/auth'
 
@@ -29,6 +30,11 @@ const router = createRouter({
     { path: '/my-team', name: 'my-team', component: () => import('../views/MyTeamView.vue'), meta: { auth: true, title: 'Моя команда', description: 'Лига ИТМО: моя команда' } },
     { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue'), meta: { auth: true, title: 'Профиль', description: 'Лига ИТМО: профиль' } },
     { path: '/admin', name: 'admin', component: () => import('../views/admin/AdminDashboard.vue'), meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Лига ИТМО: управление лигой' } },
+    ...Object.entries(ADMIN_LEGACY_PATHS).map(([path, tab]) => ({
+      path,
+      redirect: { path: '/admin', query: { tab } },
+      meta: { auth: true, roles: ['ADMIN'], title: 'Админ', description: 'Лига ИТМО: управление лигой' },
+    })),
     { path: '/referee', name: 'referee', component: () => import('../views/referee/RefereeDashboard.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Судья', description: 'Лига ИТМО: матчи судьи' } },
     { path: '/referee/matches/:id', name: 'referee-match', component: () => import('../views/referee/LiveMatchControl.vue'), meta: { auth: true, roles: ['REFEREE', 'ADMIN'], title: 'Пульт судьи', description: 'Лига ИТМО: протокол матча' } },
     { path: '/analyst', name: 'analyst', component: () => import('../views/analyst/AnalystDashboard.vue'), meta: { auth: true, roles: ['ANALYST', 'ADMIN'], title: 'Аналитик', description: 'Лига ИТМО: матчи аналитика' } },
@@ -49,7 +55,7 @@ router.beforeEach(async (to) => {
   // Signed-in visitors can open /my-team. The page shows a stub unless they are a player or captain.
   const roles = to.meta.roles as string[] | undefined
   if (roles && !roles.some((role) => auth.hasRole(role as any))) {
-    if (to.path === '/admin' || to.path.startsWith('/referee')) {
+    if (to.path === '/admin' || to.path.startsWith('/admin/') || to.path.startsWith('/referee')) {
       return { name: 'forbidden', replace: true }
     }
     return { name: 'home' }

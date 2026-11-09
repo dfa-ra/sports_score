@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../../api/client'
+import { adminTabFromQuery, type AdminTab } from '../../lib/adminTabs'
 import { labelOf, roleLabel } from '../../lib/format'
 import { apiError } from '../../lib/errors'
 import { loadAllReferees, refereeTitle } from '../../lib/referees'
@@ -31,7 +32,18 @@ let refereeSearchTimer = 0
 const tournaments = ref<any[]>([])
 const matches = ref<any[]>([])
 const teams = ref<any[]>([])
-const tab = ref<'users' | 'tournaments' | 'matches' | 'teams' | 'players' | 'referees' | 'statistics' | 'gallery'>('users')
+const route = useRoute()
+const router = useRouter()
+const tab = computed<AdminTab>({
+  get: () => adminTabFromQuery(route.query.tab),
+  set: (next) => {
+    if (adminTabFromQuery(route.query.tab) === next && (next === 'users' ? route.query.tab == null || route.query.tab === 'users' : route.query.tab === next)) return
+    const query = { ...route.query }
+    if (next === 'users') delete query.tab
+    else query.tab = next
+    void router.replace({ name: 'admin', query })
+  },
+})
 const roleRequests = ref<any[]>([])
 const gallery = ref<any>({ photos: [], vkAlbumUrl: '' })
 const galleryPreviews = ref<Record<string, string>>({})
