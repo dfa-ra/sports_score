@@ -162,13 +162,22 @@ export function feedAddedMinute(event: FeedEvent): number | null {
   return Math.trunc(value)
 }
 
-/** Same minute the feed already prints. Added time is `{minute}+{added}'` only when that number is present. */
+/**
+ * Ordinary minutes stay on the protocol clock, including `0'`.
+ * Stoppage, when the payload already has `addedMinute` and the match has a
+ * period length, is the end of that half: `(periodLengthSeconds / 60) × period`.
+ * A missing length is not guessed; the protocol minute is left as it is.
+ */
 export function feedMinuteLabel(event: FeedEvent, periodLengthSeconds?: number | null) {
   const minute = protocolMinute(event, periodLengthSeconds)
   if (minute == null) return ''
   const added = feedAddedMinute(event)
   if (added == null) return `${minute}'`
-  return `${minute}+${added}'`
+  const length = periodLengthSeconds && periodLengthSeconds > 0 ? periodLengthSeconds : null
+  if (length == null) return `${minute}+${added}'`
+  const period = Math.max(1, Number(event.period) || 1)
+  const base = Math.floor(length / 60) * period
+  return `${base}+${added}'`
 }
 
 /** Overview order: displayed minute, then added time, then when the row was created, then id. */
@@ -187,9 +196,21 @@ export function compareFeedEvents(a: FeedEvent, b: FeedEvent, periodLengthSecond
  * only. The chip is the running match score, with an own goal on the side
  * that received the point.
  */
+function halfHasStarted<T extends FeedEvent>(
+  period: number,
+  events: T[],
+  matchPeriod?: number | null,
+) {
+  const live = events.filter((event) => !event.voided)
+  if (live.some((event) => event.eventType === 'PERIOD_START' && (event.period || 1) === period)) return true
+  const current = Number(matchPeriod) || 0
+  if (current > period) return true
+  return live.some((event) => (event.period || 1) > period)
+}
+
 export function buildMirrorFeed<T extends FeedEvent>(
   events: T[],
-  match: { homeTeamId?: string | null; periodLengthSeconds?: number | null },
+  match: { homeTeamId?: string | null; periodLengthSeconds?: number | null; period?: number | null },
 ) {
   const length = match.periodLengthSeconds
   const rows = events
@@ -218,13 +239,26 @@ export function buildMirrorFeed<T extends FeedEvent>(
     })
     byPeriod.set(period, block)
   }
-  const blocks = [...byPeriod.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([period, block]) => ({
-      period,
-      score: `${block.home}-${block.away}`,
-      items: block.items,
-    }))
+  const periods = new Set<number>(byPeriod.keys())
+  const seen = events.filter((event) => !event.voided)
+  const furthest = Math.max(
+    0,
+    Number(match.period) || 0,
+    ...seen.map((event) => event.period || 1),
+  )
+  for (let period = 1; period <= furthest; period += 1) {
+    if (halfHasStarted(period, events, match.period)) periods.add(period)
+  }
+  const blocks = [...periods]
+    .sort((a, b) => a - b)
+    .map((period) => {
+      const block = byPeriod.get(period) ?? { home: 0, away: 0, items: [] }
+      return {
+        period,
+        score: `${block.home}-${block.away}`,
+        items: block.items,
+      }
+    })
   return {
     blocks,
     total: `${home}-${away}`,

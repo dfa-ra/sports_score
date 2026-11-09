@@ -263,11 +263,47 @@ test('overview sort is minute, then added time when present, then createdAt, the
     { ...same, id: 'c', createdAt: '2026-11-01T12:00:01Z' },
   ], { homeTeamId: home, periodLengthSeconds: 15 * 60 })
   assert.deepEqual(feed.blocks[0].items.map((item) => item.id), ['c', 'b', 'a'])
-  assert.equal(feedMinuteLabel(feed.blocks[0].items[2], 15 * 60), "10+2'")
+  assert.equal(feedMinuteLabel(feed.blocks[0].items[2], 15 * 60), "15+2'")
   assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 9, period: 1 }, 1200), "0'")
+  assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 1, period: 1, metadata: { addedMinute: 4 } }, 900), "15+4'")
+  assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 1, period: 2, metadata: { addedMinute: 4 } }, 900), "30+4'")
+  assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 9, period: 1, metadata: { addedMinute: 4 } }, null), "0+4'")
+  assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 20 * 60, period: 1, metadata: { addedMinute: 4 } }, 1200), "20+4'")
   const tied = [
     { id: 'z', eventType: 'GOAL', gameTime: 60, createdAt: '2026-11-01T12:00:00Z' },
     { id: 'm', eventType: 'GOAL', gameTime: 60, createdAt: '2026-11-01T12:00:00Z' },
   ].sort((a, b) => compareFeedEvents(a, b, 900))
   assert.deepEqual(tied.map((item) => item.id), ['m', 'z'])
+})
+
+test('a started half with no other events still gets a 0-0 plate', () => {
+  const home = 'home'
+  const started = buildMirrorFeed([
+    { id: 's1', eventType: 'PERIOD_START', period: 1, gameTime: 0 },
+    { id: 'g', eventType: 'GOAL', teamId: home, period: 1, gameTime: 9 },
+    { id: 'e1', eventType: 'PERIOD_END', period: 1, gameTime: 39 },
+    { id: 's2', eventType: 'PERIOD_START', period: 2, gameTime: 1200 },
+  ], { homeTeamId: home, periodLengthSeconds: 1200, period: 2 })
+  assert.deepEqual(started.blocks.map((block) => [block.period, block.score, block.items.length]), [
+    [1, '1-0', 1],
+    [2, '0-0', 0],
+  ])
+  assert.equal(started.total, '1-0')
+
+  const quietFirst = buildMirrorFeed([
+    { id: 's2', eventType: 'PERIOD_START', period: 2, gameTime: 900 },
+    { id: 'g2', eventType: 'GOAL', teamId: 'away', period: 2, gameTime: 1000 },
+  ], { homeTeamId: home, periodLengthSeconds: 900, period: 2 })
+  assert.deepEqual(quietFirst.blocks.map((block) => [block.period, block.score, block.items.length]), [
+    [1, '0-0', 0],
+    [2, '0-1', 1],
+  ])
+
+  const notStarted = buildMirrorFeed([
+    { id: 'g1', eventType: 'GOAL', teamId: home, period: 1, gameTime: 60 },
+  ], { homeTeamId: home, periodLengthSeconds: 900, period: 1 })
+  assert.deepEqual(notStarted.blocks.map((block) => block.period), [1])
+
+  const beforeKickoff = buildMirrorFeed([], { homeTeamId: home, period: 1 })
+  assert.deepEqual(beforeKickoff.blocks, [])
 })

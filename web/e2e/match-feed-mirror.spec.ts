@@ -17,6 +17,8 @@ type Fixture = {
   homeScore: number
   awayScore: number
   periodLengthSeconds: number
+  status?: string
+  period?: number
   events: Record<string, unknown>[]
 }
 
@@ -152,7 +154,7 @@ async function install(page: Page, fixture: Fixture, eventsMode: 'ok' | 'error' 
       return json(route, {
         id: fixture.id,
         tournamentId: 'b16257ae-e20e-49ac-bb3c-c96a2173d2ee',
-        status: 'FINISHED',
+        status: fixture.status || 'FINISHED',
         sportCode: 'FOOTBALL',
         homeTeamId: fixture.homeTeamId,
         awayTeamId: fixture.awayTeamId,
@@ -160,7 +162,7 @@ async function install(page: Page, fixture: Fixture, eventsMode: 'ok' | 'error' 
         awayTeamName: fixture.awayName,
         homeScore: fixture.homeScore,
         awayScore: fixture.awayScore,
-        period: 2,
+        period: fixture.period ?? 2,
         periodCount: 2,
         periodLengthSeconds: fixture.periodLengthSeconds,
         scheduledAt: '2026-09-08T11:12:46Z',
@@ -192,7 +194,7 @@ async function shoot(page: Page, fixture: Fixture, slug: string) {
     await card.scrollIntoViewIfNeeded()
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(overflow, `${slug} scroll at ${width}`).toBeLessThanOrEqual(1)
-    await card.screenshot({ path: `${shots}/match-feed-${slug}-${width}.png` })
+    await card.screenshot({ path: `${shots}/match-feed-alisa-${slug}-${width}.png` })
   }
 }
 
@@ -203,9 +205,15 @@ test('dev-like feeds mirror goals, cards, and an own goal', async ({ page }) => 
   const card = page.locator('.card.events')
   await expect(card.getByText('Лебедев Кирилл')).toBeVisible()
   await expect(card.getByText('Начало тайма')).toHaveCount(0)
-  await expect(card.getByText('2-Й ТАЙМ')).toHaveCount(0)
-  await expect(card.locator('.half')).toContainText('2 : 0')
+  const halves = card.locator('.half')
+  await expect(halves).toHaveCount(2)
+  await expect(halves.nth(0)).toContainText('1-Й ТАЙМ')
+  await expect(halves.nth(0)).toContainText('2 : 0')
+  await expect(halves.nth(1)).toContainText('2-Й ТАЙМ')
+  await expect(halves.nth(1)).toContainText('0 : 0')
+  await expect(card.locator('section').nth(1).locator('.ev')).toHaveCount(0)
   await expect(card.locator('.total b')).toHaveText('2 : 0')
+  await expect(card.locator('header span')).toHaveText('2 : 0')
   await expect(card.locator('.ev').nth(0).locator('.min')).toHaveText("0'")
   await expect(card.locator('.ev').nth(0).locator('.run')).toHaveText('1 : 0')
   await expect(card.locator('.ev').nth(1)).toContainText('Жёлтая')
@@ -244,26 +252,26 @@ const alignMatch: Fixture = {
   awayName: 'Архитекторы',
   homeScore: 2,
   awayScore: 2,
-  periodLengthSeconds: 1200,
+  periodLengthSeconds: 900,
   events: [
     event('align0000-1111-4111-8111-align0000001', {
       id: 'h0', eventType: 'GOAL', period: 1, gameTime: 10, teamId: lawyers,
-      playerId: 'h0p', playerFirstName: 'Нуль', playerLastName: 'Домашний', playerJersey: 1,
+      playerId: 'h0p', playerFirstName: 'Домашний', playerLastName: 'Нульоченьдлинноеимякотороережетсясправа', playerJersey: 1,
       createdAt: '2026-11-01T12:00:01Z',
     }),
     event('align0000-1111-4111-8111-align0000001', {
       id: 'a0', eventType: 'YELLOW_CARD', period: 1, gameTime: 20, teamId: architects,
-      playerId: 'a0p', playerFirstName: 'Жёлтый', playerLastName: 'Гостевой', playerJersey: 4,
+      playerId: 'a0p', playerFirstName: 'Жёлтый', playerLastName: 'Оченьдлиннаяфамилиякоторуюнадосрезатьслева', playerJersey: 4,
       createdAt: '2026-11-01T12:00:02Z',
     }),
     event('align0000-1111-4111-8111-align0000001', {
-      id: 'hadd', eventType: 'GOAL', period: 1, gameTime: 30, teamId: lawyers,
+      id: 'hadd', eventType: 'GOAL', period: 1, gameTime: 20 * 60, teamId: lawyers,
       playerId: 'haddp', playerFirstName: 'Добавка', playerLastName: 'Домашний', playerJersey: 2,
       metadata: { addedMinute: 4 },
       createdAt: '2026-11-01T12:00:03Z',
     }),
     event('align0000-1111-4111-8111-align0000001', {
-      id: 'aadd', eventType: 'GOAL', period: 1, gameTime: 40, teamId: architects,
+      id: 'aadd', eventType: 'GOAL', period: 1, gameTime: 21 * 60, teamId: architects,
       playerId: 'aaddp', playerFirstName: 'Безпаса', playerLastName: 'Гостевой', playerJersey: 7,
       metadata: { addedMinute: 4 },
       createdAt: '2026-11-01T12:00:04Z',
@@ -368,12 +376,89 @@ test('away text ends at the icon and minute columns share one x', async ({ page 
         expect(Math.abs(row.nameLeft - row.whoLeft), `${row.name} home start at ${width}`).toBeLessThanOrEqual(2)
       }
     }
-    const wanted = ["0'", "16'", "0+4'"]
+    const plates = await card.locator('.half').evaluateAll((nodes) => nodes.map((node) => {
+      const style = getComputedStyle(node)
+      const title = node.querySelector('span')
+      return {
+        radius: style.borderRadius,
+        weight: title ? getComputedStyle(title).fontWeight : '',
+        fill: style.backgroundColor,
+        borderTop: style.borderTopWidth,
+      }
+    }))
+    const totalStyle = await card.locator('.total').evaluate((node) => {
+      const style = getComputedStyle(node)
+      return { radius: style.borderRadius, fill: style.backgroundColor }
+    })
+    for (const plate of plates) {
+      expect(plate.radius).toBe('10px')
+      expect(Number(plate.weight)).toBeGreaterThanOrEqual(700)
+      expect(plate.fill).toBe(totalStyle.fill)
+      expect(plate.borderTop).toBe('0px')
+    }
+    expect(totalStyle.radius).toBe('10px')
+    const lines = await card.evaluate((node) => [...node.querySelectorAll('section')].map((section) => {
+      const rows = [...section.querySelectorAll('.ev')]
+      return rows.map((row, index) => {
+        const style = getComputedStyle(row)
+        return {
+          top: style.borderTopWidth,
+          bottom: style.borderBottomWidth,
+          last: index === rows.length - 1,
+        }
+      })
+    }))
+    for (const section of lines) {
+      section.forEach((row, index) => {
+        expect(row.bottom).toBe('0px')
+        expect(row.top).toBe(index === 0 ? '0px' : '1px')
+      })
+    }
+    const wanted = ["0'", "16'", "15+4'"]
     const sample = facts.rows
       .filter((row) => wanted.includes(row.minute))
       .map((row) => ({ side: row.home ? 'home' : 'away', minute: row.minute, iconX: row.iconX }))
     console.log(`icon-x ${width}`, JSON.stringify(sample))
-    await card.screenshot({ path: `${shots}/match-feed-away-align-${width}.png` })
+    const clip = await card.evaluate((node) => {
+      const read = (row: Element) => {
+        const name = row.querySelector('b') as HTMLElement
+        const link = (name.querySelector('a, span') as HTMLElement | null) || name
+        const clipper = getComputedStyle(link).overflowX === 'hidden' ? link : name
+        const textNode = [...link.childNodes].find((child) => child.nodeType === Node.TEXT_NODE)
+        const text = textNode?.textContent || ''
+        const box = clipper.getBoundingClientRect()
+        if (!textNode || text.length < 8) return { text, overflow: false, startIn: true, endIn: true }
+        const start = document.createRange()
+        start.setStart(textNode, 0)
+        start.setEnd(textNode, 4)
+        const end = document.createRange()
+        end.setStart(textNode, text.length - 4)
+        end.setEnd(textNode, text.length)
+        const startBox = start.getBoundingClientRect()
+        const endBox = end.getBoundingClientRect()
+        return {
+          text,
+          overflow: clipper.scrollWidth > clipper.clientWidth + 1,
+          ltr: startBox.left < endBox.left,
+          startIn: startBox.left >= box.left - 1 && startBox.right <= box.right + 1,
+          endIn: endBox.left >= box.left - 1 && endBox.right <= box.right + 1 && endBox.right > box.left,
+        }
+      }
+      const home = node.querySelector('.ev.home b')?.closest('.ev')
+      const away = [...node.querySelectorAll('.ev.away')].find((row) => (row.textContent || '').includes('Жёлтый'))
+      return { home: home ? read(home) : null, away: away ? read(away) : null }
+    })
+    expect(clip.away?.ltr, `away name keeps reading order at ${width}`).toBe(true)
+    if (clip.away?.overflow) {
+      expect(clip.away.endIn, `away end visible at ${width}`).toBe(true)
+      expect(clip.away.startIn, `away start clipped at ${width}`).toBe(false)
+    }
+    expect(clip.home?.ltr, `home name keeps reading order at ${width}`).toBe(true)
+    if (clip.home?.overflow) {
+      expect(clip.home.startIn, `home start visible at ${width}`).toBe(true)
+      expect(clip.home.endIn, `home end clipped at ${width}`).toBe(false)
+    }
+    await card.screenshot({ path: `${shots}/match-feed-alisa-away-${width}.png` })
   }
 })
 
@@ -385,15 +470,23 @@ test('event feed shows loading, empty, and a retry that is at least 44px', async
   const card = page.locator('.card.events')
   await expect(card.getByText('Загрузка событий…')).toBeVisible()
   await expect(card.locator('.events-skel')).toHaveCount(5)
-  await card.screenshot({ path: `${shots}/match-feed-loading-375.png` })
+  await card.screenshot({ path: `${shots}/match-feed-alisa-loading-375.png` })
   release()
   await expect(card.getByText('Лебедев Кирилл')).toBeVisible()
 
-  await install(page, cardsMatch, 'empty')
+  await install(page, { ...cardsMatch, status: 'SCHEDULED', period: 1, homeScore: 0, awayScore: 0 }, 'empty')
   await page.goto(`/matches/${cardsMatch.id}`)
   await expect(card.getByText('Событий пока нет')).toBeVisible()
   await expect(card.getByText('Появятся после первого события матча')).toBeVisible()
-  await card.screenshot({ path: `${shots}/match-feed-empty-375.png` })
+  await expect(card.locator('header span')).toHaveText('– : –')
+  await expect(card.locator('.half')).toHaveCount(0)
+  await card.screenshot({ path: `${shots}/match-feed-alisa-empty-scheduled-375.png` })
+
+  await install(page, { ...cardsMatch, status: 'LIVE', period: 1, homeScore: 1, awayScore: 0 }, 'empty')
+  await page.goto(`/matches/${cardsMatch.id}`)
+  await expect(card.getByText('Событий пока нет')).toBeVisible()
+  await expect(card.locator('header span')).toHaveText('1 : 0')
+  await expect(card.locator('.half')).toHaveCount(0)
 
   await install(page, cardsMatch, 'error')
   await page.goto(`/matches/${cardsMatch.id}`)
@@ -402,7 +495,7 @@ test('event feed shows loading, empty, and a retry that is at least 44px', async
   const box = await retry.boundingBox()
   expect(box?.width ?? 0).toBeGreaterThanOrEqual(44)
   expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
-  await card.screenshot({ path: `${shots}/match-feed-error-375.png` })
+  await card.screenshot({ path: `${shots}/match-feed-alisa-error-375.png` })
   await install(page, cardsMatch, 'ok')
   await retry.click()
   await expect(card.getByText('Лебедев Кирилл')).toBeVisible()

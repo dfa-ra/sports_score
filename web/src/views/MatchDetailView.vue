@@ -1050,7 +1050,7 @@ onUnmounted(() => {
                 <div class="who">
                   <b>
                     <RouterLink v-if="feedTitleId(ev)" :to="`/players/${feedTitleId(ev)}`">{{ feedTitle(ev) }}</RouterLink>
-                    <template v-else>{{ feedTitle(ev) }}</template>
+                    <span v-else>{{ feedTitle(ev) }}</span>
                   </b>
                   <span v-if="feedDetail(ev)" class="assist">{{ feedDetail(ev) }}</span>
                 </div>
@@ -1732,12 +1732,15 @@ h2 a { color: inherit; }
   min-width: 0;
   min-height: 44px;
   box-sizing: border-box;
+  border-top: 0;
+  border-bottom: 0;
 }
-.card.events .ev.home.goal { grid-template-columns: 2.6rem 14px auto minmax(0, 1fr); grid-template-areas: "min mark run who"; }
-.card.events .ev.home:not(.goal) { grid-template-columns: 2.6rem 14px minmax(0, 1fr); grid-template-areas: "min mark who"; }
-.card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px 2.6rem; grid-template-areas: "who run mark min"; }
-.card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px 2.6rem; grid-template-areas: "who mark min"; }
-.card.events .min { grid-area: min; width: 2.6rem; max-width: 2.6rem; overflow: hidden; text-align: left; }
+.card.events .ev + .ev { border-top: 1px solid var(--line); }
+.card.events .ev.home.goal { grid-template-columns: 3rem 14px auto minmax(0, 1fr); grid-template-areas: "min mark run who"; }
+.card.events .ev.home:not(.goal) { grid-template-columns: 3rem 14px minmax(0, 1fr); grid-template-areas: "min mark who"; }
+.card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px 3rem; grid-template-areas: "who run mark min"; }
+.card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px 3rem; grid-template-areas: "who mark min"; }
+.card.events .min { grid-area: min; width: 3rem; max-width: 3rem; overflow: hidden; text-align: left; padding: 0; }
 .card.events .mark { grid-area: mark; width: 14px; height: 14px; min-width: 14px; min-height: 14px; flex-shrink: 0; justify-self: center; }
 .card.events .run { grid-area: run; }
 .card.events .who { grid-area: who; }
@@ -1768,6 +1771,20 @@ h2 a { color: inherit; }
 .card.events .ev b a {
   color: inherit;
   text-decoration: none;
+}
+.card.events .ev.away .who b {
+  direction: rtl;
+  text-align: right;
+}
+.card.events .ev.away .who b a,
+.card.events .ev.away .who b > span {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline;
+  width: auto;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
 }
 .card.events .assist {
   min-width: 0;
@@ -1806,13 +1823,18 @@ h2 a { color: inherit; }
 .events-retry { min-width: 44px; min-height: 44px; }
 .empty-hint { margin: 0; padding: 0 0 4px; }
 .run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
+.card.events .half,
 .total {
   margin-top: 0.35rem;
   background: #eef5fb;
-  border-radius: 12px;
+  border-radius: 10px;
+  border-top: 0;
   padding: 0.55rem 0.7rem;
 }
-.total b { color: var(--navy); font-variant-numeric: tabular-nums; }
+.card.events .half span,
+.total span,
+.total b { color: var(--navy); font-weight: 800; }
+.total b { font-variant-numeric: tabular-nums; }
 .rail { display: grid; gap: 0.75rem; }
 .form-row, .about dl div {
   display: grid;
@@ -1979,7 +2001,16 @@ h2 a { color: inherit; }
   .card header { height: 36px; }
   .card header b { font-size: 15px; line-height: 20px; font-weight: 800; text-transform: none; }
   .card header span { font-size: 14px; font-weight: 700; }
-  .half { height: 36px; padding: 0; font-size: 13.5px; font-weight: 600; }
+  .half {
+    height: 40px;
+    margin-top: 4px;
+    border-radius: 10px;
+    border-top: 0;
+    padding: 0 10px;
+    background: #eef5fc;
+    font-size: 13.5px;
+    font-weight: 800;
+  }
   .card.events .ev {
     box-sizing: border-box;
     height: auto;
@@ -2002,7 +2033,8 @@ h2 a { color: inherit; }
   .card.events .ev .min { font-size: 12px; font-weight: 600; }
   .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
   .card.events .run { font-size: 13px; font-weight: 800; }
-  .total { height: 40px; margin-top: 4px; border-radius: 10px; padding: 0 10px; background: #eef5fc; }
+  .card.events .half,
+  .total { height: 40px; margin-top: 4px; border-radius: 10px; border-top: 0; padding: 0 10px; background: #eef5fc; font-weight: 800; }
   .form-row { padding: 4px 0; }
   .form-row :deep(.team-crest) { width: 22px !important; height: 22px !important; }
   .form-row b { font-size: 14px; font-weight: 800; }
@@ -2033,13 +2065,30 @@ h2 a { color: inherit; }
     text-align: right;
   }
   .card.events .ev.away .who b,
-  .card.events .ev.away .who b a,
   .card.events .ev.away .who .assist {
     display: block;
     width: max-content;
     max-width: 100%;
     margin-left: auto;
     text-align: right;
+  }
+  .card.events .ev.away .who b {
+    direction: rtl;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .card.events .ev.away .who b a,
+  .card.events .ev.away .who b > span {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline;
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
   }
   .card.events .ev .assist { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 }
