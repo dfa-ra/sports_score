@@ -279,7 +279,7 @@ function clearQuery() {
 }
 
 onMounted(() => {
-  setPageMeta({ title: 'Игроки', description: 'Игроки Лиги ИТМО.' })
+  setPageMeta({ title: 'Игроки', description: 'Лига ИТМО: поиск игроков' })
   void teams.load()
   void loadChips()
   void loadBoard()

@@ -199,7 +199,7 @@ function barWidth(row: TourRow) {
 }
 
 onMounted(() => {
-  setPageMeta({ title: 'Турниры', description: 'Турниры Лиги ИТМО: сезон и формат.' })
+  setPageMeta({ title: 'Турниры', description: 'Лига ИТМО: турниры, сезон и формат' })
   void load()
 })
 </script>

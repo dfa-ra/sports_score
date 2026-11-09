@@ -26,9 +26,10 @@ async function load() {
     if (String(route.params.id || '') !== id) return
     card.value = data
     const name = playerHeader(data).title
+    const team = String(data.team?.name || '').trim()
     setPageMeta({
       title: name,
-      description: `${name} — игрок Лиги ИТМО.`,
+      description: team ? `Игрок Лиги ИТМО: ${name}, ${team}` : `Игрок Лиги ИТМО: ${name}`,
       path: `/players/${id}`,
     })
   } catch (error: any) {

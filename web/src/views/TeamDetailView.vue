@@ -87,7 +87,7 @@ watch(() => route.fullPath, () => {
     if (team.value?.name !== name || String(route.params.id || '') !== id) return
     setPageMeta({
       title: name,
-      description: `${name} — состав и матчи Лиги ИТМО.`,
+      description: `Лига ИТМО: ${name}`,
       path: `/teams/${id}`,
     })
   })
@@ -109,7 +109,7 @@ async function load() {
     const title = t.data?.name || 'Команда'
     const publish = () => setPageMeta({
       title,
-      description: `${title} — состав и матчи Лиги ИТМО.`,
+      description: `Лига ИТМО: ${title}`,
       path: `/teams/${id}`,
     })
     publish()

@@ -384,7 +384,7 @@ function publishTournamentTitle(name?: string | null, id?: string) {
     if ((tournament.value?.name || '').trim() !== title) return
     setPageMeta({
       title,
-      description: `${title} — таблица и матчи Лиги ИТМО.`,
+      description: `Лига ИТМО: ${title}`,
       path,
     })
   }
