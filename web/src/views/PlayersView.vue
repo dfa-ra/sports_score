@@ -551,16 +551,23 @@ onMounted(() => {
 }
 .leader-row .club {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  width: 100%;
   max-width: 100%;
   font-size: 12px;
   line-height: 1.2;
   white-space: normal;
 }
-.leader-row .club :deep(.team-crest) { flex: 0 0 auto; }
-.club :deep(.team-crest),
-.club-name { line-height: 1.2; }
-.club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.club :deep(.team-crest) {
+  flex-shrink: 0;
+  line-height: 1;
+}
+.club :deep(.team-crest--fallback) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 .leader-row .club-name {
   white-space: normal;
   overflow: visible;
@@ -808,7 +815,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .stat-m, .stat-side { display: none; }
   .line .stat-main { font-size: 15px; font-weight: 800; }
   .row-who { gap: 8px; min-width: 0; }
-  .line .name-team { flex-direction: row; align-items: center; gap: 6px; min-width: 0; }
+  .line .name-team { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
   .line .player-name {
     max-width: 132px;
     font-size: 14px;
@@ -818,7 +825,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .line .club { max-width: 82px; font-size: 11px; line-height: 14px; }
+  .line .club { display: inline-flex; align-items: center; max-width: 82px; font-size: 11px; line-height: 14px; }
   .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
   .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
   .place { font-size: 13px; font-weight: 700; }
