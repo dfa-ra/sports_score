@@ -27,4 +27,39 @@ esac
 echo "---- flyway log lines ----"
 docker logs --since 30m "${BACKEND}" 2>&1 | grep -E 'Flyway|Migrating schema|Successfully applied|is up to date|version "46' | grep -v -i -E 'password|jdbc:' || true
 
+UPLOAD_SRC="$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/data/uploads"}}{{.Source}}{{end}}{{end}}' "${BACKEND}")"
+meta_line() {
+  local path="$1"
+  local label="$2"
+  if [[ -z "${path}" ]]; then
+    echo "${label}=absent"
+    return 0
+  fi
+  case "${path}" in
+    /media | /media/*)
+      echo "${label}=under-/media-not-stat"
+      return 0
+      ;;
+  esac
+  if [[ ! -d "${path}" ]]; then
+    echo "${label}=missing"
+    return 0
+  fi
+  stat -c "${label} inode=%i mtime=%Y ctime=%Z" "${path}"
+}
+BEFORE_FILE="$(ls -d /opt/studentleague/backups/pre-v0.2.65-*-kirov | head -n 1)/storage-stat-before.txt"
+{
+  meta_line "${UPLOAD_SRC}" uploads
+  meta_line /media media
+} > /tmp/storage-stat-after.txt
+echo "---- storage stat before ----"
+cat "${BEFORE_FILE}"
+echo "---- storage stat after ----"
+cat /tmp/storage-stat-after.txt
+if ! cmp -s "${BEFORE_FILE}" /tmp/storage-stat-after.txt; then
+  echo "uploads or /media metadata changed since the pre-release backup"
+  exit 1
+fi
+rm -f /tmp/storage-stat-after.txt
+echo "media_and_uploads_unchanged_since_backup=yes"
 echo "FLYWAY_CHECK_OK"
