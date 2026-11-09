@@ -5,6 +5,7 @@ import api from '../api/client'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import ScrollFade from '../components/ScrollFade.vue'
 import TeamCrest from '../components/TeamCrest.vue'
+import portrait from '../assets/avatar-placeholder.svg'
 import { BRAND_MARK_SRC } from '../lib/brand'
 import { setPageMeta } from '../lib/pageMeta'
 import { isPublicStatus, pageContent } from '../lib/q2Tournaments'
@@ -179,6 +180,12 @@ async function pool<T>(list: T[], limitSize: number, job: (item: T) => Promise<v
   await Promise.all(Array.from({ length: width }, () => worker()))
 }
 
+function localPortrait(src?: string | null) {
+  const value = (src ?? '').trim()
+  if (value.includes('api.dicebear.com')) return portrait
+  return value
+}
+
 function hitsFrom(content: Person[], kept: Map<string, Hit>): Hit[] {
   const board = new Map<string, Person>()
   for (const row of [...scorers.value, ...assists.value]) {
@@ -322,7 +329,7 @@ onMounted(() => {
       <div v-else class="sheet">
         <p class="found">Найдено · {{ searchTotal }}</p>
         <RouterLink v-for="hit in hits" :key="hit.id" class="hit" :to="`/players/${hit.id}`">
-          <PlayerAvatar :src="hit.avatarUrl" :first-name="hit.firstName" :last-name="hit.lastName" :name="hit.name" :size="36" />
+          <PlayerAvatar :src="localPortrait(hit.avatarUrl)" :first-name="hit.firstName" :last-name="hit.lastName" :name="hit.name" :size="36" />
           <span class="who name-team">
             <span class="player-name">
               <template v-for="(part, index) in highlightParts(hit.name, query)" :key="index">
@@ -357,7 +364,7 @@ onMounted(() => {
         <article class="leader">
           <p>Бомбардир</p>
           <div v-if="scorer" class="leader-row">
-            <PlayerAvatar :src="scorer.avatarUrl" :first-name="scorer.firstName" :last-name="scorer.lastName" :name="nameOf(scorer)" :size="40" />
+            <PlayerAvatar :src="localPortrait(scorer.avatarUrl)" :first-name="scorer.firstName" :last-name="scorer.lastName" :name="nameOf(scorer)" :size="40" />
             <span class="who name-team">
               <RouterLink :to="`/players/${scorer.playerId}`">{{ nameOf(scorer) }}</RouterLink>
               <span v-if="teamName(scorer.teamId)" class="club">
@@ -371,7 +378,7 @@ onMounted(() => {
         <article class="leader">
           <p>Лучший по передачам</p>
           <div v-if="assist" class="leader-row">
-            <PlayerAvatar :src="assist.avatarUrl" :first-name="assist.firstName" :last-name="assist.lastName" :name="nameOf(assist)" :size="40" />
+            <PlayerAvatar :src="localPortrait(assist.avatarUrl)" :first-name="assist.firstName" :last-name="assist.lastName" :name="nameOf(assist)" :size="40" />
             <span class="who name-team">
               <RouterLink :to="`/players/${assist.playerId}`">{{ nameOf(assist) }}</RouterLink>
               <span v-if="teamName(assist.teamId)" class="club">
@@ -427,7 +434,7 @@ onMounted(() => {
           <RouterLink v-for="(row, index) in tableRows" :key="row.playerId || index" class="cols line" :to="`/players/${row.playerId}`">
             <span class="place">{{ index + 1 }}</span>
             <span class="who row-who">
-              <PlayerAvatar :src="row.avatarUrl" :first-name="row.firstName" :last-name="row.lastName" :name="nameOf(row)" :size="32" />
+              <PlayerAvatar :src="localPortrait(row.avatarUrl)" :first-name="row.firstName" :last-name="row.lastName" :name="nameOf(row)" :size="32" />
               <span class="name-team">
                 <span class="player-name">{{ nameOf(row) }}</span>
                 <span v-if="teamName(row.teamId) || row.teamLogoUrl" class="club">
