@@ -140,76 +140,79 @@ async function install(page: Page) {
   })
 }
 
-test('overview events keep one row and a pinned score at 1280 and 375', async ({ page }) => {
+test('overview mirror feed keeps minutes, icons, and one column', async ({ page }) => {
   mkdirSync('/opt/cursor/artifacts', { recursive: true })
   await install(page)
   await page.goto(`/matches/${matchId}`)
   const card = page.locator('.card.events')
   await expect(card.getByText('События')).toBeVisible()
+  await expect(card.getByText('1-Й ТАЙМ')).toBeVisible()
+  await expect(card.getByText('2-Й ТАЙМ')).toBeVisible()
+  await expect(card.getByText('ИТОГ')).toBeVisible()
+  await expect(card.locator('.half').nth(0)).toContainText('1 : 0')
+  await expect(card.locator('.half').nth(1)).toContainText('0 : 1')
+  await expect(card.locator('.total b')).toHaveText('1 : 1')
+  await expect(card.getByText('Начало тайма')).toHaveCount(0)
+  await expect(card.getByText('Конец тайма')).toHaveCount(0)
   await expect(card.getByText(homeScorer)).toBeVisible()
   await expect(card.getByText(`передача · #8 ${homeAssist}`)).toBeVisible()
   await expect(card.getByText(`передача · ${awayAssist}`)).toBeVisible()
 
   const shots: Array<[number, string]> = [
-    [1280, '/opt/cursor/artifacts/q2-match-events-1280.png'],
-    [375, '/opt/cursor/artifacts/q2-match-events-375.png'],
+    [1440, '/opt/cursor/artifacts/match-feed-mirror-1440.png'],
+    [375, '/opt/cursor/artifacts/match-feed-mirror-375.png'],
+    [320, '/opt/cursor/artifacts/match-feed-mirror-320.png'],
   ]
-  const scoreInset: number[] = []
   for (const [width, shot] of shots) {
-    await page.setViewportSize({ width, height: width === 375 ? 900 : 1000 })
+    await page.setViewportSize({ width, height: width >= 720 ? 1000 : 900 })
     await card.scrollIntoViewIfNeeded()
     const facts = await card.evaluate((node) => {
-      const cardBox = node.getBoundingClientRect()
-      const pad = parseFloat(getComputedStyle(node).paddingRight) || 0
-      const edge = cardBox.right - pad
       const rows = [...node.querySelectorAll('.ev')].map((row) => {
         const who = row.querySelector('.who') as HTMLElement
         const scorer = row.querySelector('b') as HTMLElement
         const assist = row.querySelector('.assist') as HTMLElement | null
         const minute = row.querySelector('.min') as HTMLElement
-        const score = row.querySelector('.run') as HTMLElement
+        const score = row.querySelector('.run') as HTMLElement | null
         const box = (el: HTMLElement) => el.getBoundingClientRect()
         const scorerBox = box(scorer)
-        const scoreBox = box(score)
         const minuteBox = box(minute)
         const rowBox = box(row as HTMLElement)
-        const assistStyle = assist ? getComputedStyle(assist) : null
-        const scorerStyle = getComputedStyle(scorer)
+        const icon = row.querySelector('.mark') as HTMLElement
+        const iconBox = box(icon)
+        const scoreBox = score ? box(score) : null
+        const minuteStyle = getComputedStyle(minute)
+        const iconStyle = getComputedStyle(icon)
         return {
           home: row.classList.contains('home'),
+          goal: row.classList.contains('goal'),
           textAlign: getComputedStyle(who).textAlign,
           minute: minute.textContent?.trim() || '',
           scorer: scorer.textContent?.trim() || '',
           assist: assist?.textContent?.trim() || '',
-          markClass: (row.querySelector('.mark') as HTMLElement | null)?.className || '',
-          markBox: (() => {
-            const icon = row.querySelector('.mark') as HTMLElement | null
-            if (!icon) return { w: 0, h: 0, top: 0, bottom: 0, left: 0, right: 0 }
-            const box = icon.getBoundingClientRect()
-            return { w: box.width, h: box.height, top: box.top, bottom: box.bottom, left: box.left, right: box.right }
-          })(),
-          assistSize: assistStyle?.fontSize || '',
-          score: score.textContent?.trim() || '',
+          markClass: icon.className,
+          markW: iconBox.width,
+          markH: iconBox.height,
+          minuteShrink: minuteStyle.flexShrink,
+          iconShrink: iconStyle.flexShrink,
+          rowHeight: rowBox.height,
           scorerTop: scorerBox.top,
           scorerBottom: scorerBox.bottom,
-          scorerHeight: scorerBox.height,
-          scorerLine: parseFloat(scorerStyle.fontSize) || 14,
+          scorerLeft: scorerBox.left,
+          scorerRight: scorerBox.right,
           scorerOverflow: scorer.scrollWidth > scorer.clientWidth + 1,
           assistTop: assist ? box(assist).top : null,
           assistLeft: assist ? box(assist).left : null,
           assistRight: assist ? box(assist).right : null,
-          scorerLeft: scorerBox.left,
-          scorerRight: scorerBox.right,
           minuteLeft: minuteBox.left,
           minuteRight: minuteBox.right,
-          scoreTop: scoreBox.top,
-          scoreBottom: scoreBox.bottom,
-          scoreLeft: scoreBox.left,
-          scoreRight: scoreBox.right,
-          rowTop: rowBox.top,
-          rowBottom: rowBox.bottom,
+          markLeft: iconBox.left,
+          markRight: iconBox.right,
+          scoreLeft: scoreBox?.left ?? null,
+          scoreRight: scoreBox?.right ?? null,
+          score: score?.textContent?.trim() || '',
+          rowRight: rowBox.right,
           rowWidth: rowBox.width,
-          inset: Math.abs(edge - scoreBox.right),
+          parens: (row.textContent || '').includes('('),
         }
       })
       return {
@@ -222,34 +225,43 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
     expect(facts.cardOverflow, `events scroll at ${width}`).toBeLessThanOrEqual(1)
     expect(facts.rows).toHaveLength(4)
     for (const row of facts.rows) {
-      expect(row.inset, `${row.scorer} score inset at ${width}`).toBeLessThanOrEqual(2)
-      expect(row.scoreTop).toBeGreaterThanOrEqual(row.rowTop - 1)
-      expect(row.scoreBottom).toBeLessThanOrEqual(row.rowBottom + 1)
-      expect(row.scoreTop).toBeLessThan(row.scorerBottom)
-      if (width > 720) expect(row.scorerHeight).toBeGreaterThan(row.scorerLine * 1.4)
-      else expect(row.scorerOverflow).toBe(false)
+      expect(row.rowHeight, `${row.scorer} height at ${width}`).toBeGreaterThanOrEqual(44)
       expect(row.rowWidth).toBeLessThanOrEqual(width)
-      const markMid = (row.markBox.top + row.markBox.bottom) / 2
-      expect(row.markBox.w).toBeGreaterThanOrEqual(13)
-      expect(row.markBox.h).toBeGreaterThanOrEqual(13)
-      expect(markMid).toBeGreaterThanOrEqual(row.scorerTop - 1)
-      expect(markMid).toBeLessThanOrEqual(row.scorerBottom + 1)
+      expect(row.markW).toBeGreaterThanOrEqual(13.5)
+      expect(row.markW).toBeLessThanOrEqual(14.5)
+      expect(row.markH).toBeGreaterThanOrEqual(13.5)
+      expect(row.markH).toBeLessThanOrEqual(14.5)
+      expect(row.parens).toBe(false)
       if (row.home) {
         expect(row.textAlign).toBe('left')
-        expect(row.minuteRight).toBeLessThanOrEqual(row.markBox.left + 1)
-        expect(row.markBox.right).toBeLessThanOrEqual(row.scorerLeft + 1)
+        expect(row.minuteRight).toBeLessThanOrEqual(row.markLeft + 1)
+        if (row.goal) {
+          expect(row.scoreLeft).not.toBeNull()
+          expect(row.markRight).toBeLessThanOrEqual((row.scoreLeft ?? 0) + 1)
+          expect((row.scoreRight ?? 0)).toBeLessThanOrEqual(row.scorerLeft + 1)
+        } else {
+          expect(row.markRight).toBeLessThanOrEqual(row.scorerLeft + 1)
+        }
       } else {
         expect(row.textAlign).toBe('right')
-        expect(row.scorerRight).toBeLessThanOrEqual(row.markBox.left + 1)
-        expect(row.markBox.right).toBeLessThanOrEqual(row.minuteLeft + 1)
-        expect(row.scoreLeft).toBeGreaterThanOrEqual(row.minuteRight - 1)
+        expect(row.markRight).toBeLessThanOrEqual(row.minuteLeft + 1)
+        expect(row.minuteRight).toBeGreaterThanOrEqual(row.rowRight - 2)
+        if (row.goal) {
+          expect((row.scoreRight ?? 0)).toBeLessThanOrEqual(row.markLeft + 1)
+          expect(row.scorerRight).toBeLessThanOrEqual((row.scoreLeft ?? 0) + 1)
+        } else {
+          expect(row.scorerRight).toBeLessThanOrEqual(row.markLeft + 1)
+        }
       }
       if (row.assist) {
-        expect(row.assistSize).toBe(width <= 720 ? '11px' : '12px')
-        expect(row.assistTop!).toBeGreaterThanOrEqual(row.scorerBottom - 2)
-        expect(row.scoreTop).toBeLessThan(row.assistTop!)
-        if (row.home) expect(Math.abs(row.assistLeft! - row.scorerLeft)).toBeLessThanOrEqual(2)
-        else expect(Math.abs(row.assistRight! - row.scorerRight)).toBeLessThanOrEqual(2)
+        if (width >= 720) {
+          expect(row.assistTop!).toBeLessThanOrEqual(row.scorerBottom + 1)
+          expect(row.assistTop!).toBeGreaterThanOrEqual(row.scorerTop - 2)
+          if (row.home) expect(row.assistLeft!).toBeGreaterThanOrEqual(row.scorerRight - 2)
+          else expect(row.assistRight!).toBeLessThanOrEqual(row.scorerLeft + 2)
+        } else {
+          expect(row.assistTop!).toBeGreaterThanOrEqual(row.scorerBottom - 2)
+        }
       }
     }
     const goal = facts.rows[0]
@@ -262,7 +274,6 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
     expect(awayGoal.minute).toBe("23'")
     expect(awayGoal.score).toBe('1 : 1')
     expect(awayGoal.assist).toBe(`передача · ${awayAssist}`)
-    expect(awayGoal.assist.includes('#')).toBe(false)
     expect(cardRow.minute).toBe("30'")
     expect(cardRow.score).toBe('')
     expect(cardRow.assist).toBe('Жёлтая')
@@ -270,12 +281,17 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
     expect(cardRow.scorer).toContain(cardPlayer)
     expect(goal.markClass).toContain('goal')
     expect(sub.markClass).toContain('substitution')
-    expect(sub.assist).toBe(`Замена → #19 ${subIn}`)
-    expect(sub.scorer).toContain(subOut)
-    scoreInset.push(facts.rows[0].inset)
+    expect(sub.scorer).toContain(subIn)
+    expect(sub.assist).toBe(`Замена · ${subOut}`)
+    if (width < 720) {
+      const clip = await card.locator('.ev').first().locator('b').evaluate((el) => {
+        const style = getComputedStyle(el)
+        return { whiteSpace: style.whiteSpace, overflow: style.overflowX, textOverflow: style.textOverflow }
+      })
+      expect(clip).toEqual({ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' })
+    }
     await card.screenshot({ path: shot })
   }
-  expect(Math.abs(scoreInset[0] - scoreInset[1])).toBeLessThanOrEqual(1)
   await page.getByRole('button', { name: 'Протокол' }).click()
   const protocolCard = page.locator('.timeline li', { hasText: cardPlayer })
   await expect(protocolCard.locator('strong')).toHaveText('Жёлтая')

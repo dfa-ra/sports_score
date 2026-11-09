@@ -8,7 +8,7 @@ import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, isOwnGoal, labelOf, periodLabel, playerTag, statusLabel } from '../lib/format'
 import { registeredName } from '../lib/playerTitle'
-import { buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
+import { buildMirrorFeed, compareMatchEvents, eventMinute, eventOnHomeSide, feedMinuteLabel, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
@@ -46,6 +46,7 @@ const formError = ref(false)
 const formReady = ref(false)
 const tournament = ref<any>(null)
 const loading = ref(true)
+const eventsState = ref<'loading' | 'ready' | 'error'>('loading')
 const me = ref<any>(null)
 const users = ref<any[]>([])
 const refereeId = ref('')
@@ -115,13 +116,53 @@ const tournamentTitle = computed(() => tournament.value?.name || match.value?.to
 const protocolMinuteMax = computed(() =>
   protocolMinuteLimit(match.value?.periodLengthSeconds, match.value?.periodCount),
 )
+const mirrorFeed = computed(() => {
+  if (!match.value) return { blocks: [] as ReturnType<typeof buildMirrorFeed>['blocks'], total: '0-0' }
+  return buildMirrorFeed(events.value, match.value)
+})
 const periodBlocks = computed(() => {
   if (!match.value) return []
-  return buildPeriodBlocks(events.value, match.value).map((block) => ({
+  return mirrorFeed.value.blocks.map((block) => ({
     ...block,
-    label: periodLabel(block.period, match.value.sportCode, match.value.periodCount),
+    label: periodLabel(block.period, match.value.sportCode, match.value.periodCount).toLocaleUpperCase('ru-RU'),
   }))
 })
+const feedTotal = computed(() => blockScore(mirrorFeed.value.total))
+
+function feedPlayer(ev: any, role: 'primary' | 'secondary' = 'primary') {
+  const jersey = role === 'secondary' ? ev.secondaryPlayerJersey : ev.playerJersey
+  return playerTag(registeredName(ev, role), jersey)
+}
+
+function feedTitle(ev: any) {
+  if (ev.eventType === 'SUBSTITUTION') {
+    return feedPlayer(ev, 'secondary') || labelOf(eventLabel, ev.eventType)
+  }
+  return feedPlayer(ev) || labelOf(eventLabel, ev.eventType)
+}
+
+function feedTitleId(ev: any) {
+  if (ev.eventType === 'SUBSTITUTION') return ev.secondaryPlayerId || ''
+  return ev.playerId || ''
+}
+
+function feedDetail(ev: any) {
+  if (isOwnGoal(ev)) return 'автогол'
+  if (ev.eventType === 'GOAL') {
+    const assist = feedPlayer(ev, 'secondary')
+    return assist ? `передача · ${assist}` : ''
+  }
+  if (ev.eventType === 'YELLOW_CARD' || ev.eventType === 'RED_CARD') {
+    return feedPlayer(ev) ? labelOf(eventLabel, ev.eventType) : ''
+  }
+  if (ev.eventType === 'SUBSTITUTION') {
+    const outgoing = feedPlayer(ev)
+    const incoming = feedPlayer(ev, 'secondary')
+    if (!outgoing) return ''
+    return incoming ? `Замена · ${outgoing}` : outgoing
+  }
+  return ''
+}
 
 function shownMinute(ev: { eventType?: string | null; gameTime?: number | null; period?: number | null }) {
   return protocolMinuteOf(ev, match.value?.periodLengthSeconds)
@@ -303,23 +344,38 @@ function describeMatch(homeName: string, awayName: string) {
   return `${base}, счёт ${Number(match.value?.homeScore ?? 0)}:${Number(match.value?.awayScore ?? 0)}`
 }
 
+async function loadEvents(id: string, quiet = false) {
+  if (!quiet) eventsState.value = 'loading'
+  try {
+    const { data } = await api.get(`/matches/${id}/events`)
+    if (String(route.params.id || '') !== id) return
+    events.value = Array.isArray(data) ? data : []
+    syncDrafts()
+    eventsState.value = 'ready'
+  } catch {
+    if (String(route.params.id || '') !== id) return
+    if (!quiet || eventsState.value !== 'ready') eventsState.value = 'error'
+  }
+}
+
 let pageTicket = 0
 async function load() {
   const ticket = ++pageTicket
   const id = String(route.params.id || '')
   missing.value = false
   if (!match.value) loading.value = true
+  void loadEvents(id)
   try {
   const directory = teams.load()
-  const [m, e, r, l] = await Promise.all([
+  const [m, r, l] = await Promise.all([
     api.get(`/matches/${id}`),
-    api.get(`/matches/${id}/events`),
     api.get(`/matches/${id}/referees`),
     api.get(`/matches/${id}/lineups`),
     directory,
   ])
   if (ticket !== pageTicket || String(route.params.id || '') !== id) return
   match.value = m.data
+  syncDrafts()
   error.value = ''
   const homeName = teams.fullName(m.data.homeTeamId)
   const awayName = teams.fullName(m.data.awayTeamId)
@@ -333,8 +389,6 @@ async function load() {
   motmPlayerId.value = m.data.playerOfTheMatch?.playerId || ''
   homeKeeperId.value = m.data.homeGoalkeeper?.playerId || ''
   awayKeeperId.value = m.data.awayGoalkeeper?.playerId || ''
-  events.value = e.data
-  syncDrafts()
   referees.value = r.data
   lineups.value = l.data
   if (!protocolTeamId.value) protocolTeamId.value = m.data.homeTeamId
@@ -460,26 +514,17 @@ function blockScore(value?: string | null) {
   return `${parts[0]} : ${parts[1]}`
 }
 
-function eventSignature(list: any[]) {
-  return list.map((ev) => `${ev.id}:${ev.voided}:${ev.gameTime}:${ev.playerId ?? ''}:${ev.secondaryPlayerId ?? ''}`).join('|')
-}
-
 async function refreshLive() {
   if (pending.value || !route.params.id) return
   const id = String(route.params.id || '')
-  const [m, e] = await Promise.all([
+  const [m] = await Promise.all([
     api.get(`/matches/${id}`),
-    api.get(`/matches/${id}/events`),
+    loadEvents(id, true),
   ])
   if (String(route.params.id || '') !== id) return
   const needsForm = !formReady.value && !formError.value && !formPending
   match.value = { ...match.value, ...m.data }
   if (needsForm) void loadForms(match.value?.homeTeamId, match.value?.awayTeamId)
-  const next = e.data ?? []
-  if (eventSignature(next) !== eventSignature(events.value)) {
-    events.value = next
-    syncDrafts()
-  }
   error.value = ''
 }
 
@@ -714,7 +759,7 @@ onMounted(async () => {
         const live = JSON.parse(message.body)
         mergeLive(live)
         if (live.type === 'PERIOD_CHANGED' || live.type === 'MATCH_STARTED') {
-          api.get(`/matches/${route.params.id}/events`).then(({ data }) => { events.value = data })
+          void loadEvents(String(route.params.id || ''), true)
         }
       })
     },
@@ -980,30 +1025,38 @@ onUnmounted(() => {
         />
         <section class="card events">
           <header><b>События</b><span>{{ heroScore }}</span></header>
-          <p v-if="!periodBlocks.length" class="muted empty-events">Событий пока нет</p>
+          <div v-if="eventsState === 'loading'" class="events-pending" role="status">
+            <span v-for="n in 5" :key="n" class="events-skel" />
+            <p>Загрузка событий…</p>
+          </div>
+          <div v-else-if="eventsState === 'error'" class="events-error">
+            <p>Не удалось загрузить события</p>
+            <button class="btn secondary events-retry" type="button" @click="loadEvents(String(match.id))">Повторить</button>
+          </div>
+          <template v-else-if="!periodBlocks.length">
+            <p class="empty-events">Событий пока нет</p>
+            <p class="muted empty-hint">Появятся после первого события матча</p>
+          </template>
           <template v-else>
             <section v-for="block in periodBlocks" :key="block.period">
               <div class="half">
                 <span>{{ block.label }}</span>
                 <span>{{ blockScore(block.score) }}</span>
               </div>
-              <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { 'goal-enter': freshGoal(ev) }]">
-                <em class="min">{{ shownMinute(ev) != null ? `${shownMinute(ev)}'` : '' }}</em>
+              <div v-for="ev in block.items" :key="ev.id" class="ev" :class="[ev.home ? 'home' : 'away', { goal: !!ev.scoreline, 'goal-enter': freshGoal(ev) }]">
+                <em class="min">{{ feedMinuteLabel(ev, match.periodLengthSeconds) }}</em>
                 <i class="mark" :class="ev.eventType.toLowerCase()" />
+                <span v-if="ev.scoreline" class="run">{{ blockScore(ev.scoreline) }}</span>
                 <div class="who">
                   <b>
-                    <RouterLink v-if="ev.playerId" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</RouterLink>
-                    <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
+                    <RouterLink v-if="feedTitleId(ev)" :to="`/players/${feedTitleId(ev)}`">{{ feedTitle(ev) }}</RouterLink>
+                    <span v-else>{{ feedTitle(ev) }}</span>
                   </b>
-                  <span v-if="isOwnGoal(ev)" class="assist">Автогол</span>
-                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')" class="assist">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
-                  <span v-else-if="(ev.eventType === 'YELLOW_CARD' || ev.eventType === 'RED_CARD') && playerTag(registeredName(ev), ev.playerJersey)" class="assist">{{ labelOf(eventLabel, ev.eventType) }}</span>
-                  <span v-else-if="ev.eventType === 'SUBSTITUTION' && (playerTag(registeredName(ev), ev.playerJersey) || registeredName(ev, 'secondary'))" class="assist">{{ labelOf(eventLabel, ev.eventType) }}<template v-if="registeredName(ev, 'secondary')"> → {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</template></span>
+                  <span v-if="feedDetail(ev)" class="assist">{{ feedDetail(ev) }}</span>
                 </div>
-                <span class="run">{{ ev.scoreline ? blockScore(ev.scoreline) : '' }}</span>
               </div>
             </section>
-            <div class="total"><span>Итог</span><b>{{ heroScore }}</b></div>
+            <div class="total"><span>ИТОГ</span><b>{{ feedTotal }}</b></div>
           </template>
         </section>
       </div>
@@ -1672,59 +1725,116 @@ h2 a { color: inherit; }
 .half, .ev { border-top: 1px solid var(--line); padding: 0.45rem 0; }
 .card.events .ev {
   display: grid;
-  grid-template-columns: 2.6rem 14px minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.5rem;
-  row-gap: 0.05rem;
+  column-gap: 8px;
+  row-gap: 0;
   width: 100%;
   min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border-top: 0;
+  border-bottom: 0;
 }
-.card.events .ev.away { grid-template-columns: minmax(0, 1fr) 14px 2.6rem auto; }
-.card.events .min { grid-column: 1; grid-row: 1; }
-.card.events .mark { grid-column: 2; grid-row: 1; justify-self: center; }
-.card.events .ev b { grid-column: 3; grid-row: 1; }
-.card.events .assist { grid-column: 3; grid-row: 2; }
-.card.events .run { grid-column: 4; grid-row: 1; }
-.card.events .ev.away b,
-.card.events .ev.away .assist { grid-column: 1; text-align: right; }
-.card.events .ev.away .min { grid-column: 3; text-align: right; }
-.card.events .ev .who { display: contents; text-align: left; }
-.card.events .ev.away .who { text-align: right; }
+.card.events .ev + .ev { border-top: 1px solid var(--line); }
+.card.events .ev.home.goal { grid-template-columns: 3rem 14px auto minmax(0, 1fr); grid-template-areas: "min mark run who"; }
+.card.events .ev.home:not(.goal) { grid-template-columns: 3rem 14px minmax(0, 1fr); grid-template-areas: "min mark who"; }
+.card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px 3rem; grid-template-areas: "who run mark min"; }
+.card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px 3rem; grid-template-areas: "who mark min"; }
+.card.events .min { grid-area: min; width: 3rem; max-width: 3rem; overflow: hidden; text-align: left; padding: 0; }
+.card.events .mark { grid-area: mark; width: 14px; height: 14px; min-width: 14px; min-height: 14px; flex-shrink: 0; justify-self: center; }
+.card.events .run { grid-area: run; }
+.card.events .who { grid-area: who; }
+.card.events .ev .who {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  text-align: left;
+}
+.card.events .ev.away .who { flex-direction: row-reverse; justify-content: flex-start; text-align: right; }
+.card.events .ev.away .min { text-align: right; }
 .card.events .ev .min {
   font-style: normal;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .card.events .ev b {
   display: block;
   min-width: 0;
   font-weight: 800;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.card.events .ev b a { overflow-wrap: anywhere; }
+.card.events .ev b a {
+  color: inherit;
+  text-decoration: none;
+}
+.card.events .ev.away .who b {
+  direction: rtl;
+  text-align: right;
+}
+.card.events .ev.away .who b a,
+.card.events .ev.away .who b > span {
+  direction: ltr;
+  unicode-bidi: isolate;
+  display: inline;
+  width: auto;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
 .card.events .assist {
+  min-width: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-.ev b a { color: inherit; text-decoration: none; }
-.card.events .run {
-  justify-self: end;
-  align-self: center;
-  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+.card.events .run {
+  justify-self: center;
+  align-self: center;
+  margin: 0;
+  padding: 0 6px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: #eef5fb;
+  color: var(--navy);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.events-pending { display: grid; gap: 6px; padding: 8px 0 4px; }
+.events-skel {
+  display: block;
+  height: 44px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #d5e0ec 25%, #eef3f8 50%, #d5e0ec 75%);
+  background-size: 200% 100%;
+}
+.events-pending p, .events-error p { margin: 0; color: var(--muted); }
+.events-error { display: grid; justify-items: start; gap: 8px; padding: 8px 0; }
+.events-retry { min-width: 44px; min-height: 44px; }
+.empty-hint { margin: 0; padding: 0 0 4px; }
 .run { color: var(--muted); font-variant-numeric: tabular-nums; font-weight: 800; }
+.card.events .half,
 .total {
   margin-top: 0.35rem;
   background: #eef5fb;
-  border-radius: 12px;
+  border-radius: 10px;
+  border-top: 0;
   padding: 0.55rem 0.7rem;
 }
-.total b { color: var(--navy); font-variant-numeric: tabular-nums; }
+.card.events .half span,
+.total span,
+.total b { color: var(--navy); font-weight: 800; }
+.total b { font-variant-numeric: tabular-nums; }
 .rail { display: grid; gap: 0.75rem; }
 .form-row, .about dl div {
   display: grid;
@@ -1891,7 +2001,16 @@ h2 a { color: inherit; }
   .card header { height: 36px; }
   .card header b { font-size: 15px; line-height: 20px; font-weight: 800; text-transform: none; }
   .card header span { font-size: 14px; font-weight: 700; }
-  .half { height: 36px; padding: 0; font-size: 13.5px; font-weight: 600; }
+  .half {
+    height: 40px;
+    margin-top: 4px;
+    border-radius: 10px;
+    border-top: 0;
+    padding: 0 10px;
+    background: #eef5fc;
+    font-size: 13.5px;
+    font-weight: 800;
+  }
   .card.events .ev {
     box-sizing: border-box;
     height: auto;
@@ -1907,18 +2026,70 @@ h2 a { color: inherit; }
     font-size: 13px;
     line-height: 16px;
     font-weight: 800;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .card.events .ev .min { font-size: 12px; font-weight: 600; }
   .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
   .card.events .run { font-size: 13px; font-weight: 800; }
-  .total { height: 40px; margin-top: 4px; border-radius: 10px; padding: 0 10px; background: #eef5fc; }
+  .card.events .half,
+  .total { height: 40px; margin-top: 4px; border-radius: 10px; border-top: 0; padding: 0 10px; background: #eef5fc; font-weight: 800; }
   .form-row { padding: 4px 0; }
   .form-row :deep(.team-crest) { width: 22px !important; height: 22px !important; }
   .form-row b { font-size: 14px; font-weight: 800; }
   .marks { gap: 4px; }
   .marks i { width: 22px; height: 22px; border-radius: 5px; font-size: 11px; }
   .empty-events { padding: 8px 0 4px; }
+}
+@media (max-width: 719px) {
+  .card.events .ev .who {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+  }
+  .card.events .ev.home .who b,
+  .card.events .ev.home .who .assist {
+    align-self: stretch;
+    max-width: 100%;
+    text-align: left;
+  }
+  .card.events .ev.away .who {
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+  .card.events .ev.away .who b,
+  .card.events .ev.away .who .assist {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    margin-left: auto;
+    text-align: right;
+  }
+  .card.events .ev.away .who b {
+    direction: rtl;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  .card.events .ev.away .who b a,
+  .card.events .ev.away .who b > span {
+    direction: ltr;
+    unicode-bidi: isolate;
+    display: inline;
+    width: auto;
+    max-width: none;
+    margin-left: 0;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  .card.events .ev .assist { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 }
 </style>
