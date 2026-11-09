@@ -1025,9 +1025,43 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .team-name { font-size: 14px; line-height: 16px; font-weight: 800; }
   .x { font-size: 15px; font-weight: 800; letter-spacing: 0.04em; }
   .hero-match :deep(.crest.lg), .hero-state :deep(.crest.lg) { width: 28px; height: 28px; font-size: 10px; }
-  .meta { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; height: 22px; margin: 0 0 10px; }
-  .meta .stage { flex: 1 1 auto; text-align: left; font-size: 12px; line-height: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .meta .tb { height: 22px; border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 700; line-height: 22px; }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-height: 22px;
+    height: auto;
+    margin: 0 0 10px;
+  }
+  .meta .stage {
+    flex: 1 1 120px;
+    min-width: 0;
+    max-width: 100%;
+    text-align: left;
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .meta .tb {
+    display: block;
+    flex: 0 1 auto;
+    max-width: 100%;
+    min-width: 0;
+    height: 22px;
+    box-sizing: border-box;
+    border-radius: 999px;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
   .hv-btn { height: 44px; width: 100%; border-radius: 12px; padding: 0 12px; font-size: 14px; position: relative; }
   .stats {

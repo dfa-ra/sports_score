@@ -683,13 +683,16 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   }
   .leaders { grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch; }
   .leader {
+    position: relative;
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-columns: 32px minmax(0, 1fr);
     grid-template-areas:
-      "label label label"
-      "avatar spacer metric"
-      "name name name";
-    gap: 4px 6px;
+      "label label"
+      "avatar avatar"
+      "name name";
+    grid-template-rows: 14px 32px minmax(0, 1fr);
+    row-gap: 2px;
+    column-gap: 6px;
     align-content: start;
     box-sizing: border-box;
     min-height: 104px;
@@ -701,41 +704,66 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .leader p {
     grid-area: label;
     margin: 0;
+    height: 14px;
+    max-width: calc(100% - 46px);
     font-size: 10px;
-    line-height: 13px;
+    line-height: 14px;
     font-weight: 600;
     letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .leader-row { display: contents; }
   .leader-row :deep(.player-avatar) {
     grid-area: avatar;
     width: 32px !important;
     height: 32px !important;
+    align-self: center;
   }
   .leader-metric {
-    grid-area: metric;
+    position: absolute;
+    top: 8px;
+    right: 10px;
     min-width: 0;
+    margin: 0;
     align-items: flex-end;
-    align-self: center;
     text-align: right;
     gap: 0;
   }
-  .leader-metric b { font-size: 28px; font-weight: 800; line-height: 1; }
-  .leader-metric small { font-size: 10.5px; font-weight: 500; line-height: 14px; }
-  .leader-row .name-team { grid-area: name; gap: 1px; min-width: 0; max-width: 100%; overflow: hidden; }
+  .leader-metric b { font-size: 28px; font-weight: 800; line-height: 28px; }
+  .leader-metric small { font-size: 10.5px; font-weight: 500; line-height: 13px; }
+  .leader-row .name-team {
+    grid-area: name;
+    align-self: end;
+    gap: 3px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+  }
   .leader-row .who a {
     display: block;
     max-width: 100%;
+    height: auto;
     font-size: 13px;
     font-weight: 800;
-    line-height: 16px;
+    line-height: 17px;
     white-space: nowrap !important;
     overflow: hidden;
     text-overflow: ellipsis;
     overflow-wrap: normal !important;
     word-break: keep-all !important;
   }
-  .leader-row .club { font-size: 11px; line-height: 14px; font-weight: 500; min-width: 0; max-width: 100%; flex-wrap: nowrap; }
+  .leader-row .club {
+    font-size: 11px;
+    line-height: 14px;
+    height: 14px;
+    font-weight: 500;
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    align-items: center;
+  }
   .leader-row .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
   .leader-row .club-name {
     display: block;

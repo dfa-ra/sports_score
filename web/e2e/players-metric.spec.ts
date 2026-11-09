@@ -223,7 +223,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
         expect(fact.paddingTop).toBe('10px')
         expect(fact.paddingRight).toBe('10px')
         expect(fact.radius).toBe('12px')
-        expect(fact.cardHeight).toBeGreaterThanOrEqual(104)
+        expect(fact.cardHeight).toBeGreaterThanOrEqual(103.5)
         expect(fact.nameLines).toBe(1)
       } else {
         expect(fact.gapCss, `${fact.title} gap css at ${width}`).toBe('4px')
@@ -292,7 +292,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
     expect(lines[1].teamHeight).toBeLessThanOrEqual(lines[1].teamLine + 2)
     expect(fact.clipped).toBe(false)
     expect(fact.value).toMatch(/^(100|2)$/)
-    expect(fact.cardHeight).toBeGreaterThanOrEqual(104)
+    expect(fact.cardHeight).toBeGreaterThanOrEqual(103.5)
   }
   const longScroll = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,

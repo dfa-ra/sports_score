@@ -129,6 +129,8 @@ function advances(index: number) {
   .line,
   .compact .line {
     grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    min-width: 0;
+    width: 100%;
     min-height: 44px;
     height: 44px;
     padding: 0 2px 0 12px;
@@ -142,9 +144,17 @@ function advances(index: number) {
     letter-spacing: 0.02em;
   }
   .wide { display: none; }
-  .club { grid-template-columns: 22px minmax(0, 1fr); gap: 6px; }
+  .club { grid-template-columns: 22px minmax(0, 1fr); gap: 6px; min-width: 0; }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
-  .club b { font-size: 14px; font-weight: 600; line-height: 18px; }
+  .club b {
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 18px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .rank {
     width: auto;
     height: auto;

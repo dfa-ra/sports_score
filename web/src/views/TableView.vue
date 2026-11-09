@@ -587,21 +587,28 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     font-weight: 700;
   }
   .sheet-stack { gap: 8px; margin-top: 6px; }
-  .sheet { display: grid; }
-  .group-title {
+  .sheet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sheet > .group-title {
     grid-row: 1;
+    grid-column: 1;
     box-sizing: border-box;
     height: 34px;
     margin: 0;
-    padding: 0 12px;
-    display: flex;
-    align-items: center;
+    padding: 0 108px 0 12px;
+    display: block;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     font-size: 13px;
-    line-height: 16px;
+    line-height: 34px;
     font-weight: 800;
     letter-spacing: 0.04em;
   }
   .sheet :deep(.board) { display: contents; }
+  .sheet :deep(.line) { grid-column: 1; min-width: 0; width: 100%; }
   .sheet :deep(.line.head) {
     grid-row: 1;
     height: 34px;
