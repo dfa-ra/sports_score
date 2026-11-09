@@ -292,7 +292,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     const name = t.data?.name || 'Таблица'
     setPageMeta({
       title: name,
-      description: `Таблица, результаты и бомбардиры: ${name}.`,
+      description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам',
       path: '/table',
     })
     if (tab.value === 'scorers' || tab.value === 'assists' || tab.value === 'keepers') await loadStats()

@@ -68,7 +68,7 @@ async function onGoogle(idToken: string) {
 }
 
 onMounted(() => {
-  setPageMeta({ title: 'Вход', description: 'Вход в Лигу ИТМО.' })
+  setPageMeta({ title: 'Вход', description: 'Лига ИТМО: вход' })
 })
 </script>
 

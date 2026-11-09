@@ -293,6 +293,13 @@ function typedMinute(eventId: string) {
   return Number(value)
 }
 
+function describeMatch(homeName: string, awayName: string) {
+  const base = `Лига ИТМО: матч ${homeName} — ${awayName}`
+  const status = match.value?.status
+  if (status !== 'LIVE' && status !== 'PAUSED' && status !== 'FINISHED') return base
+  return `${base}, счёт ${Number(match.value?.homeScore ?? 0)}:${Number(match.value?.awayScore ?? 0)}`
+}
+
 let pageTicket = 0
 async function load() {
   const ticket = ++pageTicket
@@ -317,7 +324,7 @@ async function load() {
   const awayName = teams.fullName(m.data.awayTeamId)
   const publish = () => setPageMeta({
     title: `${homeName} — ${awayName}`,
-    description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
+    description: describeMatch(homeName, awayName),
     path: `/matches/${id}`,
   })
   publish()
@@ -727,7 +734,7 @@ watch(() => route.fullPath, () => {
     if (!match.value || String(route.params.id || '') !== id) return
     setPageMeta({
       title: `${homeName} — ${awayName}`,
-      description: `Матч ${homeName} — ${awayName}. Счёт, протокол и составы.`,
+      description: describeMatch(homeName, awayName),
       path: `/matches/${id}`,
     })
   })

@@ -28,14 +28,26 @@ from urllib.parse import urlparse, parse_qs
 
 COPIES = {
     "/": "Лига ИТМО: бомбардиры и лучшие по передачам",
-    "/table": "Турнирная таблица, результаты, бомбардиры и лидеры по передачам.",
+    "/table": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам",
+    "/statistics": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам",
     "/calendar": "Лига ИТМО: календарь матчей",
+    "/matches": "Лига ИТМО: календарь матчей",
     "/live": "Матчи, которые идут сейчас.",
     "/tournaments": "Лига ИТМО: турниры, вид спорта, сезон и формат",
     "/teams": "Лига ИТМО: команды",
     "/players": "Лига ИТМО: поиск игроков",
     "/privacy": "Как Лига ИТМО обрабатывает персональные данные.",
     "/terms": "Лига ИТМО: условия использования сайта",
+    "/login": "Лига ИТМО: вход",
+    "/register": "Лига ИТМО: регистрация",
+    "/forgot-password": "Лига ИТМО: восстановление пароля",
+    "/reset-password": "Лига ИТМО: новый пароль",
+    "/my-team": "Лига ИТМО: моя команда",
+    "/profile": "Лига ИТМО: профиль",
+    "/admin": "Лига ИТМО: управление лигой",
+    "/referee": "Лига ИТМО: матчи судьи",
+    "/analyst": "Лига ИТМО: матчи аналитика",
+    "/forbidden": "Лига ИТМО: недостаточно прав",
 }
 
 class Handler(BaseHTTPRequestHandler):
@@ -177,21 +189,43 @@ EOF
   assert_absent "$body" "Турниры, таблица, календарь и матчи студенческой лиги ИТМО."
 
   curl -fsS -A 'facebookexternalhit/1.1' "$base/table" -o "$body"
-  assert_contains "$body" "лидеры по передачам"
+  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам"
   assert_contains "$body" 'name="description"'
   assert_absent "$body" "Страница не найдена"
   assert_absent "$body" 'id="app"'
 
   curl -fsS -A 'TelegramBot (like TwitterBot)' "$base/table" -o "$body"
-  assert_contains "$body" "лидеры по передачам"
+  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам"
   assert_absent "$body" "Страница не найдена"
 
-  for path in /calendar /live /tournaments /teams /players /privacy /terms; do
+  curl -fsS -A 'TelegramBot (like TwitterBot)' "$base/login" -o "$body"
+  assert_contains "$body" "Лига ИТМО: вход"
+  assert_contains "$body" 'property="og:description"'
+  assert_absent "$body" "Страница не найдена"
+  assert_absent "$body" 'id="app"'
+
+  curl -fsS -A 'Twitterbot/1.0' "$base/register" -o "$body"
+  assert_contains "$body" "Лига ИТМО: регистрация"
+  assert_absent "$body" 'id="app"'
+
+  for path in /calendar /live /tournaments /teams /players /privacy /terms \
+      /forgot-password /reset-password /profile /my-team /admin /referee /analyst /forbidden; do
     curl -fsS -A 'TelegramBot (like TwitterBot)' "$base$path" -o "$body"
     assert_absent "$body" "Страница не найдена"
     assert_absent "$body" 'id="app"'
     assert_contains "$body" 'name="description"'
   done
+
+  local missing="$work/missing-$label"
+  local code
+  code=$(curl -s -o "$missing" -w '%{http_code}' -A 'TelegramBot (like TwitterBot)' "$base/no-such-page")
+  if [[ "$code" != "404" ]]; then
+    echo "bot unknown path status $code" >&2
+    cat "$missing" >&2
+    exit 1
+  fi
+  assert_contains "$missing" "Страница не найдена"
+  assert_absent "$missing" 'id="app"'
 
   curl -fsS -A 'Mozilla/5.0' "$base/" -o "$body"
   assert_contains "$body" 'id="app"'
@@ -202,6 +236,14 @@ EOF
   assert_contains "$body" 'id="app"'
   assert_contains "$body" "Турниры, таблица, календарь и матчи студенческой лиги ИТМО."
   assert_absent "$body" "лидеры по передачам"
+
+  curl -fsS -A 'Mozilla/5.0' "$base/login" -o "$body"
+  assert_contains "$body" 'id="app"'
+  assert_absent "$body" "Лига ИТМО: вход"
+
+  curl -fsS -A 'Mozilla/5.0' "$base/forbidden" -o "$body"
+  assert_contains "$body" 'id="app"'
+  assert_absent "$body" "Лига ИТМО: недостаточно прав"
 
   nginx -c "$nginx_conf" -s quit
   nginx_conf=
