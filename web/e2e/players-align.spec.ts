@@ -53,7 +53,14 @@ test.beforeEach(async ({ page }) => {
 })
 
 function measure() {
-  const baseline = (el: Element) => {
+  const textBox = (el: Element) => {
+    const node = [...el.childNodes].find((child) => child.nodeType === Node.TEXT_NODE && (child.textContent ?? '').trim())
+    const range = document.createRange()
+    if (node) range.selectNodeContents(node)
+    else range.selectNodeContents(el)
+    return range.getBoundingClientRect()
+  }
+  const alphabetic = (el: Element) => {
     const probe = document.createElement('span')
     probe.style.cssText = 'display:inline-block;width:0;height:0;overflow:hidden;vertical-align:baseline;padding:0;margin:0;border:0'
     el.insertBefore(probe, el.firstChild)
@@ -69,10 +76,13 @@ function measure() {
     const nameTeam = row.querySelector('.name-team') ?? (row.classList.contains('name-team') ? row : null)
     if (!crest || !team || !name || !nameTeam) return null
     const box = crest.getBoundingClientRect()
-    const teamBox = team.getBoundingClientRect()
+    const teamText = textBox(team)
+    const nameText = textBox(name)
     const fallback = crest.classList.contains('team-crest--fallback')
     let letterX: number | null = null
     let letterY: number | null = null
+    let letterH: number | null = null
+    let lettersVsClub: number | null = null
     if (fallback) {
       const range = document.createRange()
       range.selectNodeContents(crest)
@@ -80,6 +90,8 @@ function measure() {
       if (letters.width > 0 && letters.height > 0) {
         letterX = Math.abs((letters.left + letters.width / 2) - (box.left + box.width / 2))
         letterY = Math.abs(mid(letters) - mid(box))
+        letterH = letters.height
+        lettersVsClub = Math.abs(mid(letters) - mid(teamText))
       }
     }
     const stacked = getComputedStyle(nameTeam).flexDirection.startsWith('column')
@@ -91,7 +103,10 @@ function measure() {
       crestH: box.height,
       letterX,
       letterY,
-      baselineDelta: stacked ? null : Math.abs(baseline(name) - baseline(team)),
+      letterH,
+      lettersVsClub,
+      baselineDelta: stacked ? null : Math.abs(nameText.bottom - teamText.bottom),
+      alphabeticDelta: stacked ? null : Math.abs(alphabetic(name) - alphabetic(team)),
       ellipsis: getComputedStyle(team).textOverflow,
       nowrap: getComputedStyle(team).whiteSpace,
     }
@@ -105,6 +120,8 @@ function measure() {
     const letters = range.getBoundingClientRect()
     return {
       letterDelta: letters.height > 0 ? Math.abs(mid(letters) - mid(box)) : null,
+      letterH: letters.height,
+      crestH: box.height,
       besideName: Boolean(name),
     }
   })
@@ -163,6 +180,7 @@ test('crest letters and name baselines at 320, 375 and 1440', async ({ page }) =
   report.home = home
   for (const crest of home.home) {
     if (crest.letterDelta != null) expect(crest.letterDelta).toBeLessThanOrEqual(0.5)
+    if (crest.letterH > 0) expect(crest.letterH).toBeLessThanOrEqual(crest.crestH)
   }
   const block = page.locator('.block').filter({ has: page.getByRole('heading', { name: 'Бомбардиры по турнирам' }) })
   await block.scrollIntoViewIfNeeded()
@@ -179,7 +197,10 @@ function assertRows(
     crestH: number
     letterX: number | null
     letterY: number | null
+    letterH: number | null
+    lettersVsClub: number | null
     baselineDelta: number | null
+    alphabeticDelta: number | null
     ellipsis: string
     nowrap: string
     team: string
@@ -189,12 +210,15 @@ function assertRows(
   const list = rows.filter((row): row is NonNullable<typeof row> => row != null)
   expect(list.length).toBeGreaterThan(0)
   for (const row of list) {
+    expect(Math.abs(row.crest - row.crestH)).toBeLessThanOrEqual(0.5)
     if (row.fallback) {
       expect(row.letterX ?? 99).toBeLessThanOrEqual(0.5)
       expect(row.letterY ?? 99).toBeLessThanOrEqual(0.5)
-      expect(Math.abs(row.crest - row.crestH)).toBeLessThanOrEqual(0.5)
+      expect(row.letterH ?? 99).toBeLessThanOrEqual(row.crestH)
+      expect(row.lettersVsClub ?? 99).toBeLessThanOrEqual(0.5)
     }
     if (row.baselineDelta != null) expect(row.baselineDelta).toBeLessThanOrEqual(0.5)
+    if (row.alphabeticDelta != null) expect(row.alphabeticDelta).toBeLessThanOrEqual(0.5)
     const crest = width <= 720 ? 11 : 16
     expect(row.crest).toBeCloseTo(crest, 0)
     if (row.team === LONG_TEAM) {

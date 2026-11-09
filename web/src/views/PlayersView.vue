@@ -456,6 +456,57 @@ onMounted(() => {
   </section>
 </template>
 
+<style>
+@font-face {
+  font-family: "TekturRow";
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("../assets/fonts/tektur-cyrillic-ext.woff2") format("woff2");
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+  ascent-override: 80%;
+  descent-override: 0%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "TekturRow";
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("../assets/fonts/tektur-cyrillic.woff2") format("woff2");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+  ascent-override: 80%;
+  descent-override: 0%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "TekturRow";
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("../assets/fonts/tektur-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  ascent-override: 80%;
+  descent-override: 0%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "TekturRow";
+  font-style: normal;
+  font-weight: 500 800;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("../assets/fonts/tektur-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  ascent-override: 80%;
+  descent-override: 0%;
+  line-gap-override: 0%;
+}
+</style>
+
 <style scoped>
 .players { min-width: 0; max-width: 100%; display: grid; gap: 0.8rem; }
 .hero {
@@ -570,6 +621,11 @@ onMounted(() => {
   justify-content: center;
   padding: 0;
   line-height: 1;
+}
+.line .player-name,
+.line .club-name,
+.leader-row .club-name {
+  font-family: TekturRow, Tektur, "Segoe UI", system-ui, sans-serif;
 }
 .club-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 .leader-row .club-name {
@@ -782,7 +838,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     flex-wrap: nowrap;
     align-items: center;
   }
-  .leader-row .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .leader-row .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 7px !important; }
   .leader-row .club :deep(.team-crest--fallback) { line-height: 11px; }
   .leader-row .club-name {
     display: block;
@@ -831,7 +887,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     text-overflow: ellipsis;
   }
   .line .club { display: inline-flex; align-items: center; max-width: 82px; font-size: 11px; line-height: 14px; }
-  .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 10px !important; }
+  .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 7px !important; }
   .line .club :deep(.team-crest--fallback) { line-height: 11px; }
   .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
   .place { font-size: 13px; font-weight: 700; }
