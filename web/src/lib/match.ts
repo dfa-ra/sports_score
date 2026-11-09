@@ -195,7 +195,7 @@ export function matchStateLabel(status?: string | null) {
   return status || ''
 }
 
-export { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute, protocolMinuteLimit } from './matchMinute.ts'
+export { boundaryMinute, buildMirrorFeed, buildPeriodBlocks, compareFeedEvents, compareMatchEvents, eventMinute, eventOnHomeSide, feedAddedMinute, feedMinuteLabel, protocolMinute, protocolMinuteLimit } from './matchMinute.ts'
 
 export function ymd(value?: string | number | Date | null) {
   return moscowYmd(value)

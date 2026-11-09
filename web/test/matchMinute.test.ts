@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { boundaryMinute, buildPeriodBlocks, compareMatchEvents, eventMinute, eventOnHomeSide, protocolMinute, protocolMinuteLimit } from '../src/lib/matchMinute.ts'
+import { boundaryMinute, buildMirrorFeed, buildPeriodBlocks, compareFeedEvents, compareMatchEvents, eventMinute, eventOnHomeSide, feedMinuteLabel, protocolMinute, protocolMinuteLimit } from '../src/lib/matchMinute.ts'
 
 test('a period that lasted 26 seconds is the first minute, not 0 and not 15', () => {
   assert.equal(boundaryMinute(26), 1)
@@ -205,4 +205,69 @@ test('an own goal by the away player is drawn on the home side and raises the ho
   assert.equal(own.playerId, 'away-scorer')
   assert.equal(own.teamId, away)
   assert.equal(blocks[0].score, '1-0')
+})
+
+test('overview feed drops whistles and scores each half on its own', () => {
+  const home = 'home'
+  const away = 'away'
+  const feed = buildMirrorFeed([
+    { id: 'whistle', eventType: 'PERIOD_START', period: 1, gameTime: 0, timestamp: '2026-11-01T12:00:00Z', createdAt: '2026-11-01T12:00:00Z' },
+    { id: 'end', eventType: 'PERIOD_END', period: 1, gameTime: 15 * 60, timestamp: '2026-11-01T12:15:00Z', createdAt: '2026-11-01T12:15:00Z' },
+    { id: 'h1', eventType: 'GOAL', teamId: home, period: 1, gameTime: 4 * 60, timestamp: '2026-11-01T12:04:00Z', createdAt: '2026-11-01T12:04:00Z' },
+    { id: 'h2', eventType: 'GOAL', teamId: away, period: 2, gameTime: 20 * 60, timestamp: '2026-11-01T12:20:00Z', createdAt: '2026-11-01T12:20:00Z' },
+    { id: 'card', eventType: 'YELLOW_CARD', teamId: home, period: 2, gameTime: 22 * 60, timestamp: '2026-11-01T12:22:00Z', createdAt: '2026-11-01T12:22:00Z' },
+  ], { homeTeamId: home, periodLengthSeconds: 15 * 60 })
+
+  assert.deepEqual(feed.blocks.map((block) => block.period), [1, 2])
+  assert.equal(feed.blocks[0].score, '1-0')
+  assert.equal(feed.blocks[0].items[0].scoreline, '1-0')
+  assert.equal(feed.blocks[1].score, '0-1')
+  assert.equal(feed.blocks[1].items[0].scoreline, '1-1')
+  assert.equal(feed.blocks[1].items[1].scoreline, null)
+  assert.equal(feed.total, '1-1')
+  assert.deepEqual(feed.blocks.flatMap((block) => block.items.map((item) => item.id)), ['h1', 'h2', 'card'])
+  assert.equal(feedMinuteLabel(feed.blocks[0].items[0], 15 * 60), "4'")
+})
+
+test('overview own goal is credited to the other side and keeps the stored minute', () => {
+  const home = 'home'
+  const feed = buildMirrorFeed([
+    {
+      id: 'own',
+      eventType: 'GOAL',
+      teamId: home,
+      period: 1,
+      gameTime: 6 * 60,
+      createdAt: '2026-11-03T13:57:50.393351Z',
+      metadata: { ownGoal: true },
+    },
+  ], { homeTeamId: home, periodLengthSeconds: 900 })
+  assert.equal(feed.blocks[0].items[0].home, false)
+  assert.equal(feed.blocks[0].score, '0-1')
+  assert.equal(feed.blocks[0].items[0].scoreline, '0-1')
+  assert.equal(feed.total, '0-1')
+  assert.equal(feedMinuteLabel(feed.blocks[0].items[0], 900), "6'")
+})
+
+test('overview sort is minute, then added time when present, then createdAt, then id', () => {
+  const home = 'home'
+  const same = {
+    eventType: 'YELLOW_CARD',
+    teamId: home,
+    period: 1,
+    gameTime: 10 * 60,
+  }
+  const feed = buildMirrorFeed([
+    { ...same, id: 'b', createdAt: '2026-11-01T12:00:02Z' },
+    { ...same, id: 'a', createdAt: '2026-11-01T12:00:01Z', metadata: { addedMinute: 2 } },
+    { ...same, id: 'c', createdAt: '2026-11-01T12:00:01Z' },
+  ], { homeTeamId: home, periodLengthSeconds: 15 * 60 })
+  assert.deepEqual(feed.blocks[0].items.map((item) => item.id), ['c', 'b', 'a'])
+  assert.equal(feedMinuteLabel(feed.blocks[0].items[2], 15 * 60), "10+2'")
+  assert.equal(feedMinuteLabel({ eventType: 'GOAL', gameTime: 9, period: 1 }, 1200), "0'")
+  const tied = [
+    { id: 'z', eventType: 'GOAL', gameTime: 60, createdAt: '2026-11-01T12:00:00Z' },
+    { id: 'm', eventType: 'GOAL', gameTime: 60, createdAt: '2026-11-01T12:00:00Z' },
+  ].sort((a, b) => compareFeedEvents(a, b, 900))
+  assert.deepEqual(tied.map((item) => item.id), ['m', 'z'])
 })

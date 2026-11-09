@@ -138,3 +138,95 @@ export function buildPeriodBlocks<T extends TimedEvent>(
     items: block.items,
   }))
 }
+
+const feedTypes = new Set([
+  'GOAL',
+  'YELLOW_CARD',
+  'RED_CARD',
+  'SUBSTITUTION',
+  'OWN_GOAL',
+])
+
+type FeedEvent = TimedEvent & {
+  createdAt?: string | null
+  addedMinute?: number | string | null
+  metadata?: { ownGoal?: boolean; addedMinute?: number | string | null } | null
+}
+
+/** Extra stoppage minute only when the payload already carries it. The event DTO does not. */
+export function feedAddedMinute(event: FeedEvent): number | null {
+  const raw = event.addedMinute ?? event.metadata?.addedMinute
+  if (raw == null || raw === '') return null
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0) return null
+  return Math.trunc(value)
+}
+
+/** Same minute the feed already prints. Added time is `{minute}+{added}'` only when that number is present. */
+export function feedMinuteLabel(event: FeedEvent, periodLengthSeconds?: number | null) {
+  const minute = protocolMinute(event, periodLengthSeconds)
+  if (minute == null) return ''
+  const added = feedAddedMinute(event)
+  if (added == null) return `${minute}'`
+  return `${minute}+${added}'`
+}
+
+/** Overview order: displayed minute, then added time, then when the row was created, then id. */
+export function compareFeedEvents(a: FeedEvent, b: FeedEvent, periodLengthSeconds?: number | null) {
+  const byMinute = (protocolMinute(a, periodLengthSeconds) ?? -1) - (protocolMinute(b, periodLengthSeconds) ?? -1)
+  if (byMinute !== 0) return byMinute
+  const byAdded = (feedAddedMinute(a) ?? 0) - (feedAddedMinute(b) ?? 0)
+  if (byAdded !== 0) return byAdded
+  const byCreated = String(a.createdAt ?? a.timestamp ?? '').localeCompare(String(b.createdAt ?? b.timestamp ?? ''))
+  if (byCreated !== 0) return byCreated
+  return String(a.id ?? '').localeCompare(String(b.id ?? ''))
+}
+
+/**
+ * Public overview feed. Whistles are not rows. The plate score is that half
+ * only. The chip is the running match score, with an own goal on the side
+ * that received the point.
+ */
+export function buildMirrorFeed<T extends FeedEvent>(
+  events: T[],
+  match: { homeTeamId?: string | null; periodLengthSeconds?: number | null },
+) {
+  const length = match.periodLengthSeconds
+  const rows = events
+    .filter((event) => !event.voided && !!event.eventType && feedTypes.has(event.eventType))
+    .sort((a, b) => compareFeedEvents(a, b, length))
+  let home = 0
+  let away = 0
+  const byPeriod = new Map<number, { home: number; away: number; items: Array<T & { home: boolean; scoreline: string | null }> }>()
+  for (const ev of rows) {
+    const scoring = ev.eventType === 'GOAL' || ev.eventType === 'OWN_GOAL'
+    const forHome = eventOnHomeSide(ev, match.homeTeamId)
+    if (scoring) {
+      if (forHome) home += 1
+      else away += 1
+    }
+    const period = ev.period || 1
+    const block = byPeriod.get(period) ?? { home: 0, away: 0, items: [] }
+    if (scoring) {
+      if (forHome) block.home += 1
+      else block.away += 1
+    }
+    block.items.push({
+      ...ev,
+      home: forHome,
+      scoreline: scoring ? `${home}-${away}` : null,
+    })
+    byPeriod.set(period, block)
+  }
+  const blocks = [...byPeriod.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([period, block]) => ({
+      period,
+      score: `${block.home}-${block.away}`,
+      items: block.items,
+    }))
+  return {
+    blocks,
+    total: `${home}-${away}`,
+  }
+}
