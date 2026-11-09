@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,6 +62,15 @@ class PublicSurfaceSecurityTest extends AbstractIntegrationTest {
     })
     void catalogIsPublicWithoutRegistration(String path) throws Exception {
         mockMvc.perform(get(path)).andExpect(status().isOk());
+    }
+
+    @Test
+    void headIsAllowedOnPublicGetsAndStillClosedOnPrivateRoutes() throws Exception {
+        mockMvc.perform(head("/api/v1/home/overview")).andExpect(status().isOk());
+        mockMvc.perform(head("/api/v1/players/me")).andExpect(status().isUnauthorized());
+        mockMvc.perform(head("/api/v1/teams/mine")).andExpect(status().isUnauthorized());
+        mockMvc.perform(head("/api/v1/matches/00000000-0000-0000-0000-000000000001/availability"))
+                .andExpect(status().isUnauthorized());
     }
 
     @ParameterizedTest

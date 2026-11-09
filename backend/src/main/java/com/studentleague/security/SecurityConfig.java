@@ -86,6 +86,7 @@ public class SecurityConfig {
                                 "/h2-console/**"
                         ).denyAll()
                         .requestMatchers(HttpMethod.GET, "/robots.txt", "/sitemap.xml", "/api/v1/link-preview").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/robots.txt", "/sitemap.xml", "/api/v1/link-preview").permitAll()
                         .requestMatchers(
                                 "/api/v1/health",
                                 "/api/v1/auth/register",
@@ -104,10 +105,29 @@ public class SecurityConfig {
                                 "/media/**"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/players/me", "/api/v1/teams/mine").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/matches/*/availability").authenticated()
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/matches/*/availability").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/availability")
                         .hasAnyRole("PLAYER", "CAPTAIN", "ADMIN")
                         .requestMatchers(HttpMethod.GET,
+                                "/api/v1/tournaments",
+                                "/api/v1/tournaments/**",
+                                "/api/v1/matches",
+                                "/api/v1/matches/**",
+                                "/api/v1/teams",
+                                "/api/v1/teams/**",
+                                "/api/v1/players",
+                                "/api/v1/players/**",
+                                "/api/v1/statistics/**",
+                                "/api/v1/sports",
+                                "/api/v1/sports/**",
+                                "/api/v1/home",
+                                "/api/v1/home/**",
+                                "/api/v1/gallery",
+                                "/api/v1/gallery/**"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.HEAD,
                                 "/api/v1/tournaments",
                                 "/api/v1/tournaments/**",
                                 "/api/v1/matches",
