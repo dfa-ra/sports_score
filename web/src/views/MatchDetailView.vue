@@ -255,7 +255,7 @@ function protocolExtra(ev: {
 }) {
   if (isOwnGoal(ev)) return ''
   const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
-  if (ev.eventType === 'GOAL' && second) return `· пас ${second}`
+  if (ev.eventType === 'GOAL' && second) return `· передача ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `→ ${second}`
   return ''
 }
@@ -984,7 +984,7 @@ onUnmounted(() => {
                     <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) || labelOf(eventLabel, ev.eventType) }}</template>
                   </b>
                   <span v-if="isOwnGoal(ev)">Автогол</span>
-                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')">пас · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
+                  <span v-else-if="ev.eventType === 'GOAL' && registeredName(ev, 'secondary')">передача · {{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</span>
                   <span v-if="ev.scoreline" class="run">{{ blockScore(ev.scoreline) }}</span>
                 </div>
                 <em v-if="shownMinute(ev) != null">{{ shownMinute(ev) }}'</em>
@@ -1073,7 +1073,7 @@ onUnmounted(() => {
                 <RouterLink v-if="ev.playerId" class="player-link" :to="`/players/${ev.playerId}`">{{ playerTag(registeredName(ev), ev.playerJersey) || 'Игрок' }}</RouterLink>
                 <template v-else>{{ playerTag(registeredName(ev), ev.playerJersey) }}</template>
                 <template v-if="ev.secondaryPlayerId && ev.eventType === 'GOAL' && !isOwnGoal(ev)">
-                  · пас <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
+                  · передача <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>
                 </template>
                 <template v-else-if="ev.secondaryPlayerId && ev.eventType === 'SUBSTITUTION'">
                   → <RouterLink class="player-link" :to="`/players/${ev.secondaryPlayerId}`">{{ playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey) }}</RouterLink>

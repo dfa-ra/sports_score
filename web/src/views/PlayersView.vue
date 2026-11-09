@@ -405,7 +405,7 @@ onMounted(() => {
           <h2>Бомбардиры</h2>
           <div class="switch" role="group" aria-label="Показатель">
             <button type="button" :class="{ on: mode === 'goals' }" :aria-pressed="mode === 'goals'" @click="mode = 'goals'">Голы</button>
-            <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Пасы</button>
+            <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Передачи</button>
           </div>
         </div>
         <div v-if="loading" aria-hidden="true">
@@ -420,7 +420,7 @@ onMounted(() => {
             <span>#</span>
             <span>Игрок</span>
             <span class="stat stat-m">М</span>
-            <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">П</span>
+            <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">Пер.</span>
             <span class="stat" :class="mode === 'assists' ? 'stat-side' : 'stat-main'">Г</span>
           </div>
           <RouterLink v-for="(row, index) in tableRows" :key="row.playerId || index" class="cols line" :to="`/players/${row.playerId}`">
@@ -441,7 +441,7 @@ onMounted(() => {
           </RouterLink>
           <p v-if="!tableRows.length" class="note quiet">Игроков пока нет</p>
           <button v-if="canMore" class="more" type="button" @click="showMore">Показать ещё</button>
-          <p class="legend">М матчи · П пасы · Г голы</p>
+          <p class="legend">М матчи · Пер. передачи · Г голы</p>
         </template>
       </div>
     </template>

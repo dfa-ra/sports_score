@@ -100,7 +100,7 @@ void main() {
         secondaryPlayerName: 'Петров',
         secondaryPlayerJersey: 8,
       ),
-      '#9 Иванов · пас #8 Петров',
+      '#9 Иванов · передача #8 Петров',
     );
     expect(
       eventDetail(eventType: 'YELLOW_CARD', playerName: 'Иванов', playerJersey: 9),

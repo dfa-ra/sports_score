@@ -515,7 +515,7 @@ onUnmounted(() => {
         <template v-else>
           <table class="stbl">
             <thead>
-              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пас.</th><th class="num">Голы</th></tr>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пер.</th><th class="num">Голы</th></tr>
             </thead>
             <tbody>
               <tr v-for="(player, index) in activeScorers.scorers" :key="player.playerId">
@@ -538,7 +538,7 @@ onUnmounted(() => {
               <span class="rk">{{ index + 1 }}</span>
               <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
               <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
-              <div class="g">{{ player.goals }}<small>{{ player.assists }} пас.</small></div>
+              <div class="g">{{ player.goals }}<small>{{ player.assists }} пер.</small></div>
             </RouterLink>
           </div>
         </template>

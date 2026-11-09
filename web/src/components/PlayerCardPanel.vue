@@ -81,7 +81,7 @@ function marks(row: MatchRow) {
   return [
     row.minutesPlayed != null ? `${row.minutesPlayed}'` : null,
     row.goals ? `${row.goals}Г` : null,
-    row.assists ? `${row.assists}П` : null,
+    row.assists ? `${row.assists}Пер.` : null,
     row.yellowCards ? `${row.yellowCards}Ж` : null,
     row.redCards ? `${row.redCards}К` : null,
   ].filter(Boolean).join(' · ')

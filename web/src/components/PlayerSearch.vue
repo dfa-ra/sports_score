@@ -155,7 +155,7 @@ onUnmounted(() => {
             <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :first-name="player.firstName" :last-name="player.lastName" :size="32" />
             <span>
               <strong>{{ labelOf(player) }}</strong>
-              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} пас.` : '' }}</small>
+              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} пер.` : '' }}</small>
             </span>
           </RouterLink>
         </div>

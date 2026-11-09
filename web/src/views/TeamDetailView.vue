@@ -319,7 +319,7 @@ async function deleteTeam() {
             <tr>
               <th class="who-h" scope="col">Фамилия Имя</th>
               <th scope="col">Голы</th>
-              <th scope="col">Пасы</th>
+              <th scope="col"><span class="assists-short">Пер.</span><span class="assists-wide">Передачи</span></th>
               <th scope="col">Игры</th>
               <th scope="col">ЖК</th>
             </tr>
@@ -443,6 +443,11 @@ h2 { font-size: 1.2rem; }
   white-space: nowrap;
 }
 .stat-table th.who-h { text-align: left; }
+.assists-wide { display: none; }
+@media (min-width: 400px) {
+  .assists-short { display: none; }
+  .assists-wide { display: inline; }
+}
 .stat-table td {
   padding: 0.65rem 0.35rem;
   border-top: 1px solid var(--line);

@@ -646,7 +646,7 @@ class _ProtocolRow extends StatelessWidget {
     final own = event.ownGoal || event.eventType == 'OWN_GOAL';
     final detail = [
       if (!own && event.eventType == 'GOAL' && event.visibleSecondaryName.isNotEmpty)
-        'пас ${playerTag(event.visibleSecondaryName, event.secondaryPlayerJersey)}',
+        'передача ${playerTag(event.visibleSecondaryName, event.secondaryPlayerJersey)}',
       periodLabel(event.period, sportCode: match.sportCode, periodCount: match.periodCount),
     ].join(' · ');
     final body = Column(

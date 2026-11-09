@@ -176,7 +176,7 @@ export function eventDetail(ev: {
   const main = playerTag(registeredName(ev), ev.playerJersey)
   if (isOwnGoal(ev)) return main ? `${main} · Автогол` : 'Автогол'
   const second = playerTag(registeredName(ev, 'secondary'), ev.secondaryPlayerJersey)
-  if (ev.eventType === 'GOAL' && second) return `${main} · пас ${second}`
+  if (ev.eventType === 'GOAL' && second) return `${main} · передача ${second}`
   if (ev.eventType === 'SUBSTITUTION' && second) return `${main} → ${second}`
   return main
 }

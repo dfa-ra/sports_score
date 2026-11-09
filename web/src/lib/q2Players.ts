@@ -59,7 +59,7 @@ export function goalsAside(count: number | null | undefined) {
 export function unitWord(count: number, kind: 'goals' | 'assists') {
   const n = Math.max(0, Math.trunc(count))
   if (kind === 'goals') return countLabel(n, 'гол', 'гола', 'голов')
-  return countLabel(n, 'пас', 'паса', 'пасов')
+  return countLabel(n, 'передача', 'передачи', 'передач')
 }
 
 function numeric(value: unknown): number | null {

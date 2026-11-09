@@ -229,7 +229,7 @@ String eventDetail({
 }) {
   final main = playerTag(playerName, playerJersey);
   final second = playerTag(secondaryPlayerName, secondaryPlayerJersey);
-  if (eventType == 'GOAL' && second.isNotEmpty) return '$main · пас $second';
+  if (eventType == 'GOAL' && second.isNotEmpty) return '$main · передача $second';
   if (eventType == 'SUBSTITUTION' && second.isNotEmpty) return '$main → $second';
   return main;
 }

@@ -162,7 +162,7 @@ const sheetHint = computed(() => {
     return 'Очко получит соперник. Передачи нет.'
   }
   if (current.kind === 'GOAL' && current.step === 'assist' && current.player) {
-    return `Гол: ${nameOf(current.player)}. Если паса не было — пропустите. Автогол — мяч в свои ворота.`
+    return `Гол: ${nameOf(current.player)}. Если передачи не было — пропустите. Автогол — мяч в свои ворота.`
   }
   if (current.step === 'team') return heldClock.value ? 'Часы стоят. Сначала команда.' : 'Сначала команда.'
   return heldClock.value ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.'

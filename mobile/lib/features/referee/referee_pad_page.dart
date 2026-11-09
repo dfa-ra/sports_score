@@ -41,7 +41,7 @@ class _Sheet {
 
   String hint({required bool held, required String scorer}) {
     if (kind == _Kind.goal && step == _Step.assist) {
-      return 'Гол: $scorer. Если паса не было — пропустите.';
+      return 'Гол: $scorer. Если передачи не было — пропустите.';
     }
     if (step == _Step.team) return held ? 'Часы стоят. Сначала команда.' : 'Сначала команда.';
     return held ? 'Часы стоят. Выберите игрока из заявки.' : 'Выберите игрока из заявки.';

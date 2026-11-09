@@ -224,7 +224,7 @@ class _StatHead extends StatelessWidget {
         children: [
           Expanded(child: Text('Фамилия Имя', style: _StatLine.label)),
           _StatNum('Голы', head: true),
-          _StatNum('Пасы', head: true),
+          _StatNum('Пер.', head: true),
           _StatNum('Игры', head: true),
           _StatNum('ЖК', head: true),
         ],
