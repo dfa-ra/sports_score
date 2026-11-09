@@ -416,14 +416,7 @@ onMounted(() => {
             <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Передачи</button>
           </div>
         </div>
-        <div v-if="loading" aria-hidden="true">
-          <div v-for="n in 6" :key="n" class="skel">
-            <span class="skeleton dot" />
-            <span class="skeleton bars" />
-            <span class="skeleton num" />
-          </div>
-        </div>
-        <template v-else>
+        <div class="board-list">
           <div class="cols head">
             <span>#</span>
             <span>Игрок</span>
@@ -431,26 +424,37 @@ onMounted(() => {
             <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">Пер.</span>
             <span class="stat" :class="mode === 'assists' ? 'stat-side' : 'stat-main'">Г</span>
           </div>
-          <RouterLink v-for="(row, index) in tableRows" :key="row.playerId || index" class="cols line" :to="`/players/${row.playerId}`">
-            <span class="place">{{ index + 1 }}</span>
-            <span class="who row-who">
-              <PlayerAvatar :src="localPortrait(row.avatarUrl)" :first-name="row.firstName" :last-name="row.lastName" :name="nameOf(row)" :size="32" />
-              <span class="name-team">
-                <span class="player-name">{{ nameOf(row) }}</span>
-                <span v-if="teamName(row.teamId) || row.teamLogoUrl" class="club">
-                  <TeamCrest :name="teamName(row.teamId) || 'Команда'" :src="row.teamLogoUrl || teams.logo(row.teamId)" :size="16" />
-                  <span class="club-name">{{ teamName(row.teamId) }}</span>
+          <div class="board-rows">
+            <div v-if="loading" aria-hidden="true">
+              <div v-for="n in 5" :key="n" class="skel">
+                <span class="skeleton dot" />
+                <span class="skeleton bars" />
+                <span class="skeleton num" />
+              </div>
+            </div>
+            <template v-else-if="tableRows.length">
+              <RouterLink v-for="(row, index) in tableRows" :key="row.playerId || index" class="cols line" :to="`/players/${row.playerId}`">
+                <span class="place">{{ index + 1 }}</span>
+                <span class="who row-who">
+                  <PlayerAvatar :src="localPortrait(row.avatarUrl)" :first-name="row.firstName" :last-name="row.lastName" :name="nameOf(row)" :size="32" />
+                  <span class="name-team">
+                    <span class="player-name">{{ nameOf(row) }}</span>
+                    <span v-if="teamName(row.teamId) || row.teamLogoUrl" class="club">
+                      <TeamCrest :name="teamName(row.teamId) || 'Команда'" :src="row.teamLogoUrl || teams.logo(row.teamId)" :size="16" />
+                      <span class="club-name">{{ teamName(row.teamId) }}</span>
+                    </span>
+                  </span>
                 </span>
-              </span>
-            </span>
-            <span class="stat stat-m">{{ row.appearances ?? 0 }}</span>
-            <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">{{ row.assists ?? 0 }}</span>
-            <span class="stat" :class="mode === 'assists' ? 'stat-side' : 'stat-main'">{{ row.goals ?? 0 }}</span>
-          </RouterLink>
-          <p v-if="!tableRows.length" class="note quiet">Игроков пока нет</p>
-          <button v-if="canMore" class="more" type="button" @click="showMore">Показать ещё</button>
+                <span class="stat stat-m">{{ row.appearances ?? 0 }}</span>
+                <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">{{ row.assists ?? 0 }}</span>
+                <span class="stat" :class="mode === 'assists' ? 'stat-side' : 'stat-main'">{{ row.goals ?? 0 }}</span>
+              </RouterLink>
+            </template>
+            <p v-else class="board-empty">Игроков пока нет</p>
+          </div>
+          <button v-if="!loading && canMore" class="more" type="button" @click="showMore">Показать ещё</button>
           <p class="legend">М матчи · Пер. передачи · Г голы</p>
-        </template>
+        </div>
       </div>
     </template>
   </section>
@@ -664,18 +668,74 @@ onMounted(() => {
 .leader-metric small { color: #8b97a8; font-size: 12px; font-weight: 600; }
 .leaders .card { min-height: 116px; border-radius: 18px; display: block; }
 .sheet { overflow: hidden; }
-.board-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.75rem 0.85rem 0.3rem; }
-.board-head h2 { margin: 0; min-width: 0; font-size: 1rem; letter-spacing: 0.04em; overflow-wrap: break-word; }
-.switch { display: inline-flex; flex: 0 0 auto; background: #eef3f8; border-radius: 999px; padding: 0.15rem; }
-.switch button { border: 0; background: transparent; border-radius: 999px; padding: 0.28rem 0.7rem; font-weight: 700; color: #5d6b7c; cursor: pointer; }
+.board-head {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 0 0.85rem;
+}
+.board-head h2 { margin: 0; min-width: 0; font-size: 1rem; letter-spacing: 0.04em; overflow-wrap: normal; }
+.switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  box-sizing: border-box;
+  height: 32px;
+  background: #eef3f8;
+  border-radius: 999px;
+  padding: 0;
+}
+.switch button {
+  position: relative;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  height: 32px;
+  padding: 0 0.7rem;
+  font-weight: 700;
+  line-height: 32px;
+  color: #5d6b7c;
+  cursor: pointer;
+}
+.switch button::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
+}
 .switch button.on { background: #4cb4e5; color: #04203f; }
+.board-list { display: flex; flex-direction: column; }
+.board-rows { min-height: calc(5 * 56px); display: flex; flex-direction: column; }
+.board-empty {
+  flex: 1 0 auto;
+  min-height: calc(5 * 56px);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
 .cols {
   display: grid;
   grid-template-columns: 1.6rem minmax(0, 1fr) 2rem 2rem 2rem;
   gap: 0.35rem;
   align-items: center;
-  padding: 0.45rem 0.85rem;
+  box-sizing: border-box;
+  padding: 0 0.85rem;
 }
+.cols.head { height: 32px; flex: 0 0 32px; }
+.cols.line { height: 56px; flex: 0 0 56px; }
 .head { color: #8b97a8; font-size: 0.72rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .line { color: inherit; text-decoration: none; border-top: 1px solid #eef3f8; }
 .line:hover { background: #f7fbfe; }
@@ -701,7 +761,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
 .note { padding: 1.2rem 0.8rem; text-align: center; }
 .note p { margin: 0; font-weight: 700; }
 .quiet { font-weight: 500; color: var(--muted); }
-.skel { display: grid; grid-template-columns: 36px minmax(0, 1fr) 28px; gap: 0.55rem; align-items: center; padding: 0.55rem 0.85rem; }
+.skel { display: grid; grid-template-columns: 36px minmax(0, 1fr) 28px; gap: 0.55rem; align-items: center; box-sizing: border-box; height: 56px; padding: 0 0.85rem; }
 .dot { width: 36px; height: 36px; min-height: 0; border-radius: 50%; }
 .bars { height: 28px; min-height: 0; }
 .num { height: 18px; min-height: 0; }
@@ -851,28 +911,27 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   }
   .leaders .card { min-height: 104px; height: 104px; border-radius: 12px; }
   .sheet { border-radius: 12px; }
-  .board-head { box-sizing: border-box; height: 48px; padding: 0 12px; }
-  .board-head h2 { font-size: 16px; line-height: 20px; font-weight: 800; }
-  .switch { width: 150px; height: 36px; align-items: center; }
+  .board-head { height: 44px; min-height: 44px; max-height: 44px; padding: 0 12px; }
+  .board-head h2 {
+    min-width: 0;
+    font-size: 16px;
+    line-height: 20px;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .switch { width: 150px; height: 32px; align-items: center; }
   .switch button {
-    position: relative;
-    height: 30px;
+    height: 32px;
     min-width: 66px;
     padding: 0 8px;
     font-size: 13px;
-  }
-  .switch button::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: var(--tap-min);
-    transform: translateY(-50%);
+    line-height: 32px;
   }
   .cols { grid-template-columns: 20px minmax(0, 1fr) 28px; padding: 0 12px; }
-  .cols.head { height: 24px; font-size: 11px; font-weight: 600; line-height: 14px; }
-  .cols.line { box-sizing: border-box; height: 48px; }
+  .cols.head { height: 24px; flex-basis: 24px; font-size: 11px; font-weight: 600; line-height: 14px; }
+  .cols.line { height: 56px; }
   .stat-m, .stat-side { display: none; }
   .line .stat-main { font-size: 15px; font-weight: 800; }
   .row-who { gap: 8px; min-width: 0; }
@@ -891,7 +950,7 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .line .club :deep(.team-crest--fallback) { line-height: 11px; }
   .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
   .place { font-size: 13px; font-weight: 700; }
-  .skel { height: 48px; box-sizing: border-box; }
+  .skel { height: 56px; padding: 0 12px; }
   .note {
     box-sizing: border-box;
     height: 64px;

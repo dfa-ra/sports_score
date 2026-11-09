@@ -428,7 +428,27 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <strong>{{ loadError }}</strong>
       <button class="btn secondary" type="button" @click="load()">Повторить</button>
     </div>
-    <div v-if="loading" class="skeleton" />
+    <template v-if="loading">
+      <div class="sheet-stack">
+        <div class="sheet tab-skel" aria-hidden="true">
+          <h2 class="group-title">Таблица</h2>
+          <div class="board">
+            <div class="line head">
+              <span>#</span>
+              <span class="team-label">Команда</span>
+              <span>И</span>
+              <span class="wide">В</span>
+              <span class="wide">Н</span>
+              <span class="wide">П</span>
+              <span>Г</span>
+              <span>О</span>
+            </div>
+            <div v-for="n in 5" :key="n" class="line sk-row"></div>
+          </div>
+        </div>
+        <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
+      </div>
+    </template>
 
     <template v-else-if="tab === 'table'">
       <EmptyState v-if="!standingGroupsHaveRows(standings)" title="Таблица пустая" text="Нет утверждённых команд или сыгранных матчей." />
@@ -478,7 +498,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Бомбардиры</h2>
           <p v-if="topNote(scorers, 'scorers')" class="muted">{{ topNote(scorers, 'scorers') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
         <div v-else-if="statsError" class="load-fail" role="alert">
           <strong>{{ statsError }}</strong>
           <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
@@ -503,6 +531,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('scorers', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('scorers')">← К топ-10</button>
         </div>
+        </div>
       </div>
     </template>
 
@@ -512,7 +541,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Вратари</h2>
           <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
         <div v-else-if="statsError" class="load-fail" role="alert">
           <strong>{{ statsError }}</strong>
           <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
@@ -537,6 +574,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('keepers', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('keepers')">← К топ-10</button>
         </div>
+        </div>
       </div>
     </template>
 
@@ -546,7 +584,21 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Лидеры по передачам</h2>
           <p v-if="topNote(assists, 'assists')" class="muted">{{ topNote(assists, 'assists') }}</p>
         </div>
-        <div v-if="statsLoading" class="skeleton" />
+        <div class="stat-body">
+        <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
+          <table class="table stat-table">
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
+                <th class="num">Игры</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="n in 5" :key="n"><td colspan="3"></td></tr>
+            </tbody>
+          </table>
+        </div>
         <div v-else-if="statsError" class="load-fail" role="alert">
           <strong>{{ statsError }}</strong>
           <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
@@ -576,6 +628,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           </button>
           <button v-if="!fullList" class="btn secondary" type="button" @click="setTab('assists', 'all')">Полный список</button>
           <button v-else class="btn ghost" type="button" @click="setTab('assists')">← К топ-10</button>
+        </div>
         </div>
       </div>
     </template>
@@ -696,6 +749,22 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     line-height: 16px;
     font-weight: 500;
   }
+  .stat-body,
+  .stat-body :deep(.empty) { min-height: calc(44px + 5 * 56px); }
+}
+@media (max-width: 720px) {
+  .tab-skel .line {
+    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    padding: 0 2px 0 12px;
+  }
+  .tab-skel .line.head {
+    height: 34px;
+    min-height: 34px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .tab-skel .wide { display: none; }
 }
 .sheet {
   background: #fff;
@@ -749,6 +818,48 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 @media (max-width: 720px) {
   .stat-table .num { width: 4.15rem; }
 }
+.sheet :deep(a.line) {
+  box-sizing: border-box;
+  height: 56px;
+  min-height: 56px;
+}
+.tab-skel .line {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 56px;
+  height: 56px;
+  padding: 0 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+.tab-skel .line.head {
+  min-height: 2.15rem;
+  height: 2.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tab-skel .sk-row { background: linear-gradient(90deg, #eef3f8, #f7fafc, #eef3f8); }
+.stat-body { min-height: calc(2.6rem + 5 * 56px); }
+.stat-table tbody td,
+.stat-skel tbody td {
+  box-sizing: border-box;
+  height: 56px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.stat-body :deep(.empty) {
+  box-sizing: border-box;
+  height: auto;
+  max-height: none;
+  min-height: calc(2.6rem + 5 * 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .pass-wide { display: none; }
 @media (min-width: 721px) {
   .pass-short { display: none; }
@@ -767,4 +878,10 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 .person b { color: var(--navy); }
 .person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
+@media (max-width: 720px) {
+  .tab-skel .line.head {
+    height: 34px;
+    min-height: 34px;
+  }
+}
 </style>

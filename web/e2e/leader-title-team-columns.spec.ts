@@ -92,23 +92,27 @@ test('players sheet title follows the goals and passes tabs', async ({ page }) =
     await expect(page.getByRole('button', { name: 'Передачи' })).toHaveClass(/on/)
     const headingBox = await sheet.evaluate((el) => {
       const rect = el.getBoundingClientRect()
+      const style = getComputedStyle(el)
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const lines = new Set([...range.getClientRects()].filter((box) => box.height > 0).map((box) => Math.round(box.top))).size
       return {
         text: el.textContent,
         clipped: el.scrollWidth > el.clientWidth + 1,
         right: rect.right,
         view: window.innerWidth,
+        lines,
+        white: style.whiteSpace,
+        ellipsis: style.textOverflow,
       }
     })
     expect(headingBox.text).toBe('Лидеры по передачам')
-    expect(headingBox.clipped).toBe(false)
     expect(headingBox.right).toBeLessThanOrEqual(headingBox.view + 1)
-    if (width === 1440) {
-      const lines = await sheet.evaluate((el) => {
-        const range = document.createRange()
-        range.selectNodeContents(el)
-        return range.getClientRects().length
-      })
-      expect(lines).toBe(1)
+    expect(headingBox.lines).toBe(1)
+    if (width === 1440) expect(headingBox.clipped).toBe(false)
+    if (width <= 720) {
+      expect(headingBox.white).toBe('nowrap')
+      expect(headingBox.ellipsis).toBe('ellipsis')
     }
 
     if (width === 375) await shot(page, 'q2-players-assists-title-375')

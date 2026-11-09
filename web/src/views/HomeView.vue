@@ -320,8 +320,7 @@ onUnmounted(() => {
     </div>
 
     <div class="container block">
-      <div v-if="!loaded" class="skeleton sk-matches" aria-hidden="true" />
-      <div v-else class="card">
+      <div class="card matches-card">
         <div class="card-head">
           <div>
             <h2>Матчи</h2>
@@ -329,7 +328,26 @@ onUnmounted(() => {
           </div>
           <RouterLink class="more-link" to="/calendar">Все игры</RouterLink>
         </div>
-        <div v-if="failed" class="block-error" role="alert">
+        <template v-if="!loaded">
+          <div class="filters" aria-hidden="true">
+            <div class="chips">
+              <span class="chip on"><span class="chip-label">Все турниры</span></span>
+            </div>
+          </div>
+          <div class="feed-list" aria-hidden="true">
+            <div class="feed-col">
+              <div v-for="n in 3" :key="`mu-${n}`" class="mrow sk-mrow"></div>
+            </div>
+            <div class="feed-col">
+              <div v-for="n in 3" :key="`mr-${n}`" class="mrow sk-mrow"></div>
+            </div>
+          </div>
+          <div class="feed-cards" aria-hidden="true">
+            <div class="skeleton sk-matches"></div>
+          </div>
+          <span class="more">Все игры →</span>
+        </template>
+        <div v-else-if="failed" class="block-error" role="alert">
           <p>Матчи не загрузились</p>
           <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
         </div>
@@ -420,9 +438,47 @@ onUnmounted(() => {
         <h2>Идут сейчас</h2>
         <RouterLink class="more-link" to="/tournaments">Все турниры</RouterLink>
       </div>
-      <div v-if="!loaded" class="tgrid">
-        <div class="skeleton sk-tcard" aria-hidden="true" />
-        <div class="skeleton sk-tcard" aria-hidden="true" />
+      <div v-if="!loaded" class="tgrid" aria-hidden="true">
+        <article v-for="n in 4" :key="n" class="skeleton sk-tcard" :class="'card tcard'">
+          <div class="tc-head">
+            <div class="tc-top">
+              <div>
+                <span class="tb">Турнир</span>
+                <h3>Турнир</h3>
+              </div>
+              <span class="st ok">Идёт</span>
+            </div>
+            <div class="tc-meta">
+              <span>Сезон</span>
+              <span>Лига</span>
+              <span>8 команд</span>
+            </div>
+            <div class="prog"><i style="width: 40%" /></div>
+            <div class="tc-prog">
+              <span>Группа</span>
+              <span class="hv-btn dark sm">К турниру</span>
+            </div>
+            <div class="lead">
+              <span class="crest sk-crest"></span>
+              <div><b>Физтех</b><span>Лидер таблицы · 12 очк. · 4 игры</span></div>
+            </div>
+          </div>
+          <div class="tc-label">Последний и ближайший матчи</div>
+          <div class="irow">
+            <div class="mtime"><b>5 дек</b><span>17:00</span></div>
+            <div class="h"><span class="n">Физтех</span><span class="crest sk-crest"></span></div>
+            <div class="sc"><span class="line"><span>1</span><span class="sep">:</span><span>0</span></span></div>
+            <div class="a"><span class="crest sk-crest"></span><span class="n">Юристы</span></div>
+            <div class="stc"><span class="st done">Завершён</span></div>
+          </div>
+          <div class="irow">
+            <div class="mtime"><b>12 дек</b><span>17:00</span></div>
+            <div class="h"><span class="n">Физтех</span><span class="crest sk-crest"></span></div>
+            <div class="sc dim"><span class="line"><span>–</span><span class="sep">:</span><span>–</span></span></div>
+            <div class="a"><span class="crest sk-crest"></span><span class="n">Юристы</span></div>
+            <div class="stc"><span class="st soon">Скоро</span></div>
+          </div>
+        </article>
       </div>
       <div v-else-if="failed" class="card block-error" role="alert">
         <p>Турниры не загрузились</p>
@@ -499,7 +555,25 @@ onUnmounted(() => {
         <h2>Бомбардиры по турнирам</h2>
         <RouterLink class="more-link" :to="statsLink(activeScorers?.tournamentId)">Вся статистика</RouterLink>
       </div>
-      <div v-if="!loaded" class="skeleton sk-scorers" aria-hidden="true" />
+      <div v-if="!loaded" class="skeleton sk-scorers" :class="'card'" aria-hidden="true">
+        <div class="tabs">
+          <button type="button" class="on" tabindex="-1"><span class="tab-label">Лига</span></button>
+        </div>
+        <div class="scorer-body">
+          <table class="stbl">
+            <thead>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пер.</th><th class="num">Голы</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="n in 5" :key="`sk-${n}`"><td colspan="6"></td></tr>
+            </tbody>
+          </table>
+          <div class="sl-mob">
+            <div v-for="n in 5" :key="`sm-${n}`" class="srow sk-srow"></div>
+          </div>
+        </div>
+        <span class="more">Полный список →</span>
+      </div>
       <div v-else-if="failed" class="card block-error" role="alert">
         <p>Статистика не загрузилась</p>
         <button class="hv-btn dark" type="button" @click="load()">Повторить</button>
@@ -520,7 +594,8 @@ onUnmounted(() => {
             </button>
           </div>
         </ScrollFade>
-        <p v-if="!activeScorers?.scorers.length" class="block-empty">Голов пока нет</p>
+        <div class="scorer-body">
+        <p v-if="!activeScorers?.scorers.length" class="block-empty scorer-empty">Голов пока нет</p>
         <template v-else>
           <table class="stbl">
             <thead>
@@ -551,6 +626,7 @@ onUnmounted(() => {
             </RouterLink>
           </div>
         </template>
+        </div>
         <RouterLink v-if="activeScorers" class="more" :to="statsLink(activeScorers.tournamentId, true)">Полный список · {{ activeScorers.shortName || activeScorers.tournamentName }} →</RouterLink>
       </div>
     </div>
@@ -759,12 +835,15 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   box-shadow: inset 0 -3px 0 transparent;
 }
 .tabs button.on { color: var(--navy); box-shadow: inset 0 -3px 0 var(--ice); }
-.feed-list { display: grid; grid-template-columns: 1fr 1fr; }
+.feed-list { display: grid; grid-template-columns: 1fr 1fr; min-height: calc(3 * 115px); }
+.feed-col { min-height: calc(3 * 115px); }
 .feed-col + .feed-col { border-left: 1px solid var(--line); }
 .feed-cards { display: none; }
 .mrow, .irow, .mc, .srow, .pl { color: inherit; text-decoration: none; }
 .mrow {
   display: grid; grid-template-columns: 56px 1fr 40px; gap: 0.75rem; align-items: center;
+  box-sizing: border-box;
+  height: 115px;
   padding: 0.75rem 1rem; border-top: 1px solid var(--line);
 }
 .feed-col .mrow:first-child { border-top: 0; }
@@ -877,7 +956,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
 .stbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .stbl th { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--line); }
-.stbl td { padding: 0.6rem 0.8rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
+.stbl tbody tr { height: 56px; }
+.stbl td { box-sizing: border-box; height: 56px; padding: 0 0.8rem; border-top: 1px solid var(--line); font-size: 0.9375rem; }
 .stbl th.num,
 .stbl td.num {
   width: 5.5rem;
@@ -897,7 +977,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .stbl td.num.g {
   margin: 0;
   width: 5.5rem;
-  padding: 0.6rem 0.8rem;
+  padding: 0 0.8rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -910,15 +990,43 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .pl b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl b, .srow .nm { color: var(--ink); font-weight: 700; }
 .sl-mob { display: none; }
-.srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; padding: 0.6rem 1rem; border-top: 1px solid var(--line); }
+.srow { display: grid; grid-template-columns: 24px 36px 1fr auto; gap: 0.7rem; align-items: center; box-sizing: border-box; height: 56px; min-height: 56px; padding: 0 1rem; border-top: 1px solid var(--line); }
 .srow .tm { font-size: 0.75rem; color: var(--muted); font-weight: 600; }
 .srow .g { font-weight: 800; font-size: 1.25rem; color: var(--navy); text-align: right; line-height: 1; }
 .srow .g small { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-top: 3px; }
 .sk-hero { height: 253px; min-height: 253px; border-radius: 22px; }
 .sk-stats { height: 127px; min-height: 127px; }
-.sk-matches { height: 521px; min-height: 521px; }
-.sk-tcard { height: 455px; min-height: 455px; }
-.sk-scorers { height: 321px; min-height: 321px; }
+.sk-matches { height: 118px; min-height: 118px; border-radius: 14px; }
+.sk-tcard.skeleton, .sk-scorers.skeleton {
+  min-height: 0;
+  height: auto;
+  background: #fff;
+  animation: none;
+}
+.sk-crest {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-wash);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.scorer-body { min-height: calc(41px + 5 * 56px); }
+.scorer-empty {
+  box-sizing: border-box;
+  min-height: calc(41px + 5 * 56px);
+  height: auto;
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sk-srow { height: 56px; min-height: 56px; }
+.matches-card .block-empty {
+  box-sizing: border-box;
+  height: auto;
+  max-height: none;
+  min-height: calc(3 * 115px);
+}
 @media (max-width: 720px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; padding: 1.25rem; }
   .hero-card { min-height: 446px; }
@@ -976,9 +1084,6 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .hero-card.has-live, .hero-card:has(.livebar) { min-height: 446px; }
   .sk-hero { height: 446px; min-height: 446px; }
   .sk-stats { height: 136px; min-height: 136px; }
-  .sk-matches { height: 381px; min-height: 381px; }
-  .sk-tcard { height: 554px; min-height: 554px; }
-  .sk-scorers { height: 291px; min-height: 291px; }
 }
 @container home (max-width: 720px) {
   .hero-state, .hero-match, .hero-match.has-live, .hero-state:has(.livebar) { grid-template-columns: 1fr; }
@@ -1141,7 +1246,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .tabs button { height: 44px; padding: 0 12px; font-size: 12px; font-weight: 700; }
   .sk-hero { height: 170px; min-height: 170px; border-radius: 16px; }
   .sk-stats { height: 58px; min-height: 58px; border-radius: 12px; }
-  .sk-matches { height: 214px; min-height: 214px; }
+  .sk-matches { height: 118px; min-height: 118px; }
+  .feed-cards { min-height: calc(118px + 16px); }
+  .scorer-body, .scorer-empty { min-height: calc(5 * 56px); }
+  .matches-card .block-empty { min-height: calc(118px + 16px); }
   .block-empty, .block-error {
     box-sizing: border-box;
     min-height: 60px;
@@ -1157,6 +1265,16 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
     font-weight: 700;
   }
   .block-error .hv-btn { width: auto; min-width: 108px; }
+  .matches-card .block-empty,
+  .scorer-empty {
+    height: auto;
+    max-height: none;
+    justify-content: center;
+    text-align: center;
+  }
+  .matches-card .block-empty { min-height: calc(118px + 16px); }
+  .scorer-body,
+  .scorer-empty { min-height: calc(5 * 56px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }
