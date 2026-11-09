@@ -514,7 +514,7 @@ async function stamp(page: Page, side: 'left' | 'right' = 'right') {
   }, side)
 }
 
-async function expectTabLabelsReadable(page: Page, selector: string, oneRow?: boolean) {
+async function expectTabLabelsReadable(page: Page, selector: string, oneRow?: boolean, allowScroll = false) {
   const report = await page.locator(selector).evaluate((bar) => {
     const buttons = [...bar.querySelectorAll('button')].filter((node): node is HTMLElement => {
       if (!(node instanceof HTMLElement)) return false
@@ -547,7 +547,7 @@ async function expectTabLabelsReadable(page: Page, selector: string, oneRow?: bo
   if (oneRow !== undefined) expect(report.oneRow).toBe(oneRow)
   for (const item of report.items) {
     expect(item.labelClipped, item.text).toBe(false)
-    expect(item.fullyVisible, item.text).toBe(true)
+    if (!allowScroll) expect(item.fullyVisible, item.text).toBe(true)
     expect(item.text.length).toBeGreaterThan(1)
   }
 }
@@ -840,7 +840,7 @@ test('narrow tabs stay readable and the header keeps room for login', async ({ p
   await page.goto('/tournaments/liga-1')
   await expect(page.getByRole('tab', { name: /Команды/ })).toBeVisible()
   await expect(page.getByRole('tab', { name: 'Регламент' })).toBeVisible()
-  await expectTabLabelsReadable(page, '.ttabs')
+  await expectTabLabelsReadable(page, '.ttabs', true, true)
   const tournamentFooter = await page.locator('.foot-ver').evaluate((el) => {
     const box = el.getBoundingClientRect()
     return {

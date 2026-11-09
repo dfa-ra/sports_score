@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { bindActiveTab } from '../lib/scrollActive'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -75,6 +76,8 @@ const showMatchForm = ref(false)
 const applying = ref(false)
 const applyNote = ref('')
 const missing = ref(false)
+const tabBar = ref<HTMLElement | null>(null)
+bindActiveTab(tabBar)
 
 const registrationOpen = computed(() => isTournamentOpenForApply(tournament.value?.status))
 const playedWhileRecruiting = computed(() =>
@@ -622,7 +625,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
 
     <div class="tab-card">
-    <div class="ttabs" role="tablist" aria-label="Разделы турнира">
+    <div ref="tabBar" class="ttabs fs-tabs" role="tablist" aria-label="Разделы турнира">
       <button v-if="showGrid || tab === 'pending'" type="button" role="tab" :aria-selected="tab === 'playoff'" :class="{ on: tab === 'playoff' }" @click="tab !== 'pending' && setTab('playoff')">
         Сетка
         <span v-if="playoffLive" class="dot" role="img" aria-label="Есть live"></span>
@@ -991,21 +994,18 @@ async function exclude(team: { teamId: string; teamName?: string }) {
   display: flex;
   gap: 0;
   overflow-x: auto;
-  border-bottom: 1px solid var(--line-strong);
   scrollbar-width: none;
   min-width: 0;
   max-width: 100%;
+  margin: 0;
 }
 .ttabs::-webkit-scrollbar { display: none; }
 .ttabs button {
   flex: 0 0 auto;
-  padding: 0.8rem 1rem;
   border: 0;
   border-bottom: 3px solid transparent;
   background: transparent;
   color: var(--muted);
-  font-weight: 800;
-  font-size: 0.8125rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1013,6 +1013,14 @@ async function exclude(team: { teamId: string; teamName?: string }) {
   gap: 0.4rem;
   align-items: center;
   cursor: pointer;
+}
+@media (min-width: 721px) {
+  .ttabs { border-bottom: 1px solid var(--line-strong); }
+  .ttabs button {
+    padding: 0.8rem 1rem;
+    font-weight: 800;
+    font-size: 0.8125rem;
+  }
 }
 .ttabs button.on { color: var(--navy); border-bottom-color: var(--ice); }
 .ttabs i {
@@ -1093,10 +1101,8 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .th h1 { font-size: 1.5rem; }
   .title-skel { width: 70%; height: 28px; }
   .meta-skel { width: 90%; }
-  .ttabs button { padding: 0.75rem 0.8rem; }
   .meta { gap: 0.15rem 1rem; }
   .meta span + span::before { display: none; }
-  .ttabs { flex-wrap: wrap; overflow: visible; }
   .row.match-row {
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   }
