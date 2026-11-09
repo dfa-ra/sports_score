@@ -38,6 +38,7 @@ import {
   type HomeTournament,
 } from '../lib/homeOverview'
 import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
+import { unitWord } from '../lib/q2Players'
 import { setPageMeta } from '../lib/pageMeta'
 import { registeredName } from '../lib/playerTitle'
 import { scheduleRevision } from '../lib/scheduleRefresh'
@@ -538,7 +539,7 @@ onUnmounted(() => {
               <span class="rk">{{ index + 1 }}</span>
               <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
               <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
-              <div class="g">{{ player.goals }}<small>{{ player.assists }} пер.</small></div>
+              <div class="g">{{ player.goals }}<small>{{ player.assists }} {{ unitWord(player.assists, 'assists') }}</small></div>
             </RouterLink>
           </div>
         </template>

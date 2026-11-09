@@ -117,6 +117,10 @@ void main() {
       '#1 А → #2 Б',
     );
     expect(eventDetail(eventType: 'GOAL', playerName: 'Иванов', playerJersey: 9), '#9 Иванов');
+    expect(assistWord(1), 'передача');
+    expect(assistWord(3), 'передачи');
+    expect(assistWord(12), 'передач');
+    expect(assistWord(21), 'передача');
   });
 
   test('formatWhen matches the web kickoff line', () {

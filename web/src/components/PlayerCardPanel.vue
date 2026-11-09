@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ageLine, formatMatchDay, outcomeMark } from '../lib/format'
+import { unitWord } from '../lib/q2Players'
 import { matchInstant } from '../lib/match'
 import { playerHeader } from '../lib/playerTitle'
 import { useAuthStore } from '../stores/auth'
@@ -81,7 +82,7 @@ function marks(row: MatchRow) {
   return [
     row.minutesPlayed != null ? `${row.minutesPlayed}'` : null,
     row.goals ? `${row.goals}Г` : null,
-    row.assists ? `${row.assists}Пер.` : null,
+    row.assists ? `${row.assists} ${unitWord(row.assists, 'assists')}` : null,
     row.yellowCards ? `${row.yellowCards}Ж` : null,
     row.redCards ? `${row.redCards}К` : null,
   ].filter(Boolean).join(' · ')

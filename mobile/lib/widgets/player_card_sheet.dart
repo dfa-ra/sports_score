@@ -32,7 +32,7 @@ class _PlayerCardSheetState extends State<PlayerCardSheet> {
     return [
       if (row.minutesPlayed != null) "${row.minutesPlayed}'",
       if (row.goals > 0) '${row.goals}Г',
-      if (row.assists > 0) '${row.assists}Пер.',
+      if (row.assists > 0) '${row.assists} ${assistWord(row.assists)}',
       if (row.yellowCards > 0) '${row.yellowCards}Ж',
       if (row.redCards > 0) '${row.redCards}К',
     ].join(' · ');

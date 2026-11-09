@@ -3,7 +3,7 @@ import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../api/client'
 import { registeredName } from '../lib/playerTitle'
-import { playerSearchQuery } from '../lib/q2Players'
+import { playerSearchQuery, unitWord } from '../lib/q2Players'
 import PlayerAvatar from './PlayerAvatar.vue'
 
 const props = defineProps<{ tournamentId?: string }>()
@@ -155,7 +155,7 @@ onUnmounted(() => {
             <PlayerAvatar :src="player.avatarUrl" :name="labelOf(player)" :first-name="player.firstName" :last-name="player.lastName" :size="32" />
             <span>
               <strong>{{ labelOf(player) }}</strong>
-              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} пер.` : '' }}</small>
+              <small>{{ player.goals ? `${player.goals} гол.` : '' }}<template v-if="player.goals && player.assists"> · </template>{{ player.assists ? `${player.assists} ${unitWord(player.assists, 'assists')}` : '' }}</small>
             </span>
           </RouterLink>
         </div>
