@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { fitLabel } from '../lib/fitLabel'
+import { fitEdgeLabel, fitLabel, fitLabelOwnsResize, scheduleFrame } from '../lib/fitLabel'
 
 const props = withDefaults(defineProps<{
   arrows?: boolean
@@ -42,30 +42,15 @@ function edgeFit() {
     if (!(button instanceof HTMLElement) || button.classList.contains('on')) continue
     const box = button.getBoundingClientRect()
     if (box.left < host.left + gutter || box.right <= host.right - gutter) continue
-    const full = label.dataset.full || ''
     const limit = host.right - gutter - box.left
     if (limit < 64) break
-    let lo = 2
-    let hi = full.length
-    let best = ''
-    while (lo <= hi) {
-      const mid = Math.floor((lo + hi) / 2)
-      const next = `${full.slice(0, mid).trimEnd()}…`
-      label.textContent = next
-      if (next.length > 2 && button.getBoundingClientRect().width <= limit && label.scrollWidth <= label.clientWidth + 1) {
-        best = next
-        lo = mid + 1
-      } else {
-        hi = mid - 1
-      }
-    }
-    if (best) label.textContent = best
-    else fitLabel(label)
+    if (!fitEdgeLabel(label, limit)) fitLabel(label)
     break
   }
 }
 
 let fitting = false
+let alive = true
 
 function coverCutChips() {
   plateWidth.value = 40
@@ -82,7 +67,20 @@ function coverCutChips() {
   plateWidth.value = Math.min(host.width, Math.max(40, host.right - plateLeft))
 }
 
-function update() {
+function fadeFlags() {
+  const node = row()
+  if (!node || getComputedStyle(node).display === 'none') {
+    left.value = false
+    right.value = false
+    return
+  }
+  coverCutChips()
+  left.value = node.scrollLeft > 2
+  right.value = node.scrollLeft + node.clientWidth < node.scrollWidth - 2
+}
+
+function fullUpdate() {
+  if (!alive) return
   const node = row()
   if (!node || getComputedStyle(node).display === 'none') {
     left.value = false
@@ -97,8 +95,11 @@ function update() {
       coverCutChips()
     } finally { fitting = false }
   }
-  left.value = node.scrollLeft > 2
-  right.value = node.scrollLeft + node.clientWidth < node.scrollWidth - 2
+  fadeFlags()
+}
+
+function scheduleFull() {
+  scheduleFrame(fullUpdate)
 }
 
 function revealActive() {
@@ -122,12 +123,12 @@ function nudge(direction: number) {
 }
 
 function onScroll() {
-  update()
+  fadeFlags()
 }
 
 function onResize() {
   phoneWidth()
-  update()
+  scheduleFull()
 }
 
 let observer: ResizeObserver | null = null
@@ -137,24 +138,28 @@ onMounted(() => {
   phoneWidth()
   bound = row()
   bound?.addEventListener('scroll', onScroll, { passive: true })
-  bound?.addEventListener('fit-label', update)
-  update()
+  bound?.addEventListener('fit-label', onScroll)
+  fullUpdate()
   revealActive()
-  observer = new ResizeObserver(() => update())
+  observer = new ResizeObserver(() => {
+    if (fitLabelOwnsResize()) return
+    scheduleFull()
+  })
   if (bound) observer.observe(bound)
   window.addEventListener('resize', onResize)
+  void document.fonts?.ready.then(() => scheduleFull())
 })
 
 onUnmounted(() => {
+  alive = false
   observer?.disconnect()
   bound?.removeEventListener('scroll', onScroll)
-  bound?.removeEventListener('fit-label', update)
+  bound?.removeEventListener('fit-label', onScroll)
   window.removeEventListener('resize', onResize)
 })
 
 watch(() => props.watchKey, () => {
-  update()
-  requestAnimationFrame(() => update())
+  scheduleFull()
 }, { flush: 'post' })
 </script>
 
