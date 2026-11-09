@@ -124,7 +124,8 @@ public class HomeOverviewService {
             }
         }
 
-        Map<UUID, Team> teams = loadTeams(corpus, running);
+        TeamIndex roster = loadTeams(corpus, running);
+        Map<UUID, Team> teams = roster.teams();
         BracketIndex bracket = bracketIndex(tournamentIds);
         Map<UUID, MatchResponse> mapped = mapMatches(displayMatches(liveEntities, upcomingEntities, recentEntities, running, byTournament));
 
@@ -134,7 +135,7 @@ public class HomeOverviewService {
         List<HomeScorersResponse> scorers = new ArrayList<>();
         for (Tournament tournament : running) {
             List<Match> matches = byTournament.getOrDefault(tournament.getId(), List.of());
-            cards.add(card(tournament, matches, now, tournamentsById, teams, mapped, bracket));
+            cards.add(card(tournament, matches, now, tournamentsById, teams, roster.approvedCounts(), mapped, bracket));
             if (tournament.getStatus() == TournamentStatus.ACTIVE) {
                 scorers.add(scorersOf(tournament, teams));
             }
@@ -237,6 +238,7 @@ public class HomeOverviewService {
             Instant now,
             Map<UUID, Tournament> tournamentsById,
             Map<UUID, Team> teams,
+            Map<UUID, Integer> approvedCounts,
             Map<UUID, MatchResponse> mapped,
             BracketIndex bracket
     ) {
@@ -247,9 +249,7 @@ public class HomeOverviewService {
                 rounds,
                 bracket.thirdPlaceMatchIds()
         );
-        int teamsCount = (int) tournamentTeamRepository.findByTournamentId(tournament.getId()).stream()
-                .filter(entry -> entry.getStatus() == TournamentTeamStatus.APPROVED)
-                .count();
+        int teamsCount = approvedCounts.getOrDefault(tournament.getId(), 0);
         HomeLeaderResponse leader = tournament.getStatus() == TournamentStatus.REGISTRATION
                 ? null
                 : leaderOf(tournament.getId(), teams);
@@ -301,13 +301,10 @@ public class HomeOverviewService {
                     continue;
                 }
                 StandingRow row = table.rows().getFirst();
-                Team team = teams.get(row.teamId());
-                if (team == null && row.teamId() != null) {
-                    team = teamRepository.findById(row.teamId()).orElse(null);
-                    if (team != null) {
-                        teams.put(team.getId(), team);
-                    }
+                if (row.teamId() != null && !teams.containsKey(row.teamId())) {
+                    rememberTeams(teams, List.of(row.teamId()));
                 }
+                Team team = row.teamId() == null ? null : teams.get(row.teamId());
                 String name = team != null ? team.getName() : row.teamName();
                 return new HomeLeaderResponse(
                         row.teamId(),
@@ -331,14 +328,23 @@ public class HomeOverviewService {
         try {
             List<PlayerStatisticsResponse> scorers = statisticsService.board(tournament.getId(), SCORER_LIMIT).scorers();
             if (scorers != null) {
+                List<PlayerStatisticsResponse> picked = new ArrayList<>();
+                List<UUID> missingTeams = new ArrayList<>();
                 for (PlayerStatisticsResponse scorer : scorers) {
                     if (scorer.goals() <= 0) {
                         continue;
                     }
-                    Team team = scorer.teamId() == null ? null : teams.get(scorer.teamId());
-                    if (team == null && scorer.teamId() != null) {
-                        team = teamRepository.findById(scorer.teamId()).orElse(null);
+                    picked.add(scorer);
+                    if (scorer.teamId() != null && !teams.containsKey(scorer.teamId())) {
+                        missingTeams.add(scorer.teamId());
                     }
+                    if (picked.size() >= SCORER_LIMIT) {
+                        break;
+                    }
+                }
+                rememberTeams(teams, missingTeams);
+                for (PlayerStatisticsResponse scorer : picked) {
+                    Team team = scorer.teamId() == null ? null : teams.get(scorer.teamId());
                     String teamName = team != null ? team.getName() : null;
                     rows.add(new HomeScorerResponse(
                             scorer.playerId(),
@@ -353,9 +359,6 @@ public class HomeOverviewService {
                             scorer.avatarUrl(),
                             scorer.teamLogoUrl() != null ? scorer.teamLogoUrl() : (team == null ? null : blankToNull(team.getLogoUrl()))
                     ));
-                    if (rows.size() >= SCORER_LIMIT) {
-                        break;
-                    }
                 }
             }
         } catch (RuntimeException ex) {
@@ -379,7 +382,7 @@ public class HomeOverviewService {
         return joined.isBlank() ? "Игрок" : joined;
     }
 
-    private Map<UUID, Team> loadTeams(List<Match> matches, List<Tournament> running) {
+    private TeamIndex loadTeams(List<Match> matches, List<Tournament> running) {
         Set<UUID> ids = new HashSet<>();
         for (Match match : matches) {
             if (match.getHomeTeamId() != null) {
@@ -389,9 +392,15 @@ public class HomeOverviewService {
                 ids.add(match.getAwayTeamId());
             }
         }
-        for (Tournament tournament : running) {
-            for (TournamentTeam entry : tournamentTeamRepository.findByTournamentId(tournament.getId())) {
-                if (entry.getStatus() == TournamentTeamStatus.APPROVED) {
+        Map<UUID, Integer> approvedCounts = new HashMap<>();
+        if (!running.isEmpty()) {
+            List<UUID> tournamentIds = running.stream().map(Tournament::getId).toList();
+            for (TournamentTeam entry : tournamentTeamRepository.findByTournamentIdIn(tournamentIds)) {
+                if (entry.getStatus() != TournamentTeamStatus.APPROVED) {
+                    continue;
+                }
+                approvedCounts.merge(entry.getTournamentId(), 1, Integer::sum);
+                if (entry.getTeamId() != null) {
                     ids.add(entry.getTeamId());
                 }
             }
@@ -402,7 +411,22 @@ public class HomeOverviewService {
                 teams.put(team.getId(), team);
             }
         }
-        return teams;
+        return new TeamIndex(teams, approvedCounts);
+    }
+
+    private void rememberTeams(Map<UUID, Team> teams, List<UUID> ids) {
+        Set<UUID> missing = new HashSet<>();
+        for (UUID id : ids) {
+            if (id != null && !teams.containsKey(id)) {
+                missing.add(id);
+            }
+        }
+        if (missing.isEmpty()) {
+            return;
+        }
+        for (Team team : teamRepository.findAllById(missing)) {
+            teams.put(team.getId(), team);
+        }
     }
 
     private List<Match> displayMatches(
@@ -538,6 +562,9 @@ public class HomeOverviewService {
     }
 
     private record BracketIndex(Map<UUID, Integer> rounds, Set<UUID> thirdPlaceMatchIds) {
+    }
+
+    private record TeamIndex(Map<UUID, Team> teams, Map<UUID, Integer> approvedCounts) {
     }
 
     private static String blankToNull(String value) {
