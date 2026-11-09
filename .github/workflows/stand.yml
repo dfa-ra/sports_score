@@ -112,7 +112,9 @@ jobs:
               out/student-league-dev-android.apk
           fi
           git tag -f dev
-          git push -f origin refs/tags/dev
+          # The stand downloads the GitHub Release named dev. A rejected tag
+          # update must not skip that deploy.
+          git push -f origin refs/tags/dev || echo "dev tag was not updated; release assets are published"
 
   deploy:
     name: SSH deploy to dev

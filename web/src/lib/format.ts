@@ -73,13 +73,17 @@ export const eventLabel: Record<string, string> = {
   GOAL: 'Гол',
   ASSIST: 'Передача',
   YELLOW_CARD: 'Жёлтая',
+  SECOND_YELLOW: 'Вторая жёлтая',
   RED_CARD: 'Красная',
+  OWN_GOAL: 'Автогол',
   SUBSTITUTION: 'Замена',
   POINT: 'Очко',
   FOUL: 'Фол',
   TIMEOUT: 'Тайм-аут',
   PERIOD_START: 'Начало тайма',
   PERIOD_END: 'Конец тайма',
+  PENALTY_SCORED: 'Пенальти',
+  PENALTY_MISSED: 'Пенальти мимо',
   OTHER: 'Событие',
 }
 

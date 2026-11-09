@@ -82,16 +82,6 @@ export function compareMatchEvents(a: TimedEvent, b: TimedEvent) {
   return String(a.id ?? '').localeCompare(String(b.id ?? ''))
 }
 
-const visibleTypes = new Set([
-  'GOAL',
-  'YELLOW_CARD',
-  'RED_CARD',
-  'SUBSTITUTION',
-  'OWN_GOAL',
-  'PERIOD_START',
-  'PERIOD_END',
-])
-
 /**
  * Which touchline the row belongs to. An own goal is filed with the team that
  * received the point. The event still names the player who kicked it in.
@@ -110,7 +100,7 @@ export function buildPeriodBlocks<T extends TimedEvent>(
   match: { homeTeamId?: string | null },
 ) {
   const chrono = events
-    .filter((event) => !event.voided && !!event.eventType && visibleTypes.has(event.eventType))
+    .filter((event) => !event.voided && !!event.eventType)
     .sort(compareMatchEvents)
   let home = 0
   let away = 0

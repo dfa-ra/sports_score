@@ -181,6 +181,14 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
           minute: minute.textContent?.trim() || '',
           scorer: scorer.textContent?.trim() || '',
           assist: assist?.textContent?.trim() || '',
+          kind: (row.querySelector('.kind') as HTMLElement | null)?.textContent?.trim() || '',
+          iconClass: (row.querySelector('.ev-mark') as HTMLElement | null)?.className || '',
+          iconBox: (() => {
+            const icon = row.querySelector('.ev-mark') as HTMLElement | null
+            if (!icon) return { w: 0, h: 0 }
+            const box = icon.getBoundingClientRect()
+            return { w: box.width, h: box.height }
+          })(),
           assistSize: assistStyle?.fontSize || '',
           score: score.textContent?.trim() || '',
           scorerTop: scorerBox.top,
@@ -252,7 +260,14 @@ test('overview events keep one row and a pinned score at 1280 and 375', async ({
     expect(cardRow.minute).toBe("30'")
     expect(cardRow.score).toBe('')
     expect(cardRow.assist).toBe('')
+    expect(cardRow.kind).toBe('Жёлтая')
+    expect(cardRow.iconClass).toContain('yellow_card')
+    expect(cardRow.iconBox.w).toBeGreaterThan(6)
+    expect(cardRow.iconBox.h).toBeGreaterThan(8)
     expect(cardRow.scorer).toContain(cardPlayer)
+    expect(goal.kind).toBe('Гол')
+    expect(goal.iconBox.w).toBeGreaterThan(6)
+    expect(sub.kind).toBe('Замена')
     expect(sub.assist).toBe(`→ #19 ${subIn}`)
     expect(sub.scorer).toContain(subOut)
     scoreInset.push(facts.rows[0].inset)
