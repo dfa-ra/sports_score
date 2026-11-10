@@ -266,7 +266,13 @@ onUnmounted(stopDrag)
 
     <template v-else>
       <p v-if="rosterMismatch" class="form-error mismatch">{{ ROSTER_MISMATCH_PLATE }}</p>
-      <p v-if="locked" class="banner">Сетка уже сформирована</p>
+      <p v-if="locked" class="banner">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+        Сетка уже сформирована
+      </p>
       <div class="summary desk" aria-label="Сводка стадий">
         <p v-if="!lines.length" class="muted">Стадии плей-офф ещё не выбраны.</p>
         <div v-for="(line, index) in lines" :key="line.stage" class="sum" :class="line.powerOfTwo ? 'ok' : 'bad'">
@@ -360,12 +366,25 @@ h3 {
 .empty { margin: 0.4rem 0 1rem; }
 .empty a { color: var(--ice); font-weight: 800; }
 .banner {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   margin: 0 0 0.7rem;
   padding: 0.7rem 0.85rem;
   border-radius: 12px;
-  background: #fff6e8;
-  color: #8a5a10;
+  background: #e6ebf4;
+  color: #00205b;
   font-weight: 800;
+}
+.banner svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .summary.desk {
   position: sticky;
@@ -396,8 +415,8 @@ h3 {
   border-radius: 50%;
   background: var(--muted);
 }
-.sum.ok i { background: #2f9e6b; }
-.sum.bad i { background: var(--danger); }
+.sum.ok i { background: var(--qualify-sum-ok); }
+.sum.bad i { background: var(--qualify-sum-bad); }
 .sum.bad,
 .sum.bad b,
 .sum.bad span { color: var(--danger); font-weight: 800; }
@@ -492,13 +511,13 @@ select:disabled {
 }
 .skel-title { height: 1rem; width: 40%; margin-bottom: 0.45rem; }
 .skel-row { height: 44px; margin-bottom: 0.35rem; }
-.ok-line { margin: 0; color: #1f7a4d; font-weight: 800; }
+.ok-line { margin: 0; color: #00205b; font-weight: 800; }
 @keyframes pulse {
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
 @media (max-width: 720px) {
-  .summary.desk { display: none; }
+  .summary.desk { position: static; }
   .summary.phone { display: block; }
   .desk-error { display: none; }
   .dock {
