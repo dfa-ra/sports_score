@@ -132,11 +132,11 @@ public class PlayoffQualifyService {
     @Transactional(readOnly = true)
     public PlayoffViewResponse decorate(UUID tournamentId, PlayoffViewResponse view) {
         List<PlayoffQualificationRule> rules = storedRules(tournamentId);
-        List<QualifyMarkResponse> marks = marks(rules);
+        List<GroupView> groups = rules.isEmpty() ? List.of() : groupViews(tournamentId);
+        List<QualifyMarkResponse> marks = marks(rules, groups);
         if (rules.isEmpty() || view.rounds() == null || view.rounds().isEmpty()) {
             return withMarks(view, marks);
         }
-        List<GroupView> groups = groupViews(tournamentId);
         Map<String, GroupView> byName = new HashMap<>();
         for (GroupView group : groups) {
             byName.put(group.name(), group);
@@ -153,9 +153,12 @@ public class PlayoffQualifyService {
                     : (retitle
                     ? roundHeading(chain.get(index - 1).stage(), chain.get(index - 1).total(), false)
                     : view.rounds().get(index - 1).title());
+            Map<Integer, Integer> feeders = index == 0
+                    ? Map.of()
+                    : visibleMatchNumbers(view.rounds().get(index - 1).slots());
             List<PlayoffSlotResponse> slots = new ArrayList<>();
             for (PlayoffSlotResponse slot : round.slots()) {
-                slots.add(paint(slot, title, previous, byName, retitle));
+                slots.add(paint(slot, title, previous, byName, retitle, feeders));
             }
             rounds.add(new PlayoffRoundResponse(round.round(), title, slots));
         }
@@ -211,13 +214,17 @@ public class PlayoffQualifyService {
             ));
         }
         boolean built = bracketBuilt(tournament);
+        PlayoffQualifyResponse.RangeError error = report.failure() == null
+                ? null
+                : new PlayoffQualifyResponse.RangeError(report.failure().code(), report.failure().message());
         return new PlayoffQualifyResponse(
                 blocks,
                 rows,
                 new PlayoffQualifyResponse.Derived(perStage),
                 built,
                 built,
-                built ? List.of() : proposalOf(groups, report)
+                built ? List.of() : proposalOf(groups, report),
+                error
         );
     }
 
@@ -291,15 +298,31 @@ public class PlayoffQualifyService {
         );
     }
 
+    /** 1-based index among the matches a viewer can see. Bye slots are not numbered. */
+    static Map<Integer, Integer> visibleMatchNumbers(List<PlayoffSlotResponse> slots) {
+        List<PlayoffSlotResponse> ordered = new ArrayList<>(slots);
+        ordered.sort(java.util.Comparator.comparingInt(PlayoffSlotResponse::slotIndex));
+        Map<Integer, Integer> numbers = new java.util.HashMap<>();
+        int number = 1;
+        for (PlayoffSlotResponse slot : ordered) {
+            if (slot.bye() || "THIRD".equals(slot.kind())) {
+                continue;
+            }
+            numbers.put(slot.slotIndex(), number++);
+        }
+        return numbers;
+    }
+
     private PlayoffSlotResponse paint(
             PlayoffSlotResponse slot,
             String roundTitle,
             String previousTitle,
             Map<String, GroupView> groups,
-            boolean retitle
+            boolean retitle,
+            Map<Integer, Integer> feeders
     ) {
-        Side home = paintSide(slot, true, previousTitle, groups, retitle);
-        Side away = paintSide(slot, false, previousTitle, groups, retitle);
+        Side home = paintSide(slot, true, previousTitle, groups, retitle, feeders);
+        Side away = paintSide(slot, false, previousTitle, groups, retitle, feeders);
         return new PlayoffSlotResponse(
                 slot.id(),
                 slot.round(),
@@ -335,7 +358,8 @@ public class PlayoffQualifyService {
             boolean home,
             String previousTitle,
             Map<String, GroupView> groups,
-            boolean retitle
+            boolean retitle,
+            Map<Integer, Integer> feeders
     ) {
         String groupName = home ? slot.homeGroupName() : slot.awayGroupName();
         Integer place = home ? slot.homePlace() : slot.awayPlace();
@@ -344,6 +368,9 @@ public class PlayoffQualifyService {
         String waiting = home ? slot.homeWaitingLabel() : slot.awayWaitingLabel();
         boolean seeded = place != null && place > 0 && groupName != null && !groupName.isBlank();
         GroupView group = groupName == null ? null : groups.get(groupName);
+        if (seeded && group != null && place > group.size()) {
+            return new Side(null, null, null);
+        }
         if (seeded && group != null && !group.finished()) {
             return new Side(null, null, seedLabel(groupName, place));
         }
@@ -354,8 +381,11 @@ public class PlayoffQualifyService {
             }
         }
         if (teamId == null && retitle && slot.round() > 1 && !"THIRD".equals(slot.kind()) && !seeded) {
-            int feeder = slot.slotIndex() * 2 + (home ? 1 : 2);
-            return new Side(null, null, PlayoffService.winnerSlotLabel(previousTitle, feeder));
+            int feederIndex = slot.slotIndex() * 2 + (home ? 0 : 1);
+            Integer number = feeders.get(feederIndex);
+            if (number != null) {
+                return new Side(null, null, PlayoffService.winnerSlotLabel(previousTitle, number));
+            }
         }
         return new Side(teamId, teamName, waiting);
     }
@@ -371,10 +401,19 @@ public class PlayoffQualifyService {
         );
     }
 
-    private List<QualifyMarkResponse> marks(List<PlayoffQualificationRule> rules) {
+    private List<QualifyMarkResponse> marks(List<PlayoffQualificationRule> rules, List<GroupView> groups) {
+        Map<UUID, Integer> sizes = new HashMap<>();
+        for (GroupView group : groups) {
+            sizes.put(group.id(), group.size());
+        }
         List<QualifyMarkResponse> marks = new ArrayList<>();
         for (PlayoffQualificationRule rule : rules) {
-            for (int place = rule.getPlaceFrom(); place <= rule.getPlaceTo(); place++) {
+            if (rule.getPlaceTo() < rule.getPlaceFrom()) {
+                continue;
+            }
+            int size = sizes.getOrDefault(rule.getTableId(), 0);
+            int last = Math.min(rule.getPlaceTo(), size);
+            for (int place = Math.max(1, rule.getPlaceFrom()); place <= last; place++) {
                 marks.add(new QualifyMarkResponse(rule.getTableId(), place, rule.getStage().name()));
             }
         }

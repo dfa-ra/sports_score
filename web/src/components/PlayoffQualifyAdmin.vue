@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
 import {
@@ -10,13 +10,18 @@ import {
   qualifyLines,
   stageLabel,
   stageMeta,
+  summaryTitle,
   winnersWord,
   type PlaceSpan,
   type QualifyStageId,
 } from '../lib/qualifyStages'
 
 const props = defineProps<{ tournamentId: string }>()
-const emit = defineEmits<{ changed: []; active: [boolean] }>()
+const emit = defineEmits<{
+  changed: []
+  active: [boolean]
+  gate: [value: { canBuild: boolean; hint: string }]
+}>()
 
 type PlaceRow = { place: number; teamId?: string | null; teamName?: string | null; stage?: string | null }
 type GroupBlock = { id: string; name: string; teamCount: number; finished: boolean; places: PlaceRow[] }
@@ -119,18 +124,30 @@ function selected(groupId: string, place: number) {
   return !!span && place >= span.from && place <= span.to
 }
 
+function stopDrag() {
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', stopDrag)
+  window.removeEventListener('pointercancel', stopDrag)
+}
+
+function onPointerMove(event: PointerEvent) {
+  if (locked.value || pending.value || !selection.value) return
+  const hit = document.elementFromPoint(event.clientX, event.clientY)
+  const row = hit?.closest?.('[data-qualify-place]') as HTMLElement | null
+  if (!row) return
+  if (row.dataset.groupId !== selection.value.groupId) return
+  const place = Number(row.dataset.place)
+  if (!place) return
+  selection.value = { ...selection.value, focus: place }
+}
+
 function onPointerDown(event: PointerEvent, groupId: string, place: number) {
   if (locked.value || pending.value) return
   if ((event.target as HTMLElement | null)?.closest('select')) return
   selection.value = { groupId, anchor: place, focus: place }
-  ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
-}
-
-function onPointerEnter(groupId: string, place: number, event: PointerEvent) {
-  if (locked.value || pending.value) return
-  if (!selection.value || selection.value.groupId !== groupId) return
-  if (event.pointerType === 'mouse' && event.buttons === 0) return
-  selection.value = { ...selection.value, focus: place }
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', stopDrag)
+  window.addEventListener('pointercancel', stopDrag)
 }
 
 function setStage(groupId: string, place: number, stage: string) {
@@ -190,7 +207,24 @@ function barColor(stage?: string) {
   return stageMeta(stage)?.color || 'transparent'
 }
 
+const buildHint = computed(() => {
+  if (loading.value || locked.value) return ''
+  if (placeError.value) return placeError.value
+  if (powerError.value) return powerError.value
+  if (error.value) return error.value
+  if (missingStage.value) return 'Укажите стадию для каждого места.'
+  if (touched.value) return 'Сначала сохраните изменения. Сетка собирается из сохранённых правил.'
+  if (!lines.value.length) return 'Сначала сохраните выход из групп так, чтобы сводка была зелёной.'
+  return ''
+})
+const canBuild = computed(() => !loading.value && !locked.value && !pending.value && buildHint.value === '')
+
+watch([canBuild, buildHint], () => {
+  emit('gate', { canBuild: canBuild.value, hint: buildHint.value })
+}, { immediate: true })
+
 onMounted(load)
+onUnmounted(stopDrag)
 </script>
 
 <template>
@@ -216,7 +250,7 @@ onMounted(load)
         <p v-if="!lines.length" class="muted">Стадии плей-офф ещё не выбраны.</p>
         <div v-for="(line, index) in lines" :key="line.stage" class="sum" :class="line.powerOfTwo ? 'ok' : 'bad'">
           <i aria-hidden="true"></i>
-          <b>{{ line.stage === 'F' ? 'Финал' : stageMeta(line.stage)?.label }}</b>
+          <b>{{ summaryTitle(line, lines, index) }}</b>
           <span>{{ line.direct }} напрямую + {{ line.fromPrev }} {{ winnersWord(line.fromPrev) }}{{ index > 0 ? ' ' + stageLabel(lines[index - 1].stage) : '' }} = {{ line.total }}</span>
           <span class="sr">{{ index }}</span>
         </div>
@@ -230,8 +264,10 @@ onMounted(load)
           class="qrow"
           :class="{ on: selected(group.id, row.place) }"
           :style="{ '--bar': barColor(stages[group.id]?.[row.place]) }"
+          data-qualify-place=""
+          :data-group-id="group.id"
+          :data-place="row.place"
           @pointerdown="onPointerDown($event, group.id, row.place)"
-          @pointerenter="onPointerEnter(group.id, row.place, $event)"
         >
           <span class="place">{{ row.place }}</span>
           <span class="team">{{ group.finished && row.teamName ? row.teamName : '—' }}</span>
@@ -251,12 +287,12 @@ onMounted(load)
       <div class="dock">
         <div class="summary phone" aria-label="Сводка стадий">
           <p v-if="placeError" class="form-error">{{ placeError }}</p>
-          <p v-else-if="powerError" class="form-error">{{ powerError }}</p>
-          <p v-else-if="missingStage" class="muted">Укажите стадию для каждого места.</p>
-          <p v-else-if="lines.length" class="ok-line">Сетка сходится</p>
+          <p v-if="powerError" class="form-error">{{ powerError }}</p>
+          <p v-else-if="!placeError && missingStage" class="muted">Укажите стадию для каждого места.</p>
+          <p v-else-if="!placeError && lines.length" class="ok-line">{{ lines.map((line, index) => summaryTitle(line, lines, index)).join(' · ') }}</p>
         </div>
         <p v-if="placeError" class="form-error desk-error">{{ placeError }}</p>
-        <p v-else-if="powerError" class="form-error desk-error">{{ powerError }}</p>
+        <p v-if="powerError" class="form-error desk-error">{{ powerError }}</p>
         <p v-else-if="missingStage" class="muted desk-error">Укажите стадию для каждого места. Проведите по местам 1–2 и выберите стадию для всех сразу.</p>
         <p v-if="error && error !== placeError" class="form-error">{{ error }}</p>
         <div v-if="confirming" class="confirm">
@@ -296,14 +332,14 @@ h3 {
 }
 .summary.desk {
   position: sticky;
-  top: 4.25rem;
-  z-index: 4;
+  top: var(--chrome-h);
+  z-index: 8;
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
   margin: 0 0 0.9rem;
   padding: 0.55rem;
-  background: rgba(255, 255, 255, 0.96);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 12px;
 }
@@ -343,6 +379,7 @@ h3 {
   background: #fff;
 }
 .qrow.on { background: color-mix(in srgb, var(--bar, #4cb4e5) 14%, #fff); }
+.place, .team { touch-action: none; }
 .place { font-weight: 800; color: var(--navy); }
 .team {
   min-width: 0;
@@ -416,7 +453,7 @@ select:disabled {
     z-index: 5;
     margin: 0.4rem -0.2rem 0;
     padding: 0.7rem 0.2rem calc(0.7rem + env(safe-area-inset-bottom));
-    background: rgba(255, 255, 255, 0.98);
+    background: #fff;
     border-top: 1px solid var(--line);
   }
   .dock .btn { width: 100%; min-height: 44px; }

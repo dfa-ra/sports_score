@@ -71,6 +71,10 @@ public class PlayoffPairService {
         if (current.rules() == null || current.rules().isEmpty()) {
             throw ApiException.badRequest("Сначала сохраните выход из групп");
         }
+        if (current.error() != null
+                && !PlayoffQualifyMath.NOT_POWER_OF_TWO.equals(current.error().code())) {
+            throw new ApiException(current.error().code(), current.error().message(), HttpStatus.BAD_REQUEST);
+        }
         List<StageLine> lines = linesOf(current);
         if (lines.isEmpty()) {
             throw new ApiException(

@@ -39,10 +39,40 @@ class PlayoffQualifyMathTest {
     void placeBeyondTheGroupIsRejectedAndNothingIsTreatedAsValid() {
         Report report = PlayoffQualifyMath.evaluate(
                 List.of(new GroupSize(groupA, "Группа A", 6)),
-                List.of(new RuleSpan(groupA, 1, 7, QualifyStage.QF))
+                List.of(new RuleSpan(groupA, 7, 7, QualifyStage.QF))
         );
         assertEquals(PlayoffQualifyMath.PLACE_OUT_OF_RANGE, report.failure().code());
-        assertTrue(report.failure().message().contains("6"));
+        assertEquals(
+                "Место 7 в группе «Группа A» больше числа команд (6)",
+                report.failure().message()
+        );
+        assertTrue(report.byPlace().isEmpty());
+    }
+
+    @Test
+    void aRuleThatRunsPastTheCurrentRosterStillCountsThePlacesThatRemain() {
+        Report report = PlayoffQualifyMath.evaluate(
+                List.of(new GroupSize(groupC, "Группа C", 3)),
+                List.of(new RuleSpan(groupC, 1, 4, QualifyStage.R8))
+        );
+        assertEquals(PlayoffQualifyMath.PLACE_OUT_OF_RANGE, report.failure().code());
+        assertEquals("В группе C теперь 3 команды, а правило до места 4", report.failure().message());
+        assertEquals(3, report.byPlace().get(groupC).size());
+        assertEquals(QualifyStage.R8, report.byPlace().get(groupC).get(1));
+        assertEquals(null, report.byPlace().get(groupC).get(4));
+        assertEquals(QualifyStage.R8, report.stages().get(0).stage());
+        assertEquals(3, report.stages().get(0).direct());
+        assertEquals(false, report.stages().get(0).powerOfTwo());
+    }
+
+    @Test
+    void reversedRangeHasItsOwnCode() {
+        Report report = PlayoffQualifyMath.evaluate(
+                List.of(new GroupSize(groupA, "Группа A", 6)),
+                List.of(new RuleSpan(groupA, 3, 2, QualifyStage.QF))
+        );
+        assertEquals(PlayoffQualifyMath.INVALID_RANGE, report.failure().code());
+        assertEquals("Диапазон мест 3–2 в группе «Группа A» перепутан", report.failure().message());
     }
 
     @Test
@@ -54,7 +84,7 @@ class PlayoffQualifyMathTest {
                         new RuleSpan(groupA, 2, 3, QualifyStage.R8)
                 )
         );
-        assertEquals(PlayoffQualifyMath.PLACE_OUT_OF_RANGE, report.failure().code());
+        assertEquals(PlayoffQualifyMath.PLACE_OVERLAP, report.failure().code());
         assertTrue(report.failure().message().contains("дважды"));
     }
 

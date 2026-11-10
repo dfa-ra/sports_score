@@ -8,6 +8,7 @@ import {
   powerMessage,
   qualifyLines,
   stageMap,
+  summaryTitle,
 } from '../src/lib/qualifyStages.ts'
 
 test('Zakhar groups: round of 16 has 8, quarterfinal is 4 direct plus 4 winners', () => {
@@ -44,11 +45,33 @@ test('a place past the group size uses the same sentence and blocks the save', (
   )
   assert.equal(
     placeOutOfRange(
+      [{ id: 'c', name: 'Группа C', teamCount: 3 }],
+      [{ groupId: 'c', placeFrom: 1, placeTo: 4 }],
+    ),
+    'В группе C теперь 3 команды, а правило до места 4',
+  )
+  assert.equal(
+    placeOutOfRange(
+      [{ id: 'a', name: 'Группа A', teamCount: 6 }],
+      [{ groupId: 'a', placeFrom: 3, placeTo: 2 }],
+    ),
+    'Диапазон мест 3–2 в группе «Группа A» перепутан',
+  )
+  assert.equal(
+    placeOutOfRange(
       [{ id: 'a', name: 'Группа A', teamCount: 6 }],
       [{ groupId: 'a', placeFrom: 1, placeTo: 6 }],
     ),
     '',
   )
+})
+
+test('two teams close the summary on the final row', () => {
+  const two = qualifyLines({ SF: 2 })
+  assert.equal(summaryTitle(two[0], two, 0), 'Финал')
+  const full = qualifyLines({ R8: 8, QF: 4 })
+  assert.equal(summaryTitle(full[3], full, 3), 'Финал')
+  assert.equal(summaryTitle(full[0], full, 0), '1/8')
 })
 
 test('group heading and legend follow the stage colours', () => {
@@ -62,4 +85,5 @@ test('group heading and legend follow the stage colours', () => {
   ])
   assert.deepEqual(items.map((item) => item.label), ['1/8', '1/4', 'Серебряная лига', 'Выбывает'])
   assert.equal(stageMap([{ groupId: 'a', place: 1, stage: 'QF' }]).a[1], 'QF')
+  assert.equal(stageMap([{ groupId: 'a', place: 5, stage: 'OUT' }]).a[5], 'OUT')
 })

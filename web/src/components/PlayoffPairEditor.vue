@@ -4,7 +4,15 @@ import api from '../api/client'
 import { apiError } from '../lib/errors'
 import { stageMeta } from '../lib/qualifyStages'
 
-const props = defineProps<{ tournamentId: string; refreshKey?: number }>()
+const props = withDefaults(defineProps<{
+  tournamentId: string
+  refreshKey?: number
+  canBuild?: boolean
+  hint?: string
+}>(), {
+  canBuild: true,
+  hint: '',
+})
 const emit = defineEmits<{ changed: [] }>()
 
 type Side = {
@@ -89,6 +97,7 @@ function move(pair: Pair, side: 'home' | 'away', nextKey: string) {
 }
 
 async function build() {
+  if (!props.canBuild) return
   pending.value = true
   error.value = ''
   try {
@@ -126,7 +135,7 @@ watch(() => props.refreshKey, () => {
     <h2>Пары</h2>
     <p v-if="loading" class="muted">Считаем посев…</p>
     <p v-else-if="locked" class="banner">Сетка уже сформирована. Пары меняются после пересборки.</p>
-    <p v-else-if="!pairs.length" class="muted">Сначала сохраните выход из групп так, чтобы сводка была зелёной.</p>
+    <p v-else-if="!pairs.length && !hint" class="muted">Сначала сохраните выход из групп так, чтобы сводка была зелёной.</p>
     <template v-else>
       <p class="muted">Посев по местам. Команду в паре можно поменять, пока сетка не собрана.</p>
       <div v-for="pair in pairs" :key="`${pair.stage}-${pair.pairIndex}`" class="prow" :style="{ '--bar': stageMeta(pair.stage)?.color || '#d5dbe3' }">
@@ -152,15 +161,16 @@ watch(() => props.refreshKey, () => {
         <span v-else class="wait">Победитель</span>
       </div>
       <div class="dock">
+        <p v-if="hint" class="form-error">{{ hint }}</p>
         <p v-if="error" class="form-error">{{ error }}</p>
         <div v-if="confirming" class="confirm">
           <p>Сетка соберётся по этим парам. Недоигранная группа останется посевом, например A1.</p>
           <div class="actions">
-            <button class="btn" type="button" :disabled="pending" @click="build">Собрать</button>
+            <button class="btn" type="button" :disabled="pending || !canBuild" @click="build">Собрать</button>
             <button class="btn secondary" type="button" :disabled="pending" @click="confirming = false">Отмена</button>
           </div>
         </div>
-        <button v-else class="btn" type="button" :disabled="pending" @click="confirming = true">Собрать сетку</button>
+        <button v-else class="btn" type="button" :disabled="pending || !canBuild" @click="confirming = true">Собрать сетку</button>
       </div>
     </template>
   </section>

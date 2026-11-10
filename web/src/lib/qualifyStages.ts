@@ -122,6 +122,12 @@ export function firstPowerError(lines: StageLine[]) {
 export type PlaceSpan = { groupId: string; placeFrom: number; placeTo: number }
 
 /** Same sentence as the server when a place is outside 1..group size. */
+export function groupToken(name: string) {
+  const trimmed = String(name || '').trim()
+  const letter = trimmed.match(/([A-Za-zА-Яа-яЁё])$/)
+  return letter ? letter[1].toUpperCase() : trimmed
+}
+
 export function placeOutOfRange(
   groups: { id: string; name: string; teamCount: number }[],
   rules: PlaceSpan[],
@@ -130,12 +136,24 @@ export function placeOutOfRange(
   for (const rule of rules) {
     const group = byId.get(rule.groupId)
     if (!group) continue
-    if (rule.placeFrom < 1 || rule.placeTo < rule.placeFrom || rule.placeTo > group.teamCount) {
-      const place = Math.max(rule.placeTo, rule.placeFrom)
-      return `Место ${place} в группе «${group.name}» больше числа команд (${group.teamCount})`
+    if (rule.placeFrom < 1 || rule.placeTo < rule.placeFrom) {
+      return `Диапазон мест ${rule.placeFrom}–${rule.placeTo} в группе «${group.name}» перепутан`
+    }
+    if (rule.placeFrom <= group.teamCount && rule.placeTo > group.teamCount) {
+      return `В группе ${groupToken(group.name)} теперь ${group.teamCount} ${teamsWord(group.teamCount)}, а правило до места ${rule.placeTo}`
+    }
+    if (rule.placeTo > group.teamCount) {
+      return `Место ${rule.placeTo} в группе «${group.name}» больше числа команд (${group.teamCount})`
     }
   }
   return ''
+}
+
+/** A round of exactly two teams is the final, even when that round was picked as 1/2. */
+export function summaryTitle(line: StageLine, lines: StageLine[], index: number) {
+  const closing = index === lines.length - 1 && line.total === 2 && line.powerOfTwo
+  if (line.stage === 'F' || closing) return 'Финал'
+  return stageMeta(line.stage)?.label || ''
 }
 
 /** Legend entries that actually appear, in bracket order. The final is not a direct place. */
@@ -147,7 +165,7 @@ export function legendItems(marks: QualifyMark[]) {
 export function stageMap(marks: QualifyMark[]) {
   const map: Record<string, Record<number, string>> = {}
   for (const mark of marks) {
-    if (!mark.groupId || !mark.stage || mark.stage === 'OUT') continue
+    if (!mark.groupId || !mark.stage || mark.stage === 'F') continue
     const group = map[mark.groupId] || (map[mark.groupId] = {})
     group[mark.place] = mark.stage
   }

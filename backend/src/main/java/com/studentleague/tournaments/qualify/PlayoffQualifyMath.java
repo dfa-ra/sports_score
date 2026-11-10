@@ -18,6 +18,8 @@ import java.util.UUID;
 public final class PlayoffQualifyMath {
 
     public static final String PLACE_OUT_OF_RANGE = "PLACE_OUT_OF_RANGE";
+    public static final String PLACE_OVERLAP = "PLACE_OVERLAP";
+    public static final String INVALID_RANGE = "INVALID_RANGE";
     public static final String NOT_POWER_OF_TWO = "NOT_POWER_OF_TWO";
     public static final String LOCKED = "LOCKED";
 
@@ -48,6 +50,7 @@ public final class PlayoffQualifyMath {
             byId.put(group.id(), group);
         }
         Map<UUID, Map<Integer, QualifyStage>> assigned = new LinkedHashMap<>();
+        Failure failure = null;
         for (RuleSpan rule : rules) {
             if (rule.stage() == null || rule.stage() == QualifyStage.F) {
                 return fail(PLACE_OUT_OF_RANGE, "Стадия места указана неверно", assigned);
@@ -56,24 +59,23 @@ public final class PlayoffQualifyMath {
             if (group == null) {
                 return fail(PLACE_OUT_OF_RANGE, "Группа не найдена в этом турнире", assigned);
             }
-            if (rule.placeFrom() < 1 || rule.placeTo() < rule.placeFrom() || rule.placeTo() > group.size()) {
-                return fail(
-                        PLACE_OUT_OF_RANGE,
-                        "Место " + Math.max(rule.placeTo(), rule.placeFrom())
-                                + " в группе «" + group.name() + "» больше числа команд (" + group.size() + ")"
-                , assigned);
+            if (rule.placeFrom() < 1 || rule.placeTo() < rule.placeFrom()) {
+                failure = first(failure, new Failure(
+                        INVALID_RANGE,
+                        "Диапазон мест " + rule.placeFrom() + "–" + rule.placeTo()
+                                + " в группе «" + group.name() + "» перепутан"
+                ));
+                continue;
             }
-            Map<Integer, QualifyStage> places = assigned.computeIfAbsent(group.id(), ignored -> new LinkedHashMap<>());
-            for (int place = rule.placeFrom(); place <= rule.placeTo(); place++) {
-                if (places.containsKey(place)) {
-                    return fail(
-                            PLACE_OUT_OF_RANGE,
-                            "Место " + place + " в группе «" + group.name() + "» указано дважды",
-                            assigned
-                    );
-                }
-                places.put(place, rule.stage());
+            int last = rule.placeTo();
+            if (rule.placeTo() > group.size()) {
+                failure = first(failure, new Failure(PLACE_OUT_OF_RANGE, beyondSize(group, rule)));
+                last = group.size();
             }
+            if (rule.placeFrom() > last) {
+                continue;
+            }
+            failure = first(failure, assign(assigned, group, rule.placeFrom(), last, rule.stage()));
         }
         EnumMap<QualifyStage, Integer> direct = new EnumMap<>(QualifyStage.class);
         for (Map<Integer, QualifyStage> places : assigned.values()) {
@@ -84,10 +86,12 @@ public final class PlayoffQualifyMath {
             }
         }
         List<StageLine> lines = lines(direct);
+        if (failure != null) {
+            return new Report(lines, failure, assigned);
+        }
         if (lines.isEmpty()) {
             return new Report(lines, new Failure(NOT_POWER_OF_TWO, "В плей-офф не выходит ни одна команда"), assigned);
         }
-        Failure failure = null;
         for (int index = 0; index < lines.size(); index++) {
             StageLine line = lines.get(index);
             if (!line.powerOfTwo()) {
@@ -232,6 +236,55 @@ public final class PlayoffQualifyMath {
             return "победителя";
         }
         return "победителей";
+    }
+
+    /** Last letter of «Группа C» is the token the admin sentence uses. */
+    static String groupToken(String name) {
+        String trimmed = name == null ? "" : name.trim();
+        for (int index = trimmed.length() - 1; index >= 0; index--) {
+            char c = trimmed.charAt(index);
+            if (Character.isWhitespace(c)) {
+                break;
+            }
+            if (Character.isLetter(c)) {
+                return String.valueOf(Character.toUpperCase(c));
+            }
+        }
+        return trimmed;
+    }
+
+    private static String beyondSize(GroupSize group, RuleSpan rule) {
+        if (rule.placeFrom() <= group.size()) {
+            return "В группе " + groupToken(group.name()) + " теперь " + group.size() + " "
+                    + teamsWord(group.size()) + ", а правило до места " + rule.placeTo();
+        }
+        return "Место " + rule.placeTo() + " в группе «" + group.name() + "» больше числа команд (" + group.size() + ")";
+    }
+
+    private static Failure assign(
+            Map<UUID, Map<Integer, QualifyStage>> assigned,
+            GroupSize group,
+            int from,
+            int to,
+            QualifyStage stage
+    ) {
+        Map<Integer, QualifyStage> places = assigned.computeIfAbsent(group.id(), ignored -> new LinkedHashMap<>());
+        Failure overlap = null;
+        for (int place = from; place <= to; place++) {
+            if (places.containsKey(place)) {
+                overlap = first(overlap, new Failure(
+                        PLACE_OVERLAP,
+                        "Место " + place + " в группе «" + group.name() + "» указано дважды"
+                ));
+                continue;
+            }
+            places.put(place, stage);
+        }
+        return overlap;
+    }
+
+    private static Failure first(Failure current, Failure next) {
+        return current == null ? next : current;
     }
 
     private static Report fail(String code, String message, Map<UUID, Map<Integer, QualifyStage>> assigned) {

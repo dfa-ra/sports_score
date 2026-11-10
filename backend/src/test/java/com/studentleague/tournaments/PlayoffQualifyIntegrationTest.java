@@ -223,7 +223,7 @@ class PlayoffQualifyIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rounds[0].title").value("1/8 финала"))
                 .andExpect(jsonPath("$.rounds[1].title").value("1/4 финала"))
                 .andExpect(jsonPath("$.rounds[3].title").value("Финал"))
-                .andReturn().getResponse().getContentAsString());
+                .andReturn().getResponse().getContentAsByteArray());
         java.util.Set<String> labels = new java.util.HashSet<>();
         for (JsonNode round : view.get("rounds")) {
             for (JsonNode slot : round.get("slots")) {
@@ -239,6 +239,12 @@ class PlayoffQualifyIntegrationTest extends AbstractIntegrationTest {
         }
         org.junit.jupiter.api.Assertions.assertTrue(labels.contains("A1"), labels.toString());
         org.junit.jupiter.api.Assertions.assertTrue(labels.contains("C4"), labels.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(labels.contains("Победитель 1/8 №1"), labels.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(labels.contains("Победитель 1/8 №4"), labels.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(
+                labels.stream().noneMatch(label -> label.contains("№6") || label.contains("№8")),
+                labels.toString()
+        );
 
         mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
                         .header("Authorization", auth(admin))
@@ -374,6 +380,87 @@ class PlayoffQualifyIntegrationTest extends AbstractIntegrationTest {
             }
         }
         throw new IllegalStateException(name);
+    }
+
+    @Test
+    void shrinkingTheGroupFlagsTheStaleRuleAndHidesTheMissingPlace() throws Exception {
+        String admin = createAdminAndLogin("pq-shrink-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        List<String> teams = new ArrayList<>();
+        String groupId = group(admin, tournamentId, "Группа C", 4, teams);
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rules":[{"groupId":"%s","placeFrom":1,"placeTo":4,"stage":"R8"}]}
+                                """.formatted(groupId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.error").value(nullValue()))
+                .andExpect(jsonPath("$.derived.perStage.R8.direct").value(4));
+
+        String kept = String.join("\",\"", teams.subList(0, 3));
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/tables")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tables":[{"id":"%s","name":"Группа C","teamIds":["%s"]}]}
+                                """.formatted(groupId, kept)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groups[0].teamCount").value(3))
+                .andExpect(jsonPath("$.groups[0].places.length()").value(3))
+                .andExpect(jsonPath("$.rules[0].placeTo").value(4))
+                .andExpect(jsonPath("$.derived.perStage.R8.direct").value(3))
+                .andExpect(jsonPath("$.derived.perStage.R8.powerOfTwo").value(false))
+                .andExpect(jsonPath("$.error.code").value("PLACE_OUT_OF_RANGE"))
+                .andExpect(jsonPath("$.error.message").value("В группе C теперь 3 команды, а правило до места 4"));
+
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.qualifyMarks.length()").value(3))
+                .andExpect(jsonPath("$.qualifyMarks[?(@.place == 4)]", hasSize(0)));
+
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff-qualify/pairs")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PLACE_OUT_OF_RANGE"))
+                .andExpect(jsonPath("$.message").value("В группе C теперь 3 команды, а правило до места 4"));
+    }
+
+    @Test
+    void reversedRangeAndOverlapHaveTheirOwnCodes() throws Exception {
+        String admin = createAdminAndLogin("pq-range-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        String groupId = group(admin, tournamentId, "Группа A", 6);
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rules":[{"groupId":"%s","placeFrom":3,"placeTo":2,"stage":"QF"}]}
+                                """.formatted(groupId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_RANGE"))
+                .andExpect(jsonPath("$.message").value("Диапазон мест 3–2 в группе «Группа A» перепутан"));
+
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"rules":[
+                                  {"groupId":"%s","placeFrom":1,"placeTo":2,"stage":"QF"},
+                                  {"groupId":"%s","placeFrom":2,"placeTo":3,"stage":"R8"}
+                                ]}
+                                """.formatted(groupId, groupId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PLACE_OVERLAP"))
+                .andExpect(jsonPath("$.message", containsString("указано дважды")));
     }
 
     @Test

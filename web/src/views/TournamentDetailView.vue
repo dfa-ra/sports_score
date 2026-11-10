@@ -437,6 +437,7 @@ const qualifyByGroup = computed(() => stageMap(qualifyMarks.value))
 const hasQualify = computed(() => qualifyMarks.value.length > 0)
 const qualifyRulesOn = ref(false)
 const qualifyTick = ref(0)
+const qualifyGate = ref({ canBuild: false, hint: '' })
 
 function qualifyChanged() {
   qualifyTick.value += 1
@@ -865,10 +866,13 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         :tournament-id="tournament.id"
         @active="qualifyRulesOn = $event"
         @changed="qualifyChanged"
+        @gate="qualifyGate = $event"
       />
       <PlayoffPairEditor
         :tournament-id="tournament.id"
         :refresh-key="qualifyTick"
+        :can-build="qualifyGate.canBuild"
+        :hint="qualifyGate.hint"
         @changed="load"
       />
       <PlayoffAdmin

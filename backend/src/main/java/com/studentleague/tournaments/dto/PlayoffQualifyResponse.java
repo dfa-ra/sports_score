@@ -10,7 +10,8 @@ public record PlayoffQualifyResponse(
         Derived derived,
         boolean locked,
         boolean bracketBuilt,
-        List<ProposedPair> proposal
+        List<ProposedPair> proposal,
+        RangeError error
 ) {
     public record GroupBlock(
             UUID id,
@@ -38,6 +39,10 @@ public record PlayoffQualifyResponse(
     }
 
     public record Derived(Map<String, StageMath> perStage) {
+    }
+
+    /** Present when saved or submitted rules do not fit the current groups. */
+    public record RangeError(String code, String message) {
     }
 
     public record StageMath(int direct, int fromPrev, int total, boolean powerOfTwo) {
