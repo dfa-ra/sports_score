@@ -59,6 +59,9 @@ public class PlayoffSlot {
     @Column(length = 120)
     private String venue;
 
+    @Column(nullable = false)
+    private boolean bye;
+
     @PrePersist
     void onCreate() {
         if (id == null) {
@@ -179,5 +182,13 @@ public class PlayoffSlot {
 
     public void setVenue(String venue) {
         this.venue = venue;
+    }
+
+    public boolean isBye() {
+        return bye;
+    }
+
+    public void setBye(boolean bye) {
+        this.bye = bye;
     }
 }

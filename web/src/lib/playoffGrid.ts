@@ -29,6 +29,7 @@ export type PlayoffSlot = {
   penaltyHome?: number | null
   penaltyAway?: number | null
   minute?: number | null
+  bye?: boolean | null
 }
 
 export type PlayoffRound = {
@@ -48,7 +49,7 @@ export { isThirdPlaceSlot }
 
 /** Bracket lines follow the main pairs. The 3rd-place slot is not a feeder. */
 export function linkSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
-  return slots.filter((slot) => !isThirdPlaceSlot(slot))
+  return slots.filter((slot) => !isThirdPlaceSlot(slot) && !slot.bye)
 }
 
 export function thirdPlaceSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
@@ -98,7 +99,7 @@ export function bracketPanels(rounds: PlayoffRound[]): BracketPanel[] {
       key: `round-${round.round ?? roundIndex}`,
       title: round.title || '',
       tab: segmentLabel(round.title),
-      slots: last ? main : slots,
+      slots: main,
       roundIndex,
       thirdPlace: false,
       champion: last,
@@ -112,7 +113,8 @@ export function defaultPanelIndex(panels: BracketPanel[]): number {
 }
 
 export function teamCountOf(rounds: PlayoffRound[]): number {
-  return slotsOf(rounds[0]).length * 2
+  const slots = slotsOf(rounds[0]).filter((slot) => !slot.bye && !isThirdPlaceSlot(slot))
+  return Math.max(1, slots.length) * 2
 }
 
 export function bracketIsEmpty(rounds?: PlayoffRound[] | null): boolean {

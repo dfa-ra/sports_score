@@ -7,6 +7,7 @@ public record PlayoffViewResponse(
         List<Integer> advancingPlaces,
         List<QualifiedTeamResponse> qualified,
         List<PlayoffRoundResponse> rounds,
-        List<UnassignedMatchResponse> unassignedMatches
+        List<UnassignedMatchResponse> unassignedMatches,
+        List<QualifyMarkResponse> qualifyMarks
 ) {
 }

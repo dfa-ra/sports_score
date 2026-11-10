@@ -26,6 +26,9 @@ import ApplyTeamDialog from '../components/ApplyTeamDialog.vue'
 import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PlayoffAdmin from '../components/PlayoffAdmin.vue'
+import PlayoffQualifyAdmin from '../components/PlayoffQualifyAdmin.vue'
+import QualifyLegend from '../components/QualifyLegend.vue'
+import { stageMap, type QualifyMark } from '../lib/qualifyStages'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import CardsStandings from '../components/CardsStandings.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
@@ -428,6 +431,15 @@ const perMatchLabel = computed(() => {
   return goalsPerMatchLabel(value)
 })
 const advancingPlaces = computed(() => Array.isArray(playoff.value?.advancingPlaces) ? playoff.value.advancingPlaces as number[] : [])
+const qualifyMarks = computed<QualifyMark[]>(() => (Array.isArray(playoff.value?.qualifyMarks) ? playoff.value.qualifyMarks : []))
+const qualifyByGroup = computed(() => stageMap(qualifyMarks.value))
+const hasQualify = computed(() => qualifyMarks.value.length > 0)
+const qualifyRulesOn = ref(false)
+
+function qualifyStage(groupId: string | null, place: number) {
+  if (!groupId) return ''
+  return qualifyByGroup.value[groupId]?.[place] || ''
+}
 const upcoming = computed(() => matches.value
   .filter((match) => match.status === 'SCHEDULED' || match.status === 'LIVE' || match.status === 'PAUSED')
   .slice()
@@ -667,8 +679,9 @@ async function exclude(team: { teamId: string; teamName?: string }) {
           <p>Нет утверждённых команд или сыгранных матчей.</p>
         </div>
         <template v-else>
-          <CardsStandings :tables="standings" :places="advancingPlaces" />
-          <p v-if="advancingPlaces.length" class="legend"><i class="ice"></i> Выходят в плей-офф</p>
+          <CardsStandings :tables="standings" :places="hasQualify ? [] : advancingPlaces" :stage-of="hasQualify ? qualifyStage : undefined" />
+          <QualifyLegend v-if="hasQualify" :marks="qualifyMarks" />
+          <p v-else-if="advancingPlaces.length" class="legend"><i class="ice"></i> Выходят в плей-офф</p>
           <p class="legend keys">И — игры, В — победы, Н — ничьи, П — поражения, О — очки</p>
         </template>
       </div>
@@ -808,7 +821,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <button class="btn secondary" type="submit" :disabled="pending">Сохранить</button>
       </form>
 
-      <h2>Таблицы и группы</h2>
+      <h2 id="groups">Таблицы и группы</h2>
       <p class="muted">Сколько групп показать и какие команды в какой. Матчи между разными группами в зачёт не идут.</p>
       <label class="field">Количество таблиц
         <input
@@ -841,10 +854,16 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       </p>
       <button class="btn secondary" type="button" :disabled="pending" @click="saveTables">Сохранить таблицы</button>
 
+      <PlayoffQualifyAdmin
+        :tournament-id="tournament.id"
+        @active="qualifyRulesOn = $event"
+        @changed="load"
+      />
       <PlayoffAdmin
         :tournament-id="tournament.id"
         :tables="savedTables"
         :playoff="playoff"
+        :qualify-rules="qualifyRulesOn"
         @changed="load"
       />
 

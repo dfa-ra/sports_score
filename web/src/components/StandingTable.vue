@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { stageMeta } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
@@ -8,17 +9,33 @@ const props = defineProps<{
   rows: any[]
   compact?: boolean
   markedPlaces?: number[]
+  /** Place number → stage id. When passed, it replaces the single advancing colour. */
+  placeStages?: Record<number, string> | null
 }>()
 
 const teams = useTeamDirectory()
 
+function stageId(index: number) {
+  if (!props.placeStages) return ''
+  return props.placeStages[index + 1] || ''
+}
+
 function rankClass(index: number) {
+  const stage = stageId(index)
+  if (stage) return 'q'
+  if (props.placeStages) return ''
   // A passed list, including an empty one, is the only highlight. The old
   // 1–2 / 3–4 colours stay only for callers that do not pass places.
   if (props.markedPlaces) return advancingRank(index, props.markedPlaces) ? 'ice' : ''
   if (index < 2) return 'ice'
   if (index < 4) return 'navy'
   return ''
+}
+
+function rowStyle(index: number) {
+  const meta = stageMeta(stageId(index))
+  if (!meta) return undefined
+  return { '--q': meta.color, '--q-ink': meta.ink }
 }
 
 function advances(index: number) {
@@ -43,7 +60,8 @@ function advances(index: number) {
       v-for="(row, i) in rows"
       :key="row.teamId"
       class="line"
-      :class="{ advances: advances(i) }"
+      :class="{ advances: advances(i), q: !!stageId(i) }"
+      :style="rowStyle(i)"
       :to="`/teams/${row.teamId}`"
     >
       <span>
@@ -125,6 +143,8 @@ function advances(index: number) {
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
 .rank.navy { background: var(--navy); color: #fff; }
+.line.q { background: color-mix(in srgb, var(--q) 16%, #fff); }
+.rank.q { background: var(--q); color: var(--q-ink, #102033); }
 @media (max-width: 720px) {
   .line,
   .compact .line {
@@ -165,6 +185,13 @@ function advances(index: number) {
     font-weight: 700;
   }
   .rank.ice, .rank.navy { background: transparent; color: #8b97a8; }
+  .rank.q {
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    background: var(--q);
+    color: var(--q-ink, #102033);
+  }
   .points { font-size: 14px; font-weight: 700; }
 }
 </style>

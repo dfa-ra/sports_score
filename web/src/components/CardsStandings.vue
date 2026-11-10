@@ -1,14 +1,27 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { stageMeta } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
-defineProps<{
+const props = defineProps<{
   tables: StandingGroup[]
   places?: number[] | null
+  /** When set, each place is coloured by its stage instead of one shared list. */
+  stageOf?: (groupId: string | null, place: number) => string
 }>()
+
+function stageId(groupId: string | null, place: number) {
+  return props.stageOf?.(groupId, place) || ''
+}
+
+function stageStyle(groupId: string | null, place: number) {
+  const meta = stageMeta(stageId(groupId, place))
+  if (!meta) return undefined
+  return { '--q': meta.color, '--q-ink': meta.ink }
+}
 
 const teams = useTeamDirectory()
 
@@ -40,10 +53,11 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           v-for="(row, rowIndex) in table.rows"
           :key="row.teamId"
           class="line"
-          :class="{ mark: advancingRank(rowIndex, places) }"
+          :class="{ mark: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+          :style="stageStyle(table.id, rowIndex + 1)"
           :to="`/teams/${row.teamId}`"
         >
-          <span><i class="rank" :class="{ ice: advancingRank(rowIndex, places) }">{{ rowIndex + 1 }}</i></span>
+          <span><i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i></span>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <b>{{ clubName(row) }}</b>
@@ -61,9 +75,11 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           v-for="(row, rowIndex) in table.rows"
           :key="`m-${row.teamId}`"
           class="mrow"
+          :class="{ q: !!stageId(table.id, rowIndex + 1) }"
+          :style="stageStyle(table.id, rowIndex + 1)"
           :to="`/teams/${row.teamId}`"
         >
-          <i class="rank" :class="{ ice: advancingRank(rowIndex, places) }">{{ rowIndex + 1 }}</i>
+          <i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
@@ -137,6 +153,8 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   background: #eef2f6;
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
+.line.q, .mrow.q { background: color-mix(in srgb, var(--q) 16%, #fff); }
+.rank.q { background: var(--q); color: var(--q-ink, #102033); }
 .phone { display: none; }
 @media (max-width: 720px) {
   .desk { display: none; }
@@ -156,5 +174,12 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   .mrow small { display: block; color: var(--muted); font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }
+  .rank.q {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    background: var(--q);
+    color: var(--q-ink, #102033);
+  }
 }
 </style>
