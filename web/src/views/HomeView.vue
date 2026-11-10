@@ -354,7 +354,7 @@ onUnmounted(() => {
         </div>
         <template v-else>
           <div class="filters">
-            <ScrollFade arrows fade="#ffffff">
+            <ScrollFade class="home-chips" arrows fade="#ffffff">
               <div class="chips">
                 <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">
                   <span class="chip-label">Все турниры</span>
@@ -413,7 +413,7 @@ onUnmounted(() => {
               </RouterLink>
             </div>
           </div>
-          <ScrollFade v-if="upcoming.length || recent.length" fade="#ffffff">
+          <ScrollFade v-if="upcoming.length || recent.length" class="home-feed" fade="#ffffff">
           <div class="feed-cards">
             <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
@@ -1288,6 +1288,31 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   }
   .hero-state .acts { gap: 8px; }
   .hero-state .hv-btn { height: 44px; min-height: 44px; }
+  .home-chips :deep(.scroll-fade-arrow) {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+  .home-chips :deep(.scroll-fade-edge.right) { width: 40px; }
+  .home-chips .chips::after { flex-basis: 56px; }
+  .home-chips .chip {
+    height: 40px;
+    min-height: 40px;
+  }
+  .home-feed :deep(.scroll-fade-edge.left) { display: none; }
+  .home-feed :deep(.scroll-fade-edge.right) { width: 36px; }
+  .feed-cards { padding-left: 12px; }
+  .mc { border: 1px solid #dde4ee; border-radius: 14px; }
+  .mc-top { min-width: 0; }
+  .mc-top .tb {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mc-top .st { flex: 0 0 auto; }
 }
 @media (max-width: 360px) {
   .hero-state h1 { font-size: 30px; }

@@ -7,7 +7,8 @@ import SockJS from 'sockjs-client'
 import api from '../api/client'
 import { useAuthStore } from '../stores/auth'
 import { eventLabel, isOwnGoal, labelOf, periodLabel, playerTag, statusLabel } from '../lib/format'
-import { registeredName } from '../lib/playerTitle'
+import { nameForms, registeredName } from '../lib/playerTitle'
+import FitName from '../components/FitName.vue'
 import { buildMirrorFeed, compareMatchEvents, eventMinute, eventOnHomeSide, feedMinuteLabel, matchCardWhen, penaltyPair, protocolMinute as protocolMinuteOf, protocolMinuteLimit, publicScore, unplayedCardScore } from '../lib/match'
 import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
@@ -144,6 +145,19 @@ function feedTitle(ev: any) {
 function feedTitleId(ev: any) {
   if (ev.eventType === 'SUBSTITUTION') return ev.secondaryPlayerId || ''
   return ev.playerId || ''
+}
+
+function titlePerson(ev: any) {
+  const role = ev?.eventType === 'SUBSTITUTION' ? 'secondary' : 'primary'
+  const jersey = role === 'secondary' ? ev?.secondaryPlayerJersey : ev?.playerJersey
+  return { jersey: jersey ?? null, ...nameForms(ev, role) }
+}
+
+function assistPerson(ev: any) {
+  if (!ev || ev.eventType !== 'GOAL' || isOwnGoal(ev)) return null
+  const forms = nameForms(ev, 'secondary')
+  if (!forms.full) return null
+  return { jersey: ev.secondaryPlayerJersey ?? null, ...forms }
 }
 
 function feedDetail(ev: any) {
@@ -1049,10 +1063,31 @@ onUnmounted(() => {
                 <span v-if="ev.scoreline" class="run">{{ blockScore(ev.scoreline) }}</span>
                 <div class="who">
                   <b>
-                    <RouterLink v-if="feedTitleId(ev)" :to="`/players/${feedTitleId(ev)}`">{{ feedTitle(ev) }}</RouterLink>
-                    <span v-else>{{ feedTitle(ev) }}</span>
+                    <RouterLink v-if="feedTitleId(ev)" class="who-link" :to="`/players/${feedTitleId(ev)}`">
+                      <span class="who-plain">{{ feedTitle(ev) }}</span>
+                      <span class="who-fit">
+                        <span v-if="titlePerson(ev).jersey != null" class="shirt">#{{ titlePerson(ev).jersey }}</span>
+                        <FitName :full="titlePerson(ev).full" :short="titlePerson(ev).short" />
+                      </span>
+                    </RouterLink>
+                    <template v-else>
+                      <span class="who-plain">{{ feedTitle(ev) }}</span>
+                      <span class="who-fit">
+                        <span v-if="titlePerson(ev).jersey != null" class="shirt">#{{ titlePerson(ev).jersey }}</span>
+                        <FitName :full="titlePerson(ev).full" :short="titlePerson(ev).short" />
+                      </span>
+                    </template>
                   </b>
-                  <span v-if="feedDetail(ev)" class="assist">{{ feedDetail(ev) }}</span>
+                  <span v-if="feedDetail(ev)" class="assist">
+                    <span class="assist-plain">{{ feedDetail(ev) }}</span>
+                    <span v-if="assistPerson(ev)" class="assist-fit">
+                      <span class="assist-kind">передача ·</span>
+                      <span class="assist-person">
+                        <span v-if="assistPerson(ev)?.jersey != null" class="shirt">#{{ assistPerson(ev)?.jersey }}</span>
+                        <FitName :full="assistPerson(ev)?.full || ''" :short="assistPerson(ev)?.short || ''" />
+                      </span>
+                    </span>
+                  </span>
                 </div>
               </div>
             </section>
@@ -1772,6 +1807,8 @@ h2 a { color: inherit; }
   color: inherit;
   text-decoration: none;
 }
+.who-fit, .assist-fit { display: none; }
+.shirt { flex-shrink: 0; }
 .card.events .ev.away .who b {
   direction: rtl;
   text-align: right;
@@ -2030,7 +2067,41 @@ h2 a { color: inherit; }
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .card.events .ev .min { font-size: 12px; font-weight: 600; }
+  .card.events .ev.home.goal { grid-template-columns: 28px 14px auto minmax(0, 1fr); }
+  .card.events .ev.home:not(.goal) { grid-template-columns: 28px 14px minmax(0, 1fr); }
+  .card.events .ev.away.goal { grid-template-columns: minmax(0, 1fr) auto 14px 28px; }
+  .card.events .ev.away:not(.goal) { grid-template-columns: minmax(0, 1fr) 14px 28px; }
+  .card.events .min,
+  .card.events .ev .min { width: 28px; max-width: 28px; font-size: 12px; font-weight: 600; }
+  .who-plain { display: none; }
+  .card.events .who-fit {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .card.events .ev b a.who-link,
+  .card.events .ev.away .who b a.who-link {
+    display: flex;
+    direction: ltr;
+    unicode-bidi: normal;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    margin-left: 0;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+  .card.events .ev.away .who b,
+  .card.events .ev.away .who b > span {
+    direction: ltr;
+    unicode-bidi: normal;
+    width: auto;
+    max-width: 100%;
+    overflow: hidden;
+  }
   .card.events .assist { font-size: 11px; line-height: 14px; font-weight: 500; }
   .card.events .run { font-size: 13px; font-weight: 800; }
   .card.events .half,
@@ -2072,24 +2143,45 @@ h2 a { color: inherit; }
     margin-left: auto;
     text-align: right;
   }
-  .card.events .ev.away .who b {
-    direction: rtl;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    overflow: hidden;
-  }
+  .card.events .ev.away .who b,
   .card.events .ev.away .who b a,
   .card.events .ev.away .who b > span {
     direction: ltr;
-    unicode-bidi: isolate;
-    display: inline;
-    width: auto;
-    max-width: none;
-    margin-left: 0;
-    overflow: visible;
-    text-overflow: clip;
-    white-space: nowrap;
+    unicode-bidi: normal;
   }
   .card.events .ev .assist { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+}
+@media (max-width: 360px) {
+  .card.events .assist {
+    max-height: 28px;
+    overflow: hidden;
+    line-height: 14px;
+  }
+  .card.events .assist-plain { display: none; }
+  .card.events .assist-fit {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 4px;
+    max-width: 100%;
+    max-height: 28px;
+    overflow: hidden;
+    line-height: 14px;
+  }
+  .card.events .assist-person {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+  .card.events .assist-person :deep(.fit-name) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 </style>

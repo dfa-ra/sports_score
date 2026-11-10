@@ -549,19 +549,29 @@ h2 { font-size: 1.2rem; }
   }
 }
 @media (max-width: 720px) {
-  .stack { gap: 12px; margin-top: -5px; }
-  .team-head { gap: 0; min-height: 44px; margin-bottom: 0; align-items: center; }
-  .team-head :deep(.team-crest) { width: 44px !important; height: 44px !important; font-size: 14px !important; }
-  .team-head h1 { font-size: 20px; line-height: 24px; font-weight: 800; }
-  .team-head p { margin: 0; font-size: 12px; line-height: 16px; font-weight: 500; }
+  .stack { gap: 12px; margin-top: 0; }
+  .team-head {
+    gap: 12px;
+    min-height: 0;
+    margin-bottom: 8px;
+    padding-top: 16px;
+    align-items: center;
+  }
+  .team-head :deep(.team-crest) { width: 48px !important; height: 48px !important; font-size: 16px !important; }
+  .team-head h1 { font-size: 22px; line-height: 26px; font-weight: 800; text-transform: uppercase; }
+  .team-head p { margin: 0; font-size: 13px; line-height: 16px; font-weight: 500; color: #5b6b82; }
   .star {
     position: relative;
     width: 44px;
     height: 44px;
-    font-size: 18px;
+    padding: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: #9aa7b8;
     display: grid;
     place-items: center;
   }
+  .star.on { color: #4cb4e5; }
   .star::before {
     content: "";
     position: absolute;

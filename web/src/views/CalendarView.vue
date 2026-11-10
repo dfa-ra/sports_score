@@ -116,7 +116,15 @@ const chipLabels = computed(() => {
 
 const showToday = computed(() => !liveOnly.value && filter.value.kind !== 'undated' && selectedDay.value === todayKey.value)
 const phone = ref(false)
+const pageEl = ref<HTMLElement | null>(null)
+const bandEl = ref<HTMLElement | null>(null)
 let phoneMedia: MediaQueryList | null = null
+let bandObserver: ResizeObserver | null = null
+
+function syncBar() {
+  const height = bandEl.value?.offsetHeight || 0
+  pageEl.value?.style.setProperty('--games-bar', `${height}px`)
+}
 function syncPhone() { phone.value = !!phoneMedia?.matches }
 
 const eyebrow = computed(() => {
@@ -299,6 +307,11 @@ onMounted(async () => {
   phoneMedia = window.matchMedia('(max-width: 720px)')
   syncPhone()
   phoneMedia.addEventListener('change', syncPhone)
+  syncBar()
+  if (bandEl.value && typeof ResizeObserver !== 'undefined') {
+    bandObserver = new ResizeObserver(() => syncBar())
+    bandObserver.observe(bandEl.value)
+  }
   syncCalendarQuery()
   await load(true)
   armRefresh()
@@ -325,13 +338,14 @@ watch(() => week.value.join('|'), (next, prev) => {
 
 onUnmounted(() => {
   phoneMedia?.removeEventListener('change', syncPhone)
+  bandObserver?.disconnect()
   if (refreshTimer) window.clearInterval(refreshTimer)
 })
 </script>
 
 <template>
-  <section class="calendar">
-    <div class="hero-band">
+  <section ref="pageEl" class="calendar">
+    <div ref="bandEl" class="hero-band">
     <header class="hero" :class="{ 'is-today': showToday }">
       <p class="eyebrow">{{ eyebrow }}</p>
       <h1>{{ title }}</h1>
@@ -359,7 +373,7 @@ onUnmounted(() => {
       </div>
     </header>
 
-    <ScrollFade class="filters-fade" arrows :fade="phone ? '#001433' : '#e8eef4'">
+    <ScrollFade class="filters-fade" :arrows="!phone" :fade="phone ? '#001433' : '#e8eef4'">
       <div class="filters" role="tablist" aria-label="Фильтр матчей">
         <button type="button" :class="{ on: filter.kind === 'all' }" @click="pick({ kind: 'all' })">
           <span class="full chip-label">Все турниры</span><span class="short chip-label">Все</span>
@@ -762,5 +776,69 @@ onUnmounted(() => {
   .card-head { gap: 8px; align-items: center; padding: 0 12px; height: 44px; }
   .days { gap: 4px; }
   .day { padding-inline: 0; }
+  .week {
+    height: 56px;
+    gap: 0;
+    align-items: stretch;
+    overflow: visible;
+  }
+  .days {
+    flex: 1 1 auto;
+    gap: 6px;
+    width: auto;
+    overflow: hidden;
+  }
+  .day {
+    flex: 1 1 0;
+    height: 56px;
+  }
+  .arrow {
+    position: relative;
+    width: 32px;
+    height: 56px;
+    flex: 0 0 32px;
+  }
+  .arrow::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 44px;
+    height: 56px;
+    transform: translate(-50%, -50%);
+  }
+  .filters-fade { position: relative; }
+  .filters-fade :deep(.scroll-fade-edge.right) { width: 36px; }
+  .filters button {
+    height: 40px;
+    min-height: 40px;
+  }
+  .card-head {
+    height: auto;
+    min-height: 44px;
+    overflow: visible;
+    align-items: flex-start;
+    padding: 14px 12px 8px;
+  }
+  .card-head > div { min-width: 0; flex: 1 1 auto; }
+  .card-head b {
+    display: block;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.25;
+    font-weight: 800;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: break-word;
+  }
+  .card-head a {
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: flex-start;
+  }
+  .main-col .card { scroll-margin-top: var(--games-bar, 0px); }
+}
+@media (max-width: 360px) {
+  .days { gap: 4px; }
 }
 </style>
