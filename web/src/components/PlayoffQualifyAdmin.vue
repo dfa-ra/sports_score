@@ -485,6 +485,15 @@ select:disabled {
   appearance: none;
   -webkit-appearance: none;
 }
+.is-locked select option,
+.is-locked select option:disabled,
+select:disabled option,
+select:disabled option:disabled {
+  color: var(--stage-silver-ink);
+  -webkit-text-fill-color: var(--stage-silver-ink);
+  background-color: var(--stage-silver-row);
+  opacity: 1;
+}
 .dock { display: grid; gap: 0.55rem; margin-top: 0.4rem; }
 .dock > .form-error {
   color: var(--danger);
