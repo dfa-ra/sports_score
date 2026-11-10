@@ -35,6 +35,18 @@ function circleTip(groupId: string | null, place: number) {
   return stageFullName(stageId(groupId, place)) || undefined
 }
 
+function stageName(groupId: string | null, place: number) {
+  return stageFullName(stageId(groupId, place)) || undefined
+}
+
+function dismissTip(event: KeyboardEvent) {
+  ;(event.currentTarget as HTMLElement).classList.add('tip-off')
+}
+
+function clearTip(event: FocusEvent) {
+  ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
+}
+
 const teams = useTeamDirectory()
 
 function clubName(row: { teamId?: string; teamName?: string }) {
@@ -69,7 +81,15 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <span><i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }" :title="circleTip(table.id, rowIndex + 1)" :aria-label="circleTip(table.id, rowIndex + 1)">{{ rowIndex + 1 }}</i></span>
+          <span><i
+            class="rank"
+            :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+            :tabindex="stageId(table.id, rowIndex + 1) ? 0 : undefined"
+            :title="circleTip(table.id, rowIndex + 1)"
+            :aria-label="stageName(table.id, rowIndex + 1)"
+            @keydown.escape.prevent="dismissTip"
+            @blur="clearTip"
+          >{{ rowIndex + 1 }}<span v-if="stageName(table.id, rowIndex + 1)" class="stage-tip" aria-hidden="true">{{ stageName(table.id, rowIndex + 1) }}</span></i></span>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <b>{{ clubName(row) }}</b>
@@ -91,7 +111,15 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }" :title="circleTip(table.id, rowIndex + 1)" :aria-label="circleTip(table.id, rowIndex + 1)">{{ rowIndex + 1 }}</i>
+          <i
+            class="rank"
+            :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+            :tabindex="stageId(table.id, rowIndex + 1) ? 0 : undefined"
+            :title="circleTip(table.id, rowIndex + 1)"
+            :aria-label="stageName(table.id, rowIndex + 1)"
+            @keydown.escape.prevent="dismissTip"
+            @blur="clearTip"
+          >{{ rowIndex + 1 }}<span v-if="stageName(table.id, rowIndex + 1)" class="stage-tip" aria-hidden="true">{{ stageName(table.id, rowIndex + 1) }}</span></i>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
@@ -153,6 +181,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 }
 .pts { font-weight: 800; color: var(--navy); }
 .rank {
+  position: relative;
   width: 1.45rem;
   height: 1.45rem;
   display: inline-grid;
@@ -203,4 +232,29 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
   }
 }
+.rank:focus { outline: none; }
+.rank:focus-visible {
+  outline: 2px solid #4cb4e5;
+  outline-offset: 2px;
+}
+.stage-tip {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: #00205b;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rank:focus-visible:not(.tip-off) .stage-tip { display: block; }
 </style>

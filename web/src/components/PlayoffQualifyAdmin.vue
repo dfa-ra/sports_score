@@ -279,7 +279,7 @@ onUnmounted(stopDrag)
           <i aria-hidden="true"></i>
           <b>{{ summaryTitle(line, lines, index) }}</b>
           <span>{{ line.direct }} напрямую + {{ line.fromPrev }} {{ winnersWord(line.fromPrev) }}{{ index > 0 ? ' ' + stageLabel(lines[index - 1].stage) : '' }} = {{ line.total }}</span>
-          <span class="sr">{{ index }}</span>
+          <span class="sr" aria-hidden="true">{{ index }}</span>
         </div>
       </div>
 

@@ -54,6 +54,18 @@ function circleTip(index: number) {
   if (!desktopTip.value) return undefined
   return stageFullName(stageId(index)) || undefined
 }
+
+function stageName(index: number) {
+  return stageFullName(stageId(index)) || undefined
+}
+
+function dismissTip(event: KeyboardEvent) {
+  ;(event.currentTarget as HTMLElement).classList.add('tip-off')
+}
+
+function clearTip(event: FocusEvent) {
+  ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
+}
 </script>
 
 <template>
@@ -77,7 +89,15 @@ function circleTip(index: number) {
       :to="`/teams/${row.teamId}`"
     >
       <span>
-        <span class="rank" :class="rankClass(i)" :title="circleTip(i)" :aria-label="circleTip(i)">{{ i + 1 }}</span>
+        <span
+          class="rank"
+          :class="rankClass(i)"
+          :tabindex="stageId(i) ? 0 : undefined"
+          :title="circleTip(i)"
+          :aria-label="stageName(i)"
+          @keydown.escape.prevent="dismissTip"
+          @blur="clearTip"
+        >{{ i + 1 }}<span v-if="stageName(i)" class="stage-tip" aria-hidden="true">{{ stageName(i) }}</span></span>
       </span>
       <span class="club">
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
@@ -141,6 +161,7 @@ function circleTip(index: number) {
 }
 .points { font-weight: 800; }
 .rank {
+  position: relative;
   width: 1.45rem;
   height: 1.45rem;
   display: inline-flex;
@@ -216,4 +237,29 @@ function circleTip(index: number) {
   }
   .points { font-size: 14px; font-weight: 700; }
 }
+.rank:focus { outline: none; }
+.rank:focus-visible {
+  outline: 2px solid #4cb4e5;
+  outline-offset: 2px;
+}
+.stage-tip {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: #00205b;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rank:focus-visible:not(.tip-off) .stage-tip { display: block; }
 </style>
