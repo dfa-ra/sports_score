@@ -178,6 +178,203 @@ class PlayoffQualifyIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void unfinishedGroupsStayAsSeedsAndTheBracketLocksTheRules() throws Exception {
+        String admin = createAdminAndLogin("pq-seed-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        JsonNode tables = assign(
+                admin,
+                tournamentId,
+                addTeams(UUID.fromString(tournamentId), "A", 6),
+                addTeams(UUID.fromString(tournamentId), "B", 6),
+                addTeams(UUID.fromString(tournamentId), "C", 8)
+        );
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(zakharBody(
+                                tables.get(0).get("id").asText(),
+                                tables.get(1).get("id").asText(),
+                                tables.get(2).get("id").asText()
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.proposal.length()").value(8));
+
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff-qualify/pairs")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm\":false}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff-qualify/pairs")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"confirm\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locked").value(true))
+                .andExpect(jsonPath("$.bracketBuilt").value(true));
+
+        JsonNode view = objectMapper.readTree(mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.competitionStage").value("PLAYOFF"))
+                .andExpect(jsonPath("$.rounds.length()").value(4))
+                .andExpect(jsonPath("$.rounds[0].title").value("1/8 финала"))
+                .andExpect(jsonPath("$.rounds[1].title").value("1/4 финала"))
+                .andExpect(jsonPath("$.rounds[3].title").value("Финал"))
+                .andReturn().getResponse().getContentAsString());
+        java.util.Set<String> labels = new java.util.HashSet<>();
+        for (JsonNode round : view.get("rounds")) {
+            for (JsonNode slot : round.get("slots")) {
+                if (slot.hasNonNull("homeWaitingLabel")) {
+                    labels.add(slot.get("homeWaitingLabel").asText());
+                    org.junit.jupiter.api.Assertions.assertTrue(slot.get("homeTeamName").isNull());
+                }
+                if (slot.hasNonNull("awayWaitingLabel")) {
+                    labels.add(slot.get("awayWaitingLabel").asText());
+                    org.junit.jupiter.api.Assertions.assertTrue(slot.get("awayTeamName").isNull());
+                }
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(labels.contains("A1"), labels.toString());
+        org.junit.jupiter.api.Assertions.assertTrue(labels.contains("C4"), labels.toString());
+
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(zakharBody(
+                                tables.get(0).get("id").asText(),
+                                tables.get(1).get("id").asText(),
+                                tables.get(2).get("id").asText()
+                        )))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOCKED"));
+    }
+
+    @Test
+    void manualPairEditReplacesTheSeedAndADuplicateDoesNotBuild() throws Exception {
+        String admin = createAdminAndLogin("pq-pair-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        String sportId = footballId(admin);
+        String tournamentId = createTournament(admin, sportId);
+        JsonNode tables = assign(
+                admin,
+                tournamentId,
+                addTeams(UUID.fromString(tournamentId), "A", 6),
+                addTeams(UUID.fromString(tournamentId), "B", 6),
+                addTeams(UUID.fromString(tournamentId), "C", 8)
+        );
+        mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(zakharBody(
+                                tables.get(0).get("id").asText(),
+                                tables.get(1).get("id").asText(),
+                                tables.get(2).get("id").asText()
+                        )))
+                .andExpect(status().isOk());
+        JsonNode qualify = objectMapper.readTree(mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        JsonNode first = null;
+        JsonNode second = null;
+        for (JsonNode pair : qualify.get("proposal")) {
+            if (!"R8".equals(pair.get("stage").asText()) || pair.get("away").isNull()) {
+                continue;
+            }
+            if (pair.get("pairIndex").asInt() == 0) {
+                first = pair;
+            }
+            if (pair.get("pairIndex").asInt() == 1) {
+                second = pair;
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertNotNull(first);
+        org.junit.jupiter.api.Assertions.assertNotNull(second);
+
+        String duplicate = """
+                {"confirm":true,"pairs":[{"stage":"R8","pairIndex":0,"homeGroupId":"%s","homePlace":%d,"awayGroupId":"%s","awayPlace":%d}]}
+                """.formatted(
+                first.get("home").get("groupId").asText(),
+                first.get("home").get("place").asInt(),
+                first.get("home").get("groupId").asText(),
+                first.get("home").get("place").asInt()
+        );
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff-qualify/pairs")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(duplicate))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(jsonPath("$.rounds.length()").value(0));
+
+        com.fasterxml.jackson.databind.node.ObjectNode body = objectMapper.createObjectNode();
+        body.put("confirm", true);
+        com.fasterxml.jackson.databind.node.ArrayNode pairs = body.putArray("pairs");
+        for (JsonNode pair : qualify.get("proposal")) {
+            com.fasterxml.jackson.databind.node.ObjectNode row = pairs.addObject();
+            row.put("stage", pair.get("stage").asText());
+            row.put("pairIndex", pair.get("pairIndex").asInt());
+            JsonNode home = pair.get("home");
+            JsonNode away = pair.get("away");
+            if (pair.get("pairIndex").asInt() == 0 && "R8".equals(pair.get("stage").asText())) {
+                home = second.get("home");
+                away = first.get("away");
+            } else if (pair.get("pairIndex").asInt() == 1 && "R8".equals(pair.get("stage").asText())) {
+                home = first.get("home");
+                away = second.get("away");
+            }
+            if (home != null && !home.isNull()) {
+                row.put("homeGroupId", home.get("groupId").asText());
+                row.put("homePlace", home.get("place").asInt());
+            }
+            if (away != null && !away.isNull()) {
+                row.put("awayGroupId", away.get("groupId").asText());
+                row.put("awayPlace", away.get("place").asInt());
+            }
+        }
+        mockMvc.perform(post("/api/v1/tournaments/" + tournamentId + "/playoff-qualify/pairs")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.bracketBuilt").value(true));
+
+        JsonNode view = objectMapper.readTree(mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        JsonNode swapped = null;
+        for (JsonNode slot : view.get("rounds").get(0).get("slots")) {
+            if (!slot.get("bye").asBoolean() && slot.get("slotIndex").asInt() >= 0) {
+                int real = 0;
+                for (JsonNode earlier : view.get("rounds").get(0).get("slots")) {
+                    if (earlier.get("slotIndex").asInt() >= slot.get("slotIndex").asInt()) {
+                        break;
+                    }
+                    if (!earlier.get("bye").asBoolean()) {
+                        real++;
+                    }
+                }
+                if (real == 0) {
+                    swapped = slot;
+                    break;
+                }
+            }
+        }
+        org.junit.jupiter.api.Assertions.assertNotNull(swapped);
+        org.junit.jupiter.api.Assertions.assertEquals(second.get("home").get("place").asInt(), swapped.get("homePlace").asInt());
+        org.junit.jupiter.api.Assertions.assertEquals(second.get("home").get("groupId").asText(), groupIdOf(tables, swapped.get("homeGroupName").asText()));
+    }
+
+    private static String groupIdOf(JsonNode tables, String name) {
+        for (JsonNode table : tables) {
+            if (name.equals(table.get("name").asText())) {
+                return table.get("id").asText();
+            }
+        }
+        throw new IllegalStateException(name);
+    }
+
+    @Test
     void tournamentWithoutGroupsSaysSo() throws Exception {
         String admin = createAdminAndLogin("pq-e-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         String sportId = footballId(admin);

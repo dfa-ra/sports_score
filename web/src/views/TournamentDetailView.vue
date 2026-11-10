@@ -27,6 +27,7 @@ import CreateMatchForm from '../components/CreateMatchForm.vue'
 import EmptyState from '../components/EmptyState.vue'
 import PlayoffAdmin from '../components/PlayoffAdmin.vue'
 import PlayoffQualifyAdmin from '../components/PlayoffQualifyAdmin.vue'
+import PlayoffPairEditor from '../components/PlayoffPairEditor.vue'
 import QualifyLegend from '../components/QualifyLegend.vue'
 import { stageMap, type QualifyMark } from '../lib/qualifyStages'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
@@ -435,6 +436,12 @@ const qualifyMarks = computed<QualifyMark[]>(() => (Array.isArray(playoff.value?
 const qualifyByGroup = computed(() => stageMap(qualifyMarks.value))
 const hasQualify = computed(() => qualifyMarks.value.length > 0)
 const qualifyRulesOn = ref(false)
+const qualifyTick = ref(0)
+
+function qualifyChanged() {
+  qualifyTick.value += 1
+  load()
+}
 
 function qualifyStage(groupId: string | null, place: number) {
   if (!groupId) return ''
@@ -857,6 +864,11 @@ async function exclude(team: { teamId: string; teamName?: string }) {
       <PlayoffQualifyAdmin
         :tournament-id="tournament.id"
         @active="qualifyRulesOn = $event"
+        @changed="qualifyChanged"
+      />
+      <PlayoffPairEditor
+        :tournament-id="tournament.id"
+        :refresh-key="qualifyTick"
         @changed="load"
       />
       <PlayoffAdmin

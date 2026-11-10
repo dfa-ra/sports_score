@@ -1,8 +1,10 @@
 package com.studentleague.tournaments.controller;
 
+import com.studentleague.tournaments.dto.ApplyPairsRequest;
 import com.studentleague.tournaments.dto.PlayoffQualifyResponse;
 import com.studentleague.tournaments.dto.RebuildPlayoffRequest;
 import com.studentleague.tournaments.dto.SavePlayoffQualifyRequest;
+import com.studentleague.tournaments.service.PlayoffPairService;
 import com.studentleague.tournaments.service.PlayoffQualifyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -26,9 +28,14 @@ import java.util.UUID;
 public class PlayoffQualifyController {
 
     private final PlayoffQualifyService playoffQualifyService;
+    private final PlayoffPairService playoffPairService;
 
-    public PlayoffQualifyController(PlayoffQualifyService playoffQualifyService) {
+    public PlayoffQualifyController(
+            PlayoffQualifyService playoffQualifyService,
+            PlayoffPairService playoffPairService
+    ) {
         this.playoffQualifyService = playoffQualifyService;
+        this.playoffPairService = playoffPairService;
     }
 
     @GetMapping
@@ -46,6 +53,16 @@ public class PlayoffQualifyController {
             @Valid @RequestBody SavePlayoffQualifyRequest request
     ) {
         return playoffQualifyService.save(id, request);
+    }
+
+    @PostMapping("/pairs")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Seed the bracket from the saved places, with optional pair edits (ADMIN)")
+    public PlayoffQualifyResponse pairs(
+            @PathVariable UUID id,
+            @Valid @RequestBody ApplyPairsRequest request
+    ) {
+        return playoffPairService.apply(id, request);
     }
 
     @PostMapping("/rebuild")

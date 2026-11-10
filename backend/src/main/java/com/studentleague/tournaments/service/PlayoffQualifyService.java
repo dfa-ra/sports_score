@@ -21,6 +21,10 @@ import com.studentleague.tournaments.entity.PlayoffQualificationRule;
 import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
+import com.studentleague.tournaments.pairing.PlayoffPairing;
+import com.studentleague.tournaments.pairing.PlayoffPairing.Entrant;
+import com.studentleague.tournaments.pairing.PlayoffPairing.PairingRejected;
+import com.studentleague.tournaments.pairing.PlayoffPairing.SlotDraft;
 import com.studentleague.tournaments.qualify.PlayoffQualifyMath;
 import com.studentleague.tournaments.qualify.PlayoffQualifyMath.Failure;
 import com.studentleague.tournaments.qualify.PlayoffQualifyMath.GroupSize;
@@ -143,10 +147,12 @@ public class PlayoffQualifyService {
         List<PlayoffRoundResponse> rounds = new ArrayList<>();
         for (int index = 0; index < view.rounds().size(); index++) {
             PlayoffRoundResponse round = view.rounds().get(index);
-            String title = retitle ? roundHeading(chain.get(index).stage()) : round.title();
+            String title = retitle ? roundHeading(chain.get(index).stage(), chain.get(index).total(), index == chain.size() - 1) : round.title();
             String previous = index == 0
                     ? null
-                    : (retitle ? roundHeading(chain.get(index - 1).stage()) : view.rounds().get(index - 1).title());
+                    : (retitle
+                    ? roundHeading(chain.get(index - 1).stage(), chain.get(index - 1).total(), false)
+                    : view.rounds().get(index - 1).title());
             List<PlayoffSlotResponse> slots = new ArrayList<>();
             for (PlayoffSlotResponse slot : round.slots()) {
                 slots.add(paint(slot, title, previous, byName, retitle));
@@ -210,7 +216,78 @@ public class PlayoffQualifyService {
                 rows,
                 new PlayoffQualifyResponse.Derived(perStage),
                 built,
-                built
+                built,
+                built ? List.of() : proposalOf(groups, report)
+        );
+    }
+
+    private List<PlayoffQualifyResponse.ProposedPair> proposalOf(List<GroupView> groups, Report report) {
+        if (report.failure() != null || report.stages().isEmpty()) {
+            return List.of();
+        }
+        List<Entrant> entrants = new ArrayList<>();
+        int order = 0;
+        for (GroupView group : groups) {
+            Map<Integer, QualifyStage> stages = report.byPlace().getOrDefault(group.id(), Map.of());
+            for (int place = 1; place <= group.size(); place++) {
+                QualifyStage stage = stages.get(place);
+                if (stage == null || !stage.playoffEntry()) {
+                    continue;
+                }
+                StandingRow team = group.finished() ? group.row(place) : null;
+                entrants.add(new Entrant(
+                        group.id(),
+                        group.name(),
+                        place,
+                        order,
+                        stage,
+                        team == null ? null : team.teamId()
+                ));
+            }
+            order++;
+        }
+        List<SlotDraft> slots;
+        try {
+            slots = PlayoffPairing.arrange(report.stages(), entrants);
+        } catch (PairingRejected ex) {
+            return List.of();
+        }
+        QualifyStage closer = report.stages().getLast().total() == 2 ? report.stages().getLast().stage() : null;
+        List<PlayoffQualifyResponse.ProposedPair> pairs = new ArrayList<>();
+        for (SlotDraft slot : slots) {
+            if (slot.bye() || (slot.home() == null && slot.away() == null)) {
+                continue;
+            }
+            String label = slot.stage() == closer ? "Финал" : slot.stage().label();
+            pairs.add(new PlayoffQualifyResponse.ProposedPair(
+                    slot.stage().name(),
+                    label,
+                    slot.roundNumber(),
+                    slot.pairIndex(),
+                    proposedSide(groups, slot.home()),
+                    proposedSide(groups, slot.away())
+            ));
+        }
+        return pairs;
+    }
+
+    private static PlayoffQualifyResponse.ProposedSide proposedSide(List<GroupView> groups, PlayoffPairing.Side side) {
+        if (side == null) {
+            return null;
+        }
+        String teamName = null;
+        for (GroupView group : groups) {
+            if (group.id().equals(side.groupId()) && group.finished()) {
+                StandingRow row = group.row(side.place());
+                teamName = row == null ? null : row.teamName();
+            }
+        }
+        return new PlayoffQualifyResponse.ProposedSide(
+                side.groupId(),
+                side.groupName(),
+                side.place(),
+                seedLabel(side.groupName(), side.place()),
+                teamName
         );
     }
 
@@ -429,7 +506,11 @@ public class PlayoffQualifyService {
     }
 
     static String roundHeading(QualifyStage stage) {
-        if (stage == QualifyStage.F) {
+        return roundHeading(stage, 0, false);
+    }
+
+    static String roundHeading(QualifyStage stage, int total, boolean closing) {
+        if (stage == QualifyStage.F || (closing && total == 2)) {
             return "Финал";
         }
         return stage.label() + " финала";

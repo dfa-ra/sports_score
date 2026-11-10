@@ -9,7 +9,8 @@ public record PlayoffQualifyResponse(
         List<RuleRow> rules,
         Derived derived,
         boolean locked,
-        boolean bracketBuilt
+        boolean bracketBuilt,
+        List<ProposedPair> proposal
 ) {
     public record GroupBlock(
             UUID id,
@@ -40,5 +41,25 @@ public record PlayoffQualifyResponse(
     }
 
     public record StageMath(int direct, int fromPrev, int total, boolean powerOfTwo) {
+    }
+
+    /** One real match the admin can still move before the bracket is stored. */
+    public record ProposedPair(
+            String stage,
+            String stageLabel,
+            int roundNumber,
+            int pairIndex,
+            ProposedSide home,
+            ProposedSide away
+    ) {
+    }
+
+    public record ProposedSide(
+            UUID groupId,
+            String groupName,
+            int place,
+            String seed,
+            String teamName
+    ) {
     }
 }
