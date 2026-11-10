@@ -9,7 +9,7 @@ const items = computed(() => legendItems(props.marks || []))
 <template>
   <p v-if="items.length" class="legend">
     <span v-for="item in items" :key="item.id">
-      <i :style="{ background: item.color }"></i>{{ item.label }}
+      <i :data-qualify="item.id"></i>{{ item.label }}
     </span>
   </p>
 </template>
@@ -28,5 +28,6 @@ i {
   width: 0.7rem;
   height: 0.7rem;
   border-radius: 50%;
+  background: var(--q-dot);
 }
 </style>

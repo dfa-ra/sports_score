@@ -1,4 +1,4 @@
-/** Stage colours shared by the admin rows, the public table and the legend. */
+/** Stage names. The painted colours live in one place: the --stage-* tokens in styles/main.css. */
 
 export type QualifyStageId = 'R16' | 'R8' | 'QF' | 'SF' | 'F' | 'SILVER' | 'OUT'
 
@@ -20,12 +20,12 @@ const PIPE: QualifyStageId[] = ['R16', 'R8', 'QF', 'SF']
 const ALLOWED = [2, 4, 8, 16]
 
 export const QUALIFY_STAGES: { id: QualifyStageId; label: string; color: string; ink: string }[] = [
-  { id: 'R16', label: '1/16', color: '#7b61ff', ink: '#fff' },
-  { id: 'R8', label: '1/8', color: '#4cb4e5', ink: '#102033' },
-  { id: 'QF', label: '1/4', color: '#2f9e6b', ink: '#fff' },
-  { id: 'SF', label: '1/2', color: '#e0a106', ink: '#102033' },
-  { id: 'SILVER', label: 'Серебряная лига', color: '#8d97a8', ink: '#102033' },
-  { id: 'OUT', label: 'Выбывает', color: '#d5dbe3', ink: '#102033' },
+  { id: 'R16', label: '1/16', color: 'var(--stage-r16)', ink: 'var(--stage-r16-ink)' },
+  { id: 'R8', label: '1/8', color: 'var(--stage-r8)', ink: 'var(--stage-r8-ink)' },
+  { id: 'QF', label: '1/4', color: 'var(--stage-qf)', ink: 'var(--stage-qf-ink)' },
+  { id: 'SF', label: '1/2', color: 'var(--stage-sf)', ink: 'var(--stage-sf-ink)' },
+  { id: 'SILVER', label: 'Серебряная лига', color: 'var(--stage-silver)', ink: 'var(--stage-silver-ink)' },
+  { id: 'OUT', label: 'Выбывает', color: 'var(--stage-out)', ink: 'var(--stage-out-ink)' },
 ]
 
 const BY_ID = new Map(QUALIFY_STAGES.map((item) => [item.id, item]))

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
-import { stageMeta } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
@@ -32,12 +31,6 @@ function rankClass(index: number) {
   return ''
 }
 
-function rowStyle(index: number) {
-  const meta = stageMeta(stageId(index))
-  if (!meta) return undefined
-  return { '--q': meta.color, '--q-ink': meta.ink }
-}
-
 function advances(index: number) {
   if (!props.markedPlaces) return false
   return advancingRank(index, props.markedPlaces)
@@ -61,7 +54,7 @@ function advances(index: number) {
       :key="row.teamId"
       class="line"
       :class="{ advances: advances(i), q: !!stageId(i) }"
-      :style="rowStyle(i)"
+      :data-qualify="stageId(i) || null"
       :to="`/teams/${row.teamId}`"
     >
       <span>
@@ -143,8 +136,12 @@ function advances(index: number) {
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
 .rank.navy { background: var(--navy); color: #fff; }
-.line.q { background: color-mix(in srgb, var(--q) 16%, #fff); }
-.rank.q { background: var(--q); color: var(--q-ink, #102033); }
+.line.q { background: var(--q-row); }
+.rank.q {
+  background: var(--q-circle);
+  color: var(--q-digit, #102033);
+  border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+}
 @media (max-width: 720px) {
   .line,
   .compact .line {
@@ -189,8 +186,9 @@ function advances(index: number) {
     width: 1.15rem;
     height: 1.15rem;
     border-radius: 50%;
-    background: var(--q);
-    color: var(--q-ink, #102033);
+    background: var(--q-circle);
+    color: var(--q-digit, #102033);
+    border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
   }
   .points { font-size: 14px; font-weight: 700; }
 }

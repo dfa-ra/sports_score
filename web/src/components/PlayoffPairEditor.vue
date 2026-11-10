@@ -2,8 +2,6 @@
 import { onMounted, ref, watch } from 'vue'
 import api from '../api/client'
 import { apiError } from '../lib/errors'
-import { stageMeta } from '../lib/qualifyStages'
-
 const props = withDefaults(defineProps<{
   tournamentId: string
   refreshKey?: number
@@ -138,7 +136,7 @@ watch(() => props.refreshKey, () => {
     <p v-else-if="!pairs.length && !hint" class="muted">Сначала сохраните выход из групп так, чтобы сводка была зелёной.</p>
     <template v-else>
       <p class="muted">Посев по местам. Команду в паре можно поменять, пока сетка не собрана.</p>
-      <div v-for="pair in pairs" :key="`${pair.stage}-${pair.pairIndex}`" class="prow" :style="{ '--bar': stageMeta(pair.stage)?.color || '#d5dbe3' }">
+      <div v-for="pair in pairs" :key="`${pair.stage}-${pair.pairIndex}`" class="prow" :data-qualify="pair.stage">
         <span class="stage">{{ pair.stageLabel }}</span>
         <select
           v-if="pair.home"
@@ -195,7 +193,7 @@ h2 { font-size: 1.2rem; margin: 1.2rem 0 0.35rem; }
   min-height: 44px;
   padding: 0.25rem 0.7rem 0.25rem 0.85rem;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--bar, transparent);
+  box-shadow: inset 4px 0 0 var(--q-bar, var(--stage-out));
   background: #fff;
 }
 .stage { font-weight: 800; color: var(--navy); font-size: 0.85rem; }

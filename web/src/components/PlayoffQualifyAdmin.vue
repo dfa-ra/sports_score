@@ -12,7 +12,6 @@ import {
   ROSTER_MISMATCH_PLATE,
   SAVE_RULES_HINT,
   stageLabel,
-  stageMeta,
   summaryTitle,
   winnersWord,
   type PlaceSpan,
@@ -217,10 +216,6 @@ async function rebuild() {
   }
 }
 
-function barColor(stage?: string) {
-  return stageMeta(stage)?.color || 'transparent'
-}
-
 function dismissGhost(groupId: string, place: number) {
   if (locked.value || pending.value) return
   const key = `${groupId}:${place}`
@@ -289,7 +284,7 @@ onUnmounted(stopDrag)
           :key="row.place"
           class="qrow"
           :class="{ on: selected(group.id, row.place) }"
-          :style="{ '--bar': barColor(stages[group.id]?.[row.place]) }"
+          :data-qualify="stages[group.id]?.[row.place] || null"
           data-qualify-place=""
           :data-group-id="group.id"
           :data-place="row.place"
@@ -417,10 +412,10 @@ h3 {
   min-height: 44px;
   padding: 0.25rem 0.7rem 0.25rem 0.85rem;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--bar, transparent);
+  box-shadow: inset 4px 0 0 var(--q-bar, transparent);
   background: #fff;
 }
-.qrow.on { background: color-mix(in srgb, var(--bar, #4cb4e5) 14%, #fff); }
+.qrow.on { background: color-mix(in srgb, var(--q-bar, var(--stage-r8)) 14%, #fff); }
 .qrow.gone {
   background: #fff1ef;
   box-shadow: inset 4px 0 0 var(--danger);

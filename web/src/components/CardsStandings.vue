@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
-import { stageMeta } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -15,12 +14,6 @@ const props = defineProps<{
 
 function stageId(groupId: string | null, place: number) {
   return props.stageOf?.(groupId, place) || ''
-}
-
-function stageStyle(groupId: string | null, place: number) {
-  const meta = stageMeta(stageId(groupId, place))
-  if (!meta) return undefined
-  return { '--q': meta.color, '--q-ink': meta.ink }
 }
 
 const teams = useTeamDirectory()
@@ -54,7 +47,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :key="row.teamId"
           class="line"
           :class="{ mark: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
-          :style="stageStyle(table.id, rowIndex + 1)"
+          :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
           <span><i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i></span>
@@ -76,7 +69,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :key="`m-${row.teamId}`"
           class="mrow"
           :class="{ q: !!stageId(table.id, rowIndex + 1) }"
-          :style="stageStyle(table.id, rowIndex + 1)"
+          :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
           <i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i>
@@ -153,8 +146,12 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   background: #eef2f6;
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
-.line.q, .mrow.q { background: color-mix(in srgb, var(--q) 16%, #fff); }
-.rank.q { background: var(--q); color: var(--q-ink, #102033); }
+.line.q, .mrow.q { background: var(--q-row); }
+.rank.q {
+  background: var(--q-circle);
+  color: var(--q-digit, #102033);
+  border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+}
 .phone { display: none; }
 @media (max-width: 720px) {
   .desk { display: none; }
@@ -178,8 +175,9 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     width: 1.2rem;
     height: 1.2rem;
     border-radius: 50%;
-    background: var(--q);
-    color: var(--q-ink, #102033);
+    background: var(--q-circle);
+    color: var(--q-digit, #102033);
+    border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
   }
 }
 </style>

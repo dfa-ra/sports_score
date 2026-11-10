@@ -134,7 +134,8 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
 }
 .pc.live .pf { background: rgba(227, 107, 91, 0.08); }
 .pc.live .ps { color: var(--ink); }
-.pc.final { border: 2px solid var(--navy); }
+.pc.final { border: 2px solid var(--stage-f); }
+.pc.final .fh { background: var(--stage-f); color: var(--stage-f-ink); }
 .pc.bronze { border: 2px solid var(--navy); }
 .fh {
   display: flex;

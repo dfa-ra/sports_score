@@ -103,11 +103,120 @@
   --group-gap: 0.9rem;
   --tap-min: 44px;
   --chrome-h: 68px;
+  /* Qualify stage colours. Table, legend, bracket and admin read these.
+     The numbers are the colours already on screen. */
+  --stage-stroke-width: 0px;
+  --stage-r16: #7b61ff;
+  --stage-r16-ink: #fff;
+  --stage-r16-row: color-mix(in srgb, var(--stage-r16) 16%, #fff);
+  --stage-r16-bar: var(--stage-r16);
+  --stage-r16-circle: var(--stage-r16);
+  --stage-r16-stroke: transparent;
+  --stage-r16-dot: var(--stage-r16);
+  --stage-r8: #4cb4e5;
+  --stage-r8-ink: #102033;
+  --stage-r8-row: color-mix(in srgb, var(--stage-r8) 16%, #fff);
+  --stage-r8-bar: var(--stage-r8);
+  --stage-r8-circle: var(--stage-r8);
+  --stage-r8-stroke: transparent;
+  --stage-r8-dot: var(--stage-r8);
+  --stage-qf: #2f9e6b;
+  --stage-qf-ink: #fff;
+  --stage-qf-row: color-mix(in srgb, var(--stage-qf) 16%, #fff);
+  --stage-qf-bar: var(--stage-qf);
+  --stage-qf-circle: var(--stage-qf);
+  --stage-qf-stroke: transparent;
+  --stage-qf-dot: var(--stage-qf);
+  --stage-sf: #e0a106;
+  --stage-sf-ink: #102033;
+  --stage-sf-row: color-mix(in srgb, var(--stage-sf) 16%, #fff);
+  --stage-sf-bar: var(--stage-sf);
+  --stage-sf-circle: var(--stage-sf);
+  --stage-sf-stroke: transparent;
+  --stage-sf-dot: var(--stage-sf);
+  --stage-f: var(--navy);
+  --stage-f-ink: #fff;
+  --stage-f-row: transparent;
+  --stage-f-bar: #d5dbe3;
+  --stage-f-circle: var(--navy);
+  --stage-f-stroke: transparent;
+  --stage-f-dot: var(--navy);
+  --stage-silver: #8d97a8;
+  --stage-silver-ink: #102033;
+  --stage-silver-row: color-mix(in srgb, var(--stage-silver) 16%, #fff);
+  --stage-silver-bar: var(--stage-silver);
+  --stage-silver-circle: var(--stage-silver);
+  --stage-silver-stroke: transparent;
+  --stage-silver-dot: var(--stage-silver);
+  --stage-out: #d5dbe3;
+  --stage-out-ink: #102033;
+  --stage-out-row: color-mix(in srgb, var(--stage-out) 16%, #fff);
+  --stage-out-bar: var(--stage-out);
+  --stage-out-circle: var(--stage-out);
+  --stage-out-stroke: transparent;
+  --stage-out-dot: var(--stage-out);
   --row-table: 2.65rem;
   --row-match: 56px;
   --row-scorer: 54px;
   --row-event: 54px;
   --tab-h: auto;
+}
+
+[data-qualify='R16'] {
+  --q-row: var(--stage-r16-row);
+  --q-bar: var(--stage-r16-bar);
+  --q-circle: var(--stage-r16-circle);
+  --q-stroke: var(--stage-r16-stroke);
+  --q-digit: var(--stage-r16-ink);
+  --q-dot: var(--stage-r16-dot);
+}
+[data-qualify='R8'] {
+  --q-row: var(--stage-r8-row);
+  --q-bar: var(--stage-r8-bar);
+  --q-circle: var(--stage-r8-circle);
+  --q-stroke: var(--stage-r8-stroke);
+  --q-digit: var(--stage-r8-ink);
+  --q-dot: var(--stage-r8-dot);
+}
+[data-qualify='QF'] {
+  --q-row: var(--stage-qf-row);
+  --q-bar: var(--stage-qf-bar);
+  --q-circle: var(--stage-qf-circle);
+  --q-stroke: var(--stage-qf-stroke);
+  --q-digit: var(--stage-qf-ink);
+  --q-dot: var(--stage-qf-dot);
+}
+[data-qualify='SF'] {
+  --q-row: var(--stage-sf-row);
+  --q-bar: var(--stage-sf-bar);
+  --q-circle: var(--stage-sf-circle);
+  --q-stroke: var(--stage-sf-stroke);
+  --q-digit: var(--stage-sf-ink);
+  --q-dot: var(--stage-sf-dot);
+}
+[data-qualify='F'] {
+  --q-row: var(--stage-f-row);
+  --q-bar: var(--stage-f-bar);
+  --q-circle: var(--stage-f-circle);
+  --q-stroke: var(--stage-f-stroke);
+  --q-digit: var(--stage-f-ink);
+  --q-dot: var(--stage-f-dot);
+}
+[data-qualify='SILVER'] {
+  --q-row: var(--stage-silver-row);
+  --q-bar: var(--stage-silver-bar);
+  --q-circle: var(--stage-silver-circle);
+  --q-stroke: var(--stage-silver-stroke);
+  --q-digit: var(--stage-silver-ink);
+  --q-dot: var(--stage-silver-dot);
+}
+[data-qualify='OUT'] {
+  --q-row: var(--stage-out-row);
+  --q-bar: var(--stage-out-bar);
+  --q-circle: var(--stage-out-circle);
+  --q-stroke: var(--stage-out-stroke);
+  --q-digit: var(--stage-out-ink);
+  --q-dot: var(--stage-out-dot);
 }
 
 * { box-sizing: border-box; }
