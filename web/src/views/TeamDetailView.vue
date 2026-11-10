@@ -549,7 +549,15 @@ h2 { font-size: 1.2rem; }
   }
 }
 @media (max-width: 720px) {
-  .stack { gap: 12px; margin-top: 0; }
+  .stack {
+    gap: 12px;
+    margin-top: 0;
+    min-width: 0;
+    max-width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stack > * { min-width: 0; }
+  .fs-tabs { width: 100%; max-width: 100%; }
   .team-head {
     gap: 12px;
     min-height: 0;

@@ -993,5 +993,34 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
 }
 @media (max-width: 360px) {
   .leader-metric b { font-size: 26px; line-height: 26px; }
+  .board-head {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    max-height: none;
+    align-items: center;
+    row-gap: 8px;
+  }
+  .board-head h2 {
+    flex: 0 0 auto;
+    min-width: max-content;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  .switch {
+    flex: 1 1 168px;
+    width: auto;
+    max-width: 100%;
+    height: 40px;
+    padding-inline: 10px;
+  }
+  .switch button {
+    flex: 1 1 50%;
+    height: 40px;
+    min-width: 0;
+    padding-inline: 10px;
+    line-height: 40px;
+  }
 }
 </style>

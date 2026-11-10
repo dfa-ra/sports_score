@@ -334,7 +334,7 @@ export function formatRoundSpan(values: InstantInput[]): string {
   const last = days[days.length - 1]
   if (first.key === last.key) return `${first.day} ${MONTHS[first.month - 1]}`
   if (first.month === last.month) return `${first.day}–${last.day} ${MONTHS[first.month - 1]}`
-  return `${first.day} ${MONTHS[first.month - 1]} – ${last.day} ${MONTHS[last.month - 1]}`
+  return `${first.day} ${MONTHS[first.month - 1]}\u00A0– ${last.day} ${MONTHS[last.month - 1]}`
 }
 
 export function roundNote(slots: PlayoffSlot[]): { live: boolean; text: string } {
@@ -635,7 +635,7 @@ export function tournamentDateSpan(start?: string | null, end?: string | null) {
     withYear ? `${pad(day.day)}.${pad(day.month)}.${day.year}` : `${pad(day.day)}.${pad(day.month)}`
   if (from && to) {
     const sameYear = from.year === to.year
-    return `${text(from, !sameYear)} – ${text(to, true)}`
+    return `${text(from, !sameYear)}\u00A0– ${text(to, true)}`
   }
   const only = (from || to)!
   return text(only, true)

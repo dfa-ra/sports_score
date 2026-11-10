@@ -171,7 +171,7 @@ test('empty bracket, playoff tab and header meta skip blanks', () => {
     startDate: '2026-08-01',
     endDate: '2026-12-15',
     stage: 'PLAYOFF',
-  }), ['Сезон 2026', 'Группы + плей-офф', '8 команд', '01.08 – 15.12.2026', 'Стадия: плей-офф'])
+  }), ['Сезон 2026', 'Группы + плей-офф', '8 команд', '01.08\u00A0– 15.12.2026', 'Стадия: плей-офф'])
   assert.deepEqual(overviewMeta({ format: 'CUP', teamsCount: 1 }), ['Кубок / плей-офф', '1 команда'])
 })
 

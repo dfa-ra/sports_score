@@ -698,6 +698,7 @@ onUnmounted(() => {
   .dot { width: 4px; height: 4px; bottom: 3px; }
   .filters-fade {
     position: static;
+    top: auto;
     height: 44px;
     margin-top: auto;
     padding: 0 var(--page-gutter);
@@ -807,7 +808,7 @@ onUnmounted(() => {
     height: 56px;
     transform: translate(-50%, -50%);
   }
-  .filters-fade { position: relative; }
+  .filters-fade { position: relative; top: auto; }
   .filters-fade :deep(.scroll-fade-edge.right) { width: 36px; }
   .filters { gap: 6px; }
   .filters button {

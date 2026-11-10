@@ -1227,10 +1227,18 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
     font-variant-numeric: tabular-nums;
   }
   .match-stack .match-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-start;
     font-size: 12px;
     line-height: 16px;
     color: #5b6b82;
+    white-space: nowrap;
   }
+  .match-stack .match-meta > p { flex: 1 0 100%; }
+  .match-stack .match-meta > span { white-space: nowrap; }
+  .match-stack .match-meta > span + span::before { content: " · "; }
 }
 .actions { display: flex; gap: 0.45rem; }
 .club {

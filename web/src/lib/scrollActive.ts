@@ -1,4 +1,4 @@
-import { onMounted, onUnmounted, type Ref } from 'vue'
+import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
 /** Keep the active tab in view from the nearest edge. Do not center it. */
 export function revealActive(scroller: HTMLElement | null | undefined) {
@@ -23,8 +23,18 @@ export function bindActiveTab(scroller: Ref<HTMLElement | null>) {
   let resize: ResizeObserver | null = null
   let node: HTMLElement | null = null
   const run = () => revealActive(node)
-  onMounted(() => {
-    node = scroller.value
+  function unbind() {
+    observer?.disconnect()
+    resize?.disconnect()
+    node?.removeEventListener('scroll', run)
+    observer = null
+    resize = null
+    node = null
+  }
+  function bind(next: HTMLElement | null) {
+    if (next === node) return
+    unbind()
+    node = next
     if (!node) return
     observer = new MutationObserver(run)
     observer.observe(node, { attributes: true, subtree: true, attributeFilter: ['class'] })
@@ -35,10 +45,9 @@ export function bindActiveTab(scroller: Ref<HTMLElement | null>) {
     node.addEventListener('scroll', run, { passive: true })
     run()
     requestAnimationFrame(run)
-  })
-  onUnmounted(() => {
-    observer?.disconnect()
-    resize?.disconnect()
-    node?.removeEventListener('scroll', run)
-  })
+    void document.fonts?.ready.then(() => run())
+  }
+  onMounted(() => bind(scroller.value))
+  watch(scroller, (next) => bind(next))
+  onUnmounted(unbind)
 }

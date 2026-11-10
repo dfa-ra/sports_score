@@ -2153,20 +2153,32 @@ h2 a { color: inherit; }
 }
 @media (max-width: 360px) {
   .card.events .assist:has(.assist-fit) {
-    max-height: 28px;
+    max-height: none;
+    min-width: 0;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     line-height: 14px;
   }
   .card.events .assist:has(.assist-fit) .assist-plain { display: none; }
   .card.events .assist-fit {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: baseline;
     column-gap: 4px;
+    min-width: 0;
     max-width: 100%;
-    max-height: 28px;
     overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
     line-height: 14px;
+  }
+  .card.events .assist-kind {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .card.events .assist-person {
     display: inline-flex;
@@ -2175,13 +2187,24 @@ h2 a { color: inherit; }
     min-width: 0;
     max-width: 100%;
     flex: 1 1 auto;
+    overflow: hidden;
+    white-space: nowrap;
   }
+  .card.events .assist-person .shirt { flex-shrink: 0; }
   .card.events .assist-person :deep(.fit-name) {
     display: block;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .card.events .ev.away .who .assist,
+  .card.events .ev.away .assist-fit {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    justify-content: flex-end;
+    text-align: right;
   }
 }
 </style>

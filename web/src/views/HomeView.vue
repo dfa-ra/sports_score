@@ -1293,7 +1293,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
     height: 36px;
     font-size: 22px;
   }
-  .home-chips :deep(.scroll-fade-edge.right) { width: 40px; }
+  .home-chips :deep(.scroll-fade-edge.right) {
+    width: 64px;
+    z-index: 1;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #ffffff 46%, #ffffff 100%) !important;
+  }
   .home-chips .chips::after { flex-basis: 56px; }
   .home-chips .chip {
     height: 40px;
@@ -1316,6 +1320,28 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 }
 @media (max-width: 360px) {
   .hero-state h1 { font-size: 30px; }
+  .hero-card .acts {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .hero-card .hv-btn {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0 14px;
+  }
+  .meta .stage {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: none;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

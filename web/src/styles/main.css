@@ -747,12 +747,12 @@ a.panel:hover {
     mask-image: linear-gradient(90deg, transparent, #000 24px);
   }
   .fs-tabs.can-scroll-right {
-    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 32px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 24px), transparent);
   }
   .fs-tabs.can-scroll-left.can-scroll-right {
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 32px), transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent);
   }
   .empty {
     display: flex;
