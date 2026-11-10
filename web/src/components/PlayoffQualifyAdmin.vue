@@ -37,6 +37,8 @@ const pending = ref(false)
 const error = ref('')
 const confirming = ref(false)
 const selection = ref<{ groupId: string; anchor: number; focus: number } | null>(null)
+const dragging = ref(false)
+const qualifyEl = ref<HTMLElement | null>(null)
 
 const choices = QUALIFY_STAGES.filter((item) => item.id !== 'F')
 
@@ -137,10 +139,16 @@ function selected(groupId: string, place: number) {
   return !!span && place >= span.from && place <= span.to
 }
 
+function clearTextSelection() {
+  window.getSelection()?.removeAllRanges()
+}
+
 function stopDrag() {
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', stopDrag)
   window.removeEventListener('pointercancel', stopDrag)
+  dragging.value = false
+  qualifyEl.value?.classList.remove('is-dragging')
 }
 
 function onPointerMove(event: PointerEvent) {
@@ -152,12 +160,16 @@ function onPointerMove(event: PointerEvent) {
   const place = Number(row.dataset.place)
   if (!place) return
   selection.value = { ...selection.value, focus: place }
+  clearTextSelection()
 }
 
 function onPointerDown(event: PointerEvent, groupId: string, place: number) {
   if (locked.value || pending.value) return
   if ((event.target as HTMLElement | null)?.closest('select')) return
   selection.value = { groupId, anchor: place, focus: place }
+  dragging.value = true
+  qualifyEl.value?.classList.add('is-dragging')
+  clearTextSelection()
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', stopDrag)
   window.addEventListener('pointercancel', stopDrag)
@@ -248,7 +260,7 @@ onUnmounted(stopDrag)
 </script>
 
 <template>
-  <section class="qualify" :class="{ 'is-locked': locked }" aria-labelledby="qualify-title">
+  <section ref="qualifyEl" class="qualify" :class="{ 'is-locked': locked, 'is-dragging': dragging }" aria-labelledby="qualify-title">
     <h2 id="qualify-title">Выход из групп</h2>
     <p class="muted">Одно место — одна стадия. Порядок мест тот же, что на вкладке «Таблица».</p>
 
@@ -446,6 +458,12 @@ h3 {
 }
 .mismatch { margin: 0 0 0.8rem; font-weight: 800; }
 .drop { min-height: 44px; }
+.qualify.is-dragging,
+.qualify.is-dragging .qrow,
+.qualify.is-dragging .qrow select {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .place, .team { touch-action: none; }
 .place { font-weight: 800; color: var(--navy); }
 .team {
