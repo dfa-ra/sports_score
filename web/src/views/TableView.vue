@@ -120,6 +120,12 @@ const season = computed(() => {
   return `${year}/${year + 1}`
 })
 
+const seasonChoice = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (!picked?.name) return ''
+  return season.value && picked.id === tournamentId.value ? `${picked.name} · ${season.value}` : picked.name
+})
+
 const results = computed(() =>
   matches.value
     .filter((m) => m.tournamentId === tournamentId.value && (m.status === 'FINISHED' || m.status === 'CANCELLED'))
@@ -401,7 +407,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <template v-else>{{ loading ? 'Загрузка…' : 'Таблица' }}</template>
         </h1>
         <label class="field season">
-          <select v-model="tournamentId">
+            <select v-model="tournamentId" :title="seasonChoice">
             <option v-for="t in tournaments" :key="t.id" :value="t.id">
               {{ t.name }}{{ season && t.id === tournamentId ? ' · ' + season : '' }}
             </option>
@@ -525,7 +531,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
         <EmptyState v-else-if="!scorers.length" title="Голов пока нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num"><span class="stat-long">Голы</span><span class="stat-short">Г</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(scorers, 'scorers')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -552,7 +564,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Вратари</h2>
           <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
-        <div class="stat-body">
+        <div class="stat-body" :class="{ 'fit-rows': !statsLoading && !statsError && keepers.length }">
         <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
@@ -568,7 +580,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
         <EmptyState v-else-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num"><span class="stat-long">Сухие</span><span class="stat-short">С</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(keepers, 'keepers')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -620,8 +638,8 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
             <thead>
               <tr>
                 <th>Игрок</th>
-                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
-                <th class="num">Игры</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span><span class="stat-short">П</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
               </tr>
             </thead>
             <tbody>
@@ -762,6 +780,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   }
   .stat-body,
   .stat-body :deep(.empty) { min-height: calc(44px + 5 * 56px); }
+  .stat-body.fit-rows,
+  .stat-body.fit-rows :deep(.empty) { min-height: 0; }
+}
+@media (max-width: 360px) {
+  .season select {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 @media (max-width: 720px) {
   .tab-skel .line {
@@ -827,7 +854,27 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   overflow: hidden;
 }
 @media (max-width: 720px) {
-  .stat-table .num { width: 4.15rem; }
+  .stat-table {
+    width: 100%;
+  }
+  .stat-table .num {
+    width: 36px;
+    max-width: 36px;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: right;
+  }
+  .stat-table th.num {
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+  .stat-table tbody td {
+    height: auto;
+    min-height: 48px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .stat-table .who { overflow: visible; }
 }
 .sheet :deep(a.line) {
   box-sizing: border-box;
@@ -872,9 +919,16 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   justify-content: center;
 }
 .pass-wide { display: none; }
+.stat-short { display: none; }
 @media (min-width: 721px) {
   .pass-short { display: none; }
   .pass-wide { display: inline; }
+}
+@media (max-width: 360px) {
+  .stat-table .stat-long,
+  .stat-table .pass-short,
+  .stat-table .pass-wide { display: none; }
+  .stat-table .stat-short { display: inline; }
 }
 .people { display: grid; }
 .person {

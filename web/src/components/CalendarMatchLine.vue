@@ -56,6 +56,7 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
       <span class="when">
         <em v-if="kicker" class="kicker">{{ kicker }}</em>
         <b>{{ clock }}</b>
+        <span v-if="badge" class="phone-dot" aria-hidden="true">{{ '\u00A0·\u00A0' }}</span>
         <i class="badge phone" :class="tone">{{ badge }}</i>
       </span>
       <span class="pair">
@@ -179,16 +180,32 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
 .badge.finished { background: var(--status-done-soft); color: var(--status-done-ink); }
 .badge.cancelled { background: #eef2f6; color: #8b97a6; }
 .badge.phone { display: none; }
+.phone-dot { display: none; }
 @media (max-width: 720px) {
-  .line { min-height: var(--row-match); }
-  .star { width: 44px; font-size: 12px; position: relative; }
+  .line {
+    grid-template-columns: 28px minmax(0, 1fr);
+    column-gap: 8px;
+    min-height: var(--row-match);
+  }
+  .star {
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 14px;
+    color: #9aa7b8;
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .star.on { color: #4cb4e5; }
   .star::before {
     content: "";
     position: absolute;
     left: 50%;
     top: 50%;
-    width: var(--tap-min);
-    height: var(--tap-min);
+    width: 44px;
+    height: 44px;
     transform: translate(-50%, -50%);
   }
   .body {
@@ -198,7 +215,15 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
     padding: 4px 8px 4px 0;
     align-items: center;
   }
+  .when {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: baseline;
+    column-gap: 0;
+  }
+  .kicker { flex: 1 0 100%; }
   .when b { font-size: 12px; font-weight: 800; line-height: 16px; }
+  .phone-dot { display: inline; white-space: pre; font-size: 12px; line-height: 16px; color: #5b6b82; }
   .badge.phone { font-size: 10.5px; font-weight: 500; line-height: 14px; }
   .pair { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .side.home, .side.away { justify-content: flex-start; text-align: left; }

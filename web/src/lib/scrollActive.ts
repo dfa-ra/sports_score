@@ -1,42 +1,53 @@
-import { onMounted, onUnmounted, type Ref } from 'vue'
+import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
-/** Keep the active tab inside a horizontal scroller and mark overflow for the edge fade. */
+/** Keep the active tab in view from the nearest edge. Do not center it. */
 export function revealActive(scroller: HTMLElement | null | undefined) {
   if (!scroller) return
-  const overflow = scroller.scrollWidth > scroller.clientWidth + 1
-  if (scroller.classList.contains('can-scroll') !== overflow) {
-    scroller.classList.toggle('can-scroll', overflow)
-  }
   const active = scroller.querySelector<HTMLElement>('.on')
-  if (!active) return
-  const host = scroller.getBoundingClientRect()
-  const box = active.getBoundingClientRect()
-  const edge = 36
-  if (box.left < host.left + 2) {
-    scroller.scrollLeft -= host.left + edge - box.left
-  } else if (box.right > host.right - 2) {
-    scroller.scrollLeft += box.right - (host.right - edge)
+  if (active && window.matchMedia('(max-width: 720px)').matches) {
+    const pad = 16
+    const host = scroller.getBoundingClientRect()
+    const box = active.getBoundingClientRect()
+    if (box.left < host.left + pad) scroller.scrollLeft -= host.left + pad - box.left
+    else if (box.right > host.right - pad) scroller.scrollLeft += box.right - (host.right - pad)
   }
+  const max = scroller.scrollWidth - scroller.clientWidth
+  const overflow = max > 1
+  scroller.classList.toggle('can-scroll', overflow)
+  scroller.classList.toggle('can-scroll-left', overflow && scroller.scrollLeft > 2)
+  scroller.classList.toggle('can-scroll-right', overflow && scroller.scrollLeft < max - 2)
 }
 
 export function bindActiveTab(scroller: Ref<HTMLElement | null>) {
   let observer: MutationObserver | null = null
   let resize: ResizeObserver | null = null
-  onMounted(() => {
-    const node = scroller.value
+  let node: HTMLElement | null = null
+  const run = () => revealActive(node)
+  function unbind() {
+    observer?.disconnect()
+    resize?.disconnect()
+    node?.removeEventListener('scroll', run)
+    observer = null
+    resize = null
+    node = null
+  }
+  function bind(next: HTMLElement | null) {
+    if (next === node) return
+    unbind()
+    node = next
     if (!node) return
-    const run = () => revealActive(node)
     observer = new MutationObserver(run)
     observer.observe(node, { attributes: true, subtree: true, attributeFilter: ['class'] })
     if (typeof ResizeObserver !== 'undefined') {
       resize = new ResizeObserver(run)
       resize.observe(node)
     }
+    node.addEventListener('scroll', run, { passive: true })
     run()
     requestAnimationFrame(run)
-  })
-  onUnmounted(() => {
-    observer?.disconnect()
-    resize?.disconnect()
-  })
+    void document.fonts?.ready.then(() => run())
+  }
+  onMounted(() => bind(scroller.value))
+  watch(scroller, (next) => bind(next))
+  onUnmounted(unbind)
 }

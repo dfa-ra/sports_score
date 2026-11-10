@@ -43,12 +43,28 @@ export function tournamentDatesError(start?: string | null, end?: string | null)
   return ''
 }
 
+/**
+ * One range separator for every screen: a non-breaking space, an en dash, then a space.
+ * «5 нояб. – 20 дек.» The dash is U+2013, never a hyphen.
+ */
+export function joinDateRange(start?: string | null, end?: string | null) {
+  const from = String(start ?? '').trim()
+  const to = String(end ?? '').trim()
+  if (!from) return to
+  if (!to || from === to) return from
+  return `${from}\u00A0\u2013 ${to}`
+}
+
+/** Time or date, then a middle dot, then a status. One space on each side of the dot. */
+export function joinWhenStatus(when?: string | null, status?: string | null) {
+  const left = String(when ?? '').trim()
+  const right = String(status ?? '').trim()
+  if (left && right) return `${left} \u00B7 ${right}`
+  return left || right
+}
+
 export function formatDateRange(start?: string | null, end?: string | null) {
-  const from = formatIsoDate(start)
-  const to = formatIsoDate(end)
-  if (!from && !to) return ''
-  if (from && to && from !== to) return `${from} — ${to}`
-  return from || to
+  return joinDateRange(formatIsoDate(start), formatIsoDate(end))
 }
 
 function formatIsoDate(value?: string | null) {

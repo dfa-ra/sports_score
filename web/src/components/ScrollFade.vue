@@ -61,8 +61,8 @@ function fadeFlags() {
     return
   }
   coverCutChips()
-  assign(left, node.scrollLeft > 2)
-  assign(right, node.scrollLeft + node.clientWidth < node.scrollWidth - 2)
+  assign(left, node.scrollLeft > 1)
+  assign(right, node.scrollLeft + node.clientWidth < node.scrollWidth - 1)
 }
 
 function fullUpdate() {
@@ -115,6 +115,7 @@ function onResize() {
 }
 
 let observer: ResizeObserver | null = null
+let content: MutationObserver | null = null
 let bound: HTMLElement | null = null
 
 onMounted(() => {
@@ -125,6 +126,8 @@ onMounted(() => {
   revealActive()
   observer = new ResizeObserver(() => scheduleFull())
   if (bound) observer.observe(bound)
+  content = new MutationObserver(() => scheduleFull())
+  if (bound) content.observe(bound, { childList: true, subtree: true })
   window.addEventListener('resize', onResize)
   void document.fonts?.ready.then(() => scheduleFull())
 })
@@ -133,6 +136,7 @@ onUnmounted(() => {
   alive = false
   if (frame) cancelAnimationFrame(frame)
   observer?.disconnect()
+  content?.disconnect()
   bound?.removeEventListener('scroll', onScroll)
   window.removeEventListener('resize', onResize)
 })

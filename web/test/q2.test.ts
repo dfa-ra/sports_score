@@ -6,6 +6,7 @@ import {
   assembleTour,
   compareTours,
   countLive,
+  dateSpan,
   filterRows,
   groupRows,
   heroCounts,
@@ -160,4 +161,8 @@ test('the all-tournaments board omits tournamentId and search highlights the typ
   assert.equal(goalsFromCard({ matchHistory: [{ goals: 1 }, { goals: 3 }] }), 4)
   assert.deepEqual(teamFromCard({ team: { name: 'Физтех', logoUrl: '/a.png' } }), { name: 'Физтех', logo: '/a.png' })
   assert.equal(teamFromCard({}), null)
+  assert.equal(dateSpan('2026-11-01', '2026-11-01'), '1 нояб. 2026')
+  assert.equal(dateSpan('2026-11-01', '2026-12-01'), '1 нояб.\u00A0\u2013 1 дек.')
+  assert.equal(dateSpan('2026-11-05', '2026-12-20'), '5 нояб.\u00A0\u2013 20 дек.')
+  assert.equal(dateSpan('2025-11-01', '2026-01-01'), '1 нояб. 2025\u00A0– 1 янв. 2026')
 })

@@ -121,7 +121,7 @@ onMounted(() => {
           <p class="figure"><b>{{ counts.total }}</b><span>всего</span></p>
         </div>
       </div>
-      <ScrollFade v-if="!error" solid arrows fade="#001433" :watch-key="filter">
+      <ScrollFade v-if="!error" class="chip-fade" arrows fade="#001433" :watch-key="filter">
         <div class="chips" role="group" aria-label="Фильтр турниров">
           <button
             v-for="chip in FILTERS"
@@ -164,7 +164,9 @@ onMounted(() => {
           <span class="tour-badge" :class="row.status.toLowerCase()">{{ row.badge }}</span>
           <span class="name-block">
             <span class="name">{{ row.name }}</span>
-            <span v-if="row.meta" class="meta">{{ row.meta }}</span>
+            <span v-if="row.lead || row.dates" class="meta">
+              <span v-if="row.lead">{{ row.lead }}</span><span v-if="row.lead && row.dates" class="dot"> · </span><span v-if="row.dates" class="dates">{{ row.dates }}</span>
+            </span>
           </span>
           <span class="aside">
             <span v-if="row.liveText" class="live">{{ row.liveText }}</span>
@@ -304,18 +306,62 @@ onMounted(() => {
   .hero h1 { font-size: 1.55rem; }
   .hero-top { display: grid; justify-content: stretch; padding-right: 2.5rem; }
   .mark { width: 84px; height: 84px; }
-  .chips { display: flex; overflow: visible; }
-  .chip { flex: 0 0 auto; padding: 0.36rem 0.42rem; font-size: 0.7rem; }
+  .hero :deep(.scroll-fade-arrow) { display: none; }
+  .chip-fade { position: relative; min-width: 0; max-width: 100%; }
+  .chip-fade :deep(.scroll-fade-edge) { display: none; }
+  .chip-fade.show-right::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    width: 32px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, #001433);
+  }
+  .chip-fade.show-left::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    width: 24px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, #001433, transparent);
+  }
+  .chips { display: flex; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; }
+  .chip {
+    position: relative;
+    box-sizing: border-box;
+    flex: 1 0 auto;
+    height: 40px;
+    min-height: 40px;
+    min-width: 48px;
+    padding: 0 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    line-height: 40px;
+  }
+  .chip::before { content: ""; position: absolute; inset: -2px; }
   .sheet { border-radius: 10px; }
   .row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas: "name badge" "aside aside";
     align-items: start;
   }
+  .name, .muted .name { color: #00205b; }
+  .meta { color: #5b6b82; }
+  .dates { display: block; color: #5b6b82; white-space: nowrap; }
+  .dot { display: none; }
   .name-block { grid-area: name; }
   .tour-badge { grid-area: badge; justify-self: end; }
   .aside { grid-area: aside; justify-items: start; text-align: left; }
   .bar { height: 4px; }
   .chev { display: none; }
+}
+@media (max-width: 360px) {
+  .chip { flex: 0 0 auto; }
 }
 </style>

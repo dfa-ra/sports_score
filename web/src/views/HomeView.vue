@@ -40,7 +40,8 @@ import {
 import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
 import { unitWord } from '../lib/q2Players'
 import { setPageMeta } from '../lib/pageMeta'
-import { registeredName } from '../lib/playerTitle'
+import { nameForms, registeredName } from '../lib/playerTitle'
+import FitName from '../components/FitName.vue'
 import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
 
@@ -353,7 +354,7 @@ onUnmounted(() => {
         </div>
         <template v-else>
           <div class="filters">
-            <ScrollFade arrows fade="#ffffff">
+            <ScrollFade class="home-chips" arrows fade="#ffffff">
               <div class="chips">
                 <button class="chip" :class="{ on: chip == null }" type="button" @click="chip = null">
                   <span class="chip-label">Все турниры</span>
@@ -412,7 +413,7 @@ onUnmounted(() => {
               </RouterLink>
             </div>
           </div>
-          <ScrollFade v-if="upcoming.length || recent.length" fade="#ffffff">
+          <ScrollFade v-if="upcoming.length || recent.length" class="home-feed" fade="#ffffff">
           <div class="feed-cards">
             <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
@@ -621,7 +622,7 @@ onUnmounted(() => {
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
               <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
-              <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <div><div class="nm"><FitName :full="nameForms(player).full" :short="nameForms(player).short" :force-below="360" /></div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} {{ unitWord(player.assists, 'assists') }}</small></div>
             </RouterLink>
           </div>
@@ -1275,6 +1276,72 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .matches-card .block-empty { min-height: calc(118px + 16px); }
   .scorer-body,
   .scorer-empty { min-height: calc(5 * 56px); }
+  .srow > div { min-width: 0; }
+  .srow .nm { display: block; min-width: 0; }
+  .hero-state { padding: 16px; }
+  .hero-state > div { display: block; min-width: 0; }
+  .hero-state h1 {
+    position: static;
+    margin: 0 0 14px;
+    line-height: 1;
+    font-size: 34px;
+  }
+  .hero-state .acts { gap: 8px; }
+  .hero-state .hv-btn { height: 44px; min-height: 44px; }
+  .home-chips :deep(.scroll-fade-arrow) {
+    width: 36px;
+    height: 36px;
+    font-size: 22px;
+  }
+  .home-chips :deep(.scroll-fade-edge.right) {
+    width: 64px;
+    z-index: 1;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, #ffffff 46%, #ffffff 100%) !important;
+  }
+  .home-chips .chips::after { flex-basis: 56px; }
+  .home-chips .chip {
+    height: 40px;
+    min-height: 40px;
+  }
+  .home-feed :deep(.scroll-fade-edge.left) { display: none; }
+  .home-feed :deep(.scroll-fade-edge.right) { width: 36px; }
+  .feed-cards { padding-left: 12px; scroll-padding-inline: 12px; }
+  .mc { border: 1px solid #dde4ee; border-radius: 14px; }
+  .mc-top { min-width: 0; }
+  .mc-top .tb {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mc-top .st { flex: 0 0 auto; }
+}
+@media (max-width: 360px) {
+  .hero-state h1 { font-size: 30px; }
+  .hero-card .acts {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .hero-card .hv-btn {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0 14px;
+  }
+  .meta .stage {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: none;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

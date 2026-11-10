@@ -819,34 +819,37 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .leader {
     position: relative;
     display: grid;
-    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "label label"
+      "label metric"
       "avatar avatar"
       "name name";
-    grid-template-rows: 14px 32px minmax(0, 1fr);
+    grid-template-rows: minmax(26px, auto) 32px minmax(0, 1fr);
     row-gap: 2px;
     column-gap: 6px;
     align-content: start;
     box-sizing: border-box;
-    min-height: 104px;
-    height: 104px;
-    overflow: hidden;
+    min-height: 116px;
+    height: auto;
+    overflow: visible;
     padding: 10px;
     border-radius: 12px;
   }
   .leader p {
     grid-area: label;
     margin: 0;
-    height: 14px;
-    max-width: calc(100% - 46px);
+    min-height: 26px;
+    height: auto;
+    max-width: 100%;
     font-size: 10px;
-    line-height: 14px;
+    line-height: 13px;
     font-weight: 600;
     letter-spacing: 0.04em;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
   .leader-row { display: contents; }
   .leader-row :deep(.player-avatar) {
@@ -856,9 +859,9 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     align-self: center;
   }
   .leader-metric {
-    position: absolute;
-    top: 8px;
-    right: 10px;
+    position: static;
+    grid-area: metric;
+    align-self: start;
     min-width: 0;
     margin: 0;
     align-items: flex-end;
@@ -934,10 +937,20 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   .cols.line { height: 56px; }
   .stat-m, .stat-side { display: none; }
   .line .stat-main { font-size: 15px; font-weight: 800; }
-  .row-who { gap: 8px; min-width: 0; }
-  .line .name-team { display: inline-flex; flex-direction: row; align-items: last baseline; gap: 6px; min-width: 0; max-width: 100%; }
+  .row-who {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 16px;
+    column-gap: 8px;
+    row-gap: 0;
+    align-items: center;
+    min-width: 0;
+  }
+  .line .name-team,
+  .line .club { display: contents; }
   .line .player-name {
-    max-width: 132px;
+    grid-column: 2;
+    grid-row: 1;
+    max-width: none;
     font-size: 14px;
     font-weight: 800;
     line-height: 18px;
@@ -945,10 +958,22 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .line .club { display: inline-flex; align-items: center; max-width: 82px; font-size: 11px; line-height: 14px; }
-  .line .club :deep(.team-crest) { width: 11px !important; height: 11px !important; font-size: 7px !important; }
+  .line .club-name { grid-column: 2; grid-row: 2; }
+  .line .club :deep(.team-crest) {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    justify-self: center;
+    width: 16px !important;
+    height: 16px !important;
+    font-size: 8px !important;
+  }
   .line .club :deep(.team-crest--fallback) { line-height: 11px; }
-  .line :deep(.player-avatar) { width: 28px !important; height: 28px !important; }
+  .line :deep(.player-avatar) {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 28px !important;
+    height: 28px !important;
+  }
   .place { font-size: 13px; font-weight: 700; }
   .skel { height: 56px; padding: 0 12px; }
   .note {
@@ -965,5 +990,37 @@ mark { background: #d7f0fb; color: inherit; border-radius: 3px; }
   }
   .note p { font-size: 13.5px; font-weight: 700; line-height: 18px; }
   .note .btn { height: 44px; min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .leader-metric b { font-size: 26px; line-height: 26px; }
+  .board-head {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 44px;
+    max-height: none;
+    align-items: center;
+    row-gap: 8px;
+  }
+  .board-head h2 {
+    flex: 0 0 auto;
+    min-width: max-content;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  .switch {
+    flex: 1 1 168px;
+    width: auto;
+    max-width: 100%;
+    height: 40px;
+    padding-inline: 10px;
+  }
+  .switch button {
+    flex: 1 1 50%;
+    height: 40px;
+    min-width: 0;
+    padding-inline: 10px;
+    line-height: 40px;
+  }
 }
 </style>
