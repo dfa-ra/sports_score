@@ -1,4 +1,4 @@
-import { formatLabel } from './format.ts'
+import { formatLabel, joinDateRange } from './format.ts'
 import { civilDateParts } from './moscowTime.ts'
 import { defaultRoundIndex, linkSlots, slotsOf, winnerSide, type PlayoffRound } from './playoffGrid.ts'
 import { parseStandings } from './standings.ts'
@@ -104,7 +104,7 @@ export function dateSpan(start?: string | null, end?: string | null, seasonYear?
   if (from && to && start && end) {
     if (from.year === to.year && from.month === to.month && from.day === to.day) return dayMonth(start, true)
     const yearsDiffer = from.year !== to.year
-    return `${dayMonth(start, yearsDiffer)}\u00A0– ${dayMonth(end, yearsDiffer)}`
+    return joinDateRange(dayMonth(start, yearsDiffer), dayMonth(end, yearsDiffer))
   }
   if (from && start) return `старт ${dayMonth(start, false)}`
   if (to && end) return dayMonth(end, true)

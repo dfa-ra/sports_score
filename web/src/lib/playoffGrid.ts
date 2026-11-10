@@ -1,4 +1,4 @@
-import { formatLabel } from './format.ts'
+import { formatLabel, joinDateRange, joinWhenStatus } from './format.ts'
 import { DATE_PENDING, matchInstant } from './matchDate.ts'
 import { moscowClock, moscowDayMonth, moscowParts, type InstantInput } from './moscowTime.ts'
 import { isThirdPlaceSlot, shortSourceRound, winnerSlotLabel } from './playoffLabel.ts'
@@ -333,15 +333,18 @@ export function formatRoundSpan(values: InstantInput[]): string {
   const first = days[0]
   const last = days[days.length - 1]
   if (first.key === last.key) return `${first.day} ${MONTHS[first.month - 1]}`
-  if (first.month === last.month) return `${first.day}–${last.day} ${MONTHS[first.month - 1]}`
-  return `${first.day} ${MONTHS[first.month - 1]}\u00A0– ${last.day} ${MONTHS[last.month - 1]}`
+  if (first.month === last.month) return `${first.day}\u2013${last.day} ${MONTHS[first.month - 1]}`
+  return joinDateRange(
+    `${first.day} ${MONTHS[first.month - 1]}`,
+    `${last.day} ${MONTHS[last.month - 1]}`,
+  )
 }
 
 export function roundNote(slots: PlayoffSlot[]): { live: boolean; text: string } {
   if (slots.some((slot) => isLiveStatus(slot.matchStatus))) return { live: true, text: '' }
   const span = formatRoundSpan(slots.map((slot) => slotInstant(slot)))
   const finished = slots.length > 0 && slots.every((slot) => slot.matchStatus === 'FINISHED')
-  if (finished && span) return { live: false, text: `${span} · завершён` }
+  if (finished && span) return { live: false, text: joinWhenStatus(span, 'завершён') }
   if (finished) return { live: false, text: 'завершён' }
   return { live: false, text: span }
 }
@@ -635,7 +638,7 @@ export function tournamentDateSpan(start?: string | null, end?: string | null) {
     withYear ? `${pad(day.day)}.${pad(day.month)}.${day.year}` : `${pad(day.day)}.${pad(day.month)}`
   if (from && to) {
     const sameYear = from.year === to.year
-    return `${text(from, !sameYear)}\u00A0– ${text(to, true)}`
+    return joinDateRange(text(from, !sameYear), text(to, true))
   }
   const only = (from || to)!
   return text(only, true)

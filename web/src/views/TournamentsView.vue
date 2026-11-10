@@ -121,7 +121,7 @@ onMounted(() => {
           <p class="figure"><b>{{ counts.total }}</b><span>всего</span></p>
         </div>
       </div>
-      <ScrollFade v-if="!error" arrows fade="#001433" :watch-key="filter">
+      <ScrollFade v-if="!error" class="chip-fade" arrows fade="#001433" :watch-key="filter">
         <div class="chips" role="group" aria-label="Фильтр турниров">
           <button
             v-for="chip in FILTERS"
@@ -307,7 +307,31 @@ onMounted(() => {
   .hero-top { display: grid; justify-content: stretch; padding-right: 2.5rem; }
   .mark { width: 84px; height: 84px; }
   .hero :deep(.scroll-fade-arrow) { display: none; }
-  .chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+  .chip-fade { position: relative; min-width: 0; max-width: 100%; }
+  .chip-fade :deep(.scroll-fade-edge) { display: none; }
+  .chip-fade.show-right::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    width: 32px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, #001433);
+  }
+  .chip-fade.show-left::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    width: 24px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, #001433, transparent);
+  }
+  .chips { display: flex; flex-wrap: nowrap; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; }
   .chip {
     position: relative;
     box-sizing: border-box;
@@ -339,6 +363,5 @@ onMounted(() => {
 }
 @media (max-width: 360px) {
   .chip { flex: 0 0 auto; }
-  .hero :deep(.scroll-fade-edge.right) { width: 32px; }
 }
 </style>

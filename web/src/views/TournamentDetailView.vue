@@ -1161,9 +1161,15 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .meta span + span::before { display: none; }
   .match-meta {
     grid-column: 1 / -1;
-    justify-items: start;
-    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: flex-start;
+    white-space: nowrap;
   }
+  .match-meta > p { flex: 1 0 100%; }
+  .match-meta > span { white-space: nowrap; }
+  .match-meta > span + span::before { content: "\00a0·\00a0"; }
 }
 @media (min-width: 361px) and (max-width: 720px) {
   .row.match-row { display: block; }
@@ -1238,7 +1244,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   }
   .match-stack .match-meta > p { flex: 1 0 100%; }
   .match-stack .match-meta > span { white-space: nowrap; }
-  .match-stack .match-meta > span + span::before { content: " · "; }
+  .match-stack .match-meta > span + span::before { content: "\00a0·\00a0"; }
 }
 .actions { display: flex; gap: 0.45rem; }
 .club {

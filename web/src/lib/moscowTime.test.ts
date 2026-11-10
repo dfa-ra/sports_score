@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fromLocalInput, toLocalInput } from './datetime.ts'
-import { formatDateRange, formatMatchDay, formatWhen } from './format.ts'
+import { formatDateRange, formatMatchDay, formatWhen, joinDateRange, joinWhenStatus } from './format.ts'
 import { kickoffClock, kickoffDayMonth, longKickoff, ymd } from './match.ts'
 import {
   civilYear,
@@ -82,7 +82,14 @@ test('a founded date uses the match-date month and stays on the stored civil day
 })
 
 test('a date-only tournament day is not shifted, and the Moscow day key can move by calendar days', () => {
-  assert.equal(formatDateRange('2026-11-10', '2026-11-12'), '10.11.2026 — 12.11.2026')
+  assert.equal(formatDateRange('2026-11-10', '2026-11-12'), '10.11.2026\u00A0\u2013 12.11.2026')
+  assert.equal(joinDateRange('5 нояб.', '20 дек.'), '5 нояб.\u00A0\u2013 20 дек.')
+  assert.equal(joinDateRange('5 нояб.', '20 дек.').charCodeAt('5 нояб.'.length + 1), 0x2013)
+  assert.equal(joinDateRange('5 нояб.', '20 дек.').includes('-'), false)
+  assert.equal(joinDateRange('1 нояб.', '1 нояб.'), '1 нояб.')
+  assert.equal(joinDateRange('', '20 дек.'), '20 дек.')
+  assert.equal(joinWhenStatus('17:12', 'Завершён'), '17:12 \u00B7 Завершён')
+  assert.equal(joinWhenStatus('17:12 · Завершён', ''), '17:12 · Завершён')
   assert.equal(formatDateRange(nextMoscowDay, nextMoscowDay), '11.11.2026')
   assert.equal(civilYear('2026-01-01'), 2026)
   assert.equal(moscowYear('2026-12-31T21:30:00Z'), 2027)

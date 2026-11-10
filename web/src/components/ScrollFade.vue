@@ -61,8 +61,8 @@ function fadeFlags() {
     return
   }
   coverCutChips()
-  assign(left, node.scrollLeft > 2)
-  assign(right, node.scrollLeft + node.clientWidth < node.scrollWidth - 2)
+  assign(left, node.scrollLeft > 1)
+  assign(right, node.scrollLeft + node.clientWidth < node.scrollWidth - 1)
 }
 
 function fullUpdate() {
