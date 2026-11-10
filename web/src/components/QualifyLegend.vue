@@ -27,7 +27,9 @@ span { display: inline-flex; align-items: center; gap: 0.35rem; }
 i {
   width: 0.7rem;
   height: 0.7rem;
+  box-sizing: border-box;
   border-radius: 50%;
-  background: var(--q-dot);
+  background: var(--q-circle);
+  border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
 </style>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { stageFullName } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -14,6 +16,23 @@ const props = defineProps<{
 
 function stageId(groupId: string | null, place: number) {
   return props.stageOf?.(groupId, place) || ''
+}
+
+const desktopTip = ref(false)
+let desktopQuery: MediaQueryList | null = null
+function syncTip() {
+  desktopTip.value = !!desktopQuery?.matches
+}
+onMounted(() => {
+  desktopQuery = window.matchMedia('(min-width: 721px)')
+  syncTip()
+  desktopQuery.addEventListener('change', syncTip)
+})
+onUnmounted(() => desktopQuery?.removeEventListener('change', syncTip))
+
+function circleTip(groupId: string | null, place: number) {
+  if (!desktopTip.value) return undefined
+  return stageFullName(stageId(groupId, place)) || undefined
 }
 
 const teams = useTeamDirectory()
@@ -50,7 +69,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <span><i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i></span>
+          <span><i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }" :title="circleTip(table.id, rowIndex + 1)" :aria-label="circleTip(table.id, rowIndex + 1)">{{ rowIndex + 1 }}</i></span>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <b>{{ clubName(row) }}</b>
@@ -72,7 +91,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }">{{ rowIndex + 1 }}</i>
+          <i class="rank" :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }" :title="circleTip(table.id, rowIndex + 1)" :aria-label="circleTip(table.id, rowIndex + 1)">{{ rowIndex + 1 }}</i>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
@@ -146,11 +165,15 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   background: #eef2f6;
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
-.line.q, .mrow.q { background: var(--q-row); }
+.line, .mrow { color: #00205b; }
+.line.q, .mrow.q {
+  background: var(--q-row);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent);
+}
 .rank.q {
   background: var(--q-circle);
-  color: var(--q-digit, #102033);
-  border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+  color: var(--q-digit, #00205b);
+  border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
 .phone { display: none; }
 @media (max-width: 720px) {
@@ -168,7 +191,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     min-width: 0;
   }
   .mrow .club b { white-space: normal; }
-  .mrow small { display: block; color: var(--muted); font-size: 0.72rem; }
+  .mrow small { display: block; color: #00205b; font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }
   .rank.q {
@@ -176,8 +199,8 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     height: 1.2rem;
     border-radius: 50%;
     background: var(--q-circle);
-    color: var(--q-digit, #102033);
-    border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+    color: var(--q-digit, #00205b);
+    border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
   }
 }
 </style>

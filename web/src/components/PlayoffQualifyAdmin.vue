@@ -412,7 +412,7 @@ h3 {
   min-height: 44px;
   padding: 0.25rem 0.7rem 0.25rem 0.85rem;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--q-bar, transparent);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent);
   background: #fff;
 }
 .qrow.on { background: color-mix(in srgb, var(--q-bar, var(--stage-r8)) 14%, #fff); }

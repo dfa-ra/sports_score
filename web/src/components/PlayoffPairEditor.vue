@@ -193,7 +193,7 @@ h2 { font-size: 1.2rem; margin: 1.2rem 0 0.35rem; }
   min-height: 44px;
   padding: 0.25rem 0.7rem 0.25rem 0.85rem;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--q-bar, var(--stage-out));
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent);
   background: #fff;
 }
 .stage { font-weight: 800; color: var(--navy); font-size: 0.85rem; }

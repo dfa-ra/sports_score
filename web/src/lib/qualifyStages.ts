@@ -40,6 +40,32 @@ export function stageLabel(id?: string | null) {
   return stageMeta(id)?.label || ''
 }
 
+/** Tooltip on the place circle. The same names the bracket uses for a round. */
+const STAGE_FULL_NAME: Record<string, string> = {
+  R16: '1/16 финала',
+  R8: '1/8 финала',
+  QF: '1/4 финала',
+  SF: '1/2 финала',
+  F: 'Финал',
+  SILVER: 'Серебряная лига',
+  OUT: 'Выбывает',
+}
+
+export function stageFullName(id?: string | null) {
+  if (!id) return ''
+  return STAGE_FULL_NAME[id] || stageLabel(id)
+}
+
+export function stageIdFromRoundTitle(title?: string | null) {
+  const text = String(title || '').trim().toLowerCase()
+  if (/^1\/16\b/.test(text)) return 'R16'
+  if (/^1\/8\b/.test(text)) return 'R8'
+  if (/^1\/4\b/.test(text)) return 'QF'
+  if (/^1\/2\b/.test(text)) return 'SF'
+  if (/^финал\b/.test(text)) return 'F'
+  return ''
+}
+
 export function teamsWord(count: number) {
   const tail = Math.abs(count) % 100
   const digit = tail % 10

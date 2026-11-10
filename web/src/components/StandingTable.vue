@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
@@ -35,6 +37,23 @@ function advances(index: number) {
   if (!props.markedPlaces) return false
   return advancingRank(index, props.markedPlaces)
 }
+
+const desktopTip = ref(false)
+let desktopQuery: MediaQueryList | null = null
+function syncTip() {
+  desktopTip.value = !!desktopQuery?.matches
+}
+onMounted(() => {
+  desktopQuery = window.matchMedia('(min-width: 721px)')
+  syncTip()
+  desktopQuery.addEventListener('change', syncTip)
+})
+onUnmounted(() => desktopQuery?.removeEventListener('change', syncTip))
+
+function circleTip(index: number) {
+  if (!desktopTip.value) return undefined
+  return stageFullName(stageId(index)) || undefined
+}
 </script>
 
 <template>
@@ -58,7 +77,7 @@ function advances(index: number) {
       :to="`/teams/${row.teamId}`"
     >
       <span>
-        <span class="rank" :class="rankClass(i)">{{ i + 1 }}</span>
+        <span class="rank" :class="rankClass(i)" :title="circleTip(i)" :aria-label="circleTip(i)">{{ i + 1 }}</span>
       </span>
       <span class="club">
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
@@ -93,6 +112,7 @@ function advances(index: number) {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+.line:not(.head) { color: #00205b; }
 .line:not(.head):hover { background: rgba(76, 180, 229, 0.08); }
 .line.advances { background: var(--accent-soft); }
 .team-label { text-align: left; }
@@ -136,11 +156,15 @@ function advances(index: number) {
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
 .rank.navy { background: var(--navy); color: #fff; }
-.line.q { background: var(--q-row); }
+.line.q {
+  background: var(--q-row);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent);
+}
+.line.q:hover { background: var(--q-row); }
 .rank.q {
   background: var(--q-circle);
-  color: var(--q-digit, #102033);
-  border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+  color: var(--q-digit, #00205b);
+  border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
 @media (max-width: 720px) {
   .line,
@@ -187,8 +211,8 @@ function advances(index: number) {
     height: 1.15rem;
     border-radius: 50%;
     background: var(--q-circle);
-    color: var(--q-digit, #102033);
-    border: var(--stage-stroke-width) solid var(--q-stroke, transparent);
+    color: var(--q-digit, #00205b);
+    border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
   }
   .points { font-size: 14px; font-weight: 700; }
 }

@@ -6,6 +6,7 @@ import PlayoffPairCard from './PlayoffPairCard.vue'
 import TeamCrest from './TeamCrest.vue'
 import { fromLocalInput, toLocalInput } from '../lib/datetime'
 import { apiError } from '../lib/errors'
+import { stageIdFromRoundTitle } from '../lib/qualifyStages'
 import { noteScheduleChange } from '../lib/scheduleRefresh'
 import {
   advancedTeamId,
@@ -560,7 +561,7 @@ function bronzePairStyle() {
       <div v-else-if="editable" class="bracket admin">
         <section v-for="panel in panels" :key="panel.key" class="round">
           <h3>{{ panel.title }}</h3>
-          <article v-for="slot in panel.slots" :key="slot.id" class="admin-slot">
+          <article v-for="slot in panel.slots" :key="slot.id" class="admin-slot" :data-qualify="panel.thirdPlace || panel.champion ? null : stageIdFromRoundTitle(panel.title) || null">
             <PlayoffPairCard
               :slot="viewSlot(slot)"
               :previous-title="previousTitle(panel.roundIndex)"
@@ -642,7 +643,7 @@ function bronzePairStyle() {
               <span v-else-if="roundNote(panel.slots).live" class="st live">идёт</span>
             </h3>
             <div class="pair-stack">
-              <div v-for="slot in panel.slots" :key="slot.id" class="pair-block">
+              <div v-for="slot in panel.slots" :key="slot.id" class="pair-block" :data-qualify="panel.thirdPlace || panel.champion ? null : stageIdFromRoundTitle(panel.title) || null">
                 <PlayoffPairCard
                   :slot="viewSlot(slot)"
                   :previous-title="previousTitle(panel.roundIndex)"
@@ -660,7 +661,7 @@ function bronzePairStyle() {
               </div>
             </div>
             <template v-for="preview in [nextPreview(panel)]" :key="`${panel.key}-next`">
-              <div v-if="preview" class="next-round">
+              <div v-if="preview" class="next-round" :data-qualify="stageIdFromRoundTitle(preview.title) || null">
                 <h4>Дальше · {{ preview.title }}</h4>
                 <div class="pair-stack">
                   <PlayoffPairCard
@@ -701,6 +702,7 @@ function bronzePairStyle() {
                 :key="slot.id"
                 class="b-slot"
                 :data-round="roundIndex"
+                :data-qualify="stageIdFromRoundTitle(round.title) || null"
                 :style="earlyStyle(roundIndex, Number(slot.slotIndex ?? 0), columnSlots(slotsOf(round), false).length)"
               >
                 <PlayoffPairCard
@@ -723,6 +725,7 @@ function bronzePairStyle() {
                 :key="slot.id"
                 class="b-slot"
                 :data-round="roundIndex"
+                :data-qualify="stageIdFromRoundTitle(round.title) || null"
                 :style="semiStyle(Number(slot.slotIndex ?? 0), linkSlots(slotsOf(round)).length)"
               >
                 <PlayoffPairCard
@@ -816,6 +819,7 @@ function bronzePairStyle() {
               :key="slot.id"
               class="cell"
               :data-round="roundIndex"
+              :data-qualify="roundIndex === rounds.length - 1 ? null : stageIdFromRoundTitle(round.title) || null"
               :data-slot-index="Number(slot.slotIndex ?? 0)"
               :style="matchCell(roundIndex, Number(slot.slotIndex ?? 0), rounds.length)"
             >
