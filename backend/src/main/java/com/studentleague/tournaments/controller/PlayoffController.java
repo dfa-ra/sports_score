@@ -6,6 +6,7 @@ import com.studentleague.tournaments.dto.PlayoffSlotResponse;
 import com.studentleague.tournaments.dto.PlayoffViewResponse;
 import com.studentleague.tournaments.dto.SetAdvancingPlacesRequest;
 import com.studentleague.tournaments.dto.UpdatePlayoffSlotRequest;
+import com.studentleague.tournaments.service.PlayoffQualifyService;
 import com.studentleague.tournaments.service.PlayoffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -29,15 +30,17 @@ import java.util.UUID;
 public class PlayoffController {
 
     private final PlayoffService playoffService;
+    private final PlayoffQualifyService playoffQualifyService;
 
-    public PlayoffController(PlayoffService playoffService) {
+    public PlayoffController(PlayoffService playoffService, PlayoffQualifyService playoffQualifyService) {
         this.playoffService = playoffService;
+        this.playoffQualifyService = playoffQualifyService;
     }
 
     @GetMapping("/playoff")
     @Operation(summary = "Playoff bracket, qualifying places and teams that advance")
     public PlayoffViewResponse view(@PathVariable UUID id) {
-        return playoffService.view(id);
+        return playoffQualifyService.decorate(id, playoffService.view(id));
     }
 
     @PutMapping("/playoff/places")

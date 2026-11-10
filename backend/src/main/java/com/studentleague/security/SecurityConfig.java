@@ -110,6 +110,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.HEAD, "/api/v1/matches/*/availability").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/matches/*/availability")
                         .hasAnyRole("PLAYER", "CAPTAIN", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/tournaments/*/playoff-qualify").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/tournaments/*/playoff-qualify").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/tournaments/*/playoff-qualify/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/tournaments",
                                 "/api/v1/tournaments/**",

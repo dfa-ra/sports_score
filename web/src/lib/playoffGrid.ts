@@ -29,6 +29,7 @@ export type PlayoffSlot = {
   penaltyHome?: number | null
   penaltyAway?: number | null
   minute?: number | null
+  bye?: boolean | null
 }
 
 export type PlayoffRound = {
@@ -48,7 +49,7 @@ export { isThirdPlaceSlot }
 
 /** Bracket lines follow the main pairs. The 3rd-place slot is not a feeder. */
 export function linkSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
-  return slots.filter((slot) => !isThirdPlaceSlot(slot))
+  return slots.filter((slot) => !isThirdPlaceSlot(slot) && !slot.bye)
 }
 
 export function thirdPlaceSlots(slots: PlayoffSlot[]): PlayoffSlot[] {
@@ -98,7 +99,7 @@ export function bracketPanels(rounds: PlayoffRound[]): BracketPanel[] {
       key: `round-${round.round ?? roundIndex}`,
       title: round.title || '',
       tab: segmentLabel(round.title),
-      slots: last ? main : slots,
+      slots: main,
       roundIndex,
       thirdPlace: false,
       champion: last,
@@ -112,7 +113,8 @@ export function defaultPanelIndex(panels: BracketPanel[]): number {
 }
 
 export function teamCountOf(rounds: PlayoffRound[]): number {
-  return slotsOf(rounds[0]).length * 2
+  const slots = slotsOf(rounds[0]).filter((slot) => !slot.bye && !isThirdPlaceSlot(slot))
+  return Math.max(1, slots.length) * 2
 }
 
 export function bracketIsEmpty(rounds?: PlayoffRound[] | null): boolean {
@@ -497,6 +499,71 @@ export function connectorCell(sourceRound: number, slotIndex: number) {
     gridColumn: String(sourceRound * 2 + 2),
     gridRow: `${slotIndex * span + 2} / span ${span}`,
   }
+}
+
+/** One connector column between two rounds, as tall as the first round's slots. */
+export function connectorSpan(sourceRound: number, rowCount: number) {
+  return {
+    gridColumn: String(sourceRound * 2 + 2),
+    gridRow: `2 / span ${Math.max(1, rowCount)}`,
+  }
+}
+
+export type ConnectorEnd = {
+  slotIndex: number
+  /** 0–100 down the connector column. */
+  y: number
+  kind?: string
+  id?: string | null
+}
+
+export type ConnectorSeg = {
+  d: string
+  kind: string
+  ids: Array<string | null | undefined>
+}
+
+function linkY(y: number) {
+  const clamped = Math.max(0, Math.min(100, y))
+  return Math.round(clamped * 100) / 100
+}
+
+function joinKind(kinds: string[]) {
+  if (kinds.length > 1 && kinds.every((kind) => kind === 'on')) return 'on'
+  if (kinds.some((kind) => kind === 'pend')) return 'pend'
+  if (kinds.length === 1) return kinds[0]
+  return 'plain'
+}
+
+/**
+ * Lines from the previous round into each next match.
+ * Slot i is fed by slots i*2 and i*2+1. A missing feeder (a hidden bye) is skipped,
+ * and the card that does exist still runs to the next match. The exit ends at x=100,
+ * the right edge of the column, so the line meets the next card.
+ */
+export function bracketConnectorPaths(sources: ConnectorEnd[], targets: ConnectorEnd[]): ConnectorSeg[] {
+  const byIndex = new Map(sources.map((item) => [item.slotIndex, item]))
+  const segs: ConnectorSeg[] = []
+  const ordered = [...targets].sort((a, b) => a.slotIndex - b.slotIndex)
+  for (const target of ordered) {
+    const incoming = [byIndex.get(target.slotIndex * 2), byIndex.get(target.slotIndex * 2 + 1)]
+      .filter((item): item is ConnectorEnd => !!item)
+    if (!incoming.length) continue
+    const yTarget = linkY(target.y)
+    for (const source of incoming) {
+      segs.push({
+        d: `M0 ${linkY(source.y)} H50 V${yTarget}`,
+        kind: source.kind || 'plain',
+        ids: [source.id],
+      })
+    }
+    segs.push({
+      d: `M50 ${yTarget} H100`,
+      kind: joinKind(incoming.map((item) => item.kind || 'plain')),
+      ids: incoming.map((item) => item.id),
+    })
+  }
+  return segs
 }
 
 export function championColumn(roundCount: number) {

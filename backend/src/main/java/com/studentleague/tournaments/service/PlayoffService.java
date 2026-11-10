@@ -42,6 +42,7 @@ import com.studentleague.tournaments.entity.Tournament;
 import com.studentleague.tournaments.entity.TournamentTable;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import com.studentleague.tournaments.repository.AdvancingPlaceRepository;
+import com.studentleague.tournaments.repository.PlayoffQualificationRuleRepository;
 import com.studentleague.tournaments.repository.PlayoffSlotRepository;
 import com.studentleague.tournaments.repository.TournamentRepository;
 import com.studentleague.tournaments.repository.TournamentTableRepository;
@@ -91,6 +92,7 @@ public class PlayoffService {
     private final TournamentService tournamentService;
     private final NotificationService notificationService;
     private final StandingsBoardCache standingsBoardCache;
+    private final PlayoffQualificationRuleRepository qualificationRuleRepository;
 
     public PlayoffService(
             TournamentRepository tournamentRepository,
@@ -109,7 +111,8 @@ public class PlayoffService {
             TeamRepository teamRepository,
             TournamentService tournamentService,
             NotificationService notificationService,
-            StandingsBoardCache standingsBoardCache
+            StandingsBoardCache standingsBoardCache,
+            PlayoffQualificationRuleRepository qualificationRuleRepository
     ) {
         this.tournamentRepository = tournamentRepository;
         this.tournamentTeamRepository = tournamentTeamRepository;
@@ -128,6 +131,7 @@ public class PlayoffService {
         this.tournamentService = tournamentService;
         this.notificationService = notificationService;
         this.standingsBoardCache = standingsBoardCache;
+        this.qualificationRuleRepository = qualificationRuleRepository;
     }
 
     @Transactional(readOnly = true)
@@ -181,6 +185,11 @@ public class PlayoffService {
     @Transactional
     public PlayoffViewResponse open(UUID tournamentId, OpenPlayoffRequest request) {
         Tournament tournament = requireGroupStage(tournamentId);
+        if (qualificationRuleRepository.existsByTournamentId(tournamentId)) {
+            throw ApiException.badRequest(
+                    "Места выхода заданы по группам. Сетку собирают оттуда, а не общим списком пар."
+            );
+        }
         List<TournamentTable> tables = tournamentTableRepository.findByTournamentIdOrderBySortOrderAscIdAsc(tournamentId);
         if (tables.isEmpty()) {
             throw ApiException.badRequest("Сначала соберите группы и расставьте по ним команды");
@@ -675,7 +684,8 @@ public class PlayoffService {
                 placesOf(tournamentId),
                 qualified,
                 roundResponses,
-                unassigned(tournamentId, teams)
+                unassigned(tournamentId, teams),
+                List.of()
         );
     }
 
@@ -785,7 +795,8 @@ public class PlayoffService {
                 penaltyAway,
                 match == null ? null : MatchListFields.minute(match, Instant.now()),
                 match == null ? null : match.getStartedAt(),
-                slot.getKind() == null ? PlayoffSlotKind.MAIN.name() : slot.getKind().name()
+                slot.getKind() == null ? PlayoffSlotKind.MAIN.name() : slot.getKind().name(),
+                slot.isBye()
         );
     }
 
@@ -1118,6 +1129,55 @@ public class PlayoffService {
             return "команды";
         }
         return "команд";
+    }
+
+    /**
+     * Drops every playoff slot and every playoff match, including results.
+     * Group matches and qualification rules stay. The tournament returns to the group stage.
+     */
+    @Transactional
+    public void resetBracket(UUID tournamentId) {
+        Tournament tournament = requireTournament(tournamentId);
+        List<PlayoffSlot> slots = playoffSlotRepository.findByTournamentIdOrderByRoundNumberAscSlotIndexAsc(tournamentId);
+        for (PlayoffSlot slot : slots) {
+            slot.setMatchId(null);
+        }
+        if (!slots.isEmpty()) {
+            playoffSlotRepository.saveAll(slots);
+            playoffSlotRepository.flush();
+        }
+        List<Match> playoffMatches = new ArrayList<>();
+        for (Match match : matchRepository.findByTournamentId(tournamentId)) {
+            if (match.getBracketRound() != null) {
+                playoffMatches.add(match);
+            }
+        }
+        for (Match match : playoffMatches) {
+            deletePlayoffMatch(match);
+        }
+        if (!slots.isEmpty()) {
+            playoffSlotRepository.deleteAll(slots);
+            playoffSlotRepository.flush();
+        }
+        if (tournament.getCompetitionStage() != CompetitionStage.GROUPS) {
+            tournament.setCompetitionStage(CompetitionStage.GROUPS);
+            tournamentRepository.save(tournament);
+        }
+        standingsBoardCache.invalidateTournament(tournamentId);
+    }
+
+    private void deletePlayoffMatch(Match match) {
+        UUID matchId = match.getId();
+        matchEventRepository.deleteByMatchId(matchId);
+        matchLineupPlayerRepository.deleteByMatchId(matchId);
+        matchRefereeRepository.deleteByMatchId(matchId);
+        matchAvailabilityRepository.deleteByMatchId(matchId);
+        matchAnalystStatsRepository.deleteByMatchId(matchId);
+        matchAnalystAssignmentRepository.deleteByMatchId(matchId);
+        penaltyKickRepository.deleteAll(penaltyKickRepository.findByMatchIdOrderByKickOrderAsc(matchId));
+        matchRepository.flush();
+        matchRepository.delete(match);
+        matchRepository.flush();
     }
 
     private static String blankToNull(String value) {

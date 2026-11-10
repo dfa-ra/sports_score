@@ -119,7 +119,7 @@ function rowLit(home: boolean) {
   background: #fff;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent), var(--shadow);
   overflow: hidden;
   color: inherit;
   text-decoration: none;
@@ -130,11 +130,12 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
 .pc.static:hover { border-color: var(--line-strong); }
 .pc.live {
   border-color: rgba(227, 107, 91, 0.55);
-  box-shadow: 0 0 0 3px rgba(227, 107, 91, 0.14), var(--shadow);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent), 0 0 0 3px rgba(227, 107, 91, 0.14), var(--shadow);
 }
 .pc.live .pf { background: rgba(227, 107, 91, 0.08); }
 .pc.live .ps { color: var(--ink); }
-.pc.final { border: 2px solid var(--navy); }
+.pc.final { border: 2px solid var(--stage-f); }
+.pc.final .fh { background: var(--stage-f); color: var(--stage-f-ink); }
 .pc.bronze { border: 2px solid var(--navy); }
 .fh {
   display: flex;

@@ -1,14 +1,51 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { stageFullName } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
 
-defineProps<{
+const props = defineProps<{
   tables: StandingGroup[]
   places?: number[] | null
+  /** When set, each place is coloured by its stage instead of one shared list. */
+  stageOf?: (groupId: string | null, place: number) => string
 }>()
+
+function stageId(groupId: string | null, place: number) {
+  return props.stageOf?.(groupId, place) || ''
+}
+
+const desktopTip = ref(false)
+let desktopQuery: MediaQueryList | null = null
+function syncTip() {
+  desktopTip.value = !!desktopQuery?.matches
+}
+onMounted(() => {
+  desktopQuery = window.matchMedia('(min-width: 721px)')
+  syncTip()
+  desktopQuery.addEventListener('change', syncTip)
+})
+onUnmounted(() => desktopQuery?.removeEventListener('change', syncTip))
+
+function circleTip(groupId: string | null, place: number) {
+  if (!desktopTip.value) return undefined
+  return stageFullName(stageId(groupId, place)) || undefined
+}
+
+function stageName(groupId: string | null, place: number) {
+  return stageFullName(stageId(groupId, place)) || undefined
+}
+
+function dismissTip(event: KeyboardEvent) {
+  ;(event.currentTarget as HTMLElement).classList.add('tip-off')
+}
+
+function clearTip(event: FocusEvent) {
+  ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
+}
 
 const teams = useTeamDirectory()
 
@@ -40,10 +77,19 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           v-for="(row, rowIndex) in table.rows"
           :key="row.teamId"
           class="line"
-          :class="{ mark: advancingRank(rowIndex, places) }"
+          :class="{ mark: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+          :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <span><i class="rank" :class="{ ice: advancingRank(rowIndex, places) }">{{ rowIndex + 1 }}</i></span>
+          <span><i
+            class="rank"
+            :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+            :tabindex="stageId(table.id, rowIndex + 1) ? 0 : undefined"
+            :title="circleTip(table.id, rowIndex + 1)"
+            :aria-label="stageName(table.id, rowIndex + 1)"
+            @keydown.escape.prevent="dismissTip"
+            @blur="clearTip"
+          >{{ rowIndex + 1 }}<span v-if="stageName(table.id, rowIndex + 1)" class="stage-tip" aria-hidden="true">{{ stageName(table.id, rowIndex + 1) }}</span></i></span>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <b>{{ clubName(row) }}</b>
@@ -61,9 +107,19 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           v-for="(row, rowIndex) in table.rows"
           :key="`m-${row.teamId}`"
           class="mrow"
+          :class="{ q: !!stageId(table.id, rowIndex + 1) }"
+          :data-qualify="stageId(table.id, rowIndex + 1) || null"
           :to="`/teams/${row.teamId}`"
         >
-          <i class="rank" :class="{ ice: advancingRank(rowIndex, places) }">{{ rowIndex + 1 }}</i>
+          <i
+            class="rank"
+            :class="{ ice: !stageId(table.id, rowIndex + 1) && advancingRank(rowIndex, places), q: !!stageId(table.id, rowIndex + 1) }"
+            :tabindex="stageId(table.id, rowIndex + 1) ? 0 : undefined"
+            :title="circleTip(table.id, rowIndex + 1)"
+            :aria-label="stageName(table.id, rowIndex + 1)"
+            @keydown.escape.prevent="dismissTip"
+            @blur="clearTip"
+          >{{ rowIndex + 1 }}<span v-if="stageName(table.id, rowIndex + 1)" class="stage-tip" aria-hidden="true">{{ stageName(table.id, rowIndex + 1) }}</span></i>
           <span class="club">
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
@@ -125,6 +181,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 }
 .pts { font-weight: 800; color: var(--navy); }
 .rank {
+  position: relative;
   width: 1.45rem;
   height: 1.45rem;
   display: inline-grid;
@@ -137,6 +194,16 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   background: #eef2f6;
 }
 .rank.ice { background: var(--ice); color: var(--navy); }
+.line, .mrow { color: #00205b; }
+.line.q, .mrow.q {
+  background: var(--q-row);
+  box-shadow: inset var(--q-bar-width, 0px) 0 0 var(--q-bar, transparent);
+}
+.rank.q {
+  background: var(--q-circle);
+  color: var(--q-digit, #00205b);
+  border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
+}
 .phone { display: none; }
 @media (max-width: 720px) {
   .desk { display: none; }
@@ -153,8 +220,41 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     min-width: 0;
   }
   .mrow .club b { white-space: normal; }
-  .mrow small { display: block; color: var(--muted); font-size: 0.72rem; }
+  .mrow small { display: block; color: #00205b; font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }
+  .rank.q {
+    width: 1.2rem;
+    height: 1.2rem;
+    border-radius: 50%;
+    background: var(--q-circle);
+    color: var(--q-digit, #00205b);
+    border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
+  }
 }
+.rank:focus { outline: none; }
+.rank:focus-visible {
+  outline: 2px solid #4cb4e5;
+  outline-offset: 2px;
+}
+.stage-tip {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: none;
+  padding: 0.2rem 0.45rem;
+  border-radius: 6px;
+  background: #00205b;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rank:focus-visible:not(.tip-off) .stage-tip { display: block; }
 </style>

@@ -103,11 +103,139 @@
   --group-gap: 0.9rem;
   --tap-min: 44px;
   --chrome-h: 68px;
+  /* Qualify stage colours, variant A. Table, legend, bracket and admin read these. */
+  --stage-sf: #00205b;
+  --stage-sf-ink: #fff;
+  --stage-sf-row: #e6ebf4;
+  --stage-sf-bar: #00205b;
+  --stage-sf-bar-width: 3px;
+  --stage-sf-circle: #00205b;
+  --stage-sf-stroke: transparent;
+  --stage-sf-stroke-width: 0px;
+  --stage-qf: #4cb4e5;
+  --stage-qf-ink: #00205b;
+  --stage-qf-row: #eaf6fc;
+  --stage-qf-bar: #4cb4e5;
+  --stage-qf-bar-width: 3px;
+  --stage-qf-circle: #4cb4e5;
+  --stage-qf-stroke: transparent;
+  --stage-qf-stroke-width: 0px;
+  --stage-r8: #a6d9f2;
+  --stage-r8-ink: #00205b;
+  --stage-r8-row: #f3f9fd;
+  --stage-r8-bar: #a6d9f2;
+  --stage-r8-bar-width: 3px;
+  --stage-r8-circle: #fff;
+  --stage-r8-stroke: #4cb4e5;
+  --stage-r8-stroke-width: 2px;
+  /* 1/16 is one step lighter than 1/8 and uses only #a6d9f2, #f3f9fd, white and #00205b.
+     Row #fff, bar #f3f9fd at 3px, circle #fff, 2px border #a6d9f2, digit #00205b. */
+  --stage-r16: #f3f9fd;
+  --stage-r16-ink: #00205b;
+  --stage-r16-row: #fff;
+  --stage-r16-bar: #f3f9fd;
+  --stage-r16-bar-width: 3px;
+  --stage-r16-circle: #fff;
+  --stage-r16-stroke: #a6d9f2;
+  --stage-r16-stroke-width: 2px;
+  --stage-f: var(--stage-sf);
+  --stage-f-ink: var(--stage-sf-ink);
+  --stage-f-row: var(--stage-sf-row);
+  --stage-f-bar: var(--stage-sf-bar);
+  --stage-f-bar-width: var(--stage-sf-bar-width);
+  --stage-f-circle: var(--stage-sf-circle);
+  --stage-f-stroke: var(--stage-sf-stroke);
+  --stage-f-stroke-width: var(--stage-sf-stroke-width);
+  --stage-silver: #b8c2cf;
+  --stage-silver-ink: #5b6b82;
+  --stage-silver-row: #f3f5f8;
+  --stage-silver-bar: #b8c2cf;
+  --stage-silver-bar-width: 3px;
+  --stage-silver-circle: #fff;
+  --stage-silver-stroke: #b8c2cf;
+  --stage-silver-stroke-width: 2px;
+  --stage-out: #eef1f6;
+  --stage-out-ink: #5b6b82;
+  --stage-out-row: #fff;
+  --stage-out-bar: transparent;
+  --stage-out-bar-width: 0px;
+  --stage-out-circle: #eef1f6;
+  --stage-out-stroke: transparent;
+  --stage-out-stroke-width: 0px;
+  --stage-out-legend-stroke: #b8c2cf;
+  --stage-out-legend-stroke-width: 1px;
+  /* «Выход из групп» summary dots. Match is ice, error is this red. */
+  --qualify-sum-ok: #4cb4e5;
+  --qualify-sum-bad: #d64545;
   --row-table: 2.65rem;
   --row-match: 56px;
   --row-scorer: 54px;
   --row-event: 54px;
   --tab-h: auto;
+}
+
+[data-qualify='R16'] {
+  --q-row: var(--stage-r16-row);
+  --q-bar: var(--stage-r16-bar);
+  --q-bar-width: var(--stage-r16-bar-width);
+  --q-circle: var(--stage-r16-circle);
+  --q-stroke: var(--stage-r16-stroke);
+  --q-stroke-width: var(--stage-r16-stroke-width);
+  --q-digit: var(--stage-r16-ink);
+}
+[data-qualify='R8'] {
+  --q-row: var(--stage-r8-row);
+  --q-bar: var(--stage-r8-bar);
+  --q-bar-width: var(--stage-r8-bar-width);
+  --q-circle: var(--stage-r8-circle);
+  --q-stroke: var(--stage-r8-stroke);
+  --q-stroke-width: var(--stage-r8-stroke-width);
+  --q-digit: var(--stage-r8-ink);
+}
+[data-qualify='QF'] {
+  --q-row: var(--stage-qf-row);
+  --q-bar: var(--stage-qf-bar);
+  --q-bar-width: var(--stage-qf-bar-width);
+  --q-circle: var(--stage-qf-circle);
+  --q-stroke: var(--stage-qf-stroke);
+  --q-stroke-width: var(--stage-qf-stroke-width);
+  --q-digit: var(--stage-qf-ink);
+}
+[data-qualify='SF'] {
+  --q-row: var(--stage-sf-row);
+  --q-bar: var(--stage-sf-bar);
+  --q-bar-width: var(--stage-sf-bar-width);
+  --q-circle: var(--stage-sf-circle);
+  --q-stroke: var(--stage-sf-stroke);
+  --q-stroke-width: var(--stage-sf-stroke-width);
+  --q-digit: var(--stage-sf-ink);
+}
+[data-qualify='F'] {
+  --q-row: var(--stage-f-row);
+  --q-bar: var(--stage-f-bar);
+  --q-bar-width: var(--stage-f-bar-width);
+  --q-circle: var(--stage-f-circle);
+  --q-stroke: var(--stage-f-stroke);
+  --q-stroke-width: var(--stage-f-stroke-width);
+  --q-digit: var(--stage-f-ink);
+}
+[data-qualify='SILVER'] {
+  --q-row: var(--stage-silver-row);
+  --q-bar: var(--stage-silver-bar);
+  --q-bar-width: var(--stage-silver-bar-width);
+  --q-circle: var(--stage-silver-circle);
+  --q-stroke: var(--stage-silver-stroke);
+  --q-stroke-width: var(--stage-silver-stroke-width);
+  --q-digit: var(--stage-silver-ink);
+}
+[data-qualify='OUT'] {
+  --q-row: var(--stage-out-row);
+  --q-bar: var(--stage-out-bar);
+  --q-bar-width: var(--stage-out-bar-width);
+  --q-circle: var(--stage-out-circle);
+  --q-stroke: var(--stage-out-stroke);
+  --q-stroke-width: var(--stage-out-stroke-width);
+  --q-digit: var(--stage-out-ink);
 }
 
 * { box-sizing: border-box; }

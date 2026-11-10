@@ -28,6 +28,7 @@ public record PlayoffSlotResponse(
         Integer penaltyAway,
         Integer minute,
         Instant startedAt,
-        String kind
+        String kind,
+        boolean bye
 ) {
 }

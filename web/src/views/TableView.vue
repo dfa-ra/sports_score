@@ -7,6 +7,8 @@ import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
 import StandingTable from '../components/StandingTable.vue'
+import QualifyLegend from '../components/QualifyLegend.vue'
+import { stageMap, type QualifyMark } from '../lib/qualifyStages'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import BrandMark from '../components/BrandMark.vue'
 import StatPlayerCell from '../components/StatPlayerCell.vue'
@@ -47,6 +49,10 @@ const advancingPlaces = computed(() => {
   if (!Array.isArray(raw)) return []
   return raw.map((place: unknown) => Number(place)).filter((place) => Number.isFinite(place))
 })
+
+const qualifyMarks = computed<QualifyMark[]>(() => (Array.isArray(playoff.value?.qualifyMarks) ? playoff.value.qualifyMarks : []))
+const qualifyByGroup = computed(() => stageMap(qualifyMarks.value))
+const hasQualify = computed(() => qualifyMarks.value.length > 0)
 
 const hasPlayoff = computed(() => {
   const picked = tournaments.value.find((item) => item.id === tournamentId.value)
@@ -455,8 +461,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
       <div v-else class="sheet-stack">
         <div v-for="(table, i) in standings" :key="table.id || i" class="sheet">
           <h2 v-if="table.name" class="group-title">{{ table.name }}</h2>
-          <StandingTable :rows="table.rows" :marked-places="advancingPlaces" />
+          <StandingTable
+            :rows="table.rows"
+            :marked-places="hasQualify ? undefined : advancingPlaces"
+            :place-stages="hasQualify ? (qualifyByGroup[table.id || ''] || {}) : undefined"
+          />
         </div>
+        <QualifyLegend v-if="hasQualify" :marks="qualifyMarks" />
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
       </div>
     </template>

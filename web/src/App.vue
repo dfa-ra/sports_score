@@ -118,7 +118,7 @@ const stickyChrome = computed(() => {
   const name = String(route.name || '')
   if (name === 'calendar' || name === 'live' || name === 'match') return true
   if (name === 'table') return String(route.query.tab || 'table') !== 'playoff'
-  if (name === 'tournament') return String(route.query.tab || '') === 'table'
+  if (name === 'tournament') return true
   return false
 })
 

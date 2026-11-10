@@ -10,6 +10,8 @@ const props = defineProps<{
   tournamentId: string
   tables: { id: string; name: string; teamIds: string[] }[]
   playoff: any
+  /** Group-by-group rules replace the single list of places and the old pair form. */
+  qualifyRules?: boolean
 }>()
 const emit = defineEmits<{ changed: [] }>()
 
@@ -128,6 +130,7 @@ async function openPlayoff() {
 
 <template>
   <div class="stack">
+    <template v-if="!qualifyRules">
     <h2>Места в плей-офф</h2>
     <p class="muted">
       Не количество команд, а сами места. Например, из каждой группы выходят 1-е и 2-е.
@@ -147,6 +150,7 @@ async function openPlayoff() {
     <button v-if="!playoffOpen" class="btn secondary" type="button" :disabled="pending" @click="savePlaces">
       Сохранить места
     </button>
+    </template>
 
     <h2>Уже сыгранные матчи</h2>
     <p class="muted">
@@ -169,6 +173,7 @@ async function openPlayoff() {
       <span v-else-if="!groupsFor(match).length" class="muted">Разные группы</span>
     </div>
 
+    <template v-if="!qualifyRules">
     <h2>Кто выходит</h2>
     <p v-if="!qualified.length" class="muted">Сначала сохраните группы и места выхода.</p>
     <div v-for="team in qualified" :key="`${team.groupName}-${team.place}-${team.teamId}`" class="row">
@@ -225,6 +230,7 @@ async function openPlayoff() {
     <p v-else-if="playoffOpen" class="muted">
       Плей-офф открыт. Состав пар зафиксирован, время и место проведения правятся в сетке.
     </p>
+    </template>
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
   </div>
