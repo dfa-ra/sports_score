@@ -160,8 +160,8 @@
   --stage-out-bar: transparent;
   --stage-out-bar-width: 0px;
   --stage-out-circle: #eef1f6;
-  --stage-out-stroke: transparent;
-  --stage-out-stroke-width: 0px;
+  --stage-out-stroke: var(--stage-silver-stroke);
+  --stage-out-stroke-width: 1px;
   /* «Выход из групп» summary dots. Match is ice, error is this red. */
   --qualify-sum-ok: #4cb4e5;
   --qualify-sum-bad: #d64545;

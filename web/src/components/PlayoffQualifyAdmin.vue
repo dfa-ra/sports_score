@@ -475,9 +475,9 @@ select {
 }
 .is-locked select,
 select:disabled {
-  color: #8a93a3;
-  -webkit-text-fill-color: #8a93a3;
-  background-color: #f3f5f8;
+  color: var(--stage-silver-ink);
+  -webkit-text-fill-color: var(--stage-silver-ink);
+  background-color: var(--stage-silver-row);
   background-image: none;
   border-color: #e1e6ec;
   cursor: not-allowed;
