@@ -6,10 +6,12 @@ import {
   QUALIFY_STAGES,
   firstPowerError,
   groupHeading,
+  placeOutOfRange,
   qualifyLines,
   stageLabel,
   stageMeta,
   winnersWord,
+  type PlaceSpan,
   type QualifyStageId,
 } from '../lib/qualifyStages'
 
@@ -31,12 +33,29 @@ const selection = ref<{ groupId: string; anchor: number; focus: number } | null>
 
 const choices = QUALIFY_STAGES.filter((item) => item.id !== 'F')
 
+const storedRules = ref<PlaceSpan[]>([])
+const touched = ref(false)
 const lines = computed(() => qualifyLines(directCounts()))
 const powerError = computed(() => firstPowerError(lines.value))
 const missingStage = computed(() =>
   groups.value.some((group) => group.places.some((row) => !stages.value[group.id]?.[row.place])),
 )
-const canSave = computed(() => !loading.value && !pending.value && !locked.value && !missingStage.value && !powerError.value && lines.value.length > 0)
+const placeError = computed(() => {
+  const live = placeOutOfRange(groups.value, rulesBody().rules)
+  if (live) return live
+  if (!touched.value) return placeOutOfRange(groups.value, storedRules.value)
+  return ''
+})
+const canSave = computed(() =>
+  !loading.value
+  && !pending.value
+  && !locked.value
+  && !missingStage.value
+  && !powerError.value
+  && !placeError.value
+  && !error.value
+  && lines.value.length > 0,
+)
 
 function directCounts() {
   const counts: Partial<Record<QualifyStageId, number>> = {}
@@ -61,8 +80,15 @@ function applyPayload(data: any) {
     }
   }
   stages.value = next
+  storedRules.value = (Array.isArray(data?.rules) ? data.rules : []).map((rule: PlaceSpan) => ({
+    groupId: String(rule.groupId),
+    placeFrom: Number(rule.placeFrom),
+    placeTo: Number(rule.placeTo),
+  }))
+  touched.value = false
+  selection.value = null
   locked.value = data?.locked === true || data?.bracketBuilt === true
-  const saved = Array.isArray(data?.rules) && data.rules.length > 0
+  const saved = storedRules.value.length > 0
   emit('active', saved)
 }
 
@@ -94,12 +120,14 @@ function selected(groupId: string, place: number) {
 }
 
 function onPointerDown(event: PointerEvent, groupId: string, place: number) {
+  if (locked.value || pending.value) return
   if ((event.target as HTMLElement | null)?.closest('select')) return
   selection.value = { groupId, anchor: place, focus: place }
   ;(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId)
 }
 
 function onPointerEnter(groupId: string, place: number, event: PointerEvent) {
+  if (locked.value || pending.value) return
   if (!selection.value || selection.value.groupId !== groupId) return
   if (event.pointerType === 'mouse' && event.buttons === 0) return
   selection.value = { ...selection.value, focus: place }
@@ -112,6 +140,7 @@ function setStage(groupId: string, place: number, stage: string) {
   const next = { ...stages.value, [groupId]: { ...stages.value[groupId] } }
   for (let cursor = from; cursor <= to; cursor += 1) next[groupId][cursor] = stage
   stages.value = next
+  touched.value = true
   error.value = ''
 }
 
@@ -165,7 +194,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="qualify" aria-labelledby="qualify-title">
+  <section class="qualify" :class="{ 'is-locked': locked }" aria-labelledby="qualify-title">
     <h2 id="qualify-title">Выход из групп</h2>
     <p class="muted">Одно место — одна стадия. Порядок мест тот же, что на вкладке «Таблица».</p>
 
@@ -221,13 +250,15 @@ onMounted(load)
 
       <div class="dock">
         <div class="summary phone" aria-label="Сводка стадий">
-          <p v-if="powerError" class="form-error">{{ powerError }}</p>
+          <p v-if="placeError" class="form-error">{{ placeError }}</p>
+          <p v-else-if="powerError" class="form-error">{{ powerError }}</p>
           <p v-else-if="missingStage" class="muted">Укажите стадию для каждого места.</p>
           <p v-else-if="lines.length" class="ok-line">Сетка сходится</p>
         </div>
-        <p v-if="powerError" class="form-error desk-error">{{ powerError }}</p>
+        <p v-if="placeError" class="form-error desk-error">{{ placeError }}</p>
+        <p v-else-if="powerError" class="form-error desk-error">{{ powerError }}</p>
         <p v-else-if="missingStage" class="muted desk-error">Укажите стадию для каждого места. Проведите по местам 1–2 и выберите стадию для всех сразу.</p>
-        <p v-if="error" class="form-error">{{ error }}</p>
+        <p v-if="error && error !== placeError" class="form-error">{{ error }}</p>
         <div v-if="confirming" class="confirm">
           <p>Сетка и результаты плей-офф будут сброшены. Правила выхода останутся.</p>
           <div class="actions">
@@ -293,7 +324,10 @@ h3 {
   background: var(--muted);
 }
 .sum.ok i { background: #2f9e6b; }
-.sum.bad i { background: #d4534a; }
+.sum.bad i { background: var(--danger); }
+.sum.bad,
+.sum.bad b,
+.sum.bad span { color: var(--danger); font-weight: 800; }
 .sum b { font-size: 0.78rem; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .block { margin: 0 0 1rem; }
@@ -325,7 +359,27 @@ select {
   color: var(--navy);
   font: inherit;
 }
+.is-locked .qrow {
+  cursor: not-allowed;
+  user-select: none;
+}
+.is-locked select,
+select:disabled {
+  color: #8a93a3;
+  -webkit-text-fill-color: #8a93a3;
+  background-color: #f3f5f8;
+  background-image: none;
+  border-color: #e1e6ec;
+  cursor: not-allowed;
+  opacity: 1;
+  appearance: none;
+  -webkit-appearance: none;
+}
 .dock { display: grid; gap: 0.55rem; margin-top: 0.4rem; }
+.dock > .form-error {
+  color: var(--danger);
+  font-weight: 800;
+}
 .summary.phone, .desk-error { margin: 0; }
 .summary.phone { display: none; }
 .confirm {

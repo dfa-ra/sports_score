@@ -119,6 +119,25 @@ export function firstPowerError(lines: StageLine[]) {
   return powerMessage(lines[index], previous)
 }
 
+export type PlaceSpan = { groupId: string; placeFrom: number; placeTo: number }
+
+/** Same sentence as the server when a place is outside 1..group size. */
+export function placeOutOfRange(
+  groups: { id: string; name: string; teamCount: number }[],
+  rules: PlaceSpan[],
+) {
+  const byId = new Map(groups.map((group) => [group.id, group]))
+  for (const rule of rules) {
+    const group = byId.get(rule.groupId)
+    if (!group) continue
+    if (rule.placeFrom < 1 || rule.placeTo < rule.placeFrom || rule.placeTo > group.teamCount) {
+      const place = Math.max(rule.placeTo, rule.placeFrom)
+      return `Место ${place} в группе «${group.name}» больше числа команд (${group.teamCount})`
+    }
+  }
+  return ''
+}
+
 /** Legend entries that actually appear, in bracket order. The final is not a direct place. */
 export function legendItems(marks: QualifyMark[]) {
   const used = new Set(marks.map((mark) => mark.stage).filter((stage) => stage && stage !== 'F'))

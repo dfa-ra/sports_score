@@ -4,6 +4,7 @@ import {
   firstPowerError,
   groupHeading,
   legendItems,
+  placeOutOfRange,
   powerMessage,
   qualifyLines,
   stageMap,
@@ -31,6 +32,23 @@ test('power-of-two copy names the stage, the direct places and the previous winn
   )
   const broken = qualifyLines({ R8: 7, QF: 4 })
   assert.match(firstPowerError(broken), /В 1\/8 должно быть 8 команд: 7 напрямую/)
+})
+
+test('a place past the group size uses the same sentence and blocks the save', () => {
+  assert.equal(
+    placeOutOfRange(
+      [{ id: 'a', name: 'Группа A', teamCount: 6 }],
+      [{ groupId: 'a', placeFrom: 7, placeTo: 7 }],
+    ),
+    'Место 7 в группе «Группа A» больше числа команд (6)',
+  )
+  assert.equal(
+    placeOutOfRange(
+      [{ id: 'a', name: 'Группа A', teamCount: 6 }],
+      [{ groupId: 'a', placeFrom: 1, placeTo: 6 }],
+    ),
+    '',
+  )
 })
 
 test('group heading and legend follow the stage colours', () => {
