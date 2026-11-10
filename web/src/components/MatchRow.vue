@@ -208,19 +208,31 @@ function tapStar() {
 }
 
 @media (max-width: 720px) {
-  .row { min-height: var(--row-match); height: var(--row-match); }
+  .row {
+    grid-template-columns: 28px minmax(0, 1fr);
+    column-gap: 8px;
+    min-height: var(--row-match);
+    height: var(--row-match);
+  }
   .star {
     position: relative;
-    width: 44px;
-    font-size: 12px;
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 14px;
+    color: #9aa7b8;
+    display: grid;
+    place-items: center;
   }
+  .star.on { color: #4cb4e5; }
   .star::before {
     content: "";
     position: absolute;
     left: 50%;
     top: 50%;
-    width: var(--tap-min);
-    height: var(--tap-min);
+    width: 44px;
+    height: 44px;
     transform: translate(-50%, -50%);
   }
   .body {

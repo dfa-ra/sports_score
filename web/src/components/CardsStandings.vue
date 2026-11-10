@@ -210,22 +210,37 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   .phone { display: grid; }
   .mrow {
     display: grid;
-    grid-template-columns: 1.6rem minmax(0, 1fr) auto;
-    gap: 0.45rem;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    column-gap: 10px;
     align-items: center;
-    padding: 0.55rem 0;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 6px 12px 6px 12px;
+    border-left: 4px solid transparent;
     border-bottom: 1px solid var(--line);
     color: inherit;
     text-decoration: none;
     min-width: 0;
+  }
+  .mrow.q {
+    border-left-color: var(--q-bar);
+    box-shadow: none;
+  }
+  .mrow .rank,
+  .mrow .rank.q,
+  .mrow .rank.ice {
+    width: 22px;
+    height: 22px;
+    box-sizing: border-box;
+    flex-shrink: 0;
   }
   .mrow .club b { white-space: normal; }
   .mrow small { display: block; color: #00205b; font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }
   .rank.q {
-    width: 1.2rem;
-    height: 1.2rem;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: var(--q-circle);
     color: var(--q-digit, #00205b);

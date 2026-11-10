@@ -40,7 +40,8 @@ import {
 import { heroLivePreview, heroLiveTail } from '../lib/heroLive'
 import { unitWord } from '../lib/q2Players'
 import { setPageMeta } from '../lib/pageMeta'
-import { registeredName } from '../lib/playerTitle'
+import { nameForms, registeredName } from '../lib/playerTitle'
+import FitName from '../components/FitName.vue'
 import { scheduleRevision } from '../lib/scheduleRefresh'
 import { tableRouteQuery } from '../lib/tableQuery'
 
@@ -621,7 +622,7 @@ onUnmounted(() => {
             <RouterLink v-for="(player, index) in activeScorers.scorers" :key="`m-${player.playerId}`" class="srow" :to="`/players/${player.playerId}`">
               <span class="rk">{{ index + 1 }}</span>
               <HomeAvatar :src="player.avatarUrl" :name="registeredName(player)" :first-name="player.firstName" :last-name="player.lastName" />
-              <div><div class="nm">{{ registeredName(player) }}</div><div class="tm">{{ player.teamName }}</div></div>
+              <div><div class="nm"><FitName :full="nameForms(player).full" :short="nameForms(player).short" :force-below="360" /></div><div class="tm">{{ player.teamName }}</div></div>
               <div class="g">{{ player.goals }}<small>{{ player.assists }} {{ unitWord(player.assists, 'assists') }}</small></div>
             </RouterLink>
           </div>
@@ -1275,6 +1276,21 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .matches-card .block-empty { min-height: calc(118px + 16px); }
   .scorer-body,
   .scorer-empty { min-height: calc(5 * 56px); }
+  .srow > div { min-width: 0; }
+  .srow .nm { display: block; min-width: 0; }
+  .hero-state { padding: 16px; }
+  .hero-state > div { display: block; min-width: 0; }
+  .hero-state h1 {
+    position: static;
+    margin: 0 0 14px;
+    line-height: 1;
+    font-size: 34px;
+  }
+  .hero-state .acts { gap: 8px; }
+  .hero-state .hv-btn { height: 44px; min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .hero-state h1 { font-size: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .st.live::before { animation: none; }

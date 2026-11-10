@@ -26,6 +26,18 @@ export type PersonFields = {
   secondaryPlayerName?: string | null
 }
 
+export type NameForms = { full: string; short: string }
+
+/** Full «Фамилия Имя», and «Фамилия И.» when the line is too narrow. */
+export function nameForms(person?: PersonFields | null, role: 'primary' | 'secondary' = 'primary'): NameForms {
+  const full = registeredName(person, role)
+  const parts = full.split(' ').filter(Boolean)
+  if (parts.length < 2) return { full, short: full }
+  const initial = parts[1].charAt(0)
+  const short = initial ? `${parts[0]} ${initial}.` : parts[0]
+  return { full, short }
+}
+
 /** «Фамилия Имя» from registration. Shirt nickname is not the title. */
 export function registeredName(person?: PersonFields | null, role: 'primary' | 'secondary' = 'primary') {
   if (!person) return ''

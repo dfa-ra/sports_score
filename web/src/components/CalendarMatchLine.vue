@@ -180,15 +180,30 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
 .badge.cancelled { background: #eef2f6; color: #8b97a6; }
 .badge.phone { display: none; }
 @media (max-width: 720px) {
-  .line { min-height: var(--row-match); }
-  .star { width: 44px; font-size: 12px; position: relative; }
+  .line {
+    grid-template-columns: 28px minmax(0, 1fr);
+    column-gap: 8px;
+    min-height: var(--row-match);
+  }
+  .star {
+    width: 28px;
+    min-width: 28px;
+    padding: 0;
+    font-size: 14px;
+    line-height: 14px;
+    color: #9aa7b8;
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+  .star.on { color: #4cb4e5; }
   .star::before {
     content: "";
     position: absolute;
     left: 50%;
     top: 50%;
-    width: var(--tap-min);
-    height: var(--tap-min);
+    width: 44px;
+    height: 44px;
     transform: translate(-50%, -50%);
   }
   .body {

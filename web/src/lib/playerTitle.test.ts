@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { registeredName } from './playerTitle.ts'
+import { nameForms, registeredName } from './playerTitle.ts'
 
 test('roster and lineup titles are the registration name, not the shirt nickname', () => {
   const roster = {
@@ -28,4 +28,12 @@ test('roster and lineup titles are the registration name, not the shirt nickname
   assert.equal(registeredName(protocol, 'secondary'), 'Петров Пётр')
   assert.notEqual(registeredName(roster), 'Vanya')
   assert.notEqual(registeredName(lineup), 'Vanya')
+})
+
+test('narrow lists fall back to surname and initial', () => {
+  assert.deepEqual(nameForms({ lastName: 'Нестеренко', firstName: 'Илья' }), {
+    full: 'Нестеренко Илья',
+    short: 'Нестеренко И.',
+  })
+  assert.deepEqual(nameForms({ lastName: 'Кирилл' }), { full: 'Кирилл', short: 'Кирилл' })
 })

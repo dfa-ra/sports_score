@@ -525,7 +525,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
         <EmptyState v-else-if="!scorers.length" title="Голов пока нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Голы</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num"><span class="stat-long">Голы</span><span class="stat-short">Г</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(scorers, 'scorers')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -568,7 +574,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
         <EmptyState v-else-if="!keepers.length" title="Сухих матчей ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
-            <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Игрок</th>
+                <th class="num"><span class="stat-long">Сухие</span><span class="stat-short">С</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="p in shown(keepers, 'keepers')" :key="p.playerId">
                 <td class="who"><StatPlayerCell :player="p" /></td>
@@ -620,8 +632,8 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
             <thead>
               <tr>
                 <th>Игрок</th>
-                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span></th>
-                <th class="num">Игры</th>
+                <th class="num pass-col"><span class="pass-short">Пер.</span><span class="pass-wide">Передачи</span><span class="stat-short">П</span></th>
+                <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
               </tr>
             </thead>
             <tbody>
@@ -827,7 +839,27 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   overflow: hidden;
 }
 @media (max-width: 720px) {
-  .stat-table .num { width: 4.15rem; }
+  .stat-table {
+    width: 100%;
+  }
+  .stat-table .num {
+    width: 36px;
+    max-width: 36px;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: right;
+  }
+  .stat-table th.num {
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+  .stat-table tbody td {
+    height: auto;
+    min-height: 48px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .stat-table .who { overflow: visible; }
 }
 .sheet :deep(a.line) {
   box-sizing: border-box;
@@ -872,9 +904,16 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   justify-content: center;
 }
 .pass-wide { display: none; }
+.stat-short { display: none; }
 @media (min-width: 721px) {
   .pass-short { display: none; }
   .pass-wide { display: inline; }
+}
+@media (max-width: 360px) {
+  .stat-table .stat-long,
+  .stat-table .pass-short,
+  .stat-table .pass-wide { display: none; }
+  .stat-table .stat-short { display: inline; }
 }
 .people { display: grid; }
 .person {
