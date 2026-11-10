@@ -809,7 +809,29 @@ onUnmounted(() => {
     transform: translate(-50%, -50%);
   }
   .filters-fade { position: relative; top: auto; }
-  .filters-fade :deep(.scroll-fade-edge.right) { width: 36px; }
+  .filters-fade :deep(.scroll-fade-edge) { display: none; }
+  .filters-fade.show-right::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 3;
+    width: 32px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, #001433);
+  }
+  .filters-fade.show-left::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 3;
+    width: 24px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(to right, #001433, transparent);
+  }
   .filters { gap: 6px; }
   .filters button {
     height: 40px;
@@ -852,6 +874,5 @@ onUnmounted(() => {
 }
 @media (max-width: 360px) {
   .days { gap: 4px; }
-  .filters-fade :deep(.scroll-fade-edge.right) { width: 32px; }
 }
 </style>

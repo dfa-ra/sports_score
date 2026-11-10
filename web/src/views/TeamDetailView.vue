@@ -557,7 +557,23 @@ h2 { font-size: 1.2rem; }
     grid-template-columns: minmax(0, 1fr);
   }
   .stack > * { min-width: 0; }
-  .fs-tabs { width: 100%; max-width: 100%; }
+  .fs-tabs {
+    width: 100%;
+    max-width: 100%;
+    scroll-padding-inline: 16px;
+  }
+  .fs-tabs.can-scroll-left {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 24px);
+    mask-image: linear-gradient(to right, transparent, #000 24px);
+  }
+  .fs-tabs.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+  .fs-tabs.can-scroll-left.can-scroll-right {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 32px), transparent);
+  }
   .team-head {
     gap: 12px;
     min-height: 0;
@@ -587,6 +603,9 @@ h2 { font-size: 1.2rem; }
   }
   .fs-tabs button { padding: 0 9px; font-size: 12px; }
   .sheet { border-radius: 12px; }
+}
+@media (min-width: 361px) and (max-width: 720px) {
+  .fs-tabs button { padding-inline: 7px; }
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 721px) {
   .make-captain {
