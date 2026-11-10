@@ -374,9 +374,6 @@ public class PlayoffQualifyService {
     private List<QualifyMarkResponse> marks(List<PlayoffQualificationRule> rules) {
         List<QualifyMarkResponse> marks = new ArrayList<>();
         for (PlayoffQualificationRule rule : rules) {
-            if (rule.getStage() == QualifyStage.OUT) {
-                continue;
-            }
             for (int place = rule.getPlaceFrom(); place <= rule.getPlaceTo(); place++) {
                 marks.add(new QualifyMarkResponse(rule.getTableId(), place, rule.getStage().name()));
             }

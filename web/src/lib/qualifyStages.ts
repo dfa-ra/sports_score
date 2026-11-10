@@ -119,10 +119,10 @@ export function firstPowerError(lines: StageLine[]) {
   return powerMessage(lines[index], previous)
 }
 
-/** Legend entries that actually appear, in bracket order. «Выбывает» stays off the legend. */
+/** Legend entries that actually appear, in bracket order. The final is not a direct place. */
 export function legendItems(marks: QualifyMark[]) {
-  const used = new Set(marks.map((mark) => mark.stage).filter((stage) => stage && stage !== 'OUT' && stage !== 'F'))
-  return QUALIFY_STAGES.filter((item) => item.id !== 'OUT' && item.id !== 'F' && used.has(item.id))
+  const used = new Set(marks.map((mark) => mark.stage).filter((stage) => stage && stage !== 'F'))
+  return QUALIFY_STAGES.filter((item) => item.id !== 'F' && used.has(item.id))
 }
 
 export function stageMap(marks: QualifyMark[]) {

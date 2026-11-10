@@ -42,6 +42,6 @@ test('group heading and legend follow the stage colours', () => {
     { groupId: 'a', place: 5, stage: 'OUT' },
     { groupId: 'c', place: 8, stage: 'SILVER' },
   ])
-  assert.deepEqual(items.map((item) => item.label), ['1/8', '1/4', 'Серебряная лига'])
+  assert.deepEqual(items.map((item) => item.label), ['1/8', '1/4', 'Серебряная лига', 'Выбывает'])
   assert.equal(stageMap([{ groupId: 'a', place: 1, stage: 'QF' }]).a[1], 'QF')
 })

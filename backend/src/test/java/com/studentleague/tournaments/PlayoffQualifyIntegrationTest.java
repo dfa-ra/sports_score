@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -66,7 +67,8 @@ class PlayoffQualifyIntegrationTest extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/api/v1/tournaments/" + tournamentId + "/playoff"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.qualifyMarks.length()").value(12));
+                .andExpect(jsonPath("$.qualifyMarks.length()").value(20))
+                .andExpect(jsonPath("$.qualifyMarks[?(@.stage == 'OUT')]", hasSize(8)));
 
         mockMvc.perform(put("/api/v1/tournaments/" + tournamentId + "/playoff-qualify")
                         .header("Authorization", auth(admin))

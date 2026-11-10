@@ -4,6 +4,7 @@ import { matchCardStage, protocolStage } from '../src/lib/playoffLabel.ts'
 import {
   arrivalLine,
   championCard,
+  bracketConnectorPaths,
   bracketIsEmpty,
   bracketPanels,
   bronzeBoardColumns,
@@ -259,4 +260,33 @@ test('champion card uses only a decided final and keeps every slot', () => {
   assert.equal(championCard({ matchStatus: 'LIVE', homeScore: 1, awayScore: 0, homeTeamId: 'a', awayTeamId: 'b', homeTeamName: 'Альфа', awayTeamName: 'Бета' }), null)
   assert.equal(championCard({ matchStatus: 'FINISHED', homeScore: 2, awayScore: 1, homeTeamId: 'a', awayTeamName: 'Бета' }), null)
   assert.equal(slots, 3)
+})
+
+test('a hidden bye does not leave a stub: the remaining card reaches the next match', () => {
+  const single = bracketConnectorPaths(
+    [{ slotIndex: 1, y: 18, kind: 'pend', id: 'm1' }],
+    [{ slotIndex: 0, y: 12 }],
+  )
+  assert.deepEqual(single.map((seg) => seg.d), ['M0 18 H50 V12', 'M50 12 H100'])
+  assert.deepEqual(single[0].ids, ['m1'])
+
+  const pair = bracketConnectorPaths(
+    [
+      { slotIndex: 0, y: 20, kind: 'plain', id: 'a' },
+      { slotIndex: 1, y: 40, kind: 'plain', id: 'b' },
+    ],
+    [{ slotIndex: 0, y: 30 }],
+  )
+  assert.deepEqual(pair.map((seg) => seg.d), ['M0 20 H50 V30', 'M0 40 H50 V30', 'M50 30 H100'])
+
+  const zakhar = bracketConnectorPaths(
+    [1, 3, 5, 7].map((slotIndex, index) => ({ slotIndex, y: 10 + index * 20, kind: 'pend', id: `m${index}` })),
+    [0, 1, 2, 3].map((slotIndex) => ({ slotIndex, y: 15 + slotIndex * 20 })),
+  )
+  assert.equal(zakhar.length, 8)
+  assert.deepEqual(
+    zakhar.filter((_, index) => index % 2 === 0).map((seg) => seg.d),
+    ['M0 10 H50 V15', 'M0 30 H50 V35', 'M0 50 H50 V55', 'M0 70 H50 V75'],
+  )
+  assert.ok(zakhar.every((seg, index) => index % 2 === 0 || seg.d.endsWith('H100')))
 })
