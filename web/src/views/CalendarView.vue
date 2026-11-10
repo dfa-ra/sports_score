@@ -809,9 +809,20 @@ onUnmounted(() => {
   }
   .filters-fade { position: relative; }
   .filters-fade :deep(.scroll-fade-edge.right) { width: 36px; }
+  .filters { gap: 6px; }
   .filters button {
     height: 40px;
     min-height: 40px;
+    min-width: 48px;
+    padding: 0 10px;
+    border-radius: 20px;
+    font-size: 12px;
+  }
+  .filters button::before {
+    inset: -2px;
+    width: auto;
+    height: auto;
+    transform: none;
   }
   .card-head {
     height: auto;
@@ -840,5 +851,6 @@ onUnmounted(() => {
 }
 @media (max-width: 360px) {
   .days { gap: 4px; }
+  .filters-fade :deep(.scroll-fade-edge.right) { width: 32px; }
 }
 </style>

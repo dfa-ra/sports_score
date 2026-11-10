@@ -120,6 +120,12 @@ const season = computed(() => {
   return `${year}/${year + 1}`
 })
 
+const seasonChoice = computed(() => {
+  const picked = tournaments.value.find((item) => item.id === tournamentId.value)
+  if (!picked?.name) return ''
+  return season.value && picked.id === tournamentId.value ? `${picked.name} · ${season.value}` : picked.name
+})
+
 const results = computed(() =>
   matches.value
     .filter((m) => m.tournamentId === tournamentId.value && (m.status === 'FINISHED' || m.status === 'CANCELLED'))
@@ -401,7 +407,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <template v-else>{{ loading ? 'Загрузка…' : 'Таблица' }}</template>
         </h1>
         <label class="field season">
-          <select v-model="tournamentId">
+            <select v-model="tournamentId" :title="seasonChoice">
             <option v-for="t in tournaments" :key="t.id" :value="t.id">
               {{ t.name }}{{ season && t.id === tournamentId ? ' · ' + season : '' }}
             </option>
@@ -558,7 +564,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <h2>Вратари</h2>
           <p v-if="topNote(keepers, 'keepers')" class="muted">{{ topNote(keepers, 'keepers') }}</p>
         </div>
-        <div class="stat-body">
+        <div class="stat-body" :class="{ 'fit-rows': !statsLoading && !statsError && keepers.length }">
         <div v-if="statsLoading" class="stat-skel" aria-hidden="true">
           <table class="table stat-table">
             <thead><tr><th>Игрок</th><th class="num">Сухие</th><th class="num">Игры</th></tr></thead>
@@ -774,6 +780,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   }
   .stat-body,
   .stat-body :deep(.empty) { min-height: calc(44px + 5 * 56px); }
+  .stat-body.fit-rows,
+  .stat-body.fit-rows :deep(.empty) { min-height: 0; }
+}
+@media (max-width: 360px) {
+  .season select {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 @media (max-width: 720px) {
   .tab-skel .line {

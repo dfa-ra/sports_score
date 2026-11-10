@@ -190,13 +190,21 @@ function clearTip(event: FocusEvent) {
 @media (max-width: 720px) {
   .line,
   .compact .line {
-    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    grid-template-columns: 22px minmax(0, 1fr) 24px 48px 28px;
     min-width: 0;
     width: 100%;
     min-height: 44px;
     height: 44px;
-    padding: 0 2px 0 12px;
+    box-sizing: border-box;
+    padding: 0 14px 0 12px;
+    border-left: 4px solid transparent;
     font-size: 14px;
+  }
+  .line > span:not(.club):not(.team-label) { text-align: right; }
+  .line > span:first-child { text-align: center; }
+  .line.q {
+    border-left-color: var(--q-bar);
+    box-shadow: none;
   }
   .head {
     height: 34px;
@@ -206,7 +214,9 @@ function clearTip(event: FocusEvent) {
     letter-spacing: 0.02em;
   }
   .wide { display: none; }
-  .club { grid-template-columns: 22px minmax(0, 1fr); gap: 6px; min-width: 0; }
+  .club,
+  .team-label { margin-left: 8px; }
+  .club { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; min-width: 0; }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
   .club b {
     min-width: 0;
@@ -218,9 +228,10 @@ function clearTip(event: FocusEvent) {
     text-overflow: ellipsis;
   }
   .rank {
-    width: auto;
-    height: auto;
-    border-radius: 0;
+    box-sizing: border-box;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
     background: transparent;
     color: #8b97a8;
     font-size: 12px;
@@ -228,8 +239,8 @@ function clearTip(event: FocusEvent) {
   }
   .rank.ice, .rank.navy { background: transparent; color: #8b97a8; }
   .rank.q {
-    width: 1.15rem;
-    height: 1.15rem;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: var(--q-circle);
     color: var(--q-digit, #00205b);

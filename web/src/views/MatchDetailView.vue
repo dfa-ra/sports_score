@@ -2152,12 +2152,12 @@ h2 a { color: inherit; }
   .card.events .ev .assist { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 }
 @media (max-width: 360px) {
-  .card.events .assist {
+  .card.events .assist:has(.assist-fit) {
     max-height: 28px;
     overflow: hidden;
     line-height: 14px;
   }
-  .card.events .assist-plain { display: none; }
+  .card.events .assist:has(.assist-fit) .assist-plain { display: none; }
   .card.events .assist-fit {
     display: flex;
     flex-wrap: wrap;

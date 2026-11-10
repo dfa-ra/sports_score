@@ -35,6 +35,8 @@ export type TourRow = {
   startDate: string
   badge: string
   muted: boolean
+  lead: string
+  dates: string
   meta: string
   stage: string
   progress: number | null
@@ -100,8 +102,9 @@ export function dateSpan(start?: string | null, end?: string | null, seasonYear?
   const from = start ? civilDateParts(start) : null
   const to = end ? civilDateParts(end) : null
   if (from && to && start && end) {
+    if (from.year === to.year && from.month === to.month && from.day === to.day) return dayMonth(start, true)
     const yearsDiffer = from.year !== to.year
-    return `${dayMonth(start, yearsDiffer)} – ${dayMonth(end, yearsDiffer)}`
+    return `${dayMonth(start, yearsDiffer)}\u00A0– ${dayMonth(end, yearsDiffer)}`
   }
   if (from && start) return `старт ${dayMonth(start, false)}`
   if (to && end) return dayMonth(end, true)
@@ -203,11 +206,12 @@ export function assembleTour(raw: TourDraft, extra: TourExtra): TourRow | null {
   const teamsCount = typeof extra.teamsCount === 'number' && !Number.isNaN(extra.teamsCount)
     ? Math.max(0, Math.trunc(extra.teamsCount))
     : null
-  const meta = [
+  const lead = [
     shortFormat(format),
     teamsCount == null ? '' : teamWords(teamsCount),
-    dateSpan(raw.startDate, raw.endDate, raw.seasonYear),
   ].filter(Boolean).join(' · ')
+  const dates = dateSpan(raw.startDate, raw.endDate, raw.seasonYear)
+  const meta = [lead, dates].filter(Boolean).join(' · ')
   const progress = status === 'ACTIVE' && typeof extra.progress === 'number' && !Number.isNaN(extra.progress)
     ? Math.max(0, Math.min(1, extra.progress))
     : null
@@ -219,6 +223,8 @@ export function assembleTour(raw: TourDraft, extra: TourExtra): TourRow | null {
     startDate: raw.startDate || '',
     badge: status === 'ACTIVE' ? 'Идёт' : status === 'REGISTRATION' ? 'Регистрация' : 'Завершён',
     muted: status === 'FINISHED',
+    lead,
+    dates,
     meta,
     stage: stageLine({ status, format, competitionStage: stage, roundTitle: extra.roundTitle }),
     progress,

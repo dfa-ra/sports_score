@@ -1301,7 +1301,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   }
   .home-feed :deep(.scroll-fade-edge.left) { display: none; }
   .home-feed :deep(.scroll-fade-edge.right) { width: 36px; }
-  .feed-cards { padding-left: 12px; }
+  .feed-cards { padding-left: 12px; scroll-padding-inline: 12px; }
   .mc { border: 1px solid #dde4ee; border-radius: 14px; }
   .mc-top { min-width: 0; }
   .mc-top .tb {
