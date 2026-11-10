@@ -6,8 +6,11 @@ import {
   QUALIFY_STAGES,
   firstPowerError,
   groupHeading,
+  missingPlaces,
   placeOutOfRange,
   qualifyLines,
+  ROSTER_MISMATCH_PLATE,
+  SAVE_RULES_HINT,
   stageLabel,
   stageMeta,
   summaryTitle,
@@ -40,6 +43,7 @@ const choices = QUALIFY_STAGES.filter((item) => item.id !== 'F')
 
 const storedRules = ref<PlaceSpan[]>([])
 const touched = ref(false)
+const dismissedGhosts = ref<string[]>([])
 const lines = computed(() => qualifyLines(directCounts()))
 const powerError = computed(() => firstPowerError(lines.value))
 const missingStage = computed(() =>
@@ -51,10 +55,19 @@ const placeError = computed(() => {
   if (!touched.value) return placeOutOfRange(groups.value, storedRules.value)
   return ''
 })
+const ghostRows = computed(() => {
+  const dropped = new Set(dismissedGhosts.value)
+  return missingPlaces(groups.value, storedRules.value).filter((row) => !dropped.has(`${row.groupId}:${row.place}`))
+})
+const rosterMismatch = computed(() => ghostRows.value.length > 0)
+function ghostsFor(groupId: string) {
+  return ghostRows.value.filter((row) => row.groupId === groupId)
+}
 const canSave = computed(() =>
   !loading.value
   && !pending.value
   && !locked.value
+  && !rosterMismatch.value
   && !missingStage.value
   && !powerError.value
   && !placeError.value
@@ -91,6 +104,7 @@ function applyPayload(data: any) {
     placeTo: Number(rule.placeTo),
   }))
   touched.value = false
+  dismissedGhosts.value = []
   selection.value = null
   locked.value = data?.locked === true || data?.bracketBuilt === true
   const saved = storedRules.value.length > 0
@@ -207,15 +221,26 @@ function barColor(stage?: string) {
   return stageMeta(stage)?.color || 'transparent'
 }
 
+function dismissGhost(groupId: string, place: number) {
+  if (locked.value || pending.value) return
+  const key = `${groupId}:${place}`
+  if (!dismissedGhosts.value.includes(key)) dismissedGhosts.value = [...dismissedGhosts.value, key]
+  touched.value = true
+  error.value = ''
+}
+
+const rulesReady = computed(() =>
+  !rosterMismatch.value
+  && !powerError.value
+  && !placeError.value
+  && !missingStage.value
+  && !error.value
+  && lines.value.length > 0
+  && !touched.value,
+)
 const buildHint = computed(() => {
   if (loading.value || locked.value) return ''
-  if (placeError.value) return placeError.value
-  if (powerError.value) return powerError.value
-  if (error.value) return error.value
-  if (missingStage.value) return 'Укажите стадию для каждого места.'
-  if (touched.value) return 'Сначала сохраните изменения. Сетка собирается из сохранённых правил.'
-  if (!lines.value.length) return 'Сначала сохраните выход из групп так, чтобы сводка была зелёной.'
-  return ''
+  return rulesReady.value ? '' : SAVE_RULES_HINT
 })
 const canBuild = computed(() => !loading.value && !locked.value && !pending.value && buildHint.value === '')
 
@@ -245,6 +270,7 @@ onUnmounted(stopDrag)
     </p>
 
     <template v-else>
+      <p v-if="rosterMismatch" class="form-error mismatch">{{ ROSTER_MISMATCH_PLATE }}</p>
       <p v-if="locked" class="banner">Сетка уже сформирована</p>
       <div class="summary desk" aria-label="Сводка стадий">
         <p v-if="!lines.length" class="muted">Стадии плей-офф ещё не выбраны.</p>
@@ -282,16 +308,32 @@ onUnmounted(stopDrag)
             <option v-for="item in choices" :key="item.id" :value="item.id">{{ item.label }}</option>
           </select>
         </div>
+        <div
+          v-for="ghost in ghostsFor(group.id)"
+          :key="`gone-${ghost.place}`"
+          class="qrow gone"
+          :data-missing-place="ghost.place"
+          :data-group-id="group.id"
+        >
+          <span class="place">{{ ghost.place }}</span>
+          <span class="team gone-label">{{ ghost.label }}</span>
+          <button
+            class="btn secondary drop"
+            type="button"
+            :disabled="locked || pending"
+            @click="dismissGhost(group.id, ghost.place)"
+          >Убрать</button>
+        </div>
       </section>
 
       <div class="dock">
         <div class="summary phone" aria-label="Сводка стадий">
-          <p v-if="placeError" class="form-error">{{ placeError }}</p>
+          <p v-if="!rosterMismatch && placeError" class="form-error">{{ placeError }}</p>
           <p v-if="powerError" class="form-error">{{ powerError }}</p>
-          <p v-else-if="!placeError && missingStage" class="muted">Укажите стадию для каждого места.</p>
-          <p v-else-if="!placeError && lines.length" class="ok-line">{{ lines.map((line, index) => summaryTitle(line, lines, index)).join(' · ') }}</p>
+          <p v-else-if="!rosterMismatch && !placeError && missingStage" class="muted">Укажите стадию для каждого места.</p>
+          <p v-else-if="!rosterMismatch && !placeError && lines.length" class="ok-line">{{ lines.map((line, index) => summaryTitle(line, lines, index)).join(' · ') }}</p>
         </div>
-        <p v-if="placeError" class="form-error desk-error">{{ placeError }}</p>
+        <p v-if="!rosterMismatch && placeError" class="form-error desk-error">{{ placeError }}</p>
         <p v-if="powerError" class="form-error desk-error">{{ powerError }}</p>
         <p v-else-if="missingStage" class="muted desk-error">Укажите стадию для каждого места. Проведите по местам 1–2 и выберите стадию для всех сразу.</p>
         <p v-if="error && error !== placeError" class="form-error">{{ error }}</p>
@@ -379,6 +421,17 @@ h3 {
   background: #fff;
 }
 .qrow.on { background: color-mix(in srgb, var(--bar, #4cb4e5) 14%, #fff); }
+.qrow.gone {
+  background: #fff1ef;
+  box-shadow: inset 4px 0 0 var(--danger);
+}
+.gone-label {
+  color: var(--danger);
+  font-weight: 800;
+  white-space: normal;
+}
+.mismatch { margin: 0 0 0.8rem; font-weight: 800; }
+.drop { min-height: 44px; }
 .place, .team { touch-action: none; }
 .place { font-weight: 800; color: var(--navy); }
 .team {
@@ -386,6 +439,12 @@ h3 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.qrow.gone .team {
+  color: var(--danger);
+  font-weight: 800;
+  white-space: normal;
+  overflow: visible;
 }
 select {
   min-height: 44px;

@@ -4,9 +4,13 @@ import {
   firstPowerError,
   groupHeading,
   legendItems,
+  missingPlaceLabel,
+  missingPlaces,
   placeOutOfRange,
   powerMessage,
   qualifyLines,
+  ROSTER_MISMATCH_PLATE,
+  SAVE_RULES_HINT,
   stageMap,
   summaryTitle,
 } from '../src/lib/qualifyStages.ts'
@@ -63,6 +67,19 @@ test('a place past the group size uses the same sentence and blocks the save', (
       [{ groupId: 'a', placeFrom: 1, placeTo: 6 }],
     ),
     '',
+  )
+})
+
+test('a missing place is a red-row label and the admin plate is Alisa’s sentence', () => {
+  assert.equal(missingPlaceLabel(4, 'Группа C'), 'Места 4 в группе C больше нет')
+  assert.equal(ROSTER_MISMATCH_PLATE, 'Правила не совпадают с составом групп — исправьте и сохраните')
+  assert.equal(SAVE_RULES_HINT, 'Сначала сохраните правила')
+  assert.deepEqual(
+    missingPlaces(
+      [{ id: 'c', name: 'Группа C', teamCount: 3 }],
+      [{ groupId: 'c', placeFrom: 1, placeTo: 4 }],
+    ),
+    [{ groupId: 'c', place: 4, label: 'Места 4 в группе C больше нет' }],
   )
 })
 

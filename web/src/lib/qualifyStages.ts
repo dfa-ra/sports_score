@@ -121,6 +121,38 @@ export function firstPowerError(lines: StageLine[]) {
 
 export type PlaceSpan = { groupId: string; placeFrom: number; placeTo: number }
 
+/** Top plate while a saved rule still names a place the group no longer has. */
+export const ROSTER_MISMATCH_PLATE = 'Правила не совпадают с составом групп — исправьте и сохраните'
+
+/** Hint beside «Собрать сетку» until the summary is green and the rules are saved. */
+export const SAVE_RULES_HINT = 'Сначала сохраните правила'
+
+export function missingPlaceLabel(place: number, groupName: string) {
+  return `Места ${place} в группе ${groupToken(groupName)} больше нет`
+}
+
+/** Places a saved span still names after the group roster shrank. */
+export function missingPlaces(
+  groups: { id: string; name: string; teamCount: number }[],
+  rules: PlaceSpan[],
+) {
+  const byId = new Map(groups.map((group) => [group.id, group]))
+  const rows: { groupId: string; place: number; label: string }[] = []
+  const seen = new Set<string>()
+  for (const rule of rules) {
+    const group = byId.get(rule.groupId)
+    if (!group || rule.placeTo < rule.placeFrom) continue
+    const first = Math.max(rule.placeFrom, group.teamCount + 1, 1)
+    for (let place = first; place <= rule.placeTo; place += 1) {
+      const key = `${rule.groupId}:${place}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      rows.push({ groupId: rule.groupId, place, label: missingPlaceLabel(place, group.name) })
+    }
+  }
+  return rows
+}
+
 /** Same sentence as the server when a place is outside 1..group size. */
 export function groupToken(name: string) {
   const trimmed = String(name || '').trim()
