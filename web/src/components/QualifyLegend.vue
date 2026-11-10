@@ -32,4 +32,7 @@ i {
   background: var(--q-circle);
   border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
+i[data-qualify='OUT'] {
+  border: var(--stage-out-legend-stroke-width) solid var(--stage-out-legend-stroke);
+}
 </style>
