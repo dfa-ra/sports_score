@@ -226,16 +226,19 @@ function formKind(letter: string) {
 .pip.draw b { background: #c47b00; }
 .pip.loss b { background: var(--danger); }
 .pip i {
-  width: 14px;
-  height: 9px;
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
   border-radius: 3px;
   background: var(--danger);
   color: #fff;
   font-style: normal;
   font-family: var(--font-display);
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 9px;
+  line-height: 14px;
+  letter-spacing: 0;
   text-align: center;
 }
 .legend {

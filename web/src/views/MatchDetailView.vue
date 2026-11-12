@@ -1711,16 +1711,18 @@ h2 a { color: inherit; }
 }
 .mark-pip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .tp-mini {
-  width: 14px;
-  height: 9px;
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
   border-radius: 3px;
   background: var(--danger);
   color: #fff;
   font-style: normal;
   font-family: var(--font-display);
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 700;
-  line-height: 9px;
+  line-height: 14px;
   text-align: center;
 }
 .pitch-score { margin-top: 0.8rem; align-items: flex-start; }
@@ -1974,6 +1976,14 @@ h2 a { color: inherit; }
 .marks i.draw { background: var(--status-warn); }
 .marks i.loss { background: var(--danger); }
 .marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
+.marks .tp-mini {
+  color: #fff;
+  background: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  font-family: var(--font-display);
+}
 .fail { display: grid; justify-items: center; gap: 0.5rem; }
 .pad { justify-self: start; margin-top: 0.6rem; }
 .overview > .stack { align-items: start; min-width: 0; }

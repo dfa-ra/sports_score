@@ -91,7 +91,7 @@ function rowLit(home: boolean) {
       v-for="home in [true, false]"
       :key="home ? 'h' : 'a'"
       class="pr"
-      :class="[kind(home), { hl: rowLit(home) }]"
+      :class="[kind(home), { hl: rowLit(home), tp: home && forfeited }]"
       @mouseenter="teamId(home) && canHover && emit('hover', teamId(home) || null)"
       @mouseleave="canHover && emit('hover', null)"
     >
@@ -211,11 +211,25 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   top: -0.35em;
 }
 .ps.dash { color: var(--muted); font-weight: 600; }
+.pr.tp {
+  height: auto;
+  min-height: 42px;
+}
 .ps.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  position: relative;
+  display: inline-block;
+  padding-bottom: 20px;
+  text-align: right;
+  line-height: 1.1;
+}
+.ps.badge :deep(.tp-badge) {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+}
+.pc.compact .pr.tp {
+  max-height: none;
+  overflow: visible;
 }
 .pr.win {
   box-shadow: inset 3px 0 0 var(--ice);

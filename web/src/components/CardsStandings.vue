@@ -220,8 +220,20 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 .pip.draw b { background: #c47b00; }
 .pip.loss b { background: var(--danger); }
 .pip i {
-  width: 14px; height: 9px; border-radius: 3px; background: var(--danger); color: #fff;
-  font-style: normal; font-family: var(--font-display); font-size: 7px; font-weight: 700; line-height: 9px; text-align: center;
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--danger);
+  color: #fff;
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0;
+  text-align: center;
 }
 .legend { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 .rank {
