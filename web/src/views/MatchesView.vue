@@ -6,6 +6,8 @@ import KickoffWhen from '../components/KickoffWhen.vue'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import EmptyState from '../components/EmptyState.vue'
 import MatchStageNote from '../components/MatchStageNote.vue'
+import ForfeitName from '../components/ForfeitName.vue'
+import ScoreForfeit from '../components/ScoreForfeit.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 
 const items = ref<any[]>([])
@@ -59,8 +61,14 @@ const visible = computed(() => {
       >
         <MatchStageNote :match="m" />
         <StatusBadge :status="m.status" :at="m.scheduledAt ?? null" :third-place="!!m.thirdPlace" />
-        <div class="versus">{{ teams.name(m.homeTeamId) }} — {{ teams.name(m.awayTeamId) }}</div>
-        <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
+        <div class="versus">
+          <ForfeitName :match="m" side="home" :name="teams.name(m.homeTeamId)" />
+          <span aria-hidden="true">—</span>
+          <ForfeitName :match="m" side="away" :name="teams.name(m.awayTeamId)" />
+        </div>
+        <ScoreForfeit :match="m">
+          <div class="score">{{ m.homeScore }} : {{ m.awayScore }}</div>
+        </ScoreForfeit>
         <KickoffWhen :at="m.scheduledAt" :started-at="m.startedAt" :status="m.status" :minute="m.minute" align="start" />
       </RouterLink>
     </div>
@@ -69,7 +77,7 @@ const visible = computed(() => {
 
 <style scoped>
 .match-card { display: grid; gap: 0.45rem; }
-.versus { font-weight: 750; color: var(--text-strong); }
+.versus { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: baseline; font-weight: 750; color: var(--text-strong); }
 .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .btn.on { background: var(--accent); color: var(--navy); border-color: transparent; border-radius: 999px; }
 .filters .btn { border-radius: 999px; }

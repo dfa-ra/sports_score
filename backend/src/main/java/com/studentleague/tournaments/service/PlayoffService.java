@@ -3,6 +3,7 @@ package com.studentleague.tournaments.service;
 import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.service.MatchListFields;
 import com.studentleague.matches.entity.Match;
@@ -307,6 +308,36 @@ public class PlayoffService {
         if (next != null && !isThird(next)) {
             boolean homeSide = source.getSlotIndex() % 2 == 0;
             placeWinner(next, homeSide, winnerOf(match));
+        }
+        syncThirdPlace(source);
+    }
+
+    /**
+     * After a forfeit is cancelled the official result may no longer be a win.
+     * A match that is still finished walks its winner again. A match that went
+     * back to an earlier status drops the team it had sent on, unless the next
+     * pair has already started.
+     */
+    public void syncAfterScoreChange(Match match) {
+        if (match.getBracketRound() == null) {
+            return;
+        }
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            advance(match);
+            return;
+        }
+        PlayoffSlot source = playoffSlotRepository.findByMatchId(match.getId()).orElse(null);
+        if (source == null || isThird(source)) {
+            return;
+        }
+        PlayoffSlot next = playoffSlotRepository.findByTournamentIdAndRoundNumberAndSlotIndex(
+                source.getTournamentId(),
+                source.getRoundNumber() + 1,
+                source.getSlotIndex() / 2
+        ).orElse(null);
+        if (next != null && !isThird(next)) {
+            boolean homeSide = source.getSlotIndex() % 2 == 0;
+            placeWinner(next, homeSide, null);
         }
         syncThirdPlace(source);
     }
@@ -796,7 +827,8 @@ public class PlayoffService {
                 match == null ? null : MatchListFields.minute(match, Instant.now()),
                 match == null ? null : match.getStartedAt(),
                 slot.getKind() == null ? PlayoffSlotKind.MAIN.name() : slot.getKind().name(),
-                slot.isBye()
+                slot.isBye(),
+                match == null ? ForfeitSide.NONE : match.getForfeit()
         );
     }
 

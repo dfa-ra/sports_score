@@ -12,10 +12,12 @@ export function matchOutcome(match: {
   awayScore?: number
   penaltyHome?: number | null
   penaltyAway?: number | null
+  forfeit?: string | null
 }, teamId?: string | null) {
   if (!teamId || match.status !== 'FINISHED') return null
   const home = teamId === match.homeTeamId
   if (!home && teamId !== match.awayTeamId) return null
+  if (match.forfeit === 'both') return 'LOSS'
   const scored = home ? Number(match.homeScore) : Number(match.awayScore)
   const conceded = home ? Number(match.awayScore) : Number(match.homeScore)
   if (scored > conceded) return 'WIN'

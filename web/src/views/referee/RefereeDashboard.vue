@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../../api/client'
 import MatchStageNote from '../../components/MatchStageNote.vue'
+import { isForfeit } from '../../lib/forfeit'
 import { refereeListGroups, refereeListScore, refereeListWhen, refereePenaltyCaption } from '../../lib/refereePad'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
 
@@ -73,7 +74,10 @@ onMounted(load)
             <small>{{ refereeListWhen(match) }}</small>
             <small v-if="refereePenaltyCaption(match)" class="pens">{{ refereePenaltyCaption(match) }}</small>
           </span>
-          <span class="score">{{ refereeListScore(match) }}</span>
+          <span class="score">
+            {{ refereeListScore(match) }}
+            <small v-if="isForfeit(match)">Техническое поражение</small>
+          </span>
         </RouterLink>
       </section>
     </div>
@@ -126,10 +130,21 @@ onMounted(load)
 .who strong { color: #001433; font-size: 1rem; overflow-wrap: anywhere; }
 .who small { color: #5c6d82; overflow-wrap: anywhere; }
 .score {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
   color: #001433;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.score small {
+  color: #e5735f;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: normal;
+  text-align: right;
+  max-width: 9rem;
 }
 .pens { color: #5c6d82; }
 .retry { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin: 0; padding: 0.8rem 1rem 0; }

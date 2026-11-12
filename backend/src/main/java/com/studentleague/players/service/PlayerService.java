@@ -321,6 +321,8 @@ public class PlayerService {
             int assists = 0;
             int yellowCards = 0;
             int redCards = 0;
+            boolean forfeited = com.studentleague.matches.domain.ForfeitRules.active(match);
+            if (!forfeited) {
             for (MatchEvent event : events) {
                 if (playerId.equals(event.getPlayerId())) {
                     switch (event.getEventType()) {
@@ -342,7 +344,8 @@ public class PlayerService {
                     assists++;
                 }
             }
-            if (stoodInGoal(match, playerId, teamId, position)) {
+            }
+            if (!forfeited && stoodInGoal(match, playerId, teamId, position)) {
                 sheets.relevant = true;
                 int conceded = home ? nz(match.getAwayScore()) : nz(match.getHomeScore());
                 if (match.getStatus() == MatchStatus.FINISHED && conceded == 0) {
@@ -369,13 +372,15 @@ public class PlayerService {
                     assists,
                     yellowCards,
                     redCards,
-                    PlayingTime.minutesPlayed(
+                    forfeited ? null : PlayingTime.minutesPlayed(
                             match,
                             lineup != null && lineup.isStarter(),
                             playerId,
                             events,
                             Instant.now()
-                    )
+                    ),
+                    match.getForfeit().value(),
+                    match.getForfeitReason() == null ? null : match.getForfeitReason().value()
             ));
         }
         return history;
@@ -412,6 +417,9 @@ public class PlayerService {
         }
         int scored = home ? match.getHomeScore() : match.getAwayScore();
         int conceded = home ? match.getAwayScore() : match.getHomeScore();
+        if (com.studentleague.matches.domain.ForfeitRules.mutual(match)) {
+            return "LOSS";
+        }
         if (scored > conceded) {
             return "WIN";
         }

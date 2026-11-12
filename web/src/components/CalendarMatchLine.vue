@@ -5,6 +5,8 @@ import { statusLabel } from '../lib/format'
 import { cardScoreParts, cardScoreText, rowClock, sideName } from '../lib/calendarFeed'
 import { matchOutcome } from '../lib/match'
 import { useFavorites } from '../stores/favorites'
+import ForfeitName from './ForfeitName.vue'
+import ScoreForfeit from './ScoreForfeit.vue'
 import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
@@ -62,18 +64,22 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
       <span class="pair">
         <span class="side home" :class="weight('home')">
           <TeamCrest :src="homeLogo" :name="homeLabel" :size="28" />
-          <span>{{ homeLabel }}</span>
+          <ForfeitName :match="match" side="home" :name="homeLabel" align="end" />
         </span>
-        <span class="score desk">{{ score }}</span>
+        <ScoreForfeit class="desk" :match="match">
+          <span class="score">{{ score }}</span>
+        </ScoreForfeit>
         <span class="side away" :class="weight('away')">
           <TeamCrest :src="awayLogo" :name="awayLabel" :size="28" />
-          <span>{{ awayLabel }}</span>
+          <ForfeitName :match="match" side="away" :name="awayLabel" />
         </span>
       </span>
-      <span class="score phone">
-        <b>{{ parts.home }}</b>
-        <b>{{ parts.away }}</b>
-      </span>
+      <ScoreForfeit class="phone" :match="match">
+        <span class="score phone">
+          <b>{{ parts.home }}</b>
+          <b>{{ parts.away }}</b>
+        </span>
+      </ScoreForfeit>
       <i class="badge desk" :class="tone">{{ badge }}</i>
     </RouterLink>
   </div>
@@ -154,6 +160,11 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.side :deep(.name-stack) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
 .side.win { font-weight: 800; }
 .side.lose { color: var(--muted); font-weight: 600; }
 .score {
@@ -163,6 +174,7 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
   white-space: nowrap;
 }
 .score.phone { display: none; }
+.phone { display: none !important; }
 .badge {
   display: inline-flex;
   align-items: center;
@@ -229,8 +241,9 @@ const awayLabel = computed(() => sideName(props.awayName, props.match?.awayTeamN
   .side.home, .side.away { justify-content: flex-start; text-align: left; }
   .side { font-size: 14px; line-height: 18px; }
   .side :deep(.team-crest) { width: 20px !important; height: 20px !important; font-size: 10px !important; }
-  .score.desk, .badge.desk { display: none; }
-  .score.phone, .badge.phone { display: grid; }
-  .score.phone { justify-items: end; gap: 2px; font-size: 15px; font-weight: 800; }
+  .desk, .badge.desk { display: none !important; }
+  .badge.phone { display: grid; }
+  .phone { display: inline-flex !important; }
+  .score.phone { justify-items: end; gap: 2px; font-size: 15px; font-weight: 800; display: grid; }
 }
 </style>

@@ -2,6 +2,7 @@ package com.studentleague.tournaments.service;
 
 import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.repository.MatchEventRepository;
@@ -510,7 +511,8 @@ public class TournamentService {
         if (tables.isEmpty()) {
             List<StandingRow> rows = formatRegistry.handler(tournament.getFormat())
                     .standings(new StandingsContext(tournament, entries, finished, teams));
-            return new TournamentStandingsResponse(List.of(new StandingTableResponse(null, null, 0, rows)));
+            return new TournamentStandingsResponse(List.of(new StandingTableResponse(
+                    null, null, 0, rows, mutualForfeit(finished))));
         }
 
         List<StandingTableResponse> result = new ArrayList<>();
@@ -529,9 +531,19 @@ public class TournamentService {
                     .toList();
             List<StandingRow> rows = formatRegistry.handler(tournament.getFormat())
                     .standings(new StandingsContext(tournament, groupEntries, intra, teams));
-            result.add(new StandingTableResponse(table.getId(), table.getName(), table.getSortOrder(), rows));
+            result.add(new StandingTableResponse(
+                    table.getId(), table.getName(), table.getSortOrder(), rows, mutualForfeit(intra)));
         }
         return new TournamentStandingsResponse(result);
+    }
+
+    private static boolean mutualForfeit(List<Match> matches) {
+        for (Match match : matches) {
+            if (ForfeitRules.mutual(match)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void requireChronologicalDates(LocalDate startDate, LocalDate endDate) {

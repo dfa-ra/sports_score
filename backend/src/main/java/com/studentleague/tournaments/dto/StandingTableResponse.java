@@ -7,6 +7,7 @@ public record StandingTableResponse(
         UUID id,
         String name,
         int sortOrder,
-        List<StandingRow> rows
+        List<StandingRow> rows,
+        boolean mutualForfeit
 ) {
 }

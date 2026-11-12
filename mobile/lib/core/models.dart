@@ -28,6 +28,7 @@ class LeagueMatch {
     this.clockRunningSince,
     this.penaltyHome,
     this.penaltyAway,
+    this.forfeit,
   });
 
   final String id;
@@ -46,6 +47,7 @@ class LeagueMatch {
   final DateTime? clockRunningSince;
   final int? penaltyHome;
   final int? penaltyAway;
+  final String? forfeit;
 
   factory LeagueMatch.fromJson(Map<String, dynamic> json) {
     return LeagueMatch(
@@ -65,9 +67,11 @@ class LeagueMatch {
       clockRunningSince: parseTime(json['clockRunningSince']),
       penaltyHome: (json['penaltyHome'] as num?)?.toInt(),
       penaltyAway: (json['penaltyAway'] as num?)?.toInt(),
+      forfeit: json['forfeit']?.toString(),
     );
   }
 
+  bool get isForfeit => forfeit == 'home' || forfeit == 'away' || forfeit == 'both';
   bool get isLive => status == 'LIVE' || status == 'PAUSED';
   bool get isFinished => status == 'FINISHED' || status == 'CANCELLED';
 }

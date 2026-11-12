@@ -6,6 +6,7 @@ import {
   refereeListGroups,
   refereeListScore,
   refereeListWhen,
+  refereeProtocolScore,
   refereePenaltyCaption,
   unclearSend,
 } from './refereePad.ts'
@@ -25,6 +26,22 @@ test('groups keep kickoff order and hide an empty bucket', () => {
   assert.deepEqual(groups[0].rows.map((row) => row.id), ['paused', 'live'])
   assert.deepEqual(groups[1].rows.map((row) => row.id), ['nodate', 'soon'])
   assert.equal(refereeListGroups([]).length, 0)
+})
+
+test('a forfeit keeps the stored score when the protocol recount is 0:0', () => {
+  const counted = { home: 0, away: 0 }
+  assert.deepEqual(
+    refereeProtocolScore({ status: 'FINISHED', homeScore: 5, awayScore: 0, forfeit: 'away' }, counted),
+    { homeScore: 5, awayScore: 0 },
+  )
+  assert.deepEqual(
+    refereeProtocolScore({ status: 'FINISHED', homeScore: 0, awayScore: 0, forfeit: 'both' }, counted),
+    { homeScore: 0, awayScore: 0 },
+  )
+  assert.deepEqual(
+    refereeProtocolScore({ status: 'LIVE', homeScore: 1, awayScore: 0, forfeit: 'none' }, counted),
+    { homeScore: 0, awayScore: 0 },
+  )
 })
 
 test('scheduled score is a dash, a real 0:0 stays, penalties are a separate caption', () => {

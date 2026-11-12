@@ -6,6 +6,8 @@ import { unitWord } from '../lib/q2Players'
 import { matchInstant } from '../lib/match'
 import { playerHeader } from '../lib/playerTitle'
 import { useAuthStore } from '../stores/auth'
+import ForfeitName from './ForfeitName.vue'
+import ScoreForfeit from './ScoreForfeit.vue'
 import PlayerAvatar from './PlayerAvatar.vue'
 import TeamCrest from './TeamCrest.vue'
 
@@ -28,6 +30,8 @@ type MatchRow = {
   yellowCards?: number
   redCards?: number
   minutesPlayed?: number | null
+  forfeit?: string | null
+  forfeitReason?: string | null
 }
 
 const STATS: { key: string; label: string }[] = [
@@ -138,17 +142,19 @@ function marks(row: MatchRow) {
         <span class="sides">
           <span :class="{ own: m.home }">
             <TeamCrest :src="m.homeTeamLogoUrl" :name="m.homeTeamName" :size="16" />
-            {{ m.homeTeamName }}
+            <ForfeitName :match="m" side="home" :name="m.homeTeamName || ''" />
           </span>
           <span :class="{ own: !m.home }">
             <TeamCrest :src="m.awayTeamLogoUrl" :name="m.awayTeamName" :size="16" />
-            {{ m.awayTeamName }}
+            <ForfeitName :match="m" side="away" :name="m.awayTeamName || ''" />
           </span>
         </span>
-        <span class="nums">
-          <b>{{ m.homeScore }}</b>
-          <b>{{ m.awayScore }}</b>
-        </span>
+        <ScoreForfeit :match="m">
+          <span class="nums">
+            <b>{{ m.homeScore }}</b>
+            <b>{{ m.awayScore }}</b>
+          </span>
+        </ScoreForfeit>
         <span v-if="m.outcome" class="result" :class="m.outcome.toLowerCase()">{{ outcomeMark[m.outcome] || m.outcome }}</span>
         <span v-if="marks(m)" class="marks">{{ marks(m) }}</span>
       </RouterLink>
