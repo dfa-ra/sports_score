@@ -103,7 +103,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID>, JpaSpecific
                 m.awayScore,
                 m.scheduledAt,
                 m.status,
-                m.startedAt
+                m.startedAt,
+                m.forfeit
             )
             from Match m
             join Team home on home.id = m.homeTeamId

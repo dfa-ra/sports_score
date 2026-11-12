@@ -1,5 +1,6 @@
 package com.studentleague.matches.live;
 
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.MatchResponse;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,8 @@ class LiveMatchPublisherTest {
                 Instant.now(), Instant.now(), null, MatchStatus.LIVE, 2, 1, 90, 1,
                 2, 1200, Instant.now(), "FOOTBALL", null, null, null, null, null, null, null,
                 null, null, null, null, null, null,
-                false, null
+                false, null,
+                ForfeitSide.NONE, null, null, null, null
         );
 
         publisher.publishMatchUpdate(match, null, "MATCH_EVENT");

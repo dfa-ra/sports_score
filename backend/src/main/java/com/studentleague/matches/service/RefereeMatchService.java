@@ -206,6 +206,9 @@ public class RefereeMatchService {
     @Transactional
     public MatchEventResponse addEvent(UserPrincipal principal, UUID matchId, CreateMatchEventRequest request) {
         Match match = requireAssignedMatch(principal, matchId);
+        if (com.studentleague.matches.domain.ForfeitRules.active(match)) {
+            throw ApiException.conflict("Сначала отмените техническое поражение");
+        }
         if (match.getStatus() == MatchStatus.FINISHED) {
             if (!principal.hasRole(Role.ADMIN)) {
                 throw ApiException.forbidden("После окончания матча протокол правит только админ");
@@ -271,6 +274,9 @@ public class RefereeMatchService {
     @Transactional
     public MatchEventResponse voidEvent(UserPrincipal principal, UUID matchId, UUID eventId) {
         Match match = requireAssignedMatch(principal, matchId);
+        if (com.studentleague.matches.domain.ForfeitRules.active(match)) {
+            throw ApiException.conflict("Сначала отмените техническое поражение");
+        }
         if (match.getStatus() == MatchStatus.FINISHED) {
             if (!principal.hasRole(Role.ADMIN)) {
                 throw ApiException.forbidden("После окончания матча протокол правит только админ");
@@ -303,7 +309,10 @@ public class RefereeMatchService {
 
     @Transactional(readOnly = true)
     public List<MatchEventResponse> listEvents(UUID matchId) {
-        matchRepository.findById(matchId).orElseThrow(() -> ApiException.notFound("Матч не найден"));
+        Match match = matchRepository.findById(matchId).orElseThrow(() -> ApiException.notFound("Матч не найден"));
+        if (com.studentleague.matches.domain.ForfeitRules.active(match)) {
+            return List.of();
+        }
         return matchEventRepository.findByMatchIdOrderByTimestampAsc(matchId).stream()
                 .map(this::toEventResponse)
                 .toList();

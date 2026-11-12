@@ -1,7 +1,9 @@
 package com.studentleague.matches.service;
 
 import com.studentleague.matches.clock.MatchClock;
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.domain.MatchEventType;
+import com.studentleague.matches.dto.ForfeitActorResponse;
 import com.studentleague.matches.dto.MatchEventResponse;
 import com.studentleague.matches.dto.MatchResponse;
 import com.studentleague.matches.dto.PlayerOfTheMatchResponse;
@@ -83,7 +85,22 @@ public class MatchMapper {
 
     public MatchResponse toResponse(Match match, String lastGoalScorer, ShootoutRules.Tally shootout) {
         List<Match> one = List.of(match);
-        return build(match, lastGoalScorer, shootout, teamNames(one), tournamentNames(one), stageFacts(one));
+        return build(match, lastGoalScorer, shootout, teamNames(one), tournamentNames(one), stageFacts(one), false, null);
+    }
+
+    /** Same public match, plus who awarded the forfeit and the private note. */
+    public MatchResponse toAdminResponse(Match match, ForfeitActorResponse setBy) {
+        List<Match> one = List.of(match);
+        return build(
+                match,
+                lastGoalScorer(match.getId()),
+                penaltyOf(match),
+                teamNames(one),
+                tournamentNames(one),
+                stageFacts(one),
+                true,
+                setBy
+        );
     }
 
     private Function<Match, MatchResponse> named(List<Match> matches) {
@@ -92,7 +109,7 @@ public class MatchMapper {
         Map<UUID, String> teams = teamNames(matches);
         Map<UUID, String> tournaments = tournamentNames(matches);
         StageFacts stages = stageFacts(matches);
-        return match -> build(match, scorers.get(match.getId()), penalties.get(match.getId()), teams, tournaments, stages);
+        return match -> build(match, scorers.get(match.getId()), penalties.get(match.getId()), teams, tournaments, stages, false, null);
     }
 
     private MatchResponse build(
@@ -101,7 +118,9 @@ public class MatchMapper {
             ShootoutRules.Tally shootout,
             Map<UUID, String> teams,
             Map<UUID, String> tournaments,
-            StageFacts stages
+            StageFacts stages,
+            boolean admin,
+            ForfeitActorResponse adminActor
     ) {
         String sportCode = sportRepository.findById(match.getSportId())
                 .map(Sport::getCode)
@@ -118,6 +137,7 @@ public class MatchMapper {
                 match.getBracketRound(),
                 stages.rounds().getOrDefault(match.getTournamentId(), 0)
         );
+        String scorer = ForfeitRules.active(match) ? null : lastGoalScorer;
         return new MatchResponse(
                 match.getId(),
                 match.getTournamentId(),
@@ -137,7 +157,7 @@ public class MatchMapper {
                 match.getClockRunningSince(),
                 sportCode,
                 match.getVenue(),
-                lastGoalScorer,
+                scorer,
                 MatchListFields.minute(match, Instant.now()),
                 playerOfTheMatch(match),
                 namedPlayer(match.getHomeGoalkeeperId()),
@@ -150,7 +170,12 @@ public class MatchMapper {
                 match.getAwayTeamId() == null ? null : teams.get(match.getAwayTeamId()),
                 match.getTournamentId() == null ? null : tournaments.get(match.getTournamentId()),
                 thirdPlace,
-                stageLabel
+                stageLabel,
+                match.getForfeit(),
+                ForfeitRules.active(match) ? match.getForfeitReason() : null,
+                admin ? match.getForfeitReasonNote() : null,
+                admin ? adminActor : null,
+                admin ? match.getForfeitSetAt() : null
         );
     }
 

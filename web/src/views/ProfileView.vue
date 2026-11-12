@@ -9,6 +9,8 @@ import { labelOf, outcomeMark, roleLabel, formatMatchDay } from '../lib/format'
 import { DATE_PENDING, matchInstant } from '../lib/match'
 import { calendarScore, playerStatRows, showsPlayerHistory } from '../lib/profileMyTeam'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import ForfeitName from '../components/ForfeitName.vue'
+import ScoreForfeit from '../components/ScoreForfeit.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import MatchRow from '../components/MatchRow.vue'
@@ -502,13 +504,15 @@ async function logout() {
             <RouterLink v-for="row in history" :key="row.matchId" class="game" :to="`/matches/${row.matchId}`">
               <span class="when">{{ rowWhen(row) }}</span>
               <span class="sides">
-                <span>{{ row.homeTeamName }}</span>
-                <span>{{ row.awayTeamName }}</span>
+                <ForfeitName :match="row" side="home" :name="row.homeTeamName || ''" />
+                <ForfeitName :match="row" side="away" :name="row.awayTeamName || ''" />
               </span>
-              <span class="nums">
-                <span class="score">{{ calendarScore(row) }}</span>
-                <span v-if="row.outcome" class="mark">{{ outcomeMark[row.outcome] || row.outcome }}</span>
-              </span>
+              <ScoreForfeit :match="row">
+                <span class="nums">
+                  <span class="score">{{ calendarScore(row) }}</span>
+                  <span v-if="row.outcome" class="mark">{{ outcomeMark[row.outcome] || row.outcome }}</span>
+                </span>
+              </ScoreForfeit>
             </RouterLink>
           </div>
         </template>

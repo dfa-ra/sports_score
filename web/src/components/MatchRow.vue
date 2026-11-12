@@ -8,6 +8,8 @@ import KickoffWhen from './KickoffWhen.vue'
 import ScorePop from './ScorePop.vue'
 import { useFavorites } from '../stores/favorites'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import ForfeitName from './ForfeitName.vue'
+import ScoreForfeit from './ScoreForfeit.vue'
 import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
@@ -64,22 +66,24 @@ function tapStar() {
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
           <TeamCrest :src="homeLogo" :name="homeName" :size="28" />
-          <b>{{ homeName }}</b>
+          <ForfeitName :match="match" side="home" :name="homeName" />
         </span>
         <span class="side" :class="{ own: highlightTeamId === match.awayTeamId }">
           <TeamCrest :src="awayLogo" :name="awayName" :size="28" />
-          <b>{{ awayName }}</b>
+          <ForfeitName :match="match" side="away" :name="awayName" />
         </span>
         <span v-if="venue" class="venue">{{ venue }}</span>
         <span v-if="isLive && match.lastGoalScorer" class="scorer">{{ match.lastGoalScorer }}</span>
       </span>
-      <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
-      <span v-else class="nums">
-        <strong v-if="scoreParts.dash">{{ scoreParts.home }}</strong>
-        <strong v-else><ScorePop :value="match.homeScore" /></strong>
-        <strong v-if="scoreParts.dash">{{ scoreParts.away }}</strong>
-        <strong v-else><ScorePop :value="match.awayScore" /></strong>
-      </span>
+      <ScoreForfeit :match="match">
+        <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
+        <span v-else class="nums">
+          <strong v-if="scoreParts.dash">{{ scoreParts.home }}</strong>
+          <strong v-else><ScorePop :value="match.homeScore" /></strong>
+          <strong v-if="scoreParts.dash">{{ scoreParts.away }}</strong>
+          <strong v-else><ScorePop :value="match.awayScore" /></strong>
+        </span>
+      </ScoreForfeit>
       <span v-if="soon" class="soon">Скоро</span>
       <span v-else-if="outcome" class="mark" :class="outcome.toLowerCase()">{{ outcomeMark[outcome] }}</span>
     </RouterLink>
@@ -159,7 +163,7 @@ function tapStar() {
   object-fit: contain;
   object-position: center;
 }
-.side b {
+.side :deep(.name-text) {
   font-weight: 500;
   font-size: 1rem;
   min-width: 0;
@@ -168,9 +172,10 @@ function tapStar() {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
-.side.own b { font-weight: 800; color: var(--navy); }
+.side.own :deep(.name-text) { font-weight: 800; color: var(--navy); }
 .nums {
   display: grid;
   justify-items: end;

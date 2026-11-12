@@ -42,7 +42,9 @@ public record PlayerCardResponse(
             int assists,
             int yellowCards,
             int redCards,
-            Integer minutesPlayed
+            Integer minutesPlayed,
+            String forfeit,
+            String forfeitReason
     ) {
     }
 }

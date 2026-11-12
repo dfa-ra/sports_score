@@ -35,6 +35,10 @@ import CardsStandings from '../components/CardsStandings.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import ForfeitBadge from '../components/ForfeitBadge.vue'
+import ForfeitName from '../components/ForfeitName.vue'
+import ScoreForfeit from '../components/ScoreForfeit.vue'
+import { isForfeit } from '../lib/forfeit'
 import TeamCrest from '../components/TeamCrest.vue'
 import { parseStandings, standingGroupsHaveRows, type StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -755,11 +759,13 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <span class="match-wide">
           <span class="match-side">
             <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="22" />
-            <span>{{ m.homeTeamName || names.fullName(m.homeTeamId) }}</span>
+            <ForfeitName :match="m" side="home" :name="m.homeTeamName || names.fullName(m.homeTeamId)" />
           </span>
-          <span class="match-score">{{ cardScoreText(m) }}</span>
+          <ScoreForfeit class="match-score" :match="m">
+            <span>{{ cardScoreText(m) }}</span>
+          </ScoreForfeit>
           <span class="match-side away">
-            <span>{{ m.awayTeamName || names.fullName(m.awayTeamId) }}</span>
+            <ForfeitName :match="m" side="away" :name="m.awayTeamName || names.fullName(m.awayTeamId)" align="end" />
             <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
           </span>
           <span class="match-meta">
@@ -771,14 +777,15 @@ async function exclude(team: { teamId: string; teamName?: string }) {
         <span class="match-stack">
           <span class="team-line">
             <TeamCrest :src="names.logo(m.homeTeamId)" :name="m.homeTeamName || names.fullName(m.homeTeamId)" :size="22" />
-            <span class="nm">{{ m.homeTeamName || names.fullName(m.homeTeamId) }}</span>
+            <ForfeitName class="nm" :match="m" side="home" :name="m.homeTeamName || names.fullName(m.homeTeamId)" />
             <b>{{ cardScoreParts(m).home }}</b>
           </span>
           <span class="team-line">
             <TeamCrest :src="names.logo(m.awayTeamId)" :name="m.awayTeamName || names.fullName(m.awayTeamId)" :size="22" />
-            <span class="nm">{{ m.awayTeamName || names.fullName(m.awayTeamId) }}</span>
+            <ForfeitName class="nm" :match="m" side="away" :name="m.awayTeamName || names.fullName(m.awayTeamId)" />
             <b>{{ cardScoreParts(m).away }}</b>
           </span>
+          <ForfeitBadge v-if="isForfeit(m)" class="stack-badge" :match="m" />
           <span class="match-meta">
             <MatchStageNote :match="m" />
             <span>{{ matchListWhen(m) }}</span>
@@ -1127,7 +1134,9 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   font-variant-numeric: tabular-nums;
   font-weight: 800;
   white-space: nowrap;
+  justify-self: center;
 }
+.stack-badge { display: none !important; }
 .match-meta {
   display: grid;
   justify-items: end;
@@ -1175,7 +1184,7 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .row.match-row { display: block; }
   .match-wide {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     column-gap: 8px;
     width: 100%;
@@ -1190,11 +1199,11 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
     overflow-wrap: break-word;
   }
   .match-score {
-    width: 56px;
-    max-width: 56px;
+    width: auto;
+    max-width: none;
     justify-self: center;
     text-align: center;
-    overflow: hidden;
+    overflow: visible;
   }
 }
 @media (max-width: 360px) {
@@ -1220,10 +1229,11 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
     min-width: 0;
     font-size: 14px;
     line-height: 18px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
+  .stack-badge { display: inline-flex !important; justify-content: center; width: 100%; }
   .team-line b {
     width: 28px;
     font-size: 16px;

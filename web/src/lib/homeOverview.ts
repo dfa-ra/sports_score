@@ -40,6 +40,8 @@ export type HomeMatch = {
   penaltyAway?: number | null
   stageLabel?: string | null
   round?: number | null
+  forfeit?: string | null
+  forfeitReason?: string | null
 }
 
 export type HomeLeader = {

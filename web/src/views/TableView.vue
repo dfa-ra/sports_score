@@ -454,6 +454,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
               <span class="wide">П</span>
               <span>Г</span>
               <span>О</span>
+              <span class="form-col">Форма</span>
             </div>
             <div v-for="n in 5" :key="n" class="line sk-row"></div>
           </div>
@@ -471,6 +472,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
             :rows="table.rows"
             :marked-places="hasQualify ? undefined : advancingPlaces"
             :place-stages="hasQualify ? (qualifyByGroup[table.id || ''] || {}) : undefined"
+            :mutual-forfeit="table.mutualForfeit"
           />
         </div>
         <QualifyLegend v-if="hasQualify" :marks="qualifyMarks" />
@@ -791,6 +793,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   }
 }
 @media (max-width: 720px) {
+  .tab-skel .form-col { display: none; }
   .tab-skel .line {
     grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
     padding: 0 2px 0 12px;
@@ -883,7 +886,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 .tab-skel .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
   align-items: center;
   box-sizing: border-box;
   min-height: 56px;

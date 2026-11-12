@@ -1,5 +1,6 @@
 package com.studentleague.matches.dto;
 
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 
 import java.time.Instant;
@@ -20,6 +21,7 @@ public record RecentFormResponse(
         int awayScore,
         Instant scheduledAt,
         MatchStatus status,
-        Instant startedAt
+        Instant startedAt,
+        ForfeitSide forfeit
 ) {
 }

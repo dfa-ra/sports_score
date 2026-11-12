@@ -1,5 +1,7 @@
 package com.studentleague.home.dto;
 
+import com.studentleague.matches.domain.ForfeitReason;
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 
 import java.time.Instant;
@@ -34,6 +36,8 @@ public record HomeMatchResponse(
         Integer penaltyHome,
         Integer penaltyAway,
         String stageLabel,
-        Integer round
+        Integer round,
+        ForfeitSide forfeit,
+        ForfeitReason forfeitReason
 ) {
 }

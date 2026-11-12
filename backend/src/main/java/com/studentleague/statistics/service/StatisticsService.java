@@ -1,6 +1,7 @@
 package com.studentleague.statistics.service;
 
 import com.studentleague.cache.StandingsBoardCache;
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
@@ -92,6 +93,9 @@ public class StatisticsService {
         Map<UUID, PlayerAccumulator> stats = new HashMap<>();
 
         for (Match match : matches) {
+            if (ForfeitRules.active(match)) {
+                continue;
+            }
             List<MatchEvent> events = eventsByMatch.getOrDefault(match.getId(), List.of());
             Set<UUID> appeared = new HashSet<>();
             for (MatchEvent event : events) {
@@ -317,7 +321,7 @@ public class StatisticsService {
     private KeeperCounts keeperCounts(UUID tournamentId) {
         KeeperCounts counts = new KeeperCounts();
         List<Match> matches = resolveMatches(tournamentId, null, null).stream()
-                .filter(match -> match.getStatus() == MatchStatus.FINISHED)
+                .filter(match -> match.getStatus() == MatchStatus.FINISHED && !ForfeitRules.active(match))
                 .toList();
         if (matches.isEmpty()) {
             return counts;
@@ -477,7 +481,10 @@ public class StatisticsService {
             home.goalsAgainst += match.getAwayScore();
             away.goalsFor += match.getAwayScore();
             away.goalsAgainst += match.getHomeScore();
-            if (match.getHomeScore() > match.getAwayScore()) {
+            if (ForfeitRules.mutual(match)) {
+                home.losses++;
+                away.losses++;
+            } else if (match.getHomeScore() > match.getAwayScore()) {
                 home.wins++;
                 home.points += 3;
                 away.losses++;

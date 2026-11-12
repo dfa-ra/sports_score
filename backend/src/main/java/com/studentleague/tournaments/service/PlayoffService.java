@@ -311,6 +311,36 @@ public class PlayoffService {
         syncThirdPlace(source);
     }
 
+    /**
+     * After a forfeit is cancelled the official result may no longer be a win.
+     * A match that is still finished walks its winner again. A match that went
+     * back to an earlier status drops the team it had sent on, unless the next
+     * pair has already started.
+     */
+    public void syncAfterScoreChange(Match match) {
+        if (match.getBracketRound() == null) {
+            return;
+        }
+        if (match.getStatus() == MatchStatus.FINISHED) {
+            advance(match);
+            return;
+        }
+        PlayoffSlot source = playoffSlotRepository.findByMatchId(match.getId()).orElse(null);
+        if (source == null || isThird(source)) {
+            return;
+        }
+        PlayoffSlot next = playoffSlotRepository.findByTournamentIdAndRoundNumberAndSlotIndex(
+                source.getTournamentId(),
+                source.getRoundNumber() + 1,
+                source.getSlotIndex() / 2
+        ).orElse(null);
+        if (next != null && !isThird(next)) {
+            boolean homeSide = source.getSlotIndex() % 2 == 0;
+            placeWinner(next, homeSide, null);
+        }
+        syncThirdPlace(source);
+    }
+
     public void syncVenue(Match match) {
         if (match.getBracketRound() == null) {
             return;

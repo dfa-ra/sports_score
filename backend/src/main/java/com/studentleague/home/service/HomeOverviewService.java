@@ -530,7 +530,9 @@ public class HomeOverviewService {
                         bracket.rounds().getOrDefault(match.getTournamentId(), 0),
                         bracket.thirdPlaceMatchIds().contains(match.getId())
                 ),
-                match.getBracketRound() != null ? match.getBracketRound() : HomeLabels.groupRoundOf(match, siblings)
+                match.getBracketRound() != null ? match.getBracketRound() : HomeLabels.groupRoundOf(match, siblings),
+                response.forfeit(),
+                response.forfeitReason()
         );
     }
 

@@ -1,7 +1,12 @@
 package com.studentleague.matches.entity;
 
+import com.studentleague.matches.domain.ForfeitReason;
+import com.studentleague.matches.domain.ForfeitReasonConverter;
+import com.studentleague.matches.domain.ForfeitSide;
+import com.studentleague.matches.domain.ForfeitSideConverter;
 import com.studentleague.matches.domain.MatchStatus;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -86,6 +91,36 @@ public class Match {
     /** Calendar tour within a group. Separate from {@code bracketRound}. */
     @Column(name = "round_number")
     private Integer roundNumber;
+
+    @Convert(converter = ForfeitSideConverter.class)
+    @Column(nullable = false, length = 16)
+    private ForfeitSide forfeit = ForfeitSide.NONE;
+
+    @Convert(converter = ForfeitReasonConverter.class)
+    @Column(name = "forfeit_reason", length = 32)
+    private ForfeitReason forfeitReason;
+
+    @Column(name = "forfeit_reason_note", length = 500)
+    private String forfeitReasonNote;
+
+    @Column(name = "forfeit_set_by")
+    private UUID forfeitSetBy;
+
+    @Column(name = "forfeit_set_at")
+    private Instant forfeitSetAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pre_forfeit_status", length = 32)
+    private MatchStatus preForfeitStatus;
+
+    @Column(name = "pre_forfeit_home_score")
+    private Integer preForfeitHomeScore;
+
+    @Column(name = "pre_forfeit_away_score")
+    private Integer preForfeitAwayScore;
+
+    @Column(name = "pre_forfeit_finished_at")
+    private Instant preForfeitFinishedAt;
 
     @PrePersist
     void onCreate() {
@@ -276,5 +311,77 @@ public class Match {
 
     public void setRoundNumber(Integer roundNumber) {
         this.roundNumber = roundNumber;
+    }
+
+    public ForfeitSide getForfeit() {
+        return forfeit == null ? ForfeitSide.NONE : forfeit;
+    }
+
+    public void setForfeit(ForfeitSide forfeit) {
+        this.forfeit = forfeit == null ? ForfeitSide.NONE : forfeit;
+    }
+
+    public ForfeitReason getForfeitReason() {
+        return forfeitReason;
+    }
+
+    public void setForfeitReason(ForfeitReason forfeitReason) {
+        this.forfeitReason = forfeitReason;
+    }
+
+    public String getForfeitReasonNote() {
+        return forfeitReasonNote;
+    }
+
+    public void setForfeitReasonNote(String forfeitReasonNote) {
+        this.forfeitReasonNote = forfeitReasonNote;
+    }
+
+    public UUID getForfeitSetBy() {
+        return forfeitSetBy;
+    }
+
+    public void setForfeitSetBy(UUID forfeitSetBy) {
+        this.forfeitSetBy = forfeitSetBy;
+    }
+
+    public Instant getForfeitSetAt() {
+        return forfeitSetAt;
+    }
+
+    public void setForfeitSetAt(Instant forfeitSetAt) {
+        this.forfeitSetAt = forfeitSetAt;
+    }
+
+    public MatchStatus getPreForfeitStatus() {
+        return preForfeitStatus;
+    }
+
+    public void setPreForfeitStatus(MatchStatus preForfeitStatus) {
+        this.preForfeitStatus = preForfeitStatus;
+    }
+
+    public Integer getPreForfeitHomeScore() {
+        return preForfeitHomeScore;
+    }
+
+    public void setPreForfeitHomeScore(Integer preForfeitHomeScore) {
+        this.preForfeitHomeScore = preForfeitHomeScore;
+    }
+
+    public Integer getPreForfeitAwayScore() {
+        return preForfeitAwayScore;
+    }
+
+    public void setPreForfeitAwayScore(Integer preForfeitAwayScore) {
+        this.preForfeitAwayScore = preForfeitAwayScore;
+    }
+
+    public Instant getPreForfeitFinishedAt() {
+        return preForfeitFinishedAt;
+    }
+
+    public void setPreForfeitFinishedAt(Instant preForfeitFinishedAt) {
+        this.preForfeitFinishedAt = preForfeitFinishedAt;
     }
 }
