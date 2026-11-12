@@ -850,7 +850,6 @@ onUnmounted(() => {
         </div>
         <div class="nums">
           <b>{{ heroScore }}</b>
-          <p v-if="forfeitLine" class="forfeit-line">{{ forfeitLine }}</p>
           <p v-if="shootoutScore && !pendingScore" class="pens">{{ shootoutScore }}</p>
           <p v-if="match.status === 'LIVE' || match.status === 'PAUSED'" class="clock" :class="{ expired }">
             <template v-if="minute != null">{{ minute }}' · </template>{{ periodLabel(match.period, match.sportCode, match.periodCount) }}
@@ -864,6 +863,7 @@ onUnmounted(() => {
           <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.awayTeamId) }" @click="tapTeamStar('away', match.awayTeamId)">★</button>
         </div>
       </div>
+      <p v-if="forfeitLine" class="forfeit-line">{{ forfeitLine }}</p>
       <p class="pitch-meta" :class="{ 'forfeit-meta': forfeited }"><span>{{ matchCardWhen(match) }}</span><span v-if="placeText" class="venue"> · {{ placeText }}</span></p>
       <MatchShareButton
         :home-name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
@@ -1693,14 +1693,21 @@ h2 a { color: inherit; }
 .pill.finished { background: rgba(255,255,255,0.14); }
 .pill.cancelled { color: rgba(255,255,255,0.65); }
 .pitch-chips { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: auto; }
-.pill.forfeit { background: var(--danger); color: #fff; font-family: var(--font-display); }
+.pill.forfeit { background: #e5735f; color: #fff; font-family: var(--font-display); }
+.pitch-top .pill.forfeit span { color: #fff; }
 .chip-short { display: none; }
 .forfeit-line {
-  margin: 0.35rem 0 0;
+  width: 100%;
+  margin: 8px 0 0;
   color: var(--danger);
-  font-size: 0.82rem;
+  font-size: 13px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .mark-pip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
 .tp-mini {
@@ -2006,6 +2013,12 @@ h2 a { color: inherit; }
   }
   .pill { height: 22px; padding: 0 8px; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
   .pitch-score { grid-column: 1 / -1; margin: 0; align-items: center; }
+  .forfeit-line {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 16px;
+  }
   .pitch-side {
     display: flex;
     flex-direction: row;

@@ -785,7 +785,7 @@ async function exclude(team: { teamId: string; teamName?: string }) {
             <ForfeitName class="nm" :match="m" side="away" :name="m.awayTeamName || names.fullName(m.awayTeamId)" />
             <b>{{ cardScoreParts(m).away }}</b>
           </span>
-          <ForfeitBadge v-if="isForfeit(m)" class="stack-badge" :match="m" />
+          <span v-if="isForfeit(m)" class="stack-badge"><ForfeitBadge :match="m" /></span>
           <span class="match-meta">
             <MatchStageNote :match="m" />
             <span>{{ matchListWhen(m) }}</span>
@@ -1181,29 +1181,42 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .match-meta > span + span::before { content: "\00a0·\00a0"; }
 }
 @media (min-width: 361px) and (max-width: 720px) {
-  .row.match-row { display: block; }
+  .row.match-row { display: block; height: auto; }
   .match-wide {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: center;
+    align-items: start;
     column-gap: 8px;
+    row-gap: 2px;
     width: 100%;
   }
   .match-side {
     min-width: 0;
     max-width: 100%;
+    align-items: flex-start;
   }
   .match-side > span {
     min-width: 0;
     white-space: normal;
     overflow-wrap: break-word;
   }
+  .match-side :deep(.tp-reason) {
+    display: block;
+    font-size: 11px;
+    line-height: 13px;
+  }
   .match-score {
     width: auto;
     max-width: none;
     justify-self: center;
+    align-self: start;
     text-align: center;
     overflow: visible;
+  }
+  .match-score.on {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
   }
 }
 @media (max-width: 360px) {
@@ -1211,15 +1224,14 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   .match-wide { display: none; }
   .match-stack {
     display: grid;
-    gap: 4px;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    align-items: start;
     width: 100%;
   }
   .team-line {
-    display: grid;
-    grid-template-columns: 22px minmax(0, 1fr) 28px;
-    column-gap: 8px;
-    align-items: center;
-    min-width: 0;
+    display: contents;
   }
   .team-line :deep(.team-crest) {
     width: 22px !important;
@@ -1233,7 +1245,18 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
     text-overflow: clip;
     white-space: normal;
   }
-  .stack-badge { display: inline-flex !important; justify-content: center; width: 100%; }
+  .team-line :deep(.tp-reason) {
+    display: block;
+    font-size: 11px;
+    line-height: 13px;
+  }
+  .stack-badge {
+    display: inline-flex !important;
+    grid-column: 3;
+    justify-self: end;
+    width: auto;
+  }
+  .match-stack .match-meta { grid-column: 1 / -1; }
   .team-line b {
     width: 28px;
     font-size: 16px;

@@ -151,7 +151,7 @@ function formKind(letter: string) {
         </span>
       </span>
     </RouterLink>
-    <p class="legend">{{ FORM_LEGEND }}<template v-if="mutualForfeit"> {{ MUTUAL_LEGEND }}</template></p>
+    <p class="legend">{{ mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
   </div>
 </template>
 

@@ -217,7 +217,8 @@ function tapStar() {
     grid-template-columns: 28px minmax(0, 1fr);
     column-gap: 8px;
     min-height: var(--row-match);
-    height: var(--row-match);
+    height: auto;
+    align-items: stretch;
   }
   .star {
     position: relative;
@@ -244,8 +245,8 @@ function tapStar() {
     grid-template-columns: 46px minmax(0, 1fr) auto auto;
     gap: 6px;
     min-height: var(--row-match);
-    height: var(--row-match);
-    padding: 0 8px 0 0;
+    height: auto;
+    padding: 6px 8px 6px 0;
     align-items: center;
   }
   .kick-slot :deep(.kick-date) { font-size: 12px; font-weight: 800; line-height: 16px; color: var(--navy); }
@@ -255,7 +256,18 @@ function tapStar() {
   .side {
     grid-template-columns: 20px minmax(0, 1fr);
     gap: 6px;
-    height: 18px;
+    height: auto;
+    min-height: 18px;
+    align-items: start;
+  }
+  .side :deep(.tp-reason) {
+    display: block;
+    font-size: 11px;
+    line-height: 13px;
+    white-space: normal;
+  }
+  .body :deep(.tp-score.on) {
+    align-items: flex-end;
   }
   .side :deep(.team-crest) {
     width: 20px !important;

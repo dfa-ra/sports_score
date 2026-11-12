@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import ForfeitBadge from './ForfeitBadge.vue'
 import TeamCrest from './TeamCrest.vue'
+import { isForfeit } from '../lib/forfeit'
 import {
   footerView,
   pairAria,
@@ -35,6 +37,7 @@ const aria = computed(() => {
   return thirdPlace.value ? `${THIRD_PLACE_SLOT_LABEL}. ${pair}` : pair
 })
 const showSeed = computed(() => !!props.firstRound && !props.compact)
+const forfeited = computed(() => isForfeit(props.slot))
 
 function teamId(home: boolean) {
   return home ? props.slot.homeTeamId : props.slot.awayTeamId
@@ -101,8 +104,9 @@ function rowLit(home: boolean) {
         <span class="pn" :title="name(home)">{{ name(home) }}</span>
         <span v-if="seed(home)" class="seed">{{ seed(home) }}</span>
         <span v-else class="seed ghost"></span>
-        <span class="ps" :class="{ dash: score(home).dash }">
+        <span class="ps" :class="{ dash: score(home).dash, badge: home && forfeited }">
           {{ score(home).text }}<sup v-if="score(home).pens != null">({{ score(home).pens }})</sup>
+          <ForfeitBadge v-if="home && forfeited" :match="slot" />
         </span>
       </template>
     </div>
@@ -207,6 +211,12 @@ a.pc:hover { border-color: var(--ice); color: inherit; }
   top: -0.35em;
 }
 .ps.dash { color: var(--muted); font-weight: 600; }
+.ps.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
 .pr.win {
   box-shadow: inset 3px 0 0 var(--ice);
   background: linear-gradient(90deg, rgba(76, 180, 229, 0.1), transparent 70%);

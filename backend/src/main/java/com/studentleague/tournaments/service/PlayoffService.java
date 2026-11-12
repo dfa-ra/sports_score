@@ -3,6 +3,7 @@ package com.studentleague.tournaments.service;
 import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.service.MatchListFields;
 import com.studentleague.matches.entity.Match;
@@ -826,7 +827,8 @@ public class PlayoffService {
                 match == null ? null : MatchListFields.minute(match, Instant.now()),
                 match == null ? null : match.getStartedAt(),
                 slot.getKind() == null ? PlayoffSlotKind.MAIN.name() : slot.getKind().name(),
-                slot.isBye()
+                slot.isBye(),
+                match == null ? ForfeitSide.NONE : match.getForfeit()
         );
     }
 

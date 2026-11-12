@@ -349,7 +349,8 @@ public class PlayoffQualifyService {
                 slot.minute(),
                 slot.startedAt(),
                 slot.kind(),
-                slot.bye()
+                slot.bye(),
+                slot.forfeit()
         );
     }
 

@@ -458,6 +458,15 @@ class _RefereePadPageState extends State<RefereePadPage> {
                         ),
                       ],
                     ),
+                    if (current.isForfeit)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Техническое поражение',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      ),
                   ],
                 ),
               ),

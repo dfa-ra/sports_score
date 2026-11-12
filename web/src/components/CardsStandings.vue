@@ -158,7 +158,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           <span class="pts"><b>{{ row.points }}</b><small>очк.</small></span>
         </RouterLink>
       </div>
-      <p class="legend">{{ FORM_LEGEND }}<template v-if="table.mutualForfeit"> {{ MUTUAL_LEGEND }}</template></p>
+      <p class="legend">{{ table.mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
     </section>
   </div>
 </template>

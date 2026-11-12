@@ -7,7 +7,8 @@ import api from '../../api/client'
 import { eventDetail, eventLabel, formatClock, labelOf, periodLabel, playerTag } from '../../lib/format'
 import { registeredName } from '../../lib/playerTitle'
 import { finishConfirmQuestion, protocolMinute, protocolScore, publicScore } from '../../lib/match'
-import { reconciledEvent, refereePenaltyCaption, unclearSend } from '../../lib/refereePad'
+import { isForfeit } from '../../lib/forfeit'
+import { reconciledEvent, refereePenaltyCaption, refereeProtocolScore, unclearSend } from '../../lib/refereePad'
 import { apiError } from '../../lib/errors'
 import { useMatchClock } from '../../lib/useMatchClock'
 import { useTeamDirectory } from '../../lib/useTeamDirectory'
@@ -203,8 +204,8 @@ function mergeServerEvents(server: any[], local: any[]) {
 
 function paintScore(current = match.value, rows = events.value) {
   if (!current) return
-  const counted = protocolScore(current, rows)
-  match.value = { ...current, homeScore: counted.home, awayScore: counted.away }
+  const next = refereeProtocolScore(current, protocolScore(current, rows))
+  match.value = { ...current, homeScore: next.homeScore, awayScore: next.awayScore }
 }
 
 function upsertProtocolEvent(event: any) {
@@ -230,13 +231,14 @@ function applyLive(live: any) {
   if (!match.value || !live) return
   if (live.matchId && String(live.matchId) !== String(match.value.id)) return
   if (live.lastEvent?.id) upsertProtocolEvent(live.lastEvent)
-  const counted = protocolScore(match.value, events.value)
+  const counted = refereeProtocolScore(match.value, protocolScore(match.value, events.value))
   const frameScore = typeof live.homeScore === 'number' && typeof live.awayScore === 'number'
+  const recount = !isForfeit(match.value) && (protocolDirty.value || live.lastEvent)
   match.value = {
     ...match.value,
     status: live.status ?? match.value.status,
-    homeScore: protocolDirty.value || live.lastEvent ? counted.home : (frameScore ? live.homeScore : counted.home),
-    awayScore: protocolDirty.value || live.lastEvent ? counted.away : (frameScore ? live.awayScore : counted.away),
+    homeScore: recount ? counted.homeScore : (frameScore ? live.homeScore : counted.homeScore),
+    awayScore: recount ? counted.awayScore : (frameScore ? live.awayScore : counted.awayScore),
     gameTimeSeconds: live.gameTimeSeconds ?? match.value.gameTimeSeconds,
     period: live.period ?? match.value.period,
     periodCount: live.periodCount ?? match.value.periodCount,
@@ -321,8 +323,8 @@ async function reload() {
 }
 
 function protocolScorePatch(current: any, rows: any[]) {
-  const counted = protocolScore(current, rows)
-  return { homeScore: counted.home, awayScore: counted.away }
+  const next = refereeProtocolScore(current, protocolScore(current, rows))
+  return { homeScore: next.homeScore, awayScore: next.awayScore }
 }
 
 async function refreshMatch() {
@@ -854,6 +856,7 @@ onUnmounted(() => {
             <span>{{ awayLabel }}</span>
           </strong>
         </div>
+        <p v-if="isForfeit(match)" class="forfeit-label">Техническое поражение</p>
         <p class="status-line">
           <span>{{ match.status === 'LIVE' ? 'В игре' : match.status === 'PAUSED' ? 'Пауза' : match.status === 'FINISHED' ? 'Завершён' : match.status === 'CANCELLED' ? 'Отменён' : 'Матч не начат' }}</span>
           <span v-if="match.period"> · {{ periodLabel(match.period, match.sportCode, match.periodCount) }}</span>
@@ -1172,6 +1175,7 @@ onUnmounted(() => {
 .club.away { justify-content: flex-end; text-align: right; }
 .mid { display: grid; justify-items: center; gap: 0.15rem; }
 .score { font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; }
+.forfeit-label { margin: 0; color: #fff; font-size: 13px; font-weight: 700; line-height: 1.3; text-align: center; }
 .pens { margin: 0; color: #d5e6f5; font-size: 0.85rem; }
 .clock {
   font-family: var(--font-display);
