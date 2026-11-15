@@ -163,17 +163,15 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
         String admin = createAdminAndLogin("tf-summary-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         Group group = group(admin);
         goal(admin, group.matchId, group.homeTeamId, group.homePlayerId);
-        mockMvc.perform(post("/api/v1/referee/matches/" + group.matchId + "/start")
-                        .header("Authorization", auth(admin)))
-                .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/referee/matches/" + group.matchId + "/finish")
-                        .header("Authorization", auth(admin)))
-                .andExpect(status().isOk());
+        finish(admin, group.matchId);
+        String otherId = createMatch(admin, group.tournamentId, group.homeTeamId, group.awayTeamId);
+        goal(admin, otherId, group.homeTeamId, group.homePlayerId);
+        finish(admin, otherId);
 
         JsonNode before = summary(group.tournamentId);
         JsonNode leagueBefore = summary(null);
-        assertThat(before.get("matchesPlayed").asLong()).isEqualTo(1);
-        assertThat(before.get("goals").asLong()).isEqualTo(1);
+        assertThat(before.get("matchesPlayed").asLong()).isEqualTo(2);
+        assertThat(before.get("goals").asLong()).isEqualTo(2);
         assertThat(before.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
 
         mockMvc.perform(post("/api/v1/admin/matches/" + group.matchId + "/forfeit")
@@ -186,20 +184,20 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.homeScore").value(5));
 
         JsonNode forfeited = summary(group.tournamentId);
-        assertThat(forfeited.get("matchesPlayed").asLong()).isZero();
-        assertThat(forfeited.get("goals").asLong()).isZero();
-        assertThat(forfeited.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("0.0");
+        assertThat(forfeited.get("matchesPlayed").asLong()).isEqualTo(2);
+        assertThat(forfeited.get("goals").asLong()).isEqualTo(1);
+        assertThat(forfeited.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
         JsonNode leagueForfeited = summary(null);
-        assertThat(leagueForfeited.get("matchesPlayed").asLong()).isEqualTo(leagueBefore.get("matchesPlayed").asLong() - 1);
+        assertThat(leagueForfeited.get("matchesPlayed").asLong()).isEqualTo(leagueBefore.get("matchesPlayed").asLong());
         assertThat(leagueForfeited.get("goals").asLong()).isEqualTo(leagueBefore.get("goals").asLong() - 1);
         mockMvc.perform(get("/api/v1/home/overview"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.matchesPlayed").value(leagueForfeited.get("matchesPlayed").asLong()))
                 .andExpect(jsonPath("$.summary.goals").value(leagueForfeited.get("goals").asLong()));
         row(group, group.homeTeamId)
-                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(1))
-                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(group.homeTeamId)).value(5))
-                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].points".formatted(group.homeTeamId)).value(3));
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(2))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(group.homeTeamId)).value(6))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].points".formatted(group.homeTeamId)).value(6));
 
         mockMvc.perform(post("/api/v1/admin/matches/" + group.matchId + "/forfeit/cancel")
                         .header("Authorization", auth(admin)))
@@ -207,8 +205,8 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.homeScore").value(1));
 
         JsonNode restored = summary(group.tournamentId);
-        assertThat(restored.get("matchesPlayed").asLong()).isEqualTo(1);
-        assertThat(restored.get("goals").asLong()).isEqualTo(1);
+        assertThat(restored.get("matchesPlayed").asLong()).isEqualTo(2);
+        assertThat(restored.get("goals").asLong()).isEqualTo(2);
         assertThat(restored.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
         JsonNode leagueRestored = summary(null);
         assertThat(leagueRestored.get("matchesPlayed").asLong()).isEqualTo(leagueBefore.get("matchesPlayed").asLong());
@@ -222,11 +220,11 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
                                 """))
                 .andExpect(status().isOk());
         JsonNode mutual = summary(group.tournamentId);
-        assertThat(mutual.get("matchesPlayed").asLong()).isZero();
-        assertThat(mutual.get("goals").asLong()).isZero();
-        assertThat(mutual.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("0.0");
+        assertThat(mutual.get("matchesPlayed").asLong()).isEqualTo(2);
+        assertThat(mutual.get("goals").asLong()).isEqualTo(1);
+        assertThat(mutual.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
         row(group, group.homeTeamId)
-                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(1));
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(2));
     }
 
     @Test
@@ -366,6 +364,15 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
 
     private org.springframework.test.web.servlet.ResultActions row(Group group, String teamId) throws Exception {
         return mockMvc.perform(get("/api/v1/tournaments/" + group.tournamentId + "/standings"))
+                .andExpect(status().isOk());
+    }
+
+    private void finish(String admin, String matchId) throws Exception {
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/start")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + matchId + "/finish")
+                        .header("Authorization", auth(admin)))
                 .andExpect(status().isOk());
     }
 

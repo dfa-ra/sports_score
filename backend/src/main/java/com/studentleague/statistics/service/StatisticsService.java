@@ -209,22 +209,26 @@ public class StatisticsService {
     }
 
     /**
-     * «Голы» and «Г/матч» count finished matches that are not an active forfeit.
-     * A one-sided 5:0 and a mutual 0:0 stay out of both the total and the denominator
-     * until the forfeit is cancelled. Standings still count those matches.
+     * «Сыграно» is every finished match, including an active forfeit.
+     * «Голы» and the «Г/матч» divisor are finished matches with forfeit none.
+     * Cancelling a forfeit puts that match's restored score back into the goal total
+     * and the divisor. «Сыграно» does not change, because the match was already finished.
      */
     private LeagueSummaryResponse loadSummary(UUID tournamentId) {
-        long matches;
+        long played;
+        long scoredMatches;
         long goals;
         long teams;
         long players;
         if (tournamentId == null) {
-            matches = matchRepository.countByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
+            played = matchRepository.countByStatus(MatchStatus.FINISHED);
+            scoredMatches = matchRepository.countByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
             goals = matchRepository.sumScoresByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
             teams = tournamentTeamRepository.countDistinctTeamsByStatus(TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayers();
         } else {
-            matches = matchRepository.countByTournamentIdAndStatusAndForfeit(
+            played = matchRepository.countByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+            scoredMatches = matchRepository.countByTournamentIdAndStatusAndForfeit(
                     tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
             goals = matchRepository.sumScoresByTournamentStatusAndForfeit(
                     tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
@@ -232,10 +236,10 @@ public class StatisticsService {
                     tournamentId, TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayersInTournament(tournamentId);
         }
-        BigDecimal perMatch = matches == 0
+        BigDecimal perMatch = scoredMatches == 0
                 ? BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
-                : BigDecimal.valueOf(goals).divide(BigDecimal.valueOf(matches), 1, RoundingMode.HALF_UP);
-        return new LeagueSummaryResponse(matches, goals, perMatch, teams, players, Instant.now());
+                : BigDecimal.valueOf(goals).divide(BigDecimal.valueOf(scoredMatches), 1, RoundingMode.HALF_UP);
+        return new LeagueSummaryResponse(played, goals, perMatch, teams, players, Instant.now());
     }
 
     private static String summaryKey(UUID tournamentId) {
