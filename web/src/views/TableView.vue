@@ -210,7 +210,7 @@ function applyBundle(id: string, bundle: TournamentBundle) {
   const name = bundle.tournament?.name || 'Таблица'
   setPageMeta({
     title: name,
-    description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по ассистентам',
+    description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты',
     path: '/table',
   })
 }
@@ -378,7 +378,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     const name = t.data?.name || 'Таблица'
     setPageMeta({
       title: name,
-      description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по ассистентам',
+      description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты',
       path: '/table',
     })
     if (tab.value === 'scorers' || tab.value === 'assists' || tab.value === 'keepers') await loadStats()
@@ -621,7 +621,7 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
             <thead>
               <tr>
                 <th>Игрок</th>
-                <th class="num pass-col"><span class="pass-short">Асс.</span><span class="pass-wide">Ассистенты</span></th>
+                <th class="num pass-col"><span class="pass-short">А</span><span class="pass-wide">Ассисты</span></th>
                 <th class="num">Игры</th>
               </tr>
             </thead>
@@ -634,13 +634,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
           <strong>{{ statsError }}</strong>
           <button class="btn secondary" type="button" @click="retryStats">Повторить</button>
         </div>
-        <EmptyState v-else-if="!assists.length" title="Ассистентов ещё нет" />
+        <EmptyState v-else-if="!assists.length" title="Ассистов ещё нет" />
         <div v-else class="table-wrap">
           <table class="table stat-table">
             <thead>
               <tr>
                 <th>Игрок</th>
-                <th class="num pass-col"><span class="pass-short">Асс.</span><span class="pass-wide">Ассистенты</span><span class="stat-short">А</span></th>
+                <th class="num pass-col"><span class="pass-short">А</span><span class="pass-wide">Ассисты</span><span class="stat-short">А</span></th>
                 <th class="num"><span class="stat-long">Игры</span><span class="stat-short">И</span></th>
               </tr>
             </thead>

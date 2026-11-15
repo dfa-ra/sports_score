@@ -163,7 +163,7 @@ test('crest letters and name baselines at 320, 375 and 1440', async ({ page }) =
       await page.screenshot({ path: `${OUT}/crest-letters-375.png`, clip })
     }
 
-    await page.getByRole('button', { name: 'Ассистенты' }).click()
+    await page.getByRole('button', { name: 'Ассисты' }).click()
     await expect(page.getByRole('heading', { name: 'Ассистенты' })).toBeVisible()
     await page.evaluate(() => document.fonts.ready)
     const assists = await page.evaluate(measure)

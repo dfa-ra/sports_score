@@ -236,7 +236,7 @@ class _Assists extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        _StatCard(title: 'Ассистенты', rows: store.assists, empty: 'Ассистентов ещё нет'),
+        _StatCard(title: 'Ассистенты', rows: store.assists, empty: 'Ассистов ещё нет'),
       ],
     );
   }

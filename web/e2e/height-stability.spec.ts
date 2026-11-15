@@ -171,7 +171,7 @@ test('players heading, hit target and block height stay put', async ({ page }) =
     expect(loadedHead).toBeLessThanOrEqual(45)
 
     const goalsSheet = loadedSheet
-    await page.getByRole('button', { name: 'Ассистенты' }).click()
+    await page.getByRole('button', { name: 'Ассисты' }).click()
     const assistsSheet = await height(page, '.players .sheet')
     expectStable(goalsSheet, assistsSheet, `players tab ${width}`)
 

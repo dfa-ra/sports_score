@@ -4,13 +4,13 @@ import { mkdirSync } from 'node:fs'
 const OUT = '/opt/cursor/artifacts'
 
 const words: Record<number, { goals: string; assists: string }> = {
-  1: { goals: 'гол', assists: 'ассистент' },
-  2: { goals: 'гола', assists: 'ассистента' },
-  5: { goals: 'голов', assists: 'ассистентов' },
-  11: { goals: 'голов', assists: 'ассистентов' },
-  12: { goals: 'голов', assists: 'ассистентов' },
-  21: { goals: 'гол', assists: 'ассистент' },
-  100: { goals: 'голов', assists: 'ассистентов' },
+  1: { goals: 'гол', assists: 'ассист' },
+  2: { goals: 'гола', assists: 'ассиста' },
+  5: { goals: 'голов', assists: 'ассистов' },
+  11: { goals: 'голов', assists: 'ассистов' },
+  12: { goals: 'голов', assists: 'ассистов' },
+  21: { goals: 'гол', assists: 'ассист' },
+  100: { goals: 'голов', assists: 'ассистов' },
 }
 
 type BoardMode = 'ready' | 'hold' | 'empty' | 'fail'
@@ -193,7 +193,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
   await page.goto('/players')
   await expect(page.getByRole('heading', { name: 'Бомбардиры' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Голы' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Ассисты' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Все турниры' })).toBeVisible()
   await expect(page.locator('.leader-metric')).toHaveCount(2)
   await expect(page.getByText('Физтех').first()).toBeVisible()
@@ -264,7 +264,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
   await expect(page.getByText('Факультет программной инженерии').first()).toBeVisible()
   await expect(page.locator('.leader').nth(0).locator('.leader-metric b')).toHaveText('100')
   await expect(page.locator('.leader').nth(0).locator('.leader-metric small')).toHaveText('голов')
-  await expect(page.locator('.leader').nth(1).locator('.leader-metric small')).toHaveText('ассистента')
+  await expect(page.locator('.leader').nth(1).locator('.leader-metric small')).toHaveText('ассиста')
   const longFacts = await metricFacts(page)
   expect(longFacts).toHaveLength(2)
   for (const fact of longFacts) {
@@ -306,7 +306,7 @@ test('players leader metric stack keeps word forms at 1, 2, 5, 11, 21 and 100', 
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/players')
   await expect(page.getByText('Бомбардир', { exact: true })).toBeVisible()
-  await expect(page.getByText('Лучший по ассистентам', { exact: true })).toBeVisible()
+  await expect(page.getByText('Лучший ассистент', { exact: true })).toBeVisible()
   await expect(page.locator('.leader-metric')).toHaveCount(0)
   await expect(page.getByText('Игроков пока нет')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Игроки' })).toBeVisible()

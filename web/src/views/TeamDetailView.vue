@@ -320,7 +320,7 @@ async function deleteTeam() {
             <tr>
               <th class="who-h" scope="col">Фамилия Имя</th>
               <th scope="col">Голы</th>
-              <th scope="col"><span class="assists-short">Асс.</span><span class="assists-wide">Ассистенты</span></th>
+              <th scope="col"><span class="assists-short">А</span><span class="assists-wide">Ассисты</span></th>
               <th scope="col">Игры</th>
               <th scope="col">ЖК</th>
             </tr>

@@ -223,10 +223,10 @@ String eventLabel(String? type) => eventLabels[type] ?? type ?? 'Событие'
 String assistWord(int count) {
   final abs = count.abs() % 100;
   final last = abs % 10;
-  if (abs > 10 && abs < 20) return 'ассистентов';
-  if (last == 1) return 'ассистент';
-  if (last >= 2 && last <= 4) return 'ассистента';
-  return 'ассистентов';
+  if (abs > 10 && abs < 20) return 'ассистов';
+  if (last == 1) return 'ассист';
+  if (last >= 2 && last <= 4) return 'ассиста';
+  return 'ассистов';
 }
 
 String eventDetail({
