@@ -14,7 +14,8 @@ import { apiError } from '../lib/errors'
 import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { cardScoreText } from '../lib/calendarFeed'
-import { aboutStage, classifyFormPayload, formMarks, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import { aboutStage, classifyFormPayload, formEntries, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import { eventsEmptyCopy, isForfeit, matchForfeitLine, STATS_NOTE } from '../lib/forfeit'
 import NotFoundView from './NotFoundView.vue'
 import { useMatchClock } from '../lib/useMatchClock'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -30,6 +31,7 @@ import MatchShareButton from '../components/MatchShareButton.vue'
 import PenaltyShootoutAdmin from '../components/PenaltyShootoutAdmin.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import MatchAnalystStats from '../components/MatchAnalystStats.vue'
+import TechnicalForfeitAdmin from '../components/TechnicalForfeitAdmin.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -106,12 +108,24 @@ const timeline = computed(() =>
     .filter((event) => !event.voided)
     .sort(compareMatchEvents),
 )
-const homeMarks = computed(() => formMarks(homeForm.value, match.value?.homeTeamId, match.value?.id))
-const awayMarks = computed(() => formMarks(awayForm.value, match.value?.awayTeamId, match.value?.id))
+const homeEntries = computed(() => formEntries(homeForm.value, match.value?.homeTeamId, match.value?.id))
+const awayEntries = computed(() => formEntries(awayForm.value, match.value?.awayTeamId, match.value?.id))
 const publicReferees = computed(() => refereeNames(referees.value))
 const stageText = computed(() => aboutStage(match.value, tournament.value))
 const placeText = computed(() => venueLabel(match.value?.venue))
 const heroScore = computed(() => match.value ? cardScoreText(match.value) : '')
+const forfeited = computed(() => isForfeit(match.value))
+const forfeitLine = computed(() => matchForfeitLine(
+  match.value,
+  teams.fullName(match.value?.homeTeamId, match.value?.homeTeamName || 'Команда'),
+  teams.fullName(match.value?.awayTeamId, match.value?.awayTeamName || 'Команда'),
+))
+const forfeitEventsCopy = computed(() => eventsEmptyCopy(match.value))
+
+async function onForfeit(next: any) {
+  match.value = { ...(match.value || {}), ...next }
+  if (match.value?.id) await loadEvents(String(match.value.id), true)
+}
 const tournamentTitle = computed(() => tournament.value?.name || match.value?.tournamentName || 'Турнир')
 
 const protocolMinuteMax = computed(() =>
@@ -821,7 +835,10 @@ onUnmounted(() => {
       <div class="pitch-top">
         <RouterLink v-if="match.tournamentId" :to="`/tournaments/${match.tournamentId}`">‹ {{ tournamentTitle }}</RouterLink>
         <span v-else>‹ {{ tournamentTitle }}</span>
-        <i class="pill" :class="(match.status || '').toLowerCase()">{{ statusLabel[match.status] || match.status }}</i>
+        <span class="pitch-chips">
+          <i class="pill" :class="(match.status || '').toLowerCase()">{{ statusLabel[match.status] || match.status }}</i>
+          <i v-if="forfeited" class="pill forfeit"><span class="chip-full">Техническое поражение</span><span class="chip-short">ТП</span></i>
+        </span>
       </div>
       <div class="pitch-score">
         <div class="pitch-side">
@@ -846,7 +863,8 @@ onUnmounted(() => {
           <button class="fav-star" type="button" :class="{ on: fav.hasTeam(match.awayTeamId) }" @click="tapTeamStar('away', match.awayTeamId)">★</button>
         </div>
       </div>
-      <p class="pitch-meta">{{ matchCardWhen(match) }} · {{ placeText }}</p>
+      <p v-if="forfeitLine" class="forfeit-line">{{ forfeitLine }}</p>
+      <p class="pitch-meta" :class="{ 'forfeit-meta': forfeited }"><span>{{ matchCardWhen(match) }}</span><span v-if="placeText" class="venue"> · {{ placeText }}</span></p>
       <MatchShareButton
         :home-name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
         :away-name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
@@ -859,7 +877,13 @@ onUnmounted(() => {
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="ok" class="form-ok">{{ ok }}</p>
 
-    <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED'">
+    <AdminOnly v-if="auth.canManageLeague" title="Для админа" :open="match.status === 'FINISHED' || forfeited">
+      <TechnicalForfeitAdmin
+        :match="match"
+        :home-name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')"
+        :away-name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')"
+        @updated="onForfeit"
+      />
       <CopyChip :value="String(match.id)" label="Скопировать id матча" />
       <form v-if="match.status === 'FINISHED'" class="stack motm-form" @submit.prevent="savePlayerOfTheMatch()">
         <h2>Игрок матча</h2>
@@ -1047,6 +1071,10 @@ onUnmounted(() => {
             <p>Не удалось загрузить события</p>
             <button class="btn secondary events-retry" type="button" @click="loadEvents(String(match.id))">Повторить</button>
           </div>
+          <template v-else-if="forfeited">
+            <p class="empty-events">{{ forfeitEventsCopy }}</p>
+            <p class="muted empty-hint">{{ STATS_NOTE }}</p>
+          </template>
           <template v-else-if="!periodBlocks.length">
             <p class="empty-events">Событий пока нет</p>
             <p class="muted empty-hint">Появятся после первого события матча</p>
@@ -1108,16 +1136,22 @@ onUnmounted(() => {
               <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />
               <b>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</b>
               <span class="marks">
-                <i v-for="(mark, index) in homeMarks" :key="`h-${index}`" :class="markClass(mark)">{{ mark }}</i>
-                <em v-if="!homeMarks.length">нет матчей</em>
+                <span v-for="(mark, index) in homeEntries" :key="`h-${index}`" class="mark-pip">
+                  <i :class="markClass(mark.letter)">{{ mark.letter }}</i>
+                  <em v-if="mark.technical" class="tp-mini">ТП</em>
+                </span>
+                <em v-if="!homeEntries.length">нет матчей</em>
               </span>
             </div>
             <div class="form-row">
               <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="28" />
               <b>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</b>
               <span class="marks">
-                <i v-for="(mark, index) in awayMarks" :key="`a-${index}`" :class="markClass(mark)">{{ mark }}</i>
-                <em v-if="!awayMarks.length">нет матчей</em>
+                <span v-for="(mark, index) in awayEntries" :key="`a-${index}`" class="mark-pip">
+                  <i :class="markClass(mark.letter)">{{ mark.letter }}</i>
+                  <em v-if="mark.technical" class="tp-mini">ТП</em>
+                </span>
+                <em v-if="!awayEntries.length">нет матчей</em>
               </span>
             </div>
           </template>
@@ -1658,6 +1692,39 @@ h2 a { color: inherit; }
 .pill.paused { background: var(--status-warn-soft); color: #ffe0a8; }
 .pill.finished { background: rgba(255,255,255,0.14); }
 .pill.cancelled { color: rgba(255,255,255,0.65); }
+.pitch-chips { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: auto; }
+.pill.forfeit { background: #e5735f; color: #fff; font-family: var(--font-display); }
+.pitch-top .pill.forfeit span { color: #fff; }
+.chip-short { display: none; }
+.forfeit-line {
+  width: 100%;
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.mark-pip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
+.tp-mini {
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--danger);
+  color: #fff;
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+}
 .pitch-score { margin-top: 0.8rem; align-items: flex-start; }
 .pitch-side {
   display: grid;
@@ -1909,6 +1976,14 @@ h2 a { color: inherit; }
 .marks i.draw { background: var(--status-warn); }
 .marks i.loss { background: var(--danger); }
 .marks em { color: var(--muted); font-style: normal; font-size: 0.78rem; }
+.marks .tp-mini {
+  color: #fff;
+  background: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  font-family: var(--font-display);
+}
 .fail { display: grid; justify-items: center; gap: 0.5rem; }
 .pad { justify-self: start; margin-top: 0.6rem; }
 .overview > .stack { align-items: start; min-width: 0; }
@@ -1948,6 +2023,12 @@ h2 a { color: inherit; }
   }
   .pill { height: 22px; padding: 0 8px; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
   .pitch-score { grid-column: 1 / -1; margin: 0; align-items: center; }
+  .forfeit-line {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 16px;
+  }
   .pitch-side {
     display: flex;
     flex-direction: row;
@@ -1997,6 +2078,9 @@ h2 a { color: inherit; }
     font-weight: 500;
     text-align: left;
   }
+  .chip-full { display: none; }
+  .chip-short { display: inline; }
+  .pitch-meta.forfeit-meta .venue { display: none; }
   .pitch :deep(.share) {
     grid-column: 2;
     align-self: center;

@@ -1,4 +1,5 @@
 import { periodLabel } from './format.ts'
+import { isForfeit } from './forfeit.ts'
 import { kickoffClock, kickoffDayMonth, penaltyPair, unplayedCardScore } from './match.ts'
 
 export type RefereeListRow = {
@@ -30,6 +31,24 @@ export function refereeListGroups<T extends RefereeListRow>(rows: readonly T[]) 
       .slice()
       .sort((a, b) => String(a.scheduledAt || '').localeCompare(String(b.scheduledAt || ''))),
   })).filter((group) => group.rows.length > 0)
+}
+
+/**
+ * A forfeit score lives on the match. Recounting events starts at 0:0 because
+ * those goals are not protocol events, and the public event list is empty
+ * while the forfeit is active.
+ */
+export function refereeProtocolScore(
+  match: RefereeListRow & { forfeit?: string | null },
+  counted: { home: number; away: number },
+) {
+  if (isForfeit(match)) {
+    return {
+      homeScore: Number(match.homeScore ?? 0),
+      awayScore: Number(match.awayScore ?? 0),
+    }
+  }
+  return { homeScore: counted.home, awayScore: counted.away }
 }
 
 /** A dash until the match starts. A real 0:0 stays. Penalties are not part of this line. */

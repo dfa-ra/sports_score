@@ -9,6 +9,8 @@ import StatusBadge from '../components/StatusBadge.vue'
 import PlayerPicker from '../components/PlayerPicker.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import TeamCardEditor from '../components/TeamCardEditor.vue'
+import ForfeitName from '../components/ForfeitName.vue'
+import ScoreForfeit from '../components/ScoreForfeit.vue'
 import TeamCrest from '../components/TeamCrest.vue'
 import { myTeamStub, showsMyTeamRoster } from '../lib/myTeamAccess'
 import { matchListWhen } from '../lib/format'
@@ -436,13 +438,17 @@ async function confirmRemove() {
           <RouterLink v-for="match in matches" :key="match.id" class="cal" :to="`/matches/${match.id}`">
             <span class="when">{{ kickoffLabel(match) }}</span>
             <span class="opponent">
-              {{ matchTitle(match) }}
+              <ForfeitName :match="match" side="home" :name="sideName(match, 'home')" />
+              <span aria-hidden="true">–</span>
+              <ForfeitName :match="match" side="away" :name="sideName(match, 'away')" />
               <StatusBadge :status="match.status" :at="match.scheduledAt ?? null" :third-place="!!match.thirdPlace" />
             </span>
-            <span class="score">
-              <span class="main">{{ calendarScoreParts(match).score }}</span>
-              <small v-if="calendarScoreParts(match).penalty" class="pens">{{ calendarScoreParts(match).penalty }}</small>
-            </span>
+            <ScoreForfeit :match="match">
+              <span class="score">
+                <span class="main">{{ calendarScoreParts(match).score }}</span>
+                <small v-if="calendarScoreParts(match).penalty" class="pens">{{ calendarScoreParts(match).penalty }}</small>
+              </span>
+            </ScoreForfeit>
           </RouterLink>
         </section>
       </div>
@@ -564,6 +570,7 @@ async function confirmRemove() {
   text-decoration: none;
 }
 .opponent { min-width: 0; display: flex; flex-wrap: wrap; gap: 0.35rem 0.55rem; align-items: center; overflow-wrap: break-word; font-weight: 800; }
+.opponent :deep(.name-stack) { flex: 0 1 auto; }
 .calendar .score {
   display: grid;
   justify-items: end;

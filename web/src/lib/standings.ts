@@ -1,3 +1,8 @@
+export type StandingFormMark = {
+  result: string
+  technical?: boolean
+}
+
 export type StandingRow = {
   teamId: string
   teamName: string
@@ -8,6 +13,7 @@ export type StandingRow = {
   goalsFor: number
   goalsAgainst: number
   points: number
+  form?: StandingFormMark[]
 }
 
 export type StandingGroup = {
@@ -15,6 +21,7 @@ export type StandingGroup = {
   name: string | null
   sortOrder: number
   rows: StandingRow[]
+  mutualForfeit?: boolean
 }
 
 export function parseStandings(data: unknown): StandingGroup[] {
@@ -40,5 +47,6 @@ function asGroup(item: any): StandingGroup {
     name: item?.name ?? null,
     sortOrder: Number(item?.sortOrder || 0),
     rows: Array.isArray(item?.rows) ? item.rows : [],
+    mutualForfeit: item?.mutualForfeit === true,
   }
 }

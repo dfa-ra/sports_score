@@ -2,6 +2,7 @@ package com.studentleague.matches.service;
 
 import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.common.exception.ApiException;
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
 import com.studentleague.matches.repository.MatchEventRepository;
@@ -34,6 +35,9 @@ public class MatchScoreService {
     }
 
     public void apply(Match match) {
+        if (ForfeitRules.active(match)) {
+            return;
+        }
         Sport sport = sportRepository.findById(match.getSportId())
                 .orElseThrow(() -> ApiException.notFound("Вид спорта не найден"));
         List<MatchEvent> active = matchEventRepository.findByMatchIdAndVoidedFalseOrderByTimestampAsc(match.getId());

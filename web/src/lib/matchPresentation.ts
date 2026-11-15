@@ -12,6 +12,7 @@ export type FormRow = {
   penaltyAway?: number | null
   startedAt?: string | null
   scheduledAt?: string | null
+  forfeit?: string | null
 }
 
 const FORM_LIMIT = 5
@@ -87,9 +88,18 @@ export function classifyFormPayload(
   return { ok: true, rows: prepareFormRows(list, teamId, currentMatchId) }
 }
 
-/** Letters the form endpoint actually returned. Shorter than five stays shorter. */
-export function formMarks(rows: FormRow[] | null | undefined, teamId?: string | null, currentMatchId?: string | null): string[] {
-  const marks: string[] = []
+export type FormEntry = { letter: string; technical: boolean }
+
+function technicalLoss(row: FormRow, teamId?: string | null) {
+  if (row.forfeit === 'both') return true
+  if (row.forfeit === 'home') return sameId(row.homeTeamId, teamId)
+  if (row.forfeit === 'away') return sameId(row.awayTeamId, teamId)
+  return false
+}
+
+/** Letters plus the ТП mark on a forfeit loss. Shorter than five stays shorter. */
+export function formEntries(rows: FormRow[] | null | undefined, teamId?: string | null, currentMatchId?: string | null): FormEntry[] {
+  const marks: FormEntry[] = []
   for (const row of prepareFormRows(rows, teamId, currentMatchId)) {
     const outcome = matchOutcome({
       status: row.status ?? undefined,
@@ -99,11 +109,17 @@ export function formMarks(rows: FormRow[] | null | undefined, teamId?: string | 
       awayScore: row.awayScore ?? undefined,
       penaltyHome: row.penaltyHome,
       penaltyAway: row.penaltyAway,
+      forfeit: row.forfeit,
     }, teamId)
-    const mark = outcome ? outcomeMark[outcome] : ''
-    if (mark) marks.push(mark)
+    const letter = outcome ? outcomeMark[outcome] : ''
+    if (letter) marks.push({ letter, technical: letter === 'П' && technicalLoss(row, teamId) })
   }
   return marks
+}
+
+/** Letters the form endpoint actually returned. Shorter than five stays shorter. */
+export function formMarks(rows: FormRow[] | null | undefined, teamId?: string | null, currentMatchId?: string | null): string[] {
+  return formEntries(rows, teamId, currentMatchId).map((entry) => entry.letter)
 }
 
 export function aboutStage(

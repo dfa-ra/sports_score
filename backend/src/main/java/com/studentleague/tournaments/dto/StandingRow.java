@@ -1,5 +1,6 @@
 package com.studentleague.tournaments.dto;
 
+import java.util.List;
 import java.util.UUID;
 
 public record StandingRow(
@@ -11,6 +12,7 @@ public record StandingRow(
         int losses,
         int goalsFor,
         int goalsAgainst,
-        int points
+        int points,
+        List<StandingFormMark> form
 ) {
 }

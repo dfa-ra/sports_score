@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
 import { stageFullName } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -49,6 +50,20 @@ function clearTip(event: FocusEvent) {
 
 const teams = useTeamDirectory()
 
+function formLetter(mark: { result?: string } | string | null | undefined) {
+  const result = typeof mark === 'string' ? mark : mark?.result
+  if (result === 'W' || result === 'В') return 'В'
+  if (result === 'D' || result === 'Н') return 'Н'
+  if (result === 'L' || result === 'П') return 'П'
+  return ''
+}
+
+function formKind(letter: string) {
+  if (letter === 'В') return 'win'
+  if (letter === 'Н') return 'draw'
+  return 'loss'
+}
+
 function clubName(row: { teamId?: string; teamName?: string }) {
   const known = row.teamId ? teams.teams.value[row.teamId]?.name : ''
   const fromRow = (row.teamName || '').trim()
@@ -72,6 +87,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           <span>П</span>
           <span>Мячи</span>
           <span>О</span>
+          <span>Форма</span>
         </div>
         <RouterLink
           v-for="(row, rowIndex) in table.rows"
@@ -100,6 +116,12 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           <span>{{ row.losses }}</span>
           <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
           <span class="pts">{{ row.points }}</span>
+          <span class="form-col">
+            <span v-for="(mark, markIndex) in row.form || []" :key="`${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
+              <b>{{ formLetter(mark) }}</b>
+              <i v-if="mark.technical">ТП</i>
+            </span>
+          </span>
         </RouterLink>
       </div>
       <div class="phone">
@@ -124,12 +146,19 @@ function clubName(row: { teamId?: string; teamName?: string }) {
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
               <b>{{ clubName(row) }}</b>
+              <span v-if="row.form?.length" class="form-inline">
+                <span v-for="(mark, markIndex) in row.form" :key="`p-${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
+                  <b>{{ formLetter(mark) }}</b>
+                  <i v-if="mark.technical">ТП</i>
+                </span>
+              </span>
               <small>И {{ row.played }} · В {{ row.wins }} · Н {{ row.draws }} · П {{ row.losses }} · {{ row.goalsFor }}:{{ row.goalsAgainst }}</small>
             </span>
           </span>
           <span class="pts"><b>{{ row.points }}</b><small>очк.</small></span>
         </RouterLink>
       </div>
+      <p class="legend">{{ table.mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
     </section>
   </div>
 </template>
@@ -145,7 +174,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 .desk { min-width: 0; }
 .line {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem 4.2rem 2.2rem;
+  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem 4.2rem 2.2rem minmax(5.6rem, auto);
   gap: 0.25rem;
   align-items: center;
   min-height: 2.7rem;
@@ -180,6 +209,33 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   font-weight: 700;
 }
 .pts { font-weight: 800; color: var(--navy); }
+.form-col { display: flex; justify-content: flex-end; gap: 4px; }
+.form-inline { display: none; }
+.pip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 18px; }
+.pip b {
+  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 10px; font-weight: 800; line-height: 1; color: #fff;
+}
+.pip.win b { background: #1b8a4a; }
+.pip.draw b { background: #c47b00; }
+.pip.loss b { background: var(--danger); }
+.pip i {
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--danger);
+  color: #fff;
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.legend { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 .rank {
   position: relative;
   width: 1.45rem;
@@ -235,6 +291,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     flex-shrink: 0;
   }
   .mrow .club b { white-space: normal; }
+  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
   .mrow small { display: block; color: #00205b; font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }

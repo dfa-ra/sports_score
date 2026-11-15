@@ -1,5 +1,6 @@
 package com.studentleague.matches.repository;
 
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.RecentFormResponse;
 import com.studentleague.matches.entity.Match;
@@ -103,7 +104,8 @@ public interface MatchRepository extends JpaRepository<Match, UUID>, JpaSpecific
                 m.awayScore,
                 m.scheduledAt,
                 m.status,
-                m.startedAt
+                m.startedAt,
+                m.forfeit
             )
             from Match m
             join Team home on home.id = m.homeTeamId
@@ -156,20 +158,28 @@ public interface MatchRepository extends JpaRepository<Match, UUID>, JpaSpecific
 
     long countByTournamentIdAndStatus(UUID tournamentId, MatchStatus status);
 
-    @Query("""
-            select coalesce(sum(m.homeScore + m.awayScore), 0)
-            from Match m
-            where m.status = :status
-            """)
-    long sumScoresByStatus(@Param("status") MatchStatus status);
+    long countByStatusAndForfeit(MatchStatus status, ForfeitSide forfeit);
+
+    long countByTournamentIdAndStatusAndForfeit(UUID tournamentId, MatchStatus status, ForfeitSide forfeit);
 
     @Query("""
             select coalesce(sum(m.homeScore + m.awayScore), 0)
             from Match m
-            where m.status = :status and m.tournamentId = :tournamentId
+            where m.status = :status and m.forfeit = :forfeit
             """)
-    long sumScoresByTournamentAndStatus(
+    long sumScoresByStatusAndForfeit(
+            @Param("status") MatchStatus status,
+            @Param("forfeit") ForfeitSide forfeit
+    );
+
+    @Query("""
+            select coalesce(sum(m.homeScore + m.awayScore), 0)
+            from Match m
+            where m.status = :status and m.tournamentId = :tournamentId and m.forfeit = :forfeit
+            """)
+    long sumScoresByTournamentStatusAndForfeit(
             @Param("tournamentId") UUID tournamentId,
-            @Param("status") MatchStatus status
+            @Param("status") MatchStatus status,
+            @Param("forfeit") ForfeitSide forfeit
     );
 }

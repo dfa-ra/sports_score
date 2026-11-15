@@ -5,6 +5,9 @@ import { Client } from '@stomp/stompjs'
 import api from '../api/client'
 import HomeAvatar from '../components/home/HomeAvatar.vue'
 import HomeCrest from '../components/home/HomeCrest.vue'
+import ForfeitBadge from '../components/ForfeitBadge.vue'
+import ForfeitName from '../components/ForfeitName.vue'
+import { isForfeit } from '../lib/forfeit'
 import ScrollFade from '../components/ScrollFade.vue'
 import { BRAND_MARK_SRC, SITE_NAME } from '../lib/brand'
 import { distinctLabels } from '../lib/shortLabel'
@@ -388,10 +391,10 @@ onUnmounted(() => {
                     </div>
                     <span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span>
                   </div>
-                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span></div>
-                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><ForfeitName :match="match" side="home" :name="match.homeTeamName" /></div>
+                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><ForfeitName :match="match" side="away" :name="match.awayTeamName" /></div>
                 </div>
-                <div class="mscore"><b class="dim">{{ scoreText(match, 'home') }}</b><b class="dim">{{ scoreText(match, 'away') }}</b></div>
+                <div class="mscore-pack"><div class="mscore"><b class="dim">{{ scoreText(match, 'home') }}</b><b class="dim">{{ scoreText(match, 'away') }}</b></div><ForfeitBadge :match="match" /></div>
               </RouterLink>
             </div>
             <div class="feed-col">
@@ -406,10 +409,10 @@ onUnmounted(() => {
                     </div>
                     <span class="st done">Завершён</span>
                   </div>
-                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span></div>
-                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+                  <div class="mteam"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><ForfeitName :match="match" side="home" :name="match.homeTeamName" /></div>
+                  <div class="mteam"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><ForfeitName :match="match" side="away" :name="match.awayTeamName" /></div>
                 </div>
-                <div class="mscore"><b>{{ scoreText(match, 'home') }}</b><b>{{ scoreText(match, 'away') }}</b></div>
+                <div class="mscore-pack"><div class="mscore"><b>{{ scoreText(match, 'home') }}</b><b>{{ scoreText(match, 'away') }}</b></div><ForfeitBadge :match="match" /></div>
               </RouterLink>
             </div>
           </div>
@@ -417,14 +420,16 @@ onUnmounted(() => {
           <div class="feed-cards">
             <RouterLink v-for="match in upcoming" :key="`u-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
-              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b class="dim">{{ scoreText(match, 'home') }}</b></div>
-              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span><b class="dim">{{ scoreText(match, 'away') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><ForfeitName :match="match" side="home" :name="match.homeTeamName" /><b class="dim">{{ scoreText(match, 'home') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><ForfeitName :match="match" side="away" :name="match.awayTeamName" /><b class="dim">{{ scoreText(match, 'away') }}</b></div>
+              <ForfeitBadge v-if="isForfeit(match)" class="mc-tp" :match="match" />
               <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
             </RouterLink>
             <RouterLink v-for="match in recent" :key="`r-${match.id}`" class="mc" :to="`/matches/${match.id}`">
               <div class="mc-top"><span class="tb" :class="badgeOf(match.tournamentId)">{{ match.tournamentShortName || match.tournamentName }}</span><span class="st done">Завершён</span></div>
-              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><span class="n">{{ match.homeTeamName }}</span><b>{{ scoreText(match, 'home') }}</b></div>
-              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span><b>{{ scoreText(match, 'away') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /><ForfeitName :match="match" side="home" :name="match.homeTeamName" /><b>{{ scoreText(match, 'home') }}</b></div>
+              <div class="mc-t"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><ForfeitName :match="match" side="away" :name="match.awayTeamName" /><b>{{ scoreText(match, 'away') }}</b></div>
+              <ForfeitBadge v-if="isForfeit(match)" class="mc-tp" :match="match" />
               <div class="mc-foot">{{ matchDayLabel(match.scheduledAt) }} · {{ matchClockLabel(match.scheduledAt) }}<template v-if="stageText(match)"> · {{ stageText(match) }}</template></div>
             </RouterLink>
           </div>
@@ -533,12 +538,13 @@ onUnmounted(() => {
             :to="`/matches/${match.id}`"
           >
             <div class="mtime"><b>{{ matchDayLabel(match.scheduledAt) }}</b><span>{{ matchClockLabel(match.scheduledAt) }}</span></div>
-            <div class="h"><span class="n">{{ match.homeTeamName }}</span><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
-            <div class="sc" :class="{ dim: match.status === 'SCHEDULED' }">
+            <div class="h"><ForfeitName :match="match" side="home" :name="match.homeTeamName" align="end" /><HomeCrest :id="match.homeTeamId" :name="match.homeTeamName" :src="match.homeLogoUrl" /></div>
+            <div class="sc" :class="{ dim: match.status === 'SCHEDULED', forfeit: isForfeit(match) }">
               <span class="line"><span>{{ scoreText(match, 'home') }}</span><span class="sep">:</span><span>{{ scoreText(match, 'away') }}</span></span>
               <small v-if="match.status === 'FINISHED' && match.penaltyHome != null">пен. {{ match.penaltyHome }}:{{ match.penaltyAway }}</small>
+              <ForfeitBadge :match="match" />
             </div>
-            <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><span class="n">{{ match.awayTeamName }}</span></div>
+            <div class="a"><HomeCrest :id="match.awayTeamId" :name="match.awayTeamName" :src="match.awayLogoUrl" /><ForfeitName :match="match" side="away" :name="match.awayTeamName" /></div>
             <div class="stc"><span class="st" :class="statusChip(match, now)">{{ statusText(match, now) }}</span></div>
           </RouterLink>
         </article>
@@ -669,6 +675,9 @@ onUnmounted(() => {
 .eyebrow.muted { color: var(--muted); margin-bottom: 0.6rem; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; color: var(--ink); margin: 0; }
 .hero-card h1 { color: #fff; font-size: 2rem; }
+@media (min-width: 721px) {
+  .hero-state > div > h1 { margin-bottom: 24px; line-height: 1; }
+}
 .vs {
   display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap;
   gap: 1.5rem; margin: 0.9rem 0 0.8rem; min-width: 0; font-size: 1.6rem;
@@ -842,7 +851,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .feed-cards { display: none; }
 .mrow, .irow, .mc, .srow, .pl { color: inherit; text-decoration: none; }
 .mrow {
-  display: grid; grid-template-columns: 56px 1fr 40px; gap: 0.75rem; align-items: center;
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 0.75rem; align-items: center;
   box-sizing: border-box;
   height: 115px;
   padding: 0.75rem 1rem; border-top: 1px solid var(--line);
@@ -874,6 +883,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   line-height: 1.25;
 }
 .mscore { display: grid; gap: 0.35rem; text-align: right; font-weight: 800; color: var(--ink); font-size: 1.125rem; }
+.mscore-pack { display: flex; align-items: center; gap: 8px; }
 .mscore b { height: 28px; line-height: 28px; }
 .mscore b.dim, .mc-t b.dim, .sc.dim { color: var(--muted); font-weight: 600; }
 .tb {
@@ -944,7 +954,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .block-error { display: grid; gap: 0.7rem; justify-items: center; }
 .hero-state p { color: rgba(255, 255, 255, 0.86); margin: 0 0 0.8rem; }
 .irow {
-  display: grid; grid-template-columns: 56px minmax(0, 1fr) 64px minmax(0, 1fr); grid-template-areas: "time h sc a" ". stc stc stc";
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "time h sc a" ". stc stc stc";
   gap: 0.3rem 0.6rem; align-items: center; padding: 0.6rem 1.2rem; border-top: 1px solid var(--line);
 }
 .irow .mtime { grid-area: time; }
@@ -952,6 +962,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
 .irow .h { grid-area: h; justify-content: flex-end; text-align: right; }
 .irow .a { grid-area: a; }
 .irow .sc { grid-area: sc; text-align: center; font-weight: 800; color: var(--ink); display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.irow .sc.forfeit { flex-direction: row; align-items: center; gap: 8px; }
 .irow .sc .line { display: inline-flex; align-items: baseline; justify-content: center; gap: 0.2rem; white-space: nowrap; }
 .irow .sc small { font-size: 0.75rem; color: var(--muted); font-weight: 600; white-space: nowrap; }
 .irow .stc { grid-area: stc; display: flex; justify-content: center; }
@@ -1064,12 +1075,14 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   }
   .mc-top { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; }
   .mc-t b { font-size: 1.125rem; margin-left: auto; }
+  .mc-tp { justify-self: end; }
   .mc-foot { font-size: 0.75rem; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); padding-top: 0.5rem; }
   .hero-state:not(:has(.livebar)),
   .hero-match:not(.has-live) { min-height: 0; align-items: start; gap: 0; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; grid-template-areas: "time h sc" "time a sc" ". stc stc"; padding: 0.7rem 1rem; }
   .irow .h { flex-direction: row-reverse; justify-content: flex-end; text-align: left; }
   .irow .sc { align-items: flex-end; }
+  .irow .sc.forfeit { flex-direction: column; align-items: center; gap: 2px; }
   .irow .sc .line { white-space: nowrap; }
   .irow .stc { justify-content: flex-start; }
   .tb { white-space: normal; }
@@ -1096,6 +1109,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing:
   .meta .stage { flex: 1 0 100%; text-align: center; }
   .irow { grid-template-columns: 48px minmax(0, 1fr) auto; }
   .irow .sc .line { white-space: nowrap; }
+  .irow .sc.forfeit { flex-direction: column; align-items: center; gap: 2px; }
 }
 @media (max-width: 960px) {
   .lf { display: none; }

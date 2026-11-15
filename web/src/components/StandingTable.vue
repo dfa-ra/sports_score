@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
+import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
 import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -12,6 +13,7 @@ const props = defineProps<{
   markedPlaces?: number[]
   /** Place number → stage id. When passed, it replaces the single advancing colour. */
   placeStages?: Record<number, string> | null
+  mutualForfeit?: boolean
 }>()
 
 const teams = useTeamDirectory()
@@ -66,6 +68,20 @@ function dismissTip(event: KeyboardEvent) {
 function clearTip(event: FocusEvent) {
   ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
 }
+
+function formLetter(mark: { result?: string } | string | null | undefined) {
+  const result = typeof mark === 'string' ? mark : mark?.result
+  if (result === 'W' || result === 'В') return 'В'
+  if (result === 'D' || result === 'Н') return 'Н'
+  if (result === 'L' || result === 'П') return 'П'
+  return ''
+}
+
+function formKind(letter: string) {
+  if (letter === 'В') return 'win'
+  if (letter === 'Н') return 'draw'
+  return 'loss'
+}
 </script>
 
 <template>
@@ -79,6 +95,7 @@ function clearTip(event: FocusEvent) {
       <span v-if="!compact" class="wide">П</span>
       <span>Г</span>
       <span>О</span>
+      <span class="form-col">Форма</span>
     </div>
     <RouterLink
       v-for="(row, i) in rows"
@@ -101,7 +118,20 @@ function clearTip(event: FocusEvent) {
       </span>
       <span class="club">
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
-        <b>{{ row.teamName }}</b>
+        <span class="club-name">
+          <b>{{ row.teamName }}</b>
+          <span v-if="row.form?.length" class="form-inline">
+            <span
+              v-for="(mark, index) in row.form"
+              :key="`${row.teamId}-m-${index}`"
+              class="pip"
+              :class="formKind(formLetter(mark))"
+            >
+              <b>{{ formLetter(mark) }}</b>
+              <i v-if="mark.technical">ТП</i>
+            </span>
+          </span>
+        </span>
       </span>
       <span>{{ row.played }}</span>
       <span v-if="!compact" class="wide">{{ row.wins }}</span>
@@ -109,7 +139,19 @@ function clearTip(event: FocusEvent) {
       <span v-if="!compact" class="wide">{{ row.losses }}</span>
       <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
       <span class="points">{{ row.points }}</span>
+      <span class="form-col">
+        <span
+          v-for="(mark, index) in row.form || []"
+          :key="`${row.teamId}-d-${index}`"
+          class="pip"
+          :class="formKind(formLetter(mark))"
+        >
+          <b>{{ formLetter(mark) }}</b>
+          <i v-if="mark.technical">ТП</i>
+        </span>
+      </span>
     </RouterLink>
+    <p class="legend">{{ mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
   </div>
 </template>
 
@@ -117,7 +159,7 @@ function clearTip(event: FocusEvent) {
 .board { width: 100%; }
 .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
   align-items: center;
   min-height: 2.65rem;
   padding: 0 0.85rem;
@@ -126,7 +168,7 @@ function clearTip(event: FocusEvent) {
   text-decoration: none;
 }
 .compact .line {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
@@ -152,6 +194,58 @@ function clearTip(event: FocusEvent) {
   align-items: center;
   min-width: 0;
   text-align: left;
+}
+.club-name { min-width: 0; display: grid; }
+.form-inline { display: none; }
+.form-col {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: right;
+}
+.pip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 18px;
+}
+.pip b {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+}
+.pip.win b { background: #1b8a4a; }
+.pip.draw b { background: #c47b00; }
+.pip.loss b { background: var(--danger); }
+.pip i {
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--danger);
+  color: #fff;
+  font-style: normal;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0;
+  text-align: center;
+}
+.legend {
+  margin: 0.55rem 0.85rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 .club b {
   font-weight: 600;
@@ -194,7 +288,7 @@ function clearTip(event: FocusEvent) {
     min-width: 0;
     width: 100%;
     min-height: 44px;
-    height: 44px;
+    height: auto;
     box-sizing: border-box;
     padding: 0 14px 0 12px;
     border-left: 4px solid transparent;
@@ -217,6 +311,8 @@ function clearTip(event: FocusEvent) {
   .club,
   .team-label { margin-left: 8px; }
   .club { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; min-width: 0; }
+  .form-col { display: none; }
+  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
   .club b {
     min-width: 0;

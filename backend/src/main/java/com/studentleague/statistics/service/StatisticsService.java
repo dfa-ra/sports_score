@@ -1,6 +1,8 @@
 package com.studentleague.statistics.service;
 
 import com.studentleague.cache.StandingsBoardCache;
+import com.studentleague.matches.domain.ForfeitRules;
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
@@ -92,6 +94,9 @@ public class StatisticsService {
         Map<UUID, PlayerAccumulator> stats = new HashMap<>();
 
         for (Match match : matches) {
+            if (ForfeitRules.active(match)) {
+                continue;
+            }
             List<MatchEvent> events = eventsByMatch.getOrDefault(match.getId(), List.of());
             Set<UUID> appeared = new HashSet<>();
             for (MatchEvent event : events) {
@@ -203,27 +208,38 @@ public class StatisticsService {
         return standingsBoardCache.get(summaryKey(tournamentId), () -> loadSummary(tournamentId));
     }
 
+    /**
+     * «Сыграно» is every finished match, including an active forfeit.
+     * «Голы» and the «Г/матч» divisor are finished matches with forfeit none.
+     * Cancelling a forfeit puts that match's restored score back into the goal total
+     * and the divisor. «Сыграно» does not change, because the match was already finished.
+     */
     private LeagueSummaryResponse loadSummary(UUID tournamentId) {
-        long matches;
+        long played;
+        long scoredMatches;
         long goals;
         long teams;
         long players;
         if (tournamentId == null) {
-            matches = matchRepository.countByStatus(MatchStatus.FINISHED);
-            goals = matchRepository.sumScoresByStatus(MatchStatus.FINISHED);
+            played = matchRepository.countByStatus(MatchStatus.FINISHED);
+            scoredMatches = matchRepository.countByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
+            goals = matchRepository.sumScoresByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
             teams = tournamentTeamRepository.countDistinctTeamsByStatus(TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayers();
         } else {
-            matches = matchRepository.countByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
-            goals = matchRepository.sumScoresByTournamentAndStatus(tournamentId, MatchStatus.FINISHED);
+            played = matchRepository.countByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
+            scoredMatches = matchRepository.countByTournamentIdAndStatusAndForfeit(
+                    tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
+            goals = matchRepository.sumScoresByTournamentStatusAndForfeit(
+                    tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
             teams = tournamentTeamRepository.countDistinctTeamsByTournamentAndStatus(
                     tournamentId, TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayersInTournament(tournamentId);
         }
-        BigDecimal perMatch = matches == 0
+        BigDecimal perMatch = scoredMatches == 0
                 ? BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP)
-                : BigDecimal.valueOf(goals).divide(BigDecimal.valueOf(matches), 1, RoundingMode.HALF_UP);
-        return new LeagueSummaryResponse(matches, goals, perMatch, teams, players, Instant.now());
+                : BigDecimal.valueOf(goals).divide(BigDecimal.valueOf(scoredMatches), 1, RoundingMode.HALF_UP);
+        return new LeagueSummaryResponse(played, goals, perMatch, teams, players, Instant.now());
     }
 
     private static String summaryKey(UUID tournamentId) {
@@ -317,7 +333,7 @@ public class StatisticsService {
     private KeeperCounts keeperCounts(UUID tournamentId) {
         KeeperCounts counts = new KeeperCounts();
         List<Match> matches = resolveMatches(tournamentId, null, null).stream()
-                .filter(match -> match.getStatus() == MatchStatus.FINISHED)
+                .filter(match -> match.getStatus() == MatchStatus.FINISHED && !ForfeitRules.active(match))
                 .toList();
         if (matches.isEmpty()) {
             return counts;
@@ -477,7 +493,10 @@ public class StatisticsService {
             home.goalsAgainst += match.getAwayScore();
             away.goalsFor += match.getAwayScore();
             away.goalsAgainst += match.getHomeScore();
-            if (match.getHomeScore() > match.getAwayScore()) {
+            if (ForfeitRules.mutual(match)) {
+                home.losses++;
+                away.losses++;
+            } else if (match.getHomeScore() > match.getAwayScore()) {
                 home.wins++;
                 home.points += 3;
                 away.losses++;

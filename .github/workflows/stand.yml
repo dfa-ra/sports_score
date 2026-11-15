@@ -82,9 +82,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      # 3.50 stable makes flutter analyze fail on the existing material.dart imports.
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.9'
           cache: true
       - name: Closed-test Android APK (dev stand)
         working-directory: mobile

@@ -8,6 +8,8 @@ import KickoffWhen from './KickoffWhen.vue'
 import ScorePop from './ScorePop.vue'
 import { useFavorites } from '../stores/favorites'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import ForfeitName from './ForfeitName.vue'
+import ScoreForfeit from './ScoreForfeit.vue'
 import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
@@ -64,22 +66,24 @@ function tapStar() {
       <span class="sides">
         <span class="side" :class="{ own: highlightTeamId === match.homeTeamId }">
           <TeamCrest :src="homeLogo" :name="homeName" :size="28" />
-          <b>{{ homeName }}</b>
+          <ForfeitName :match="match" side="home" :name="homeName" />
         </span>
         <span class="side" :class="{ own: highlightTeamId === match.awayTeamId }">
           <TeamCrest :src="awayLogo" :name="awayName" :size="28" />
-          <b>{{ awayName }}</b>
+          <ForfeitName :match="match" side="away" :name="awayName" />
         </span>
         <span v-if="venue" class="venue">{{ venue }}</span>
         <span v-if="isLive && match.lastGoalScorer" class="scorer">{{ match.lastGoalScorer }}</span>
       </span>
-      <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
-      <span v-else class="nums">
-        <strong v-if="scoreParts.dash">{{ scoreParts.home }}</strong>
-        <strong v-else><ScorePop :value="match.homeScore" /></strong>
-        <strong v-if="scoreParts.dash">{{ scoreParts.away }}</strong>
-        <strong v-else><ScorePop :value="match.awayScore" /></strong>
-      </span>
+      <ScoreForfeit :match="match">
+        <span v-if="shootoutScore" class="nums shootout">{{ shootoutScore }}</span>
+        <span v-else class="nums">
+          <strong v-if="scoreParts.dash">{{ scoreParts.home }}</strong>
+          <strong v-else><ScorePop :value="match.homeScore" /></strong>
+          <strong v-if="scoreParts.dash">{{ scoreParts.away }}</strong>
+          <strong v-else><ScorePop :value="match.awayScore" /></strong>
+        </span>
+      </ScoreForfeit>
       <span v-if="soon" class="soon">Скоро</span>
       <span v-else-if="outcome" class="mark" :class="outcome.toLowerCase()">{{ outcomeMark[outcome] }}</span>
     </RouterLink>
@@ -159,7 +163,7 @@ function tapStar() {
   object-fit: contain;
   object-position: center;
 }
-.side b {
+.side :deep(.name-text) {
   font-weight: 500;
   font-size: 1rem;
   min-width: 0;
@@ -168,9 +172,10 @@ function tapStar() {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
-.side.own b { font-weight: 800; color: var(--navy); }
+.side.own :deep(.name-text) { font-weight: 800; color: var(--navy); }
 .nums {
   display: grid;
   justify-items: end;
@@ -212,7 +217,8 @@ function tapStar() {
     grid-template-columns: 28px minmax(0, 1fr);
     column-gap: 8px;
     min-height: var(--row-match);
-    height: var(--row-match);
+    height: auto;
+    align-items: stretch;
   }
   .star {
     position: relative;
@@ -239,8 +245,8 @@ function tapStar() {
     grid-template-columns: 46px minmax(0, 1fr) auto auto;
     gap: 6px;
     min-height: var(--row-match);
-    height: var(--row-match);
-    padding: 0 8px 0 0;
+    height: auto;
+    padding: 6px 8px 6px 0;
     align-items: center;
   }
   .kick-slot :deep(.kick-date) { font-size: 12px; font-weight: 800; line-height: 16px; color: var(--navy); }
@@ -250,7 +256,18 @@ function tapStar() {
   .side {
     grid-template-columns: 20px minmax(0, 1fr);
     gap: 6px;
-    height: 18px;
+    height: auto;
+    min-height: 18px;
+    align-items: start;
+  }
+  .side :deep(.tp-reason) {
+    display: block;
+    font-size: 11px;
+    line-height: 13px;
+    white-space: normal;
+  }
+  .body :deep(.tp-score.on) {
+    align-items: flex-end;
   }
   .side :deep(.team-crest) {
     width: 20px !important;

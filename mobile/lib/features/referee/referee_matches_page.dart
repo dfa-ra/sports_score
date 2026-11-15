@@ -127,6 +127,11 @@ class _RefereeMatchesPageState extends State<RefereeMatchesPage> {
                               ),
                               style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.navy, fontSize: 20),
                             ),
+                            if (match.isForfeit)
+                              const Text(
+                                'Техническое поражение',
+                                style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.w800, fontSize: 13),
+                              ),
                             Text(
                               kickoffDayMonth(match.scheduledAt).isEmpty ? '—' : kickoffDayMonth(match.scheduledAt),
                               style: const TextStyle(color: AppColors.muted, fontSize: 13, fontWeight: FontWeight.w700, height: 1.15),

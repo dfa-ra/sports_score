@@ -30,6 +30,7 @@ export type PlayoffSlot = {
   penaltyAway?: number | null
   minute?: number | null
   bye?: boolean | null
+  forfeit?: string | null
 }
 
 export type PlayoffRound = {

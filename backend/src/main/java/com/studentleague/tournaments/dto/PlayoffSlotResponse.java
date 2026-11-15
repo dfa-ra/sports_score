@@ -1,5 +1,7 @@
 package com.studentleague.tournaments.dto;
 
+import com.studentleague.matches.domain.ForfeitSide;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,6 +31,7 @@ public record PlayoffSlotResponse(
         Integer minute,
         Instant startedAt,
         String kind,
-        boolean bye
+        boolean bye,
+        ForfeitSide forfeit
 ) {
 }

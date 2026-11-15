@@ -1,11 +1,14 @@
 package com.studentleague.tournaments.format;
 
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
+import com.studentleague.tournaments.dto.StandingFormMark;
 import com.studentleague.tournaments.dto.StandingRow;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -37,32 +40,99 @@ public class TableStandingsCalculator {
             if (home == null || away == null) {
                 continue;
             }
-            home.played++;
-            away.played++;
-            home.goalsFor += match.getHomeScore();
-            home.goalsAgainst += match.getAwayScore();
-            away.goalsFor += match.getAwayScore();
-            away.goalsAgainst += match.getHomeScore();
-            if (match.getHomeScore() > match.getAwayScore()) {
-                home.wins++;
-                home.points += 3;
-                away.losses++;
-            } else if (match.getHomeScore() < match.getAwayScore()) {
-                away.wins++;
-                away.points += 3;
-                home.losses++;
-            } else {
-                home.draws++;
-                away.draws++;
-                home.points++;
-                away.points++;
-            }
+            applyMatch(home, away, match);
         }
+        Map<UUID, List<StandingFormMark>> form = formOf(finished);
         return rank(new ArrayList<>(table.values()), finished).stream()
                 .map(team -> new StandingRow(
                         team.teamId, team.teamName, team.played, team.wins, team.draws, team.losses,
-                        team.goalsFor, team.goalsAgainst, team.points))
+                        team.goalsFor, team.goalsAgainst, team.points,
+                        form.getOrDefault(team.teamId, List.of())))
                 .toList();
+    }
+
+    /**
+     * A mutual forfeit is 0:0 and a loss for both sides, with no points.
+     * A one-sided forfeit is already a 5:0 score, so the ordinary win path applies.
+     */
+    private void applyMatch(Accumulator home, Accumulator away, Match match) {
+        home.played++;
+        away.played++;
+        home.goalsFor += match.getHomeScore();
+        home.goalsAgainst += match.getAwayScore();
+        away.goalsFor += match.getAwayScore();
+        away.goalsAgainst += match.getHomeScore();
+        if (ForfeitRules.mutual(match)) {
+            home.losses++;
+            away.losses++;
+            return;
+        }
+        if (match.getHomeScore() > match.getAwayScore()) {
+            home.wins++;
+            home.points += 3;
+            away.losses++;
+        } else if (match.getHomeScore() < match.getAwayScore()) {
+            away.wins++;
+            away.points += 3;
+            home.losses++;
+        } else {
+            home.draws++;
+            away.draws++;
+            home.points++;
+            away.points++;
+        }
+    }
+
+    /** Oldest of the last five on the left, newest on the right. */
+    private Map<UUID, List<StandingFormMark>> formOf(List<Match> finished) {
+        List<Match> ordered = finished.stream()
+                .sorted(Comparator
+                        .comparing(TableStandingsCalculator::kickoff, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(Match::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        Map<UUID, List<StandingFormMark>> marks = new HashMap<>();
+        for (Match match : ordered) {
+            append(marks, match.getHomeTeamId(), mark(match, true));
+            append(marks, match.getAwayTeamId(), mark(match, false));
+        }
+        Map<UUID, List<StandingFormMark>> last = new HashMap<>();
+        for (Map.Entry<UUID, List<StandingFormMark>> entry : marks.entrySet()) {
+            List<StandingFormMark> list = entry.getValue();
+            last.put(entry.getKey(), list.size() <= 5 ? List.copyOf(list) : List.copyOf(list.subList(list.size() - 5, list.size())));
+        }
+        return last;
+    }
+
+    private static void append(Map<UUID, List<StandingFormMark>> marks, UUID teamId, StandingFormMark mark) {
+        if (teamId == null) {
+            return;
+        }
+        marks.computeIfAbsent(teamId, id -> new ArrayList<>()).add(mark);
+    }
+
+    private static StandingFormMark mark(Match match, boolean homeSide) {
+        if (ForfeitRules.mutual(match)) {
+            return new StandingFormMark("L", true);
+        }
+        int scored = homeSide ? match.getHomeScore() : match.getAwayScore();
+        int conceded = homeSide ? match.getAwayScore() : match.getHomeScore();
+        if (scored > conceded) {
+            return new StandingFormMark("W", false);
+        }
+        if (scored < conceded) {
+            return new StandingFormMark("L", ForfeitRules.technicalLoss(match, homeSide));
+        }
+        return new StandingFormMark("D", false);
+    }
+
+    private static Instant kickoff(Match match) {
+        if (match.getFinishedAt() != null) {
+            return match.getFinishedAt();
+        }
+        if (match.getStartedAt() != null) {
+            return match.getStartedAt();
+        }
+        return match.getScheduledAt();
     }
 
     private List<Accumulator> rank(List<Accumulator> teams, List<Match> finished) {
@@ -119,6 +189,9 @@ public class TableStandingsCalculator {
             home.goalsAgainst += match.getAwayScore();
             away.goalsFor += match.getAwayScore();
             away.goalsAgainst += match.getHomeScore();
+            if (ForfeitRules.mutual(match)) {
+                continue;
+            }
             if (match.getHomeScore() > match.getAwayScore()) {
                 home.points += 3;
             } else if (match.getHomeScore() < match.getAwayScore()) {

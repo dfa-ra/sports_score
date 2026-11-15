@@ -2,6 +2,7 @@ package com.studentleague.matches.service;
 
 import com.studentleague.common.exception.ApiException;
 import com.studentleague.matches.clock.MatchClock;
+import com.studentleague.matches.domain.ForfeitRules;
 import com.studentleague.matches.domain.MatchEventType;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.dto.AdminCreateMatchEventRequest;
@@ -270,6 +271,9 @@ public class AdminMatchProtocolService {
                 .orElseThrow(() -> ApiException.notFound("Матч не найден"));
         if (!EDITABLE_STATUS.contains(match.getStatus())) {
             throw ApiException.conflict("Протокол этого матча закрыт");
+        }
+        if (ForfeitRules.active(match)) {
+            throw ApiException.conflict("Сначала отмените техническое поражение");
         }
         return match;
     }
