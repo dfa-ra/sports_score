@@ -376,7 +376,7 @@ onMounted(() => {
           </div>
         </article>
         <article class="leader">
-          <p>Лучший по передачам</p>
+          <p>Лучший по ассистентам</p>
           <div v-if="assist" class="leader-row">
             <PlayerAvatar :src="localPortrait(assist.avatarUrl)" :first-name="assist.firstName" :last-name="assist.lastName" :name="nameOf(assist)" :size="40" />
             <span class="who name-team">
@@ -413,7 +413,7 @@ onMounted(() => {
           <h2>{{ leaderBoardTitle(mode) }}</h2>
           <div class="switch" role="group" aria-label="Показатель">
             <button type="button" :class="{ on: mode === 'goals' }" :aria-pressed="mode === 'goals'" @click="mode = 'goals'">Голы</button>
-            <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Передачи</button>
+            <button type="button" :class="{ on: mode === 'assists' }" :aria-pressed="mode === 'assists'" @click="mode = 'assists'">Ассистенты</button>
           </div>
         </div>
         <div class="board-list">
@@ -421,7 +421,7 @@ onMounted(() => {
             <span>#</span>
             <span>Игрок</span>
             <span class="stat stat-m">М</span>
-            <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">Пер.</span>
+            <span class="stat" :class="mode === 'goals' ? 'stat-side' : 'stat-main'">Асс.</span>
             <span class="stat" :class="mode === 'assists' ? 'stat-side' : 'stat-main'">Г</span>
           </div>
           <div class="board-rows">
@@ -453,7 +453,7 @@ onMounted(() => {
             <p v-else class="board-empty">Игроков пока нет</p>
           </div>
           <button v-if="!loading && canMore" class="more" type="button" @click="showMore">Показать ещё</button>
-          <p class="legend">М матчи · Пер. передачи · Г голы</p>
+          <p class="legend">М матчи · Асс. ассистенты · Г голы</p>
         </div>
       </div>
     </template>

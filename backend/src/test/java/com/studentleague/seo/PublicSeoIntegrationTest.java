@@ -91,7 +91,7 @@ class PublicSeoIntegrationTest extends AbstractIntegrationTest {
                         .header("Host", "itmoliga.ru").header("X-Forwarded-Proto", "https"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<title>Главная — Лига ИТМО</title>")))
-                .andExpect(content().string(containsString("Лига ИТМО: бомбардиры и лучшие по передачам")))
+                .andExpect(content().string(containsString("Лига ИТМО: бомбардиры и лучшие по ассистентам")))
                 .andExpect(content().string(not(containsString("Лиги ИТМО"))));
 
         mockMvc.perform(get("/api/v1/link-preview").param("path", "/players"))
@@ -112,7 +112,7 @@ class PublicSeoIntegrationTest extends AbstractIntegrationTest {
         mockMvc.perform(get("/api/v1/link-preview").param("path", "/table"))
                 .andExpect(content().string(containsString("<title>Таблица — Лига ИТМО</title>")))
                 .andExpect(content().string(containsString(
-                        "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам")));
+                        "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по ассистентам")));
         mockMvc.perform(get("/api/v1/link-preview").param("path", "/live"))
                 .andExpect(content().string(containsString("Матчи, которые идут сейчас.")));
     }
@@ -132,7 +132,7 @@ class PublicSeoIntegrationTest extends AbstractIntegrationTest {
         expectPreview("/forbidden", "<title>Недостаточно прав — Лига ИТМО</title>", "Лига ИТМО: недостаточно прав");
         expectPreview("/matches", "<title>Игры — Лига ИТМО</title>", "Лига ИТМО: календарь матчей");
         expectPreview("/statistics", "<title>Таблица — Лига ИТМО</title>",
-                "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам");
+                "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по ассистентам");
 
         mockMvc.perform(get("/api/v1/link-preview").header("X-Preview-Path", "/no-such-page"))
                 .andExpect(status().isNotFound())

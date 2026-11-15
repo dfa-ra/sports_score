@@ -229,7 +229,7 @@ watch(scheduleRevision, () => {
 onMounted(() => {
   setPageMeta({
     title: 'Главная',
-    description: `${SITE_NAME}: ближайшие матчи, идущие турниры, бомбардиры и лучшие по передачам.`,
+    description: `${SITE_NAME}: ближайшие матчи, идущие турниры, бомбардиры и лучшие по ассистентам.`,
     path: '/',
   })
   void load()
@@ -569,7 +569,7 @@ onUnmounted(() => {
         <div class="scorer-body">
           <table class="stbl">
             <thead>
-              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пер.</th><th class="num">Голы</th></tr>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Асс.</th><th class="num">Голы</th></tr>
             </thead>
             <tbody>
               <tr v-for="n in 5" :key="`sk-${n}`"><td colspan="6"></td></tr>
@@ -606,7 +606,7 @@ onUnmounted(() => {
         <template v-else>
           <table class="stbl">
             <thead>
-              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Пер.</th><th class="num">Голы</th></tr>
+              <tr><th class="rk"></th><th>Игрок</th><th class="tm">Команда</th><th class="num">Матчи</th><th class="num">Асс.</th><th class="num">Голы</th></tr>
             </thead>
             <tbody>
               <tr v-for="(player, index) in activeScorers.scorers" :key="player.playerId">
