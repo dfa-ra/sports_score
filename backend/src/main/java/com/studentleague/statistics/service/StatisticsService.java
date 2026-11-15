@@ -2,6 +2,7 @@ package com.studentleague.statistics.service;
 
 import com.studentleague.cache.StandingsBoardCache;
 import com.studentleague.matches.domain.ForfeitRules;
+import com.studentleague.matches.domain.ForfeitSide;
 import com.studentleague.matches.domain.MatchStatus;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.matches.entity.MatchEvent;
@@ -207,19 +208,26 @@ public class StatisticsService {
         return standingsBoardCache.get(summaryKey(tournamentId), () -> loadSummary(tournamentId));
     }
 
+    /**
+     * «Голы» and «Г/матч» count finished matches that are not an active forfeit.
+     * A one-sided 5:0 and a mutual 0:0 stay out of both the total and the denominator
+     * until the forfeit is cancelled. Standings still count those matches.
+     */
     private LeagueSummaryResponse loadSummary(UUID tournamentId) {
         long matches;
         long goals;
         long teams;
         long players;
         if (tournamentId == null) {
-            matches = matchRepository.countByStatus(MatchStatus.FINISHED);
-            goals = matchRepository.sumScoresByStatus(MatchStatus.FINISHED);
+            matches = matchRepository.countByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
+            goals = matchRepository.sumScoresByStatusAndForfeit(MatchStatus.FINISHED, ForfeitSide.NONE);
             teams = tournamentTeamRepository.countDistinctTeamsByStatus(TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayers();
         } else {
-            matches = matchRepository.countByTournamentIdAndStatus(tournamentId, MatchStatus.FINISHED);
-            goals = matchRepository.sumScoresByTournamentAndStatus(tournamentId, MatchStatus.FINISHED);
+            matches = matchRepository.countByTournamentIdAndStatusAndForfeit(
+                    tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
+            goals = matchRepository.sumScoresByTournamentStatusAndForfeit(
+                    tournamentId, MatchStatus.FINISHED, ForfeitSide.NONE);
             teams = tournamentTeamRepository.countDistinctTeamsByTournamentAndStatus(
                     tournamentId, TournamentTeamStatus.APPROVED);
             players = teamMemberRepository.countDistinctActivePlayersInTournament(tournamentId);

@@ -159,6 +159,77 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void summaryOmitsActiveForfeitGoalsAndRestoresThemOnCancel() throws Exception {
+        String admin = createAdminAndLogin("tf-summary-" + System.nanoTime() + "@example.com", "Str0ngPass!");
+        Group group = group(admin);
+        goal(admin, group.matchId, group.homeTeamId, group.homePlayerId);
+        mockMvc.perform(post("/api/v1/referee/matches/" + group.matchId + "/start")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/referee/matches/" + group.matchId + "/finish")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk());
+
+        JsonNode before = summary(group.tournamentId);
+        JsonNode leagueBefore = summary(null);
+        assertThat(before.get("matchesPlayed").asLong()).isEqualTo(1);
+        assertThat(before.get("goals").asLong()).isEqualTo(1);
+        assertThat(before.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + group.matchId + "/forfeit")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"side":"away","reason":"no_show"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homeScore").value(5));
+
+        JsonNode forfeited = summary(group.tournamentId);
+        assertThat(forfeited.get("matchesPlayed").asLong()).isZero();
+        assertThat(forfeited.get("goals").asLong()).isZero();
+        assertThat(forfeited.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("0.0");
+        JsonNode leagueForfeited = summary(null);
+        assertThat(leagueForfeited.get("matchesPlayed").asLong()).isEqualTo(leagueBefore.get("matchesPlayed").asLong() - 1);
+        assertThat(leagueForfeited.get("goals").asLong()).isEqualTo(leagueBefore.get("goals").asLong() - 1);
+        mockMvc.perform(get("/api/v1/home/overview"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.matchesPlayed").value(leagueForfeited.get("matchesPlayed").asLong()))
+                .andExpect(jsonPath("$.summary.goals").value(leagueForfeited.get("goals").asLong()));
+        row(group, group.homeTeamId)
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(1))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].goalsFor".formatted(group.homeTeamId)).value(5))
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].points".formatted(group.homeTeamId)).value(3));
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + group.matchId + "/forfeit/cancel")
+                        .header("Authorization", auth(admin)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.homeScore").value(1));
+
+        JsonNode restored = summary(group.tournamentId);
+        assertThat(restored.get("matchesPlayed").asLong()).isEqualTo(1);
+        assertThat(restored.get("goals").asLong()).isEqualTo(1);
+        assertThat(restored.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("1.0");
+        JsonNode leagueRestored = summary(null);
+        assertThat(leagueRestored.get("matchesPlayed").asLong()).isEqualTo(leagueBefore.get("matchesPlayed").asLong());
+        assertThat(leagueRestored.get("goals").asLong()).isEqualTo(leagueBefore.get("goals").asLong());
+
+        mockMvc.perform(post("/api/v1/admin/matches/" + group.matchId + "/forfeit")
+                        .header("Authorization", auth(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"side":"both","reason":"incomplete"}
+                                """))
+                .andExpect(status().isOk());
+        JsonNode mutual = summary(group.tournamentId);
+        assertThat(mutual.get("matchesPlayed").asLong()).isZero();
+        assertThat(mutual.get("goals").asLong()).isZero();
+        assertThat(mutual.get("goalsPerMatch").decimalValue()).isEqualByComparingTo("0.0");
+        row(group, group.homeTeamId)
+                .andExpect(jsonPath("$.tables[0].rows[?(@.teamId == '%s')].played".formatted(group.homeTeamId)).value(1));
+    }
+
+    @Test
     void liveMatchAndSecondForfeitAreRejected() throws Exception {
         String admin = createAdminAndLogin("tf-live-" + System.nanoTime() + "@example.com", "Str0ngPass!");
         Group group = group(admin);
@@ -254,6 +325,15 @@ class TechnicalForfeitIntegrationTest extends AbstractIntegrationTest {
         userRepository.save(user);
         roleService.grantApproved(user, role, null);
         return loginOnly(email, "Str0ngPass!");
+    }
+
+    private JsonNode summary(String tournamentId) throws Exception {
+        var request = get("/api/v1/statistics/summary");
+        if (tournamentId != null) {
+            request.param("tournamentId", tournamentId);
+        }
+        MvcResult result = mockMvc.perform(request).andExpect(status().isOk()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
     private int goalsOf(Group group, String playerId) throws Exception {
