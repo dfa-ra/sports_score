@@ -27,9 +27,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
 COPIES = {
-    "/": "Лига ИТМО: бомбардиры и лучшие по передачам",
-    "/table": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам",
-    "/statistics": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам",
+    "/": "Лига ИТМО: бомбардиры и ассистенты",
+    "/table": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты",
+    "/statistics": "Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты",
     "/calendar": "Лига ИТМО: календарь матчей",
     "/matches": "Лига ИТМО: календарь матчей",
     "/live": "Матчи, которые идут сейчас.",
@@ -182,20 +182,20 @@ EOF
   local body="$work/body-$label"
 
   curl -fsS -A 'TelegramBot (like TwitterBot)' "$base/" -o "$body"
-  assert_contains "$body" "бомбардиры и лучшие по передачам"
+  assert_contains "$body" "бомбардиры и ассистенты"
   assert_contains "$body" 'property="og:description"'
   assert_absent "$body" "Страница не найдена"
   assert_absent "$body" 'id="app"'
   assert_absent "$body" "Турниры, таблица, календарь и матчи студенческой лиги ИТМО."
 
   curl -fsS -A 'facebookexternalhit/1.1' "$base/table" -o "$body"
-  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам"
+  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты"
   assert_contains "$body" 'name="description"'
   assert_absent "$body" "Страница не найдена"
   assert_absent "$body" 'id="app"'
 
   curl -fsS -A 'TelegramBot (like TwitterBot)' "$base/table" -o "$body"
-  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам"
+  assert_contains "$body" "Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты"
   assert_absent "$body" "Страница не найдена"
 
   curl -fsS -A 'TelegramBot (like TwitterBot)' "$base/login" -o "$body"
@@ -230,12 +230,12 @@ EOF
   curl -fsS -A 'Mozilla/5.0' "$base/" -o "$body"
   assert_contains "$body" 'id="app"'
   assert_contains "$body" "Турниры, таблица, календарь и матчи студенческой лиги ИТМО."
-  assert_absent "$body" "лучшие по передачам"
+  assert_absent "$body" "ассистенты"
 
   curl -fsS -A 'Mozilla/5.0' "$base/table" -o "$body"
   assert_contains "$body" 'id="app"'
   assert_contains "$body" "Турниры, таблица, календарь и матчи студенческой лиги ИТМО."
-  assert_absent "$body" "лидеры по передачам"
+  assert_absent "$body" "ассистенты"
 
   curl -fsS -A 'Mozilla/5.0' "$base/login" -o "$body"
   assert_contains "$body" 'id="app"'

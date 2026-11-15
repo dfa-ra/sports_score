@@ -59,12 +59,12 @@ export function goalsAside(count: number | null | undefined) {
 export function unitWord(count: number, kind: 'goals' | 'assists') {
   const n = Math.max(0, Math.trunc(count))
   if (kind === 'goals') return countLabel(n, 'гол', 'гола', 'голов')
-  return countLabel(n, 'передача', 'передачи', 'передач')
+  return countLabel(n, 'ассист', 'ассиста', 'ассистов')
 }
 
 /** Source case for the /players sheet title. Global h2 styles uppercase it. */
 export function leaderBoardTitle(mode: 'goals' | 'assists') {
-  if (mode === 'assists') return 'Лидеры по передачам'
+  if (mode === 'assists') return 'Ассистенты'
   return 'Бомбардиры'
 }
 

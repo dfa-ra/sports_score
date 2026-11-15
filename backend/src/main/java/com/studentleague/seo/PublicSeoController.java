@@ -132,7 +132,7 @@ public class PublicSeoController {
 
     private PageCopy copyFor(String path) {
         if ("/".equals(path)) {
-            return new PageCopy("Главная", SITE + ": бомбардиры и лучшие по передачам");
+            return new PageCopy("Главная", SITE + ": бомбардиры и ассистенты");
         }
         PageCopy fixed = staticCopy(path);
         if (fixed != null) {
@@ -145,7 +145,7 @@ public class PublicSeoController {
         return switch (path) {
             case "/table", "/statistics" -> new PageCopy(
                     "Таблица",
-                    SITE + ": турнирная таблица, результаты, бомбардиры и лидеры по передачам"
+                    SITE + ": турнирная таблица, результаты, бомбардиры и ассистенты"
             );
             case "/calendar", "/matches" -> new PageCopy("Игры", SITE + ": календарь матчей");
             case "/live" -> new PageCopy("Live", "Матчи, которые идут сейчас.");

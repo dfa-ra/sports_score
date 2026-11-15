@@ -65,10 +65,10 @@ test('players sheet title follows the goals and passes tabs', async ({ page }) =
     await expect(sheet).toHaveText('Бомбардиры')
     await expect(sheet).toHaveCSS('text-transform', 'uppercase')
     await expect(page.getByRole('button', { name: 'Голы' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Передачи' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ассисты' })).toBeVisible()
     const eyebrow = page.locator('.leader p').nth(1)
     await expect(page.locator('.leader p').nth(0)).toHaveText('Бомбардир')
-    await expect(eyebrow).toHaveText('Лучший по передачам')
+    await expect(eyebrow).toHaveText('Лучший ассистент')
     await expect(eyebrow).toHaveCSS('text-transform', 'uppercase')
     const eyebrowBox = await eyebrow.evaluate((el) => {
       const rect = el.getBoundingClientRect()
@@ -86,10 +86,10 @@ test('players sheet title follows the goals and passes tabs', async ({ page }) =
     expect(eyebrowBox.right).toBeLessThanOrEqual(eyebrowBox.view + 1)
     expect(eyebrowBox.pageOverflow).toBeLessThanOrEqual(1)
 
-    await page.getByRole('button', { name: 'Передачи' }).click()
-    await expect(sheet).toHaveText('Лидеры по передачам')
+    await page.getByRole('button', { name: 'Ассисты' }).click()
+    await expect(sheet).toHaveText('Ассистенты')
     await expect(sheet).toHaveCSS('text-transform', 'uppercase')
-    await expect(page.getByRole('button', { name: 'Передачи' })).toHaveClass(/on/)
+    await expect(page.getByRole('button', { name: 'Ассисты' })).toHaveClass(/on/)
     const headingBox = await sheet.evaluate((el) => {
       const rect = el.getBoundingClientRect()
       const style = getComputedStyle(el)
@@ -106,7 +106,7 @@ test('players sheet title follows the goals and passes tabs', async ({ page }) =
         ellipsis: style.textOverflow,
       }
     })
-    expect(headingBox.text).toBe('Лидеры по передачам')
+    expect(headingBox.text).toBe('Ассистенты')
     expect(headingBox.right).toBeLessThanOrEqual(headingBox.view + 1)
     expect(headingBox.lines).toBe(1)
     if (width === 1440) expect(headingBox.clipped).toBe(false)
@@ -159,7 +159,7 @@ test('team player table fits the numeric headers at 375 and keeps the desktop co
   expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1)
   const table = page.locator('.stat-table')
   await expect(table).toBeVisible()
-  await expect(page.locator('.assists-short')).toHaveText('Пер.')
+  await expect(page.locator('.assists-short')).toHaveText('А')
   await expect(page.locator('.assists-wide')).toBeHidden()
 
   const phone = await table.evaluate((node) => {
@@ -212,7 +212,7 @@ test('team player table fits the numeric headers at 375 and keeps the desktop co
       align: getComputedStyle(node.querySelector('td.num') as Element).textAlign,
     }
   })
-  expect(phone.headers.map((header) => header.text)).toEqual(['Фамилия Имя', 'Голы', 'Пер.', 'Игры', 'ЖК'])
+  expect(phone.headers.map((header) => header.text)).toEqual(['Фамилия Имя', 'Голы', 'А', 'Игры', 'ЖК'])
   for (const header of phone.headers) {
     expect(header.clipped, header.text).toBe(false)
     expect(header.left).toBeGreaterThanOrEqual(-1)
@@ -245,7 +245,7 @@ test('team player table fits the numeric headers at 375 and keeps the desktop co
   await shot(page, 'q2-team-columns-375')
 
   await page.setViewportSize({ width: 1440, height: 900 })
-  await expect(page.locator('.assists-wide')).toHaveText('Передачи')
+  await expect(page.locator('.assists-wide')).toHaveText('Ассисты')
   await expect(page.locator('.assists-short')).toBeHidden()
   const desktop = await table.evaluate((node) => {
     const num = node.querySelector('td.num') as HTMLElement
@@ -295,8 +295,8 @@ test('table passes tab keeps the designer copy and the existing column width', a
     await page.setViewportSize({ width, height: width === 375 ? 812 : 900 })
     await page.goto('/table?tournament=liga&tab=assists')
     expect(await page.evaluate(() => window.devicePixelRatio)).toBe(1)
-    await expect(page.getByRole('button', { name: 'Лидеры по передачам' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Лидеры по передачам' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ассистенты' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Ассистенты' })).toBeVisible()
     const head = page.locator('.pass-col')
     const facts = await head.evaluate((el) => {
       const num = el.closest('table')?.querySelector('td.num') as HTMLElement | null
@@ -307,7 +307,7 @@ test('table passes tab keeps the designer copy and the existing column width', a
         transform: getComputedStyle(el).textTransform,
       }
     })
-    expect(facts.text).toBe(width === 375 ? 'ПЕР.' : 'ПЕРЕДАЧИ')
+    expect(facts.text).toBe(width === 375 ? 'А' : 'АССИСТЫ')
     expect(facts.clipped).toBe(false)
     expect(facts.transform).toBe('uppercase')
     const px = Number.parseFloat(facts.width)
@@ -316,5 +316,5 @@ test('table passes tab keeps the designer copy and the existing column width', a
 
   assists = []
   await page.goto('/table?tournament=liga&tab=assists')
-  await expect(page.getByText('Передач ещё нет')).toBeVisible()
+  await expect(page.getByText('Ассистов ещё нет')).toBeVisible()
 })

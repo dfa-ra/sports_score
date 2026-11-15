@@ -8,14 +8,14 @@ const FALLBACK_DESCRIPTION = 'Турниры, таблица, календарь
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Лига ИТМО: бомбардиры и лучшие по передачам' } },
+    { path: '/', name: 'home', component: () => import('../views/HomeView.vue'), meta: { title: 'Главная', description: 'Лига ИТМО: бомбардиры и ассистенты' } },
     { path: '/login', name: 'login', component: () => import('../views/LoginView.vue'), meta: { guest: true, title: 'Вход', description: 'Лига ИТМО: вход' } },
     { path: '/register', name: 'register', component: () => import('../views/RegisterView.vue'), meta: { guest: true, title: 'Регистрация', description: 'Лига ИТМО: регистрация' } },
     { path: '/forgot-password', name: 'forgot-password', component: () => import('../views/ForgotPasswordView.vue'), meta: { guest: true, title: 'Восстановление пароля', description: 'Лига ИТМО: восстановление пароля' } },
     { path: '/reset-password', name: 'reset-password', component: () => import('../views/ResetPasswordView.vue'), meta: { title: 'Новый пароль', description: 'Лига ИТМО: новый пароль' } },
     { path: '/privacy', name: 'privacy', component: () => import('../views/PrivacyView.vue'), meta: { title: 'Политика конфиденциальности', description: 'Как Лига ИТМО обрабатывает персональные данные.' } },
     { path: '/terms', name: 'terms', component: () => import('../views/TermsView.vue'), meta: { title: 'Условия пользования', description: 'Лига ИТМО: условия использования сайта' } },
-    { path: '/table', name: 'table', component: () => import('../views/TableView.vue'), meta: { title: 'Таблица', description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и лидеры по передачам' } },
+    { path: '/table', name: 'table', component: () => import('../views/TableView.vue'), meta: { title: 'Таблица', description: 'Лига ИТМО: турнирная таблица, результаты, бомбардиры и ассистенты' } },
     { path: '/calendar', name: 'calendar', component: () => import('../views/CalendarView.vue'), meta: { title: 'Игры', description: 'Лига ИТМО: календарь матчей' } },
     { path: '/live', name: 'live', component: () => import('../views/CalendarView.vue'), meta: { title: 'Live', description: 'Матчи, которые идут сейчас.' } },
     { path: '/tournaments', name: 'tournaments', component: () => import('../views/TournamentsView.vue'), meta: { title: 'Турниры', description: 'Лига ИТМО: турниры, сезон и формат' } },
