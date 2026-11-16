@@ -15,6 +15,8 @@ import { setPageMeta } from '../lib/pageMeta'
 import { loadAllReferees, refereeTitle } from '../lib/referees'
 import { cardScoreText } from '../lib/calendarFeed'
 import { aboutStage, classifyFormPayload, formEntries, keepFormPayload, refereeNames, venueLabel } from '../lib/matchPresentation'
+import { standingFormFromNewestFirst } from '../lib/standings'
+import StandingForm from '../components/StandingForm.vue'
 import { eventsEmptyCopy, isForfeit, matchForfeitLine, STATS_NOTE } from '../lib/forfeit'
 import NotFoundView from './NotFoundView.vue'
 import { useMatchClock } from '../lib/useMatchClock'
@@ -527,12 +529,6 @@ async function loadForms(homeTeamId?: string, awayTeamId?: string) {
   } finally {
     if (ticket === formTicket) formPending = false
   }
-}
-
-function markClass(mark: string) {
-  if (mark === 'В') return 'win'
-  if (mark === 'Н') return 'draw'
-  return 'loss'
 }
 
 function blockScore(value?: string | null) {
@@ -1125,34 +1121,33 @@ onUnmounted(() => {
       </div>
       <aside class="rail">
         <section class="card">
-          <header><b>Форма</b><span>последние 5</span></header>
+          <header><b>Форма</b><span>последние 4</span></header>
           <div v-if="formError" class="fail">
             <p>Форма не загрузилась</p>
             <button class="btn secondary" type="button" @click="loadForms(match.homeTeamId, match.awayTeamId)">Повторить</button>
           </div>
-          <p v-else-if="!formReady" class="muted">Загрузка…</p>
-          <template v-else>
+          <template v-else-if="!formReady">
             <div class="form-row">
               <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />
               <b>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</b>
-              <span class="marks">
-                <span v-for="(mark, index) in homeEntries" :key="`h-${index}`" class="mark-pip">
-                  <i :class="markClass(mark.letter)">{{ mark.letter }}</i>
-                  <em v-if="mark.technical" class="tp-mini">ТП</em>
-                </span>
-                <em v-if="!homeEntries.length">нет матчей</em>
-              </span>
+              <StandingForm pending />
             </div>
             <div class="form-row">
               <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="28" />
               <b>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</b>
-              <span class="marks">
-                <span v-for="(mark, index) in awayEntries" :key="`a-${index}`" class="mark-pip">
-                  <i :class="markClass(mark.letter)">{{ mark.letter }}</i>
-                  <em v-if="mark.technical" class="tp-mini">ТП</em>
-                </span>
-                <em v-if="!awayEntries.length">нет матчей</em>
-              </span>
+              <StandingForm pending />
+            </div>
+          </template>
+          <template v-else>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.homeTeamId)" :name="teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.homeTeamId, match.homeTeamName || 'Команда') }}</b>
+              <StandingForm :form="standingFormFromNewestFirst(homeEntries)" />
+            </div>
+            <div class="form-row">
+              <TeamCrest :src="teams.logo(match.awayTeamId)" :name="teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда')" :size="28" />
+              <b>{{ teams.fullName(match.awayTeamId, match.awayTeamName || 'Команда') }}</b>
+              <StandingForm :form="standingFormFromNewestFirst(awayEntries)" />
             </div>
           </template>
         </section>

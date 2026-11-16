@@ -5,6 +5,7 @@ import { advancingRank } from '../lib/matchPresentation'
 import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
 import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import StandingForm from './StandingForm.vue'
 import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
@@ -68,20 +69,6 @@ function dismissTip(event: KeyboardEvent) {
 function clearTip(event: FocusEvent) {
   ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
 }
-
-function formLetter(mark: { result?: string } | string | null | undefined) {
-  const result = typeof mark === 'string' ? mark : mark?.result
-  if (result === 'W' || result === 'В') return 'В'
-  if (result === 'D' || result === 'Н') return 'Н'
-  if (result === 'L' || result === 'П') return 'П'
-  return ''
-}
-
-function formKind(letter: string) {
-  if (letter === 'В') return 'win'
-  if (letter === 'Н') return 'draw'
-  return 'loss'
-}
 </script>
 
 <template>
@@ -95,7 +82,7 @@ function formKind(letter: string) {
       <span v-if="!compact" class="wide">П</span>
       <span>Г</span>
       <span>О</span>
-      <span class="form-col">Форма</span>
+      <span class="form-col"><span>Форма</span></span>
     </div>
     <RouterLink
       v-for="(row, i) in rows"
@@ -120,16 +107,8 @@ function formKind(letter: string) {
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
         <span class="club-name">
           <b>{{ row.teamName }}</b>
-          <span v-if="row.form?.length" class="form-inline">
-            <span
-              v-for="(mark, index) in row.form"
-              :key="`${row.teamId}-m-${index}`"
-              class="pip"
-              :class="formKind(formLetter(mark))"
-            >
-              <b>{{ formLetter(mark) }}</b>
-              <i v-if="mark.technical">ТП</i>
-            </span>
+          <span class="form-inline">
+            <StandingForm :form="row.form" />
           </span>
         </span>
       </span>
@@ -140,15 +119,7 @@ function formKind(letter: string) {
       <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
       <span class="points">{{ row.points }}</span>
       <span class="form-col">
-        <span
-          v-for="(mark, index) in row.form || []"
-          :key="`${row.teamId}-d-${index}`"
-          class="pip"
-          :class="formKind(formLetter(mark))"
-        >
-          <b>{{ formLetter(mark) }}</b>
-          <i v-if="mark.technical">ТП</i>
-        </span>
+        <StandingForm :form="row.form" />
       </span>
     </RouterLink>
     <p class="legend">{{ mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
@@ -156,23 +127,37 @@ function formKind(letter: string) {
 </template>
 
 <style scoped>
-.board { width: 100%; }
+.board {
+  display: grid;
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+.board.compact {
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+}
 .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   min-height: 2.65rem;
-  padding: 0 0.85rem;
+  padding: 0;
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
 }
-.compact .line {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+.line > span:first-child {
+  box-sizing: border-box;
+  padding-left: var(--standing-row-inset);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
 }
 .line:not(.head) { color: #00205b; }
 .line:not(.head):hover { background: rgba(76, 180, 229, 0.08); }
@@ -197,52 +182,30 @@ function formKind(letter: string) {
 }
 .club-name { min-width: 0; display: grid; }
 .form-inline { display: none; }
+.points {
+  width: var(--standing-points);
+  min-width: var(--standing-points);
+  max-width: var(--standing-points);
+  justify-self: center;
+  text-align: center;
+}
 .form-col {
   display: flex;
   justify-content: flex-end;
+  justify-self: end;
   align-items: flex-start;
-  gap: 4px;
+  box-sizing: border-box;
+  width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  min-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  max-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  padding-right: var(--standing-row-inset);
   text-align: right;
 }
-.pip {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  min-width: 18px;
-}
-.pip b {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
-  color: #fff;
-}
-.pip.win b { background: #1b8a4a; }
-.pip.draw b { background: #c47b00; }
-.pip.loss b { background: var(--danger); }
-.pip i {
-  box-sizing: border-box;
-  width: auto;
-  height: auto;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: var(--danger);
-  color: #fff;
-  font-style: normal;
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 14px;
-  letter-spacing: 0;
-  text-align: center;
-}
+.line.head .form-col { align-items: center; }
+.line.head .form-col span { margin-left: auto; }
 .legend {
-  margin: 0.55rem 0.85rem 0.2rem;
+  grid-column: 1 / -1;
+  margin: 0.55rem var(--standing-row-inset) 0.2rem;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -282,23 +245,40 @@ function formKind(letter: string) {
   border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
 @media (max-width: 720px) {
+  .board,
+  .board.compact {
+    display: grid;
+    /* 4px qualify bar + 12px + 22px place + 6px before the logo, then the name. */
+    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) calc(28px + var(--standing-row-inset));
+    padding: 0;
+  }
   .line,
   .compact .line {
-    grid-template-columns: 22px minmax(0, 1fr) 24px 48px 28px;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     min-width: 0;
-    width: 100%;
+    width: auto;
     min-height: 44px;
     height: auto;
     box-sizing: border-box;
-    padding: 0 14px 0 12px;
-    border-left: 4px solid transparent;
+    padding: 0;
+    border-left: 0;
     font-size: 14px;
   }
-  .line > span:not(.club):not(.team-label) { text-align: right; }
-  .line > span:first-child { text-align: center; }
+  .line > span:first-child {
+    box-sizing: border-box;
+    width: 38px;
+    padding-left: 16px;
+    justify-self: start;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    text-align: left;
+  }
+  .line > span:not(.club):not(.team-label) { text-align: center; }
   .line.q {
-    border-left-color: var(--q-bar);
-    box-shadow: none;
+    border-left: 0;
+    box-shadow: inset 4px 0 0 var(--q-bar);
   }
   .head {
     height: 34px;
@@ -309,10 +289,15 @@ function formKind(letter: string) {
   }
   .wide { display: none; }
   .club,
-  .team-label { margin-left: 8px; }
+  .team-label { margin-left: 0; }
   .club { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; min-width: 0; }
   .form-col { display: none; }
-  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
+  .form-inline {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    margin-top: 2px;
+  }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
   .club b {
     min-width: 0;
@@ -342,7 +327,19 @@ function formKind(letter: string) {
     color: var(--q-digit, #00205b);
     border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
   }
-  .points { font-size: 14px; font-weight: 700; }
+  .points,
+  .line.head > span:nth-last-child(2) {
+    box-sizing: border-box;
+    padding-right: var(--standing-row-inset);
+  }
+  .points {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    justify-self: stretch;
+    font-size: 14px;
+    font-weight: 700;
+  }
 }
 .rank:focus { outline: none; }
 .rank:focus-visible {

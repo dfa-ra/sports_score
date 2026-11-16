@@ -32,6 +32,7 @@ import QualifyLegend from '../components/QualifyLegend.vue'
 import { stageMap, type QualifyMark } from '../lib/qualifyStages'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import CardsStandings from '../components/CardsStandings.vue'
+import StandingForm from '../components/StandingForm.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -681,7 +682,15 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
     <div v-else-if="tab === 'table'" class="table-layout" role="tabpanel">
       <div class="table-main card-block">
-        <div v-if="tableLoading" class="table-skel" role="status" aria-busy="true">Таблица загружается…</div>
+        <div v-if="tableLoading" class="table-skel" role="status" aria-busy="true">
+          <p>Таблица загружается…</p>
+          <div v-for="n in 4" :key="n" class="skel-line">
+            <span class="skel-place"></span>
+            <span class="skel-logo"></span>
+            <span class="skel-bar"></span>
+            <span class="skel-form"><StandingForm pending /></span>
+          </div>
+        </div>
         <div v-else-if="tableError" class="table-state">
           <strong>Таблица не загрузилась</strong>
           <button class="btn secondary" type="button" @click="reloadTable">Повторить</button>
@@ -982,6 +991,23 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 .card-block header button, .card-block header a { border: 0; background: transparent; color: var(--navy); font-weight: 800; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
 .table-state { display: grid; justify-items: center; gap: 0.55rem; text-align: center; padding: 1rem 0; }
 .table-skel { color: var(--muted); padding: 1rem 0; }
+.table-skel p { margin: 0 0 0.65rem; }
+.skel-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.skel-place,
+.skel-logo { display: none; }
+.skel-bar {
+  display: block;
+  height: 10px;
+  width: 42%;
+  border-radius: 6px;
+  background: #d5dee8;
+}
 .legend { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.8rem; margin: 0.7rem 0 0; }
 .legend i.ice { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--ice); }
 .soon, .scorer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; padding: 0.45rem 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }
@@ -1301,5 +1327,50 @@ h2 { font-size: 1.2rem; margin-bottom: 0.45rem; }
   gap: 0.45rem;
   align-items: center;
   color: var(--text-strong);
+}
+@media (max-width: 720px) {
+  .table-skel .skel-line {
+    display: grid;
+    grid-template-columns: 22px 6px 24px 8px minmax(0, 1fr);
+    column-gap: 0;
+    row-gap: 2px;
+    align-items: center;
+    justify-content: start;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 6px 0 6px 16px;
+  }
+  .table-skel .skel-place {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 22px;
+    height: 12px;
+    border-radius: 4px;
+    background: #d5dee8;
+    justify-self: start;
+  }
+  .table-skel .skel-logo {
+    display: block;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #d5dee8;
+  }
+  .table-skel .skel-bar {
+    grid-column: 5;
+    grid-row: 1;
+    width: 60%;
+    height: 12px;
+    align-self: end;
+  }
+  .table-skel .skel-form {
+    grid-column: 5;
+    grid-row: 2;
+    justify-self: start;
+    align-self: start;
+  }
 }
 </style>

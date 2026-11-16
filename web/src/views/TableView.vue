@@ -6,6 +6,7 @@ import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
+import StandingForm from '../components/StandingForm.vue'
 import StandingTable from '../components/StandingTable.vue'
 import QualifyLegend from '../components/QualifyLegend.vue'
 import { stageMap, type QualifyMark } from '../lib/qualifyStages'
@@ -454,9 +455,25 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
               <span class="wide">П</span>
               <span>Г</span>
               <span>О</span>
-              <span class="form-col">Форма</span>
+              <span class="form-col"><span>Форма</span></span>
             </div>
-            <div v-for="n in 5" :key="n" class="line sk-row"></div>
+            <div v-for="n in 5" :key="n" class="line sk-row">
+              <span class="sk-place"><i></i></span>
+              <span class="sk-club">
+                <i class="sk-logo"></i>
+                <span class="sk-copy">
+                  <span class="sk-bar"></span>
+                  <span class="form-inline"><StandingForm pending /></span>
+                </span>
+              </span>
+              <span></span>
+              <span class="wide"></span>
+              <span class="wide"></span>
+              <span class="wide"></span>
+              <span></span>
+              <span></span>
+              <span class="form-col"><StandingForm pending /></span>
+            </div>
           </div>
         </div>
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
@@ -744,12 +761,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   }
   .sheet-stack { gap: 8px; margin-top: 6px; }
   .sheet {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    position: relative;
+    display: block;
   }
   .sheet > .group-title {
-    grid-row: 1;
-    grid-column: 1;
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    right: 0;
     box-sizing: border-box;
     height: 34px;
     margin: 0;
@@ -762,11 +782,11 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     line-height: 34px;
     font-weight: 800;
     letter-spacing: 0.04em;
+    pointer-events: none;
   }
-  .sheet :deep(.board) { display: contents; }
-  .sheet :deep(.line) { grid-column: 1; min-width: 0; width: 100%; }
+  .sheet :deep(.board) { display: grid; }
+  .sheet :deep(.line) { grid-column: 1 / -1; min-width: 0; width: 100%; }
   .sheet :deep(.line.head) {
-    grid-row: 1;
     height: 34px;
     min-height: 34px;
     background: transparent;
@@ -791,21 +811,6 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-}
-@media (max-width: 720px) {
-  .tab-skel .form-col { display: none; }
-  .tab-skel .line {
-    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
-    padding: 0 2px 0 12px;
-  }
-  .tab-skel .line.head {
-    height: 34px;
-    min-height: 34px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-  .tab-skel .wide { display: none; }
 }
 .sheet {
   background: #fff;
@@ -884,15 +889,53 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   height: 56px;
   min-height: 56px;
 }
+.tab-skel .board {
+  display: grid;
+  box-sizing: border-box;
+  padding: 0;
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+}
+@media (min-width: 721px) {
+  .tab-skel .line > span:first-child {
+    box-sizing: border-box;
+    padding-left: var(--standing-row-inset);
+  }
+}
 .tab-skel .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   box-sizing: border-box;
   min-height: 56px;
   height: 56px;
-  padding: 0 0.85rem;
+  padding: 0;
   border-bottom: 1px solid var(--line);
+}
+.tab-skel .form-col {
+  display: flex;
+  justify-content: flex-end;
+  justify-self: end;
+  align-items: center;
+  box-sizing: border-box;
+  width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  min-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  max-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  padding-right: var(--standing-row-inset);
+  text-align: right;
+}
+.tab-skel .form-col > span { margin-left: auto; }
+.tab-skel .form-inline { display: none; }
+.tab-skel .sk-club { display: grid; gap: 4px; min-width: 0; align-content: center; }
+.tab-skel .sk-logo,
+.tab-skel .sk-place i { display: none; }
+.tab-skel .sk-bar {
+  display: block;
+  height: 10px;
+  width: 55%;
+  max-width: 180px;
+  border-radius: 6px;
+  background: #d5dee8;
 }
 .tab-skel .line.head {
   min-height: 2.15rem;
@@ -903,7 +946,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.tab-skel .sk-row { background: linear-gradient(90deg, #eef3f8, #f7fafc, #eef3f8); }
+.tab-skel .sk-row { background: #f4f7fb; }
 .stat-body { min-height: calc(2.6rem + 5 * 56px); }
 .stat-table tbody td,
 .stat-skel tbody td {
@@ -947,9 +990,67 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .person b { color: var(--navy); }
 .person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
 @media (max-width: 720px) {
+  .tab-skel .form-col { display: none; }
+  .tab-skel .form-inline { display: flex; justify-content: flex-start; margin-top: 0; }
+  .tab-skel .wide { display: none; }
+  .tab-skel .board {
+    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) calc(28px + var(--standing-row-inset));
+    padding: 0;
+  }
+  .tab-skel .line {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    padding: 0;
+  }
+  .tab-skel .line > span:first-child {
+    box-sizing: border-box;
+    width: 38px;
+    padding-left: 16px;
+    justify-self: start;
+  }
+  .tab-skel .line > span:nth-last-child(2) {
+    box-sizing: border-box;
+    padding-right: var(--standing-row-inset);
+  }
   .tab-skel .line.head {
     height: 34px;
     min-height: 34px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .tab-skel .line.head > span:not(.team-label) { text-align: center; }
+  .tab-skel .sk-place i {
+    display: block;
+    width: 22px;
+    height: 12px;
+    border-radius: 4px;
+    background: #d5dee8;
+  }
+  .tab-skel .sk-logo {
+    display: block;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #d5dee8;
+  }
+  .tab-skel .sk-club {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    align-content: center;
+  }
+  .tab-skel .sk-copy {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    min-width: 0;
+  }
+  .tab-skel .sk-bar {
+    width: 60%;
+    height: 12px;
+    max-width: none;
   }
 }
 </style>
