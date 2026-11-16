@@ -813,12 +813,19 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   .tab-skel .form-col { display: none; }
   .tab-skel .form-inline { display: flex; }
   .tab-skel .board {
-    grid-template-columns: 22px minmax(0, 1fr) 24px var(--standing-goals) 28px;
+    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) 28px;
+    padding: 0 14px 0 0;
   }
   .tab-skel .line {
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
-    padding: 0 2px 0 12px;
+    padding: 0;
+  }
+  .tab-skel .line > span:first-child {
+    box-sizing: border-box;
+    width: 38px;
+    padding-left: 16px;
+    justify-self: start;
   }
   .tab-skel .line.head {
     height: 34px;
@@ -908,7 +915,9 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 .tab-skel .board {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) 2.5rem var(--standing-form-col);
+  box-sizing: border-box;
+  padding: 0 0.85rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
 }
 .tab-skel .line {
   display: grid;
@@ -918,13 +927,17 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   box-sizing: border-box;
   min-height: 56px;
   height: 56px;
-  padding: 0 0.85rem;
+  padding: 0;
   border-bottom: 1px solid var(--line);
 }
 .tab-skel .form-col {
   display: flex;
   justify-content: flex-end;
+  justify-self: end;
   align-items: center;
+  width: var(--standing-form-col);
+  min-width: var(--standing-form-col);
+  max-width: var(--standing-form-col);
   text-align: right;
 }
 .tab-skel .form-col > span { margin-left: auto; }

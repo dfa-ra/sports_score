@@ -154,8 +154,9 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 }
 .desk {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem var(--standing-goals) 2.2rem var(--standing-form-col);
-  column-gap: 0.25rem;
+  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  box-sizing: border-box;
+  padding: 0 0.85rem;
   min-width: 0;
 }
 .line {
@@ -164,7 +165,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   grid-template-columns: subgrid;
   align-items: center;
   min-height: 2.7rem;
-  padding: 0.2rem 0.2rem;
+  padding: 0.2rem 0;
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
@@ -195,7 +196,15 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   white-space: nowrap;
   font-weight: 700;
 }
-.pts { font-weight: 800; color: var(--navy); }
+.pts {
+  width: var(--standing-points);
+  min-width: var(--standing-points);
+  max-width: var(--standing-points);
+  justify-self: center;
+  text-align: center;
+  font-weight: 800;
+  color: var(--navy);
+}
 .form-col {
   display: flex;
   justify-content: flex-end;
@@ -243,7 +252,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   .mrow {
     display: grid;
     grid-template-columns: 22px minmax(0, 1fr) auto;
-    column-gap: 10px;
+    column-gap: 6px;
     align-items: center;
     box-sizing: border-box;
     min-height: 44px;

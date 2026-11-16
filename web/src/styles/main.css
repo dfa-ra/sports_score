@@ -88,8 +88,13 @@
   --standing-form-slot: 18px;
   --standing-form-gap: 4px;
   --standing-form-col: calc(4 * var(--standing-form-slot) + 3 * var(--standing-form-gap));
+  /* Empty space in the form track, to the left of the circles, so «О» never touches them. */
+  --standing-o-form-gap: 12px;
+  --standing-form-track: calc(var(--standing-form-col) + var(--standing-o-form-gap));
   /* «37:14» in Tektur at 16px is about 46px. The track stays wider so it stays centered. */
   --standing-goals: 4.75rem;
+  /* Two-digit points, centered under «О». Wider than the glyphs so the column stays its own track. */
+  --standing-points: 2.75rem;
   --spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --mood-a: rgba(76, 180, 229, 0.22);
