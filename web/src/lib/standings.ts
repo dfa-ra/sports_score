@@ -3,6 +3,40 @@ export type StandingFormMark = {
   technical?: boolean
 }
 
+/** Four circles in the standings form column. The API may send up to five. */
+export const STANDING_FORM_SLOTS = 4
+
+export type StandingFormSlot = {
+  result: string
+  technical: boolean
+} | null
+
+/**
+ * Last played results for the standings form.
+ * The API lists the oldest on the left and the newest on the right.
+ * Keep that order, keep only the last four, and pad missing matches
+ * with empty slots on the left. An empty slot is not a result.
+ */
+export function standingFormSlots(
+  form: Array<StandingFormMark | string | null | undefined> | null | undefined,
+  slots = STANDING_FORM_SLOTS,
+): StandingFormSlot[] {
+  const played: StandingFormSlot[] = []
+  for (const mark of form ?? []) {
+    if (mark == null || mark === '') continue
+    if (typeof mark === 'string') {
+      played.push({ result: mark, technical: false })
+      continue
+    }
+    played.push({
+      result: typeof mark.result === 'string' ? mark.result : '',
+      technical: mark.technical === true,
+    })
+  }
+  const recent = played.slice(-slots)
+  return [...Array.from({ length: Math.max(0, slots - recent.length) }, () => null), ...recent]
+}
+
 export type StandingRow = {
   teamId: string
   teamName: string

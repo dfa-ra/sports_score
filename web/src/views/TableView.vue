@@ -886,7 +886,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 }
 .tab-skel .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem var(--standing-form-col);
   align-items: center;
   box-sizing: border-box;
   min-height: 56px;

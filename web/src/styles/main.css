@@ -85,6 +85,9 @@
   --radius-xl: 22px;
   --font-display: "Tektur", "Arial Narrow", sans-serif;
   --font-body: "Tektur", "Segoe UI", system-ui, sans-serif;
+  --standing-form-slot: 18px;
+  --standing-form-gap: 4px;
+  --standing-form-col: calc(4 * var(--standing-form-slot) + 3 * var(--standing-form-gap));
   --spring: cubic-bezier(0.34, 1.45, 0.64, 1);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --mood-a: rgba(76, 180, 229, 0.22);
@@ -685,6 +688,8 @@ a.panel:hover {
 
 @media (max-width: 720px) {
   :root {
+    --standing-form-slot: 16px;
+    --standing-form-gap: 3px;
     --page-gutter: 12px;
     --main-pad-top: 10px;
     --main-pad-bottom: 24px;

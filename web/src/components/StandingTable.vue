@@ -5,6 +5,7 @@ import { advancingRank } from '../lib/matchPresentation'
 import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
 import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
+import StandingForm from './StandingForm.vue'
 import TeamCrest from './TeamCrest.vue'
 
 const props = defineProps<{
@@ -68,20 +69,6 @@ function dismissTip(event: KeyboardEvent) {
 function clearTip(event: FocusEvent) {
   ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
 }
-
-function formLetter(mark: { result?: string } | string | null | undefined) {
-  const result = typeof mark === 'string' ? mark : mark?.result
-  if (result === 'W' || result === 'В') return 'В'
-  if (result === 'D' || result === 'Н') return 'Н'
-  if (result === 'L' || result === 'П') return 'П'
-  return ''
-}
-
-function formKind(letter: string) {
-  if (letter === 'В') return 'win'
-  if (letter === 'Н') return 'draw'
-  return 'loss'
-}
 </script>
 
 <template>
@@ -120,16 +107,8 @@ function formKind(letter: string) {
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
         <span class="club-name">
           <b>{{ row.teamName }}</b>
-          <span v-if="row.form?.length" class="form-inline">
-            <span
-              v-for="(mark, index) in row.form"
-              :key="`${row.teamId}-m-${index}`"
-              class="pip"
-              :class="formKind(formLetter(mark))"
-            >
-              <b>{{ formLetter(mark) }}</b>
-              <i v-if="mark.technical">ТП</i>
-            </span>
+          <span class="form-inline">
+            <StandingForm :form="row.form" />
           </span>
         </span>
       </span>
@@ -140,15 +119,7 @@ function formKind(letter: string) {
       <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
       <span class="points">{{ row.points }}</span>
       <span class="form-col">
-        <span
-          v-for="(mark, index) in row.form || []"
-          :key="`${row.teamId}-d-${index}`"
-          class="pip"
-          :class="formKind(formLetter(mark))"
-        >
-          <b>{{ formLetter(mark) }}</b>
-          <i v-if="mark.technical">ТП</i>
-        </span>
+        <StandingForm :form="row.form" />
       </span>
     </RouterLink>
     <p class="legend">{{ mutualForfeit ? FORM_LEGEND + ' ' + MUTUAL_LEGEND : FORM_LEGEND }}</p>
@@ -159,7 +130,7 @@ function formKind(letter: string) {
 .board { width: 100%; }
 .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem var(--standing-form-col);
   align-items: center;
   min-height: 2.65rem;
   padding: 0 0.85rem;
@@ -168,11 +139,13 @@ function formKind(letter: string) {
   text-decoration: none;
 }
 .compact .line {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem var(--standing-form-col);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
 }
 .line:not(.head) { color: #00205b; }
 .line:not(.head):hover { background: rgba(76, 180, 229, 0.08); }
@@ -201,45 +174,10 @@ function formKind(letter: string) {
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
-  gap: 4px;
+  width: var(--standing-form-col);
+  min-width: var(--standing-form-col);
+  max-width: var(--standing-form-col);
   text-align: right;
-}
-.pip {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  min-width: 18px;
-}
-.pip b {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
-  color: #fff;
-}
-.pip.win b { background: #1b8a4a; }
-.pip.draw b { background: #c47b00; }
-.pip.loss b { background: var(--danger); }
-.pip i {
-  box-sizing: border-box;
-  width: auto;
-  height: auto;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: var(--danger);
-  color: #fff;
-  font-style: normal;
-  font-family: var(--font-display);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 14px;
-  letter-spacing: 0;
-  text-align: center;
 }
 .legend {
   margin: 0.55rem 0.85rem 0.2rem;
@@ -312,7 +250,12 @@ function formKind(letter: string) {
   .team-label { margin-left: 8px; }
   .club { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; min-width: 0; }
   .form-col { display: none; }
-  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
+  .form-inline {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    margin-top: 2px;
+  }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
   .club b {
     min-width: 0;
