@@ -90,7 +90,9 @@
   --standing-form-col: calc(4 * var(--standing-form-slot) + 3 * var(--standing-form-gap));
   /* Empty space in the form track, to the left of the circles, so «О» never touches them. */
   --standing-o-form-gap: 12px;
-  --standing-form-track: calc(var(--standing-form-col) + var(--standing-o-form-gap));
+  /* Right inset of the circles. It lives inside the form cell so the row paint still reaches the card edge. */
+  --standing-row-inset: 14px;
+  --standing-form-track: calc(var(--standing-form-col) + var(--standing-o-form-gap) + var(--standing-row-inset));
   /* «37:14» in Tektur at 16px is about 46px. The track stays wider so it stays centered. */
   --standing-goals: 4.75rem;
   /* Two-digit points, centered under «О». Wider than the glyphs so the column stays its own track. */

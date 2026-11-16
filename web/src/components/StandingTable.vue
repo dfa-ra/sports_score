@@ -129,14 +129,14 @@ function clearTip(event: FocusEvent) {
 <style scoped>
 .board {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  padding: 0 0.85rem;
+  padding: 0;
 }
 .board.compact {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
 }
 .line {
   display: grid;
@@ -148,6 +148,10 @@ function clearTip(event: FocusEvent) {
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
+}
+.line > span:first-child {
+  box-sizing: border-box;
+  padding-left: var(--standing-row-inset);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
@@ -190,16 +194,18 @@ function clearTip(event: FocusEvent) {
   justify-content: flex-end;
   justify-self: end;
   align-items: flex-start;
-  width: var(--standing-form-col);
-  min-width: var(--standing-form-col);
-  max-width: var(--standing-form-col);
+  box-sizing: border-box;
+  width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  min-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  max-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  padding-right: var(--standing-row-inset);
   text-align: right;
 }
 .line.head .form-col { align-items: center; }
 .line.head .form-col span { margin-left: auto; }
 .legend {
   grid-column: 1 / -1;
-  margin: 0.55rem 0 0.2rem;
+  margin: 0.55rem var(--standing-row-inset) 0.2rem;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.35;
@@ -243,8 +249,8 @@ function clearTip(event: FocusEvent) {
   .board.compact {
     display: grid;
     /* 4px qualify bar + 12px + 22px place + 6px before the logo, then the name. */
-    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) 28px;
-    padding: 0 14px 0 0;
+    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) calc(28px + var(--standing-row-inset));
+    padding: 0;
   }
   .line,
   .compact .line {
@@ -321,10 +327,16 @@ function clearTip(event: FocusEvent) {
     color: var(--q-digit, #00205b);
     border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
   }
+  .points,
+  .line.head > span:nth-last-child(2) {
+    box-sizing: border-box;
+    padding-right: var(--standing-row-inset);
+  }
   .points {
-    width: 28px;
-    min-width: 28px;
-    max-width: 28px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    justify-self: stretch;
     font-size: 14px;
     font-weight: 700;
   }

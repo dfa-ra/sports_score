@@ -809,33 +809,6 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     white-space: nowrap;
   }
 }
-@media (max-width: 720px) {
-  .tab-skel .form-col { display: none; }
-  .tab-skel .form-inline { display: flex; }
-  .tab-skel .board {
-    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) 28px;
-    padding: 0 14px 0 0;
-  }
-  .tab-skel .line {
-    grid-column: 1 / -1;
-    grid-template-columns: subgrid;
-    padding: 0;
-  }
-  .tab-skel .line > span:first-child {
-    box-sizing: border-box;
-    width: 38px;
-    padding-left: 16px;
-    justify-self: start;
-  }
-  .tab-skel .line.head {
-    height: 34px;
-    min-height: 34px;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-  }
-  .tab-skel .wide { display: none; }
-}
 .sheet {
   background: #fff;
   border: 1px solid var(--line);
@@ -916,8 +889,14 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .tab-skel .board {
   display: grid;
   box-sizing: border-box;
-  padding: 0 0.85rem;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  padding: 0;
+  grid-template-columns: calc(2.5rem + var(--standing-row-inset)) minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+}
+@media (min-width: 721px) {
+  .tab-skel .line > span:first-child {
+    box-sizing: border-box;
+    padding-left: var(--standing-row-inset);
+  }
 }
 .tab-skel .line {
   display: grid;
@@ -935,9 +914,11 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   justify-content: flex-end;
   justify-self: end;
   align-items: center;
-  width: var(--standing-form-col);
-  min-width: var(--standing-form-col);
-  max-width: var(--standing-form-col);
+  box-sizing: border-box;
+  width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  min-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  max-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  padding-right: var(--standing-row-inset);
   text-align: right;
 }
 .tab-skel .form-col > span { margin-left: auto; }
@@ -1004,9 +985,36 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .person b { color: var(--navy); }
 .person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
 @media (max-width: 720px) {
+  .tab-skel .form-col { display: none; }
+  .tab-skel .form-inline { display: flex; }
+  .tab-skel .wide { display: none; }
+  .tab-skel .board {
+    grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) calc(28px + var(--standing-row-inset));
+    padding: 0;
+  }
+  .tab-skel .line {
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+    height: auto;
+    min-height: 44px;
+    padding: 0;
+  }
+  .tab-skel .line > span:first-child {
+    box-sizing: border-box;
+    width: 38px;
+    padding-left: 16px;
+    justify-self: start;
+  }
+  .tab-skel .line > span:nth-last-child(2) {
+    box-sizing: border-box;
+    padding-right: var(--standing-row-inset);
+  }
   .tab-skel .line.head {
     height: 34px;
     min-height: 34px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 }
 </style>

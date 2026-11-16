@@ -154,9 +154,9 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 }
 .desk {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
+  grid-template-columns: calc(2.2rem + var(--standing-row-inset)) minmax(0, 1fr) 2rem 2rem 2rem 2rem var(--standing-goals) var(--standing-points) var(--standing-form-track);
   box-sizing: border-box;
-  padding: 0 0.85rem;
+  padding: 0;
   min-width: 0;
 }
 .line {
@@ -210,15 +210,21 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   justify-content: flex-end;
   justify-self: end;
   align-items: flex-start;
-  width: var(--standing-form-col);
-  min-width: var(--standing-form-col);
-  max-width: var(--standing-form-col);
+  box-sizing: border-box;
+  width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  min-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  max-width: calc(var(--standing-form-col) + var(--standing-row-inset));
+  padding-right: var(--standing-row-inset);
   text-align: right;
   white-space: nowrap;
 }
 .line.head .form-col { align-items: center; }
 .line.head .form-col span { margin-left: auto; }
 .form-inline { display: none; }
+.line > span:first-child {
+  box-sizing: border-box;
+  padding-left: var(--standing-row-inset);
+}
 .line.head span { white-space: nowrap; }
 .legend { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 .rank {
