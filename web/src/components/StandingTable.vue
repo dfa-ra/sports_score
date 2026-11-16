@@ -82,7 +82,7 @@ function clearTip(event: FocusEvent) {
       <span v-if="!compact" class="wide">П</span>
       <span>Г</span>
       <span>О</span>
-      <span class="form-col">Форма</span>
+      <span class="form-col"><span>Форма</span></span>
     </div>
     <RouterLink
       v-for="(row, i) in rows"
@@ -127,19 +127,25 @@ function clearTip(event: FocusEvent) {
 </template>
 
 <style scoped>
-.board { width: 100%; }
+.board {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) 2.5rem var(--standing-form-col);
+  width: 100%;
+  min-width: 0;
+}
+.board.compact {
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem var(--standing-goals) 2.5rem var(--standing-form-col);
+}
 .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem var(--standing-form-col);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   min-height: 2.65rem;
   padding: 0 0.85rem;
   border-bottom: 1px solid var(--line);
   color: inherit;
   text-decoration: none;
-}
-.compact .line {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem var(--standing-form-col);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
@@ -173,13 +179,17 @@ function clearTip(event: FocusEvent) {
 .form-col {
   display: flex;
   justify-content: flex-end;
+  justify-self: end;
   align-items: flex-start;
   width: var(--standing-form-col);
   min-width: var(--standing-form-col);
   max-width: var(--standing-form-col);
   text-align: right;
 }
+.line.head .form-col { align-items: center; }
+.line.head .form-col span { margin-left: auto; }
 .legend {
+  grid-column: 1 / -1;
   margin: 0.55rem 0.85rem 0.2rem;
   color: var(--muted);
   font-size: 0.78rem;
@@ -220,9 +230,16 @@ function clearTip(event: FocusEvent) {
   border: var(--q-stroke-width, 0px) solid var(--q-stroke, transparent);
 }
 @media (max-width: 720px) {
+  .board,
+  .board.compact {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 24px var(--standing-goals) 28px;
+    padding: 0;
+  }
   .line,
   .compact .line {
-    grid-template-columns: 22px minmax(0, 1fr) 24px 48px 28px;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     min-width: 0;
     width: 100%;
     min-height: 44px;
@@ -232,7 +249,7 @@ function clearTip(event: FocusEvent) {
     border-left: 4px solid transparent;
     font-size: 14px;
   }
-  .line > span:not(.club):not(.team-label) { text-align: right; }
+  .line > span:not(.club):not(.team-label),
   .line > span:first-child { text-align: center; }
   .line.q {
     border-left-color: var(--q-bar);

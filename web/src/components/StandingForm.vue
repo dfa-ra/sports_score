@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { standingFormSlots, type StandingFormMark, type StandingFormSlot } from '../lib/standings'
+import { STANDING_FORM_SLOTS, standingFormSlots, type StandingFormMark, type StandingFormSlot } from '../lib/standings'
 
 const props = defineProps<{
   form?: Array<StandingFormMark | string | null> | null
+  pending?: boolean
 }>()
 
-const slots = computed(() => standingFormSlots(props.form))
+const slots = computed(() => (
+  props.pending
+    ? Array.from({ length: STANDING_FORM_SLOTS }, () => null)
+    : standingFormSlots(props.form)
+))
 
 function letter(mark: Exclude<StandingFormSlot, null>) {
   const result = mark.result
@@ -25,15 +30,15 @@ function kind(mark: Exclude<StandingFormSlot, null>) {
 </script>
 
 <template>
-  <span class="form-slots">
+  <span class="form-slots" :class="{ pending }" :aria-hidden="pending ? 'true' : undefined">
     <span
       v-for="(mark, index) in slots"
       :key="index"
       class="pip"
-      :class="mark ? kind(mark) : 'blank'"
+      :class="pending ? 'pending' : (mark ? kind(mark) : 'blank')"
     >
-      <b>{{ mark ? letter(mark) : '' }}</b>
-      <i v-if="mark?.technical">ТП</i>
+      <b>{{ pending || !mark ? '' : letter(mark) }}</b>
+      <i v-if="!pending && mark?.technical">ТП</i>
     </span>
   </span>
 </template>
@@ -81,7 +86,12 @@ function kind(mark: Exclude<StandingFormSlot, null>) {
 .pip.loss b { background: var(--danger); }
 .pip.blank b {
   background: transparent;
-  border: 1px solid #9aa8b8;
+  border: 1.5px solid #c5d0dc;
+  color: transparent;
+}
+.pip.pending b {
+  background: #c5d0dc;
+  border: 0;
   color: transparent;
 }
 .pip i {

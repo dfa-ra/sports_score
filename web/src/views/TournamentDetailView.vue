@@ -32,6 +32,7 @@ import QualifyLegend from '../components/QualifyLegend.vue'
 import { stageMap, type QualifyMark } from '../lib/qualifyStages'
 import PlayoffBracket from '../components/PlayoffBracket.vue'
 import CardsStandings from '../components/CardsStandings.vue'
+import StandingForm from '../components/StandingForm.vue'
 import PlayerAvatar from '../components/PlayerAvatar.vue'
 import MatchStageNote from '../components/MatchStageNote.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -681,7 +682,13 @@ async function exclude(team: { teamId: string; teamName?: string }) {
     </div>
     <div v-else-if="tab === 'table'" class="table-layout" role="tabpanel">
       <div class="table-main card-block">
-        <div v-if="tableLoading" class="table-skel" role="status" aria-busy="true">Таблица загружается…</div>
+        <div v-if="tableLoading" class="table-skel" role="status" aria-busy="true">
+          <p>Таблица загружается…</p>
+          <div v-for="n in 4" :key="n" class="skel-line">
+            <span class="skel-bar"></span>
+            <StandingForm pending />
+          </div>
+        </div>
         <div v-else-if="tableError" class="table-state">
           <strong>Таблица не загрузилась</strong>
           <button class="btn secondary" type="button" @click="reloadTable">Повторить</button>
@@ -982,6 +989,21 @@ async function exclude(team: { teamId: string; teamName?: string }) {
 .card-block header button, .card-block header a { border: 0; background: transparent; color: var(--navy); font-weight: 800; font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
 .table-state { display: grid; justify-items: center; gap: 0.55rem; text-align: center; padding: 1rem 0; }
 .table-skel { color: var(--muted); padding: 1rem 0; }
+.table-skel p { margin: 0 0 0.65rem; }
+.skel-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.skel-bar {
+  display: block;
+  height: 10px;
+  width: 42%;
+  border-radius: 6px;
+  background: #d5dee8;
+}
 .legend { display: flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.8rem; margin: 0.7rem 0 0; }
 .legend i.ice { width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--ice); }
 .soon, .scorer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; padding: 0.45rem 0; border-top: 1px solid var(--line); color: inherit; text-decoration: none; }

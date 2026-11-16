@@ -6,6 +6,7 @@ import api from '../api/client'
 import EmptyState from '../components/EmptyState.vue'
 import MatchRow from '../components/MatchRow.vue'
 import PlayerSearch from '../components/PlayerSearch.vue'
+import StandingForm from '../components/StandingForm.vue'
 import StandingTable from '../components/StandingTable.vue'
 import QualifyLegend from '../components/QualifyLegend.vue'
 import { stageMap, type QualifyMark } from '../lib/qualifyStages'
@@ -454,9 +455,22 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
               <span class="wide">П</span>
               <span>Г</span>
               <span>О</span>
-              <span class="form-col">Форма</span>
+              <span class="form-col"><span>Форма</span></span>
             </div>
-            <div v-for="n in 5" :key="n" class="line sk-row"></div>
+            <div v-for="n in 5" :key="n" class="line sk-row">
+              <span></span>
+              <span class="sk-club">
+                <span class="sk-bar"></span>
+                <span class="form-inline"><StandingForm pending /></span>
+              </span>
+              <span></span>
+              <span class="wide"></span>
+              <span class="wide"></span>
+              <span class="wide"></span>
+              <span></span>
+              <span></span>
+              <span class="form-col"><StandingForm pending /></span>
+            </div>
           </div>
         </div>
         <p class="tie-note">При равенстве очков сначала личные встречи, потом разница мячей</p>
@@ -744,12 +758,15 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
   }
   .sheet-stack { gap: 8px; margin-top: 6px; }
   .sheet {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    position: relative;
+    display: block;
   }
   .sheet > .group-title {
-    grid-row: 1;
-    grid-column: 1;
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    left: 0;
+    right: 0;
     box-sizing: border-box;
     height: 34px;
     margin: 0;
@@ -762,11 +779,11 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
     line-height: 34px;
     font-weight: 800;
     letter-spacing: 0.04em;
+    pointer-events: none;
   }
-  .sheet :deep(.board) { display: contents; }
-  .sheet :deep(.line) { grid-column: 1; min-width: 0; width: 100%; }
+  .sheet :deep(.board) { display: grid; }
+  .sheet :deep(.line) { grid-column: 1 / -1; min-width: 0; width: 100%; }
   .sheet :deep(.line.head) {
-    grid-row: 1;
     height: 34px;
     min-height: 34px;
     background: transparent;
@@ -794,8 +811,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
 }
 @media (max-width: 720px) {
   .tab-skel .form-col { display: none; }
+  .tab-skel .form-inline { display: flex; }
+  .tab-skel .board {
+    grid-template-columns: 22px minmax(0, 1fr) 24px var(--standing-goals) 28px;
+  }
   .tab-skel .line {
-    grid-template-columns: 22px minmax(0, 1fr) 36px 36px 34px;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     padding: 0 2px 0 12px;
   }
   .tab-skel .line.head {
@@ -884,15 +906,37 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   height: 56px;
   min-height: 56px;
 }
+.tab-skel .board {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem var(--standing-goals) 2.5rem var(--standing-form-col);
+}
 .tab-skel .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem var(--standing-form-col);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   box-sizing: border-box;
   min-height: 56px;
   height: 56px;
   padding: 0 0.85rem;
   border-bottom: 1px solid var(--line);
+}
+.tab-skel .form-col {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  text-align: right;
+}
+.tab-skel .form-col > span { margin-left: auto; }
+.tab-skel .form-inline { display: none; }
+.tab-skel .sk-club { display: grid; gap: 4px; min-width: 0; align-content: center; }
+.tab-skel .sk-bar {
+  display: block;
+  height: 10px;
+  width: 55%;
+  max-width: 180px;
+  border-radius: 6px;
+  background: #d5dee8;
 }
 .tab-skel .line.head {
   min-height: 2.15rem;
@@ -903,7 +947,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.tab-skel .sk-row { background: linear-gradient(90deg, #eef3f8, #f7fafc, #eef3f8); }
+.tab-skel .sk-row { background: #f4f7fb; }
 .stat-body { min-height: calc(2.6rem + 5 * 56px); }
 .stat-table tbody td,
 .stat-skel tbody td {

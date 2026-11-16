@@ -74,7 +74,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           <span>П</span>
           <span>Мячи</span>
           <span>О</span>
-          <span class="form-col">Форма</span>
+          <span class="form-col"><span>Форма</span></span>
         </div>
         <RouterLink
           v-for="(row, rowIndex) in table.rows"
@@ -152,11 +152,16 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   font-size: 0.95rem;
   letter-spacing: 0.04em;
 }
-.desk { min-width: 0; }
+.desk {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem var(--standing-goals) 2.2rem var(--standing-form-col);
+  column-gap: 0.25rem;
+  min-width: 0;
+}
 .line {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem 4.2rem 2.2rem var(--standing-form-col);
-  gap: 0.25rem;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   min-height: 2.7rem;
   padding: 0.2rem 0.2rem;
@@ -194,12 +199,16 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 .form-col {
   display: flex;
   justify-content: flex-end;
+  justify-self: end;
   align-items: flex-start;
   width: var(--standing-form-col);
   min-width: var(--standing-form-col);
   max-width: var(--standing-form-col);
+  text-align: right;
   white-space: nowrap;
 }
+.line.head .form-col { align-items: center; }
+.line.head .form-col span { margin-left: auto; }
 .form-inline { display: none; }
 .line.head span { white-space: nowrap; }
 .legend { margin: 0.45rem 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
