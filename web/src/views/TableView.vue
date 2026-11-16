@@ -458,10 +458,13 @@ async function load(options?: { rememberPlayoff?: boolean; listAll?: boolean }) 
               <span class="form-col"><span>Форма</span></span>
             </div>
             <div v-for="n in 5" :key="n" class="line sk-row">
-              <span></span>
+              <span class="sk-place"><i></i></span>
               <span class="sk-club">
-                <span class="sk-bar"></span>
-                <span class="form-inline"><StandingForm pending /></span>
+                <i class="sk-logo"></i>
+                <span class="sk-copy">
+                  <span class="sk-bar"></span>
+                  <span class="form-inline"><StandingForm pending /></span>
+                </span>
               </span>
               <span></span>
               <span class="wide"></span>
@@ -924,6 +927,8 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .tab-skel .form-col > span { margin-left: auto; }
 .tab-skel .form-inline { display: none; }
 .tab-skel .sk-club { display: grid; gap: 4px; min-width: 0; align-content: center; }
+.tab-skel .sk-logo,
+.tab-skel .sk-place i { display: none; }
 .tab-skel .sk-bar {
   display: block;
   height: 10px;
@@ -986,7 +991,7 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
 .person p { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.82rem; }
 @media (max-width: 720px) {
   .tab-skel .form-col { display: none; }
-  .tab-skel .form-inline { display: flex; }
+  .tab-skel .form-inline { display: flex; justify-content: flex-start; margin-top: 0; }
   .tab-skel .wide { display: none; }
   .tab-skel .board {
     grid-template-columns: 44px minmax(0, 1fr) 24px var(--standing-goals) calc(28px + var(--standing-row-inset));
@@ -995,8 +1000,6 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
   .tab-skel .line {
     grid-column: 1 / -1;
     grid-template-columns: subgrid;
-    height: auto;
-    min-height: 44px;
     padding: 0;
   }
   .tab-skel .line > span:first-child {
@@ -1015,6 +1018,39 @@ h2 { font-size: 1.05rem; margin: 0 0 0.65rem; }
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.02em;
+  }
+  .tab-skel .line.head > span:not(.team-label) { text-align: center; }
+  .tab-skel .sk-place i {
+    display: block;
+    width: 22px;
+    height: 12px;
+    border-radius: 4px;
+    background: #d5dee8;
+  }
+  .tab-skel .sk-logo {
+    display: block;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #d5dee8;
+  }
+  .tab-skel .sk-club {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    align-content: center;
+  }
+  .tab-skel .sk-copy {
+    display: grid;
+    justify-items: start;
+    gap: 2px;
+    min-width: 0;
+  }
+  .tab-skel .sk-bar {
+    width: 60%;
+    height: 12px;
+    max-width: none;
   }
 }
 </style>
