@@ -136,17 +136,26 @@ class TournamentCatalogIntegrationTest extends AbstractIntegrationTest {
         assertThat(bracket.get("stage").asText()).isEqualTo("PLAYOFF");
         assertThat(bracket.get("winnerName").isNull()).isTrue();
 
-        JsonNode list = objectMapper.readTree(mockMvc.perform(get("/api/v1/tournaments").param("size", "50"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").isArray())
-                .andReturn()
-                .getResponse()
-                .getContentAsByteArray());
         JsonNode listed = null;
-        for (JsonNode item : list.get("content")) {
-            if (tableId.equals(item.get("id").asText())) {
-                listed = item;
+        int page = 0;
+        int totalPages = 1;
+        while (listed == null && page < totalPages) {
+            JsonNode list = objectMapper.readTree(mockMvc.perform(get("/api/v1/tournaments")
+                            .param("size", "100")
+                            .param("page", String.valueOf(page)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content").isArray())
+                    .andReturn()
+                    .getResponse()
+                    .getContentAsByteArray());
+            totalPages = list.path("totalPages").asInt(0);
+            for (JsonNode item : list.get("content")) {
+                if (tableId.equals(item.get("id").asText())) {
+                    listed = item;
+                    break;
+                }
             }
+            page++;
         }
         assertThat(listed).isNotNull();
         assertThat(listed.get("name").asText()).isEqualTo("Round robin catalog");
