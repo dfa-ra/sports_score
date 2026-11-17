@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
 import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
-import { recentForm } from '../lib/standings'
+import { recentForm, type StandingFormMark } from '../lib/standings'
 import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -70,6 +70,10 @@ function clearTip(event: FocusEvent) {
   ;(event.currentTarget as HTMLElement).classList.remove('tip-off')
 }
 
+function shownForm(form: unknown): StandingFormMark[] {
+  return recentForm(Array.isArray(form) ? form as StandingFormMark[] : [])
+}
+
 function formLetter(mark: { result?: string } | string | null | undefined) {
   const result = typeof mark === 'string' ? mark : mark?.result
   if (result === 'W' || result === 'В') return 'В'
@@ -121,9 +125,9 @@ function formKind(letter: string) {
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
         <span class="club-name">
           <b>{{ row.teamName }}</b>
-          <span v-if="recentForm(row.form).length" class="form-inline">
+          <span v-if="shownForm(row.form).length" class="form-inline">
             <span
-              v-for="(mark, index) in recentForm(row.form)"
+              v-for="(mark, index) in shownForm(row.form)"
               :key="`${row.teamId}-m-${index}`"
               class="pip"
               :class="formKind(formLetter(mark))"
@@ -142,7 +146,7 @@ function formKind(letter: string) {
       <span class="points">{{ row.points }}</span>
       <span class="form-col">
         <span
-          v-for="(mark, index) in recentForm(row.form)"
+          v-for="(mark, index) in shownForm(row.form)"
           :key="`${row.teamId}-d-${index}`"
           class="pip"
           :class="formKind(formLetter(mark))"
