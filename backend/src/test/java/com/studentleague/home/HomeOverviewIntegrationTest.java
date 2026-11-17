@@ -70,7 +70,8 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
         activate(adminToken, beta);
 
         Instant past = Instant.now().minus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
-        Instant soon = Instant.now().plus(2, ChronoUnit.HOURS).truncatedTo(ChronoUnit.SECONDS);
+        // Sooner than leftover kickoffs other tests leave on the shared database.
+        Instant soon = Instant.now().plusSeconds(1).truncatedTo(ChronoUnit.SECONDS);
         Instant later = soon.plus(1, ChronoUnit.DAYS);
         String alphaDone = createMatch(adminToken, alpha, teamA, teamB, past);
         String alphaNext = createMatch(adminToken, alpha, teamA, teamB, soon);
@@ -171,6 +172,10 @@ class HomeOverviewIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.upcoming[?(@.id == '%s')]".formatted(betaNext)).isNotEmpty())
                 .andExpect(jsonPath("$.recent[?(@.id == '%s')].tournamentName".formatted(betaDone), hasItem("Осенняя лига факультетов")))
                 .andExpect(jsonPath("$.recent[?(@.id == '%s')].homeTeamName".formatted(betaDone), hasItem("Физтех " + stamp)));
+
+        mockMvc.perform(delete("/api/v1/matches/" + alphaNext)
+                        .header("Authorization", auth(adminToken)))
+                .andExpect(status().isNoContent());
     }
 
     @Test

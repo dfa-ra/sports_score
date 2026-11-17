@@ -22,6 +22,9 @@ import java.util.stream.Collectors;
 @Component
 public class TableStandingsCalculator {
 
+    /** Oldest of the last four on the left, newest on the right. */
+    static final int FORM_LIMIT = 4;
+
     public List<StandingRow> compute(StandingsContext context) {
         Map<UUID, Accumulator> table = new HashMap<>();
         for (TournamentTeam entry : context.entries()) {
@@ -83,7 +86,6 @@ public class TableStandingsCalculator {
         }
     }
 
-    /** Oldest of the last five on the left, newest on the right. */
     private Map<UUID, List<StandingFormMark>> formOf(List<Match> finished) {
         List<Match> ordered = finished.stream()
                 .sorted(Comparator
@@ -98,7 +100,8 @@ public class TableStandingsCalculator {
         Map<UUID, List<StandingFormMark>> last = new HashMap<>();
         for (Map.Entry<UUID, List<StandingFormMark>> entry : marks.entrySet()) {
             List<StandingFormMark> list = entry.getValue();
-            last.put(entry.getKey(), list.size() <= 5 ? List.copyOf(list) : List.copyOf(list.subList(list.size() - 5, list.size())));
+            int from = Math.max(0, list.size() - FORM_LIMIT);
+            last.put(entry.getKey(), List.copyOf(list.subList(from, list.size())));
         }
         return last;
     }

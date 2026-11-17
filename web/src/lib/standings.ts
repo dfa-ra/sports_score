@@ -1,3 +1,11 @@
+/** Standings form shows this many results: oldest on the left, newest on the right. */
+export const STANDING_FORM_LIMIT = 4
+
+export function recentForm<T>(form: readonly T[] | null | undefined, limit = STANDING_FORM_LIMIT): T[] {
+  if (!form?.length) return []
+  return form.length <= limit ? form.slice() : form.slice(form.length - limit)
+}
+
 export type StandingFormMark = {
   result: string
   technical?: boolean

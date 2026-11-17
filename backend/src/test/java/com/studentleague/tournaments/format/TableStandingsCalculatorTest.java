@@ -3,9 +3,12 @@ package com.studentleague.tournaments.format;
 import com.studentleague.matches.entity.Match;
 import com.studentleague.teams.entity.Team;
 import com.studentleague.tournaments.domain.TournamentTeamStatus;
+import com.studentleague.tournaments.dto.StandingFormMark;
 import com.studentleague.tournaments.entity.TournamentTeam;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -112,6 +115,30 @@ class TableStandingsCalculatorTest {
         assertThat(rows.get(0).points()).isEqualTo(7);
         assertThat(rows.get(1).points()).isEqualTo(7);
         assertThat(rows.get(2).points()).isEqualTo(7);
+    }
+
+    @Test
+    void formKeepsTheLastFourResultsWithTheNewestOnTheRight() {
+        UUID home = UUID.randomUUID();
+        UUID away = UUID.randomUUID();
+        List<Match> matches = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            Match match = finished(home, away, i % 2 == 0 ? 1 : 0, i % 2 == 0 ? 0 : 1);
+            match.setId(UUID.randomUUID());
+            match.setFinishedAt(Instant.parse("2026-01-0" + (i + 1) + "T12:00:00Z"));
+            matches.add(match);
+        }
+
+        var rows = calculator.compute(new StandingsContext(
+                null,
+                List.of(entry(home), entry(away)),
+                matches,
+                Map.of(home, team(home, "Home"), away, team(away, "Away"))
+        ));
+
+        var homeForm = rows.stream().filter(row -> row.teamName().equals("Home")).findFirst().orElseThrow();
+        assertThat(homeForm.form()).extracting(StandingFormMark::result).containsExactly("W", "L", "W", "L");
+        assertThat(rows).allSatisfy(row -> assertThat(row.form()).hasSize(TableStandingsCalculator.FORM_LIMIT));
     }
 
     private static TournamentTeam entry(UUID teamId) {
