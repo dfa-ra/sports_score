@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
 import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
+import { recentForm } from '../lib/standings'
 import { stageFullName } from '../lib/qualifyStages'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
 import TeamCrest from './TeamCrest.vue'
@@ -120,9 +121,9 @@ function formKind(letter: string) {
         <TeamCrest :src="teams.logo(row.teamId)" :name="row.teamName" :size="22" />
         <span class="club-name">
           <b>{{ row.teamName }}</b>
-          <span v-if="row.form?.length" class="form-inline">
+          <span v-if="recentForm(row.form).length" class="form-inline">
             <span
-              v-for="(mark, index) in row.form"
+              v-for="(mark, index) in recentForm(row.form)"
               :key="`${row.teamId}-m-${index}`"
               class="pip"
               :class="formKind(formLetter(mark))"
@@ -141,7 +142,7 @@ function formKind(letter: string) {
       <span class="points">{{ row.points }}</span>
       <span class="form-col">
         <span
-          v-for="(mark, index) in row.form || []"
+          v-for="(mark, index) in recentForm(row.form)"
           :key="`${row.teamId}-d-${index}`"
           class="pip"
           :class="formKind(formLetter(mark))"
@@ -156,10 +157,15 @@ function formKind(letter: string) {
 </template>
 
 <style scoped>
-.board { width: 100%; }
+.board {
+  --pip: 18px;
+  --form-gap: 4px;
+  --form-col: calc(4 * var(--pip) + 3 * var(--form-gap));
+  width: 100%;
+}
 .line {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 2.35rem 2.35rem 2.35rem 4rem 2.5rem var(--form-col);
   align-items: center;
   min-height: 2.65rem;
   padding: 0 0.85rem;
@@ -168,7 +174,7 @@ function formKind(letter: string) {
   text-decoration: none;
 }
 .compact .line {
-  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem minmax(5.6rem, auto);
+  grid-template-columns: 2.5rem minmax(0, 1fr) 2.35rem 4rem 2.5rem var(--form-col);
 }
 .line > span:not(.club):not(.team-label) {
   text-align: center;
@@ -200,20 +206,28 @@ function formKind(letter: string) {
 .form-col {
   display: flex;
   justify-content: flex-end;
-  align-items: flex-start;
-  gap: 4px;
-  text-align: right;
-}
-.pip {
-  display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 1px;
-  min-width: 18px;
+  gap: var(--form-gap);
+  width: var(--form-col);
+  min-width: var(--form-col);
+  max-width: var(--form-col);
+  justify-self: end;
+}
+.head .form-col { justify-content: center; }
+.pip {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 var(--pip);
+  align-items: center;
+  justify-content: center;
+  width: var(--pip);
+  height: var(--pip);
+  min-width: var(--pip);
+  max-width: var(--pip);
 }
 .pip b {
-  width: 18px;
-  height: 18px;
+  width: var(--pip);
+  height: var(--pip);
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -226,6 +240,10 @@ function formKind(letter: string) {
 .pip.draw b { background: #c47b00; }
 .pip.loss b { background: var(--danger); }
 .pip i {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
   box-sizing: border-box;
   width: auto;
   height: auto;
@@ -312,7 +330,9 @@ function formKind(letter: string) {
   .team-label { margin-left: 8px; }
   .club { grid-template-columns: 22px minmax(0, 1fr); gap: 8px; min-width: 0; }
   .form-col { display: none; }
-  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
+  .form-inline { display: flex; align-items: flex-start; gap: 3px; margin-top: 2px; }
+  .pip { height: auto; min-height: var(--pip); width: auto; max-width: none; flex: 0 0 auto; }
+  .pip i { position: static; transform: none; }
   .club :deep(.team-crest) { width: 22px !important; height: 22px !important; font-size: 10px !important; }
   .club b {
     min-width: 0;

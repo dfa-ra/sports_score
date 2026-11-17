@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { advancingRank } from '../lib/matchPresentation'
 import { FORM_LEGEND, MUTUAL_LEGEND } from '../lib/forfeit'
+import { recentForm } from '../lib/standings'
 import { stageFullName } from '../lib/qualifyStages'
 import type { StandingGroup } from '../lib/standings'
 import { useTeamDirectory } from '../lib/useTeamDirectory'
@@ -117,7 +118,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
           <span>{{ row.goalsFor }}:{{ row.goalsAgainst }}</span>
           <span class="pts">{{ row.points }}</span>
           <span class="form-col">
-            <span v-for="(mark, markIndex) in row.form || []" :key="`${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
+            <span v-for="(mark, markIndex) in recentForm(row.form)" :key="`${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
               <b>{{ formLetter(mark) }}</b>
               <i v-if="mark.technical">ТП</i>
             </span>
@@ -146,8 +147,8 @@ function clubName(row: { teamId?: string; teamName?: string }) {
             <TeamCrest :src="teams.logo(row.teamId)" :name="clubName(row)" :size="28" />
             <span>
               <b>{{ clubName(row) }}</b>
-              <span v-if="row.form?.length" class="form-inline">
-                <span v-for="(mark, markIndex) in row.form" :key="`p-${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
+              <span v-if="recentForm(row.form).length" class="form-inline">
+                <span v-for="(mark, markIndex) in recentForm(row.form)" :key="`p-${row.teamId}-${markIndex}`" class="pip" :class="formKind(formLetter(mark))">
                   <b>{{ formLetter(mark) }}</b>
                   <i v-if="mark.technical">ТП</i>
                 </span>
@@ -164,7 +165,14 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 </template>
 
 <style scoped>
-.groups { display: grid; gap: 1rem; min-width: 0; }
+.groups {
+  --pip: 18px;
+  --form-gap: 4px;
+  --form-col: calc(4 * var(--pip) + 3 * var(--form-gap));
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
 .group h3 {
   margin: 0 0 0.35rem;
   color: var(--navy);
@@ -174,7 +182,7 @@ function clubName(row: { teamId?: string; teamName?: string }) {
 .desk { min-width: 0; }
 .line {
   display: grid;
-  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem 4.2rem 2.2rem minmax(5.6rem, auto);
+  grid-template-columns: 2.2rem minmax(0, 1fr) 2rem 2rem 2rem 2rem 4.2rem 2.2rem var(--form-col);
   gap: 0.25rem;
   align-items: center;
   min-height: 2.7rem;
@@ -209,17 +217,41 @@ function clubName(row: { teamId?: string; teamName?: string }) {
   font-weight: 700;
 }
 .pts { font-weight: 800; color: var(--navy); }
-.form-col { display: flex; justify-content: flex-end; gap: 4px; }
+.form-col {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--form-gap);
+  width: var(--form-col);
+  min-width: var(--form-col);
+  max-width: var(--form-col);
+  justify-self: end;
+}
+.line.head > span:last-child { justify-self: end; width: var(--form-col); }
 .form-inline { display: none; }
-.pip { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; min-width: 18px; }
+.pip {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 var(--pip);
+  align-items: center;
+  justify-content: center;
+  width: var(--pip);
+  height: var(--pip);
+  min-width: var(--pip);
+  max-width: var(--pip);
+}
 .pip b {
-  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  width: var(--pip); height: var(--pip); border-radius: 50%; display: grid; place-items: center;
   font-size: 10px; font-weight: 800; line-height: 1; color: #fff;
 }
 .pip.win b { background: #1b8a4a; }
 .pip.draw b { background: #c47b00; }
 .pip.loss b { background: var(--danger); }
 .pip i {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 50%;
+  transform: translateX(-50%);
   box-sizing: border-box;
   width: auto;
   height: auto;
@@ -291,7 +323,9 @@ function clubName(row: { teamId?: string; teamName?: string }) {
     flex-shrink: 0;
   }
   .mrow .club b { white-space: normal; }
-  .form-inline { display: flex; gap: 3px; margin-top: 2px; }
+  .form-inline { display: flex; align-items: flex-start; gap: 3px; margin-top: 2px; }
+  .pip { height: auto; min-height: var(--pip); width: auto; max-width: none; flex: 0 0 auto; }
+  .pip i { position: static; transform: none; }
   .mrow small { display: block; color: #00205b; font-size: 0.72rem; }
   .mrow .pts { display: grid; justify-items: end; color: var(--navy); line-height: 1.1; }
   .mrow .pts small { font-weight: 700; }
